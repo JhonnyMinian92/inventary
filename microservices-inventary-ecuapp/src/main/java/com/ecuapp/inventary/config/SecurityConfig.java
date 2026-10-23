@@ -70,7 +70,7 @@ public class SecurityConfig {
   cors.setExposedHeaders(List.of("X-Request-Id","Retry-After"));cors.setAllowCredentials(false);cors.setMaxAge(600L);
   UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource();source.registerCorsConfiguration("/**",cors);return source;
  }
- @Bean SecurityFilterChain securityFilterChain(HttpSecurity http,AppUserRepository users,AppRoleRepository roles)throws Exception{
+ @Bean SecurityFilterChain securityFilterChain(HttpSecurity http,AppUserRepository users,AppRoleRepository roles,ApiSecurityProblemHandler apiProblems)throws Exception{
   http.cors(Customizer.withDefaults()).csrf(csrf->csrf.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
    .headers(h->h.contentTypeOptions(Customizer.withDefaults()).frameOptions(f->f.deny())
     .referrerPolicy(r->r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
@@ -86,6 +86,7 @@ public class SecurityConfig {
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()
     .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
     .requestMatchers("/api/v1/audit-events/**").hasAuthority("audit:read")
+    .requestMatchers(HttpMethod.GET,"/api/v1/reports/**").hasAuthority("reports:financial")
     .requestMatchers(HttpMethod.GET,"/api/v1/catalog/**").hasAuthority("catalog:read")
     .requestMatchers("/api/v1/catalog/**").hasAuthority("catalog:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/inventory/**","/api/v1/warehouses/**").hasAuthority("inventory:read")
@@ -93,13 +94,16 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.GET,"/api/v1/purchase-orders/**","/api/v1/goods-receipts/**","/api/v1/purchase-returns/**").hasAuthority("purchasing:read")
     .requestMatchers(HttpMethod.POST,"/api/v1/purchase-orders/*/approve").hasAuthority("purchasing:approve")
     .requestMatchers("/api/v1/purchase-orders/**","/api/v1/goods-receipts/**","/api/v1/purchase-returns/**").hasAuthority("purchasing:manage")
-    .requestMatchers(HttpMethod.GET,"/api/v1/suppliers/**","/api/v1/customers/**","/api/v1/partners/**").hasAuthority("partners:read")
+    .requestMatchers(HttpMethod.GET,"/api/v1/suppliers/**").hasAuthority("purchasing:read")
+    .requestMatchers(HttpMethod.GET,"/api/v1/customers/**","/api/v1/partners/**").hasAuthority("partners:read")
     .requestMatchers("/api/v1/customers/**").hasAuthority("customers:manage")
     .requestMatchers("/api/v1/suppliers/**","/api/v1/partners/**").hasAuthority("partners:manage")
-    .requestMatchers(HttpMethod.POST,"/api/v1/sales/*/cancel").hasAuthority("sales:cancel")
+    .requestMatchers(HttpMethod.POST,"/api/v1/sales/*/approve-cancellation").hasAuthority("sales:cancel")
+    .requestMatchers(HttpMethod.POST,"/api/v1/sales/*/request-cancellation").hasAuthority("sales:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:read")
     .requestMatchers("/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:manage")
     .requestMatchers("/graphql").hasAuthority("catalog:read").anyRequest().denyAll())
+   .exceptionHandling(errors->errors.authenticationEntryPoint(apiProblems).accessDeniedHandler(apiProblems))
    .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users,roles))))
    .addFilterAfter(new AuthenticatedActorCaptureFilter(), BearerTokenAuthenticationFilter.class);
   return http.build();

@@ -1,5 +1,6 @@
 package com.ecuapp.inventary.common;
 import com.ecuapp.inventary.domain.DomainException;
+import com.ecuapp.inventary.common.InvalidQueryException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,8 @@ public class GlobalExceptionHandler {
   ProblemDetail body=problems.create(status,"Regla de dominio no satisfecha",ex.getMessage(),req);
   body.setProperty("code",ex.code().name());return ResponseEntity.status(status).body(body);
  }
+ @ExceptionHandler(InvalidQueryException.class)
+ ResponseEntity<ProblemDetail> invalidQuery(InvalidQueryException ex,HttpServletRequest req){return response(HttpStatus.BAD_REQUEST,"Parámetros inválidos",ex.getMessage(),req);}
  @ExceptionHandler({BusinessRuleException.class,IllegalArgumentException.class})
  ResponseEntity<ProblemDetail> badRequest(RuntimeException ex,HttpServletRequest req){return response(HttpStatus.UNPROCESSABLE_ENTITY,"Regla de negocio no satisfecha",safeBusinessMessage(ex),req);}
  @ExceptionHandler(ConflictException.class)

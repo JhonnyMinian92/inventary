@@ -290,3 +290,22 @@ Los errores de aplicación usan `application/problem+json`, título, estado, det
 ### Idempotencia
 
 Cuando un endpoint de comando documenta `Idempotency-Key`, el cliente debe conservar la clave en reintentos de la misma operación. La misma clave con contenido distinto produce conflicto; no reutilizar una clave para una operación nueva.
+
+
+## Reporte consolidado de compras, ventas y existencias
+
+Endpoint implementado: `GET /api/v1/reports/inventory-balance`. Requiere permiso `reports:financial`.
+
+Parámetros obligatorios:
+- `from`: fecha inicial inclusiva, formato ISO `YYYY-MM-DD`.
+- `to`: fecha final inclusiva, formato ISO `YYYY-MM-DD`; no puede ser anterior a `from` ni una fecha futura.
+- `warehouseId`: UUID del almacén.
+
+Parámetros opcionales:
+- `productId`: UUID del producto.
+- `page`: página base cero.
+- `size`: tamaño solicitado, limitado a 100 filas.
+
+Cada fila contiene existencias de apertura y cierre estimadas desde el saldo vigente y el ledger de movimientos, compras netas recibidas y su importe, ventas netas y su importe, y existencias actuales/reservadas/disponibles. La compra se reconoce cuando se contabiliza la recepción, no al crear una orden. Las devoluciones a proveedores reducen compras; cancelaciones aprobadas y devoluciones de clientes reducen ventas en la fecha en que se registran. Las reservas y liberaciones no alteran existencias físicas.
+
+**Alcance financiero:** los importes son agregados operativos por producto; no constituyen un balance contable/fiscal completo ni calculan utilidad neta. La valoración histórica FIFO/promedio debe estar integrada y verificada antes de presentar el costo de inventario o el margen como cifras contables definitivas.

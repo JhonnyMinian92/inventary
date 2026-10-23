@@ -28,8 +28,13 @@ public class UserManagementService {
  }
  @Transactional public UserDtos.View update(UUID id,UserDtos.UpdateRequest request,String actor){
   AppUser user=require(id);
-  boolean removingLastSuperAdmin=UserRole.SUPER_ADMIN.name().equals(user.getRole())&&(!request.active()||request.role()!=UserRole.SUPER_ADMIN)&&users.countByRoleAndActiveTrue(UserRole.SUPER_ADMIN.name())<=1;
-  if(removingLastSuperAdmin)throw new BusinessRuleException("No se puede desactivar o degradar al último administrador activo.");
+  boolean removingAdmin=UserRole.SUPER_ADMIN.name().equals(user.getRole())&&(!request.active()||request.role()!=UserRole.SUPER_ADMIN);
+  if(removingAdmin){
+   // Stable, pessimistic locking serializes concurrent attempts to remove the last active administrator.
+   users.findByRoleAndActiveTrueOrderByIdAsc(UserRole.SUPER_ADMIN.name());
+   if(users.countByRoleAndActiveTrue(UserRole.SUPER_ADMIN.name())<=1)
+    throw new BusinessRuleException("No se puede desactivar o degradar al último administrador activo.");
+  }
   user.updateRole(request.role().name());user.setActive(request.active());
   audit.record(actor,"USER_UPDATED","APP_USER",id,Map.of("role",request.role().name(),"active",request.active()));
   return UserDtos.View.from(user);
