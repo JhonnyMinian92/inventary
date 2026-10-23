@@ -28,16 +28,24 @@ import java.util.stream.Collectors;
 @Service
 public class PurchaseOrderService {
  private record ReceiptCalc(PurchaseOrderLine line,BigDecimal quantity){}
- private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final BusinessPartnerRepository partners;
- private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;
+ private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final GoodsReceiptLineRepository receiptLines;private final IdempotencyRecordRepository idempotencyRecords;private final BusinessPartnerRepository partners;
+ private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;
  private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;
- public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,BusinessPartnerRepository partners,WarehouseRepository warehouses,
-   ProductRepository products,StockBalanceRepository balances,WarehouseLocationRepository locations,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
-  this.orders=orders;this.receipts=receipts;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.locations=locations;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
+ public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,IdempotencyRecordRepository idempotencyRecords,BusinessPartnerRepository partners,WarehouseRepository warehouses,
+   ProductRepository products,StockBalanceRepository balances,WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
+  this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(Pageable p){return orders.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(PurchaseDtos.OrderView::from);}
  @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id){return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
- @Transactional public PurchaseDtos.OrderView create(PurchaseDtos.CreateOrderRequest r,String actor){
+ @Transactional public PurchaseDtos.OrderView create(String key,PurchaseDtos.CreateOrderRequest r,String actor){
+  key=normalizeKey(key);
+  String requestHash=hashOrderRequest(r);
+  idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"PURCHASE_ORDER_CREATE",key,requestHash);
+  IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("PURCHASE_ORDER_CREATE",key).orElseThrow(()->new ConflictException("No se pudo reservar la clave de idempotencia."));
+  if(!requestHash.equals(idempotency.getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con otra orden de compra.");
+  if(idempotency.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED&&idempotency.getResourceId()!=null)
+   return PurchaseDtos.OrderView.from(orders.findDetailedById(idempotency.getResourceId()).orElseThrow(()->new ResourceNotFoundException("Orden de compra",idempotency.getResourceId())));
+  if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   BusinessPartner supplier=partners.findByIdAndTypeIn(r.supplierId(),List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",r.supplierId()));
   if(!supplier.isActive())throw new BusinessRuleException("El proveedor está inactivo.");
   Warehouse warehouse=warehouses.findById(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
@@ -58,6 +66,7 @@ public class PurchaseOrderService {
   String number="OC-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   PurchaseOrder order=orders.saveAndFlush(new PurchaseOrder(number,supplier,warehouse,currency==null?"USD":currency,subtotal,subtotal,clean(r.notes()),actor));
   newLines.forEach(order::addLine);orders.save(order);
+  idempotency.markCompleted("PURCHASE_ORDER",order.getId(),(short)201);idempotencyRecords.save(idempotency);
   audit.record(actor,"PURCHASE_ORDER_CREATED","PURCHASE_ORDER",order.getId(),Map.of("orderNumber",number,"lineCount",newLines.size()));
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
