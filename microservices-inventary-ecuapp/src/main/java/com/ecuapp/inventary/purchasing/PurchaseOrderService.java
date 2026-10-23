@@ -65,13 +65,23 @@ public class PurchaseOrderService {
  @Transactional public PurchaseDtos.OrderView approve(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.approve();audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
  @Transactional public PurchaseDtos.OrderView cancel(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.cancel();audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
  @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id){return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id)));}
- @Transactional public PurchaseDtos.ReceiptView receive(UUID orderId,String key,PurchaseDtos.ReceiptRequest request,String actor){
-  if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
-  String hash=hashRequest(orderId,request);Optional<GoodsReceipt> previous=receipts.findByIdempotencyKey(key);
+ @Transactional public PurchaseDtos.ReceiptView receive(UUID orderId,String rawKey,PurchaseDtos.ReceiptRequest request,String actor){
+  String key=normalizeKey(rawKey);
+  String hash=hashRequest(orderId,request);
+  Optional<GoodsReceipt> previous=receipts.findByIdempotencyKey(key);
   if(previous.isPresent()){
-   if(!hash.equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una recepción distinta.");
+   String legacyHash=legacyHashRequest(orderId,request);
+   if(!hash.equals(previous.get().getRequestHash())&&!legacyHash.equals(previous.get().getRequestHash()))
+    throw new ConflictException("La clave Idempotency-Key ya se usó con una recepción distinta.");
    return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(previous.get().getId()).orElseThrow());
   }
+  idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"GOODS_RECEIPT_CREATE",key,hash);
+  IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("GOODS_RECEIPT_CREATE",key)
+   .orElseThrow(()->new ConflictException("No se pudo reservar la clave de idempotencia."));
+  if(!hash.equals(idempotency.getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con otra recepción.");
+  if(idempotency.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED&&idempotency.getResourceId()!=null)
+   return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(idempotency.getResourceId()).orElseThrow(()->new ResourceNotFoundException("Recepción",idempotency.getResourceId())));
+  if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   PurchaseOrder order=orders.findForUpdate(orderId).orElseThrow(()->new ResourceNotFoundException("Orden de compra",orderId));
   if(order.getStatus()!=PurchaseOrderStatus.APPROVED&&order.getStatus()!=PurchaseOrderStatus.PARTIALLY_RECEIVED)throw new BusinessRuleException("Solo se reciben órdenes aprobadas o parcialmente recibidas.");
   Map<UUID,PurchaseOrderLine> lineById=order.getLines().stream().collect(Collectors.toMap(PurchaseOrderLine::getId,Function.identity()));
@@ -94,19 +104,39 @@ public class PurchaseOrderService {
   order.recalculateReceiptStatus();
   String number="REC-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   GoodsReceipt receipt=receipts.saveAndFlush(new GoodsReceipt(number,order,order.getWarehouse(),key,hash,actor));
+  List<Map.Entry<ReceiptCalc,GoodsReceiptLine>> persistedLines=new ArrayList<>();
   for(ReceiptCalc calc:calculated){
-   receipt.addLine(new GoodsReceiptLine(calc.line(),calc.quantity()));
+   GoodsReceiptLine receiptLine=new GoodsReceiptLine(calc.line(),calc.quantity());
+   receipt.addLine(receiptLine);
+   persistedLines.add(Map.entry(calc,receiptLines.saveAndFlush(receiptLine)));
+  }
+  for(Map.Entry<ReceiptCalc,GoodsReceiptLine> item:persistedLines){
+   ReceiptCalc calc=item.getKey();GoodsReceiptLine receiptLine=item.getValue();
    String movementKey="RCV-"+sha256(key).substring(0,32)+"-"+calc.line().getProduct().getId();
-   movements.save(new StockMovement(calc.line().getProduct(),order.getWarehouse(),MovementType.RECEIPT,calc.quantity(),calc.line().getUnitCost(),
-    "GOODS_RECEIPT",receipt.getId(),movementKey,sha256(receipt.getId()+"|"+calc.line().getId()+"|"+calc.quantity().toPlainString()),"Recepción "+receipt.getReceiptNumber(),actor));
+   StockMovement movement=new StockMovement(calc.line().getProduct(),order.getWarehouse(),MovementType.RECEIPT,calc.quantity(),calc.line().getUnitCost(),
+    "GOODS_RECEIPT",receipt.getId(),movementKey,sha256(receipt.getId()+"|"+receiptLine.getId()+"|"+calc.quantity().toPlainString()),"Recepción "+receipt.getReceiptNumber(),actor);
+   movement.assignLocations(null,balances.findByProductIdAndWarehouseId(calc.line().getProduct().getId(),order.getWarehouse().getId()).orElseThrow().getLocation(),
+    units.findById(calc.line().getProduct().getUnitOfMeasureId()).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",calc.line().getProduct().getUnitOfMeasureId())),
+    receipt.getReceiptNumber(),receiptLine.getId(),null);
+   movements.save(movement);
   }
   receipts.save(receipt);
+  idempotency.markCompleted("GOODS_RECEIPT",receipt.getId(),(short)201);idempotencyRecords.save(idempotency);
   outbox.save(new OutboxEvent("GOODS_RECEIPT",receipt.getId(),"GOODS_RECEIPT_POSTED",Map.of("receiptId",receipt.getId().toString(),"receiptNumber",receipt.getReceiptNumber(),"purchaseOrderId",order.getId().toString())));
   audit.record(actor,"GOODS_RECEIPT_POSTED","GOODS_RECEIPT",receipt.getId(),Map.of("receiptNumber",receipt.getReceiptNumber(),"purchaseOrderId",order.getId().toString(),"lines",calculated.size()));
   return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(receipt.getId()).orElseThrow());
  }
  private PurchaseOrder requireForUpdate(UUID id){return orders.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id));}
- private String hashRequest(UUID orderId,PurchaseDtos.ReceiptRequest r){try{return sha256(orderId+"|"+mapper.writeValueAsString(r));}catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar la recepción.");}}
+ private String hashOrderRequest(PurchaseDtos.CreateOrderRequest r){
+  List<String> lines=r.items().stream().map(x->x.productId()+"|"+x.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString()+"|"+x.unitCost().setScale(2,RoundingMode.UNNECESSARY).toPlainString()).sorted().toList();
+  return sha256(r.supplierId()+"|"+r.warehouseId()+"|"+Objects.toString(clean(r.notes()),"")+"|"+String.join(";",lines));
+ }
+ private String hashRequest(UUID orderId,PurchaseDtos.ReceiptRequest r){
+  List<String> lines=r.items().stream().map(x->x.purchaseOrderLineId()+"|"+x.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString()).sorted().toList();
+  return sha256(orderId+"|"+String.join(";",lines));
+ }
+ private String legacyHashRequest(UUID orderId,PurchaseDtos.ReceiptRequest r){try{return sha256(orderId+"|"+mapper.writeValueAsString(r));}catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar la recepción.");}}
+ private String normalizeKey(String key){if(key==null||key.isBlank()||key.trim().length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");return key.trim();}
  private String sha256(String v){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException(ex);}}
  private String clean(String v){return v==null||v.isBlank()?null:v.trim();}
 }
