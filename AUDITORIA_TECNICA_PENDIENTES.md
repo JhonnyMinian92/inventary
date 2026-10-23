@@ -86,7 +86,7 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 - **Acción:** decidir lo que forma parte del MVP; implementar servicios, DTOs, permisos, validación de esquema versionado y APIs o marcar formalmente fuera de alcance. Integrar variante con SKU/barcode, precio, unidad, stock, compras y ventas si la variante debe ser una unidad vendible.
 - **Aceptación:** contrato API y pruebas de esquemas/versiones/campos obligatorios/tipos inválidos/valores enum/atributos desconocidos/compatibilidad de datos previos.
 
-### P1-06 — No hay frontend implementado en la rama examinada
+### P1-06 — No hay frontend implementado en el árbol de `master` examinado
 
 - **Evidencia:** `app-inventary-ecuapp/README.md` contiene texto de placeholder y `app-inventary-ecuapp/docs/context.md` es un contexto, sin `package.json`, `angular.json` ni `src/` de Angular en el árbol revisado.
 - **Acción:** si la entrega prometida incluye aplicación web, implementar el frontend por su plan/contrato: login, renovación/expiración de sesión, guardas y visibilidad de permisos, catálogo, inventario, compras, ventas, devoluciones, transferencias, auditoría, errores y loading states. Si esta entrega es solo backend, declararlo como exclusión formal y no presentar el proyecto como completo de extremo a extremo.
