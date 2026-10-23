@@ -43,7 +43,9 @@ public class InventoryService {
   StockBalance balance=balances.findForUpdate(product.getId(),warehouse.getId()).orElse(null);
   if(balance==null){
    if(r.direction()==InventoryDtos.Direction.DECREASE)throw new BusinessRuleException("No existe saldo disponible para disminuir.");
-   WarehouseLocation mainLocation=locations.findByWarehouseIdAndCode(warehouse.getId(),"MAIN")\n    .orElseGet(()->locations.save(new WarehouseLocation(warehouse,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE)));\n   balance=balances.save(new StockBalance(product,warehouse,mainLocation));
+   WarehouseLocation mainLocation=locations.findByWarehouseIdAndCode(warehouse.getId(),"MAIN")
+    .orElseGet(()->locations.save(new WarehouseLocation(warehouse,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE)));
+   balance=balances.save(new StockBalance(product,warehouse,mainLocation));
   }
   MovementType type;
   if(r.direction()==InventoryDtos.Direction.INCREASE){balance.increase(quantity);type=MovementType.ADJUSTMENT_IN;}
