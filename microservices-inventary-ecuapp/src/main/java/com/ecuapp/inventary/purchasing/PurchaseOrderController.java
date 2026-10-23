@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
@@ -20,11 +21,11 @@ public class PurchaseOrderController {
  @PostMapping("/api/v1/purchase-orders") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
  public PurchaseDtos.OrderView create(@Valid @RequestBody PurchaseDtos.CreateOrderRequest r,Authentication auth){return service.create(r,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/submit") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
- public PurchaseDtos.OrderView submit(@PathVariable UUID id){return service.submit(id);}
+ public PurchaseDtos.OrderView submit(@PathVariable UUID id,Authentication auth){return service.submit(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/approve") @PreAuthorize("hasRole('ADMIN')")
- public PurchaseDtos.OrderView approve(@PathVariable UUID id){return service.approve(id);}
+ public PurchaseDtos.OrderView approve(@PathVariable UUID id,Authentication auth){return service.approve(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/cancel") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
- public PurchaseDtos.OrderView cancel(@PathVariable UUID id){return service.cancel(id);}
+ public PurchaseDtos.OrderView cancel(@PathVariable UUID id,Authentication auth){return service.cancel(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/receipts") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
  public PurchaseDtos.ReceiptView receive(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody PurchaseDtos.ReceiptRequest r,Authentication auth){return service.receive(id,key,r,auth.getName());}
  @GetMapping("/api/v1/goods-receipts/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','AUDITOR')")

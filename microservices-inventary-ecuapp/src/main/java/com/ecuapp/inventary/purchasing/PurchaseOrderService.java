@@ -60,9 +60,9 @@ public class PurchaseOrderService {
   audit.record(actor,"PURCHASE_ORDER_CREATED","PURCHASE_ORDER",order.getId(),Map.of("orderNumber",number,"lineCount",newLines.size()));
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
- @Transactional public PurchaseDtos.OrderView submit(UUID id){PurchaseOrder order=requireForUpdate(id);order.submit();audit.record("system","PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
- @Transactional public PurchaseDtos.OrderView approve(UUID id){PurchaseOrder order=requireForUpdate(id);order.approve();audit.record("system","PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
- @Transactional public PurchaseDtos.OrderView cancel(UUID id){PurchaseOrder order=requireForUpdate(id);order.cancel();audit.record("system","PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.submit();audit.record(actor,"PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView approve(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.approve();audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView cancel(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.cancel();audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
  @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id){return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id)));}
  @Transactional public PurchaseDtos.ReceiptView receive(UUID orderId,String key,PurchaseDtos.ReceiptRequest request,String actor){
   if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
