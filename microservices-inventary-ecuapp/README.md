@@ -23,3 +23,4 @@ Backend planificado sobre Java 21 y Spring Boot. El código actual es un esquele
 - Actualizar OpenAPI y los diagramas al cambiar endpoints.
 - No declarar APIs como terminadas con hallazgos críticos de seguridad abiertos.
 - Las pruebas no se ejecutaron al redactar la documentación; el responsable del proyecto realizará la validación local.
+- [Escalabilidad, GraphQL, Kafka, caché y datos](docs/11-escalabilidad-graphql-kafka-cache-datos.md)
