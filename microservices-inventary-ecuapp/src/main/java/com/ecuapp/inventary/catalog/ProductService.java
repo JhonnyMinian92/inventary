@@ -4,6 +4,7 @@ import com.ecuapp.inventary.catalog.application.ProductCommand;
 import com.ecuapp.inventary.catalog.application.ProductResult;
 import com.ecuapp.inventary.catalog.application.ProductResultMapper;
 import com.ecuapp.inventary.catalog.application.ProductUseCases;
+import com.ecuapp.inventary.catalog.application.port.out.ProductPersistencePort;
 
 import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.audit.AuditService;
@@ -21,17 +22,17 @@ import java.util.UUID;
 
 @Service
 public class ProductService implements ProductUseCases {
- private final ProductRepository products; private final CategoryRepository categories; private final StockBalanceRepository balances; private final AuditService audit;
- public ProductService(ProductRepository products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit){this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;}
+ private final ProductPersistencePort products; private final CategoryRepository categories; private final StockBalanceRepository balances; private final AuditService audit;
+ public ProductService(ProductPersistencePort products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit){this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;}
  @Transactional(readOnly=true) public Page<ProductDtos.View> list(String q,Pageable pageable){
   Pageable p=PageRequest.of(pageable.getPageNumber(),Math.min(pageable.getPageSize(),100),pageable.getSort());
-  Page<Product> result=(q==null||q.isBlank())?products.findAll(p):products.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(q.trim(),q.trim(),p);
+  Page<Product> result=(q==null||q.isBlank())?products.findAll(p):products.searchByNameOrSku(q.trim(),p);
   return result.map(ProductDtos.View::from);
  }
  @org.springframework.cache.annotation.Cacheable(cacheNames="publicProductList",key="#pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
  @Transactional(readOnly=true) public Page<ProductDtos.PublicView> publicList(Pageable pageable){
   Pageable p=PageRequest.of(pageable.getPageNumber(),Math.min(pageable.getPageSize(),100),pageable.getSort());
-  Page<Product> page=products.findByActiveTrueAndCategory_ActiveTrue(p);
+  Page<Product> page=products.findActivePublic(p);
   Set<UUID> available=page.isEmpty()?Set.of():balances.findProductIdsWithAvailableStock(page.getContent().stream().map(Product::getId).toList());
   return page.map(product->ProductDtos.PublicView.from(product,available.contains(product.getId())));
  }
@@ -39,7 +40,7 @@ public class ProductService implements ProductUseCases {
  @Transactional(readOnly=true) public ProductDtos.PublicView getPublic(String identifier){
   Product product;
   try { product=products.findById(UUID.fromString(identifier)).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
-  catch(IllegalArgumentException ex){ product=products.findBySkuIgnoreCase(identifier.trim()).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
+  catch(IllegalArgumentException ex){ product=products.findBySku(identifier.trim()).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
   if(!product.isActive()||!product.getCategory().isActive())throw new ResourceNotFoundException("Producto público",identifier);
   boolean available=balances.findProductIdsWithAvailableStock(java.util.List.of(product.getId())).contains(product.getId());
   return ProductDtos.PublicView.from(product,available);
@@ -70,7 +71,7 @@ public class ProductService implements ProductUseCases {
  public ProductResult createProduct(ProductCommand command,String actor){
   ProductDtos.WriteRequest request=new ProductDtos.WriteRequest(command.sku(),command.name(),command.description(),command.categoryId(),command.costPrice(),command.salePrice(),command.currency(),command.imageUrl());
   create(request,actor);
-  return ProductResultMapper.from(products.findBySkuIgnoreCase(normalizeSku(command.sku())).orElseThrow(()->new ResourceNotFoundException("Producto",command.sku())));
+  return ProductResultMapper.from(products.findBySku(normalizeSku(command.sku())).orElseThrow(()->new ResourceNotFoundException("Producto",command.sku())));
  }
  @Override @Transactional
  public ProductResult updateProduct(UUID id,ProductCommand command,String actor){
