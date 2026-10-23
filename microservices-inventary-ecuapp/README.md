@@ -15,6 +15,7 @@ Backend planificado sobre Java 21 y Spring Boot. El código actual es un esquele
 - [Backlog y estimación](docs/08-plan-de-trabajo.md)
 - [WebFlux, n8n, WhatsApp y OpenAI](docs/09-webflux-n8n-whatsapp-openai.md)
 - [Estimación del agente IA y tokens](docs/10-estimacion-agente-ia-tokens.md)
+- [Escalabilidad, GraphQL, Kafka, caché y datos](docs/11-escalabilidad-graphql-kafka-cache-datos.md)
 
 ## Reglas de contribución
 
@@ -23,4 +24,3 @@ Backend planificado sobre Java 21 y Spring Boot. El código actual es un esquele
 - Actualizar OpenAPI y los diagramas al cambiar endpoints.
 - No declarar APIs como terminadas con hallazgos críticos de seguridad abiertos.
 - Las pruebas no se ejecutaron al redactar la documentación; el responsable del proyecto realizará la validación local.
-- [Escalabilidad, GraphQL, Kafka, caché y datos](docs/11-escalabilidad-graphql-kafka-cache-datos.md)
