@@ -309,3 +309,12 @@ Parámetros opcionales:
 Cada fila contiene existencias de apertura y cierre estimadas desde el saldo vigente y el ledger de movimientos, compras netas recibidas y su importe, ventas netas y su importe, y existencias actuales/reservadas/disponibles. La compra se reconoce cuando se contabiliza la recepción, no al crear una orden. Las devoluciones a proveedores reducen compras; cancelaciones aprobadas y devoluciones de clientes reducen ventas en la fecha en que se registran. Las reservas y liberaciones no alteran existencias físicas.
 
 **Alcance financiero:** los importes son agregados operativos por producto; no constituyen un balance contable/fiscal completo ni calculan utilidad neta. La valoración histórica FIFO/promedio debe estar integrada y verificada antes de presentar el costo de inventario o el margen como cifras contables definitivas.
+
+
+## Operación del Outbox
+
+- El publicador reclama eventos en un lote pequeño usando `FOR UPDATE SKIP LOCKED`, marca un lease y cierra la transacción antes de publicar en Kafka.
+- Los estados `PROCESSING` con lease vencido vuelven a ser reclamables después de una caída.
+- La entrega es **al menos una vez**: el consumidor debe deduplicar por `eventId`. Un envío aceptado por Kafka seguido de un fallo al guardar el acuse en PostgreSQL puede reenviarse tras vencer el lease.
+- `POST /api/v1/admin/outbox-events/{id}/redrive` permite reactivar manualmente un evento `FAILED`. Solo la autoridad `outbox:manage` (asignada a `SUPER_ADMIN` por V15) puede realizarlo; la operación queda auditada. Eventos pendientes o ya publicados responden conflicto.
+- El lease actual es de 10 minutos y el publicador espera hasta 5 segundos por evento. Para lotes mayores o publicaciones potencialmente lentas hay que revisar el lease y el tamaño del lote.

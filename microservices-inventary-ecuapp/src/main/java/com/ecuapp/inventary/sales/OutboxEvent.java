@@ -25,12 +25,28 @@ public class OutboxEvent {
   this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=Map.copyOf(payload);
   this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
  }
- public void markPublished(){this.status="PUBLISHED";this.publishedAt=Instant.now();}
+ public void claim(Instant leaseUntil){
+  Instant now=Instant.now();
+  if(!"PENDING".equals(status)&&!"PROCESSING".equals(status))
+   throw new IllegalStateException("Solo se pueden reclamar eventos Outbox pendientes o con lease vencido.");
+  if(nextAttemptAt!=null&&nextAttemptAt.isAfter(now))
+   throw new IllegalStateException("El evento Outbox todavía está en periodo de espera.");
+  if(leaseUntil==null||!leaseUntil.isAfter(now))
+   throw new IllegalArgumentException("El lease del evento Outbox debe estar en el futuro.");
+  attempts++;
+  status="PROCESSING";
+  nextAttemptAt=leaseUntil;
+ }
+ public void markPublished(){if(!"PROCESSING".equals(status))throw new IllegalStateException("El evento Outbox no está reclamado.");this.status="PUBLISHED";this.publishedAt=Instant.now();}
  public void markFailed(){
-  this.attempts++;
+  if(!"PROCESSING".equals(status))throw new IllegalStateException("Solo se puede fallar un evento Outbox reclamado.");
   if(this.attempts>=10){this.status="FAILED";return;}
   long delay=Math.min(3600L,1L<<Math.min(this.attempts,11));
   this.status="PENDING";this.nextAttemptAt=Instant.now().plusSeconds(delay);
+ }
+ public void redrive(){
+  if(!"FAILED".equals(status))throw new IllegalStateException("Solo se pueden reactivar eventos Outbox en estado FAILED.");
+  this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();
  }
  public UUID getId(){return id;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
  public String getEventType(){return eventType;} public Map<String,Object> getPayload(){return payload;} public String getStatus(){return status;}

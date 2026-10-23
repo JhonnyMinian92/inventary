@@ -84,6 +84,7 @@ public class SecurityConfig {
     .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()
+    .requestMatchers("/api/v1/admin/outbox-events/**").hasAuthority("outbox:manage")
     .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
     .requestMatchers("/api/v1/audit-events/**").hasAuthority("audit:read")
     .requestMatchers(HttpMethod.GET,"/api/v1/reports/**").hasAuthority("reports:financial")
