@@ -2,9 +2,9 @@
 
 ## 1. Cómo interpretar la estimación
 
-La estimación cubre el **100 % del backend MVP descrito en estos documentos**, no todo lo que hace un ERP comercial ni el frontend. Es una estimación de planificación, no una fecha garantizada. Asume una persona backend senior con dedicación completa, decisiones de negocio disponibles a tiempo y sin integraciones externas fiscales/contables incluidas.
+El alcance cubre el **100 % del backend MVP descrito en estos documentos**, no todo lo que hace un ERP comercial ni el frontend. La columna de estimación de las tareas BK se conserva como referencia de esfuerzo humano de una persona backend senior; el tiempo del agente de IA y los tokens aproximados se detallan por tarea en el documento 10. Toda estimación es orientativa, depende de las decisiones de negocio y excluye integraciones externas fiscales/contables.
 
-**Estimación inicial: 16–20 semanas de trabajo (80–100 días-persona)** para implementar el alcance, mantener documentación/OpenAPI, hacer revisión estática y corregir hallazgos del código. No se ejecutan las pruebas locales en este trabajo; el usuario las hará. La aceptación local, los fallos que revele y su corrección podrían ampliar el calendario. Si se confirma SaaS multiempresa, emisión SRI, pagos, contabilidad o microservicios desplegables independientemente, estimar esos alcances por separado.
+**Estimación para agente de IA: 55–100 horas activas y 1.7–3.0 millones de tokens agregados** (ver [desglose por tarea](10-estimacion-agente-ia-tokens.md)). Tiempo de pared orientativo: 7–15 días laborables de ejecución continua o 2–4 semanas con aprobaciones e iteraciones. Es un presupuesto aproximado, no una fecha garantizada ni una medición observada. La estimación humana histórica de 16–20 semanas no representa tiempo de ejecución de IA. No se ejecutan las pruebas locales en este trabajo; el usuario las hará. La validación local y la corrección de fallos encontrados pueden ampliar el calendario.
 
 ## 2. Backlog priorizado
 
