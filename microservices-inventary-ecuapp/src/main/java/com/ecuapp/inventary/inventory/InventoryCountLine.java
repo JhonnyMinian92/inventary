@@ -32,13 +32,18 @@ public class InventoryCountLine {
 
     protected InventoryCountLine() {}
 
-    public InventoryCountLine(InventoryCount inventoryCount, Product product, BigDecimal expectedQuantity,
-                              BigDecimal countedQuantity, BigDecimal unitCost) {
-        this.inventoryCount = inventoryCount;
+    public InventoryCountLine(Product product, BigDecimal expectedQuantity, BigDecimal countedQuantity, BigDecimal unitCost) {
         this.product = product;
         this.expectedQuantity = expectedQuantity;
         this.countedQuantity = countedQuantity;
         this.unitCost = unitCost;
+    }
+
+    void attachTo(InventoryCount inventoryCount) {
+        if (this.inventoryCount != null && this.inventoryCount != inventoryCount) {
+            throw new IllegalStateException("La línea ya pertenece a otro conteo.");
+        }
+        this.inventoryCount = inventoryCount;
     }
 
     public UUID getId() { return id; }
