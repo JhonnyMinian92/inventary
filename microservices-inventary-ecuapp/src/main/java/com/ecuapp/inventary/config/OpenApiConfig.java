@@ -40,5 +40,10 @@ public class OpenApiConfig {
   responses.putIfAbsent("422",response("La solicitud incumple una regla de dominio."));
   responses.putIfAbsent("500",response("Error inesperado; consultar requestId. No se exponen detalles internos."));
  }
- private io.swagger.v3.oas.models.responses.ApiResponse response(String description){return new io.swagger.v3.oas.models.responses.ApiResponse().description(description);}
+ private io.swagger.v3.oas.models.responses.ApiResponse response(String description){
+  var schema=new io.swagger.v3.oas.models.media.Schema<>().type("object");
+  var media=new io.swagger.v3.oas.models.media.MediaType().schema(schema);
+  var content=new io.swagger.v3.oas.models.media.Content().addMediaType("application/problem+json",media);
+  return new io.swagger.v3.oas.models.responses.ApiResponse().description(description).content(content);
+ }
 }
