@@ -22,11 +22,11 @@ import java.util.stream.Collectors;
 @Service
 public class SalesReturnService {
  private final SaleRepository sales;private final SalesReturnRepository returns;private final SalesReturnLineRepository returnLines;
- private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
+ private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
  private final ObjectMapper mapper;private final AuditService audit;
- public SalesReturnService(SaleRepository sales,SalesReturnRepository returns,SalesReturnLineRepository returnLines,StockBalanceRepository balances,
+ public SalesReturnService(SaleRepository sales,SalesReturnRepository returns,SalesReturnLineRepository returnLines,StockBalanceRepository balances,WarehouseLocationRepository locations,
    StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
-  this.sales=sales;this.returns=returns;this.returnLines=returnLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
+  this.sales=sales;this.returns=returns;this.returnLines=returnLines;this.balances=balances;this.locations=locations;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public SalesReturnDtos.View get(UUID id){return SalesReturnDtos.View.from(returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución de venta",id)));}
  @Transactional public SalesReturnDtos.View create(String key,SalesReturnDtos.CreateRequest request,String actor){
@@ -59,7 +59,10 @@ public class SalesReturnService {
    String movementHash=hash(salesReturn.getId()+"|"+c.item().getId()+"|"+c.quantity().toPlainString()+"|"+c.disposition());
    if(c.disposition()==ReturnDisposition.RESTOCK){
     StockBalance balance=balances.findForUpdate(c.item().getProduct().getId(),warehouse.getId()).orElse(null);
-    if(balance==null)balance=balances.save(new StockBalance(c.item().getProduct(),warehouse));
+    if(balance==null){
+     WarehouseLocation mainLocation=locations.findByWarehouseIdAndCode(warehouse.getId(),"MAIN").orElseGet(()->locations.save(new WarehouseLocation(warehouse,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE)));
+     balance=balances.save(new StockBalance(c.item().getProduct(),warehouse,mainLocation));
+    }
     balance.increase(c.quantity());
     movements.save(new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Devolución "+number,actor));
    }else{
