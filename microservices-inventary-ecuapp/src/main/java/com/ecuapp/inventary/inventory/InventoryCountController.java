@@ -30,6 +30,7 @@ public class InventoryCountController {
     }
 
     @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('inventory:manage')")
     public InventoryCountDtos.View create(@RequestHeader("Idempotency-Key") String key,
                                           @Valid @RequestBody InventoryCountDtos.CreateRequest request,
