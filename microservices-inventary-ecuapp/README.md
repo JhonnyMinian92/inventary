@@ -10,14 +10,16 @@ Backend de inventario y ventas construido con Java 21, Spring Boot 3.5, Spring M
 
 ### Con PostgreSQL instalado localmente
 
-La configuración JDBC por defecto apunta a `jdbc:postgresql://localhost:5432/inventary`, usuario `postgres` y contraseña local `CLAVESECRETA`, según la cadena suministrada para este proyecto.
+La URL JDBC por defecto apunta a `jdbc:postgresql://localhost:5432/inventary`. El usuario (`DB_USERNAME`) y la contraseña (`DB_PASSWORD`) son obligatorios por variables de entorno; no hay credenciales de base de datos predeterminadas en la configuración de la aplicación.
 
 PowerShell:
 
 ```powershell
 $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5432/inventary"
 $env:DB_USERNAME = "postgres"
-$env:DB_PASSWORD = "CLAVESECRETA"
+$env:DB_PASSWORD = "local-only-change-this-password"
+$env:SPRING_PROFILES_ACTIVE = "dev"
+$env:SWAGGER_ENABLED = "true"
 $env:JWT_SECRET = "usa-un-secreto-aleatorio-de-al-menos-32-bytes"
 $env:BOOTSTRAP_ADMIN_USERNAME = "admin"
 $env:BOOTSTRAP_ADMIN_PASSWORD = "cambia-esta-clave-administrativa-123!"
@@ -30,7 +32,9 @@ Bash:
 ```bash
 export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/inventary'
 export DB_USERNAME='postgres'
-export DB_PASSWORD='CLAVESECRETA'
+export DB_PASSWORD='local-only-change-this-password'
+export SPRING_PROFILES_ACTIVE='dev'
+export SWAGGER_ENABLED='true'
 export JWT_SECRET='usa-un-secreto-aleatorio-de-al-menos-32-bytes'
 export BOOTSTRAP_ADMIN_USERNAME='admin'
 export BOOTSTRAP_ADMIN_PASSWORD='cambia-esta-clave-administrativa-123!'
@@ -38,19 +42,20 @@ mvn -B verify
 mvn spring-boot:run
 ```
 
-Ejecuta los comandos Maven desde `microservices-inventary-ecuapp/`. Para entornos compartidos o producción, no uses estas credenciales de ejemplo: proporciona los secretos con el gestor de secretos del entorno. No guardes contraseñas reales en commits.
+Ejecuta los comandos Maven desde `microservices-inventary-ecuapp/`. La configuración base no habilita Swagger y no incluye valores predeterminados para `DB_USERNAME`, `DB_PASSWORD` ni `JWT_SECRET`. Para desarrollo, activa explícitamente `SPRING_PROFILES_ACTIVE=dev`; para entornos compartidos o producción, proporciona secretos únicos mediante el gestor de secretos del entorno. El archivo `.env` está excluido de Git y nunca debe contener credenciales de producción en un entorno de desarrollo.
 
 ### Con Docker Compose
 
 ```bash
 cd microservices-inventary-ecuapp
 cp .env.example .env
-# Edita .env: reemplaza al menos DB_PASSWORD, JWT_SECRET y BOOTSTRAP_ADMIN_PASSWORD.
+# .env.example contiene valores de ejemplo solo para desarrollo; cambia las claves antes de usar datos reales.
+# El perfil dev habilita OpenAPI; en entornos compartidos usa SPRING_PROFILES_ACTIVE=prod y SWAGGER_ENABLED=false.
 docker compose up --build
 ```
 
 API: http://localhost:8080  
-Swagger/OpenAPI: http://localhost:8080/swagger-ui.html  
+Swagger/OpenAPI: http://localhost:8080/swagger-ui.html (solo con perfil dev o `SWAGGER_ENABLED=true`)  
 Health: http://localhost:8080/actuator/health  
 GraphQL: http://localhost:8080/graphql (consulta únicamente datos públicos de catálogo)
 
