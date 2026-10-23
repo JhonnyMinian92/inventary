@@ -169,33 +169,53 @@ public class SaleService {
  }
 
  @Transactional
- public SaleDtos.View cancel(UUID id,String key,String reason,String actor){
-  if(key==null||key.isBlank()||key.length()>120)
-   throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
-  if(reason==null||reason.isBlank()||reason.trim().length()>1000)
-   throw new BusinessRuleException("Debe indicar un motivo de cancelación de hasta 1000 caracteres.");
+ public SaleDtos.View requestCancellation(UUID id,String suppliedKey,String reason,String actor){
+  String key=normalizeIdempotencyKey(suppliedKey);
+  if(reason==null||reason.isBlank()||reason.trim().length()>1000)throw new BusinessRuleException("Debe indicar un motivo de cancelación de hasta 1000 caracteres.");
+  String cleanReason=reason.trim();
+  IdempotencyRecord record=claimIdempotency("SALE_CANCEL_REQUEST",key,sha256("SALE_CANCEL_REQUEST|"+id+"|"+cleanReason));
+  if(record.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return SaleDtos.View.from(sales.findDetailedById(record.getResourceId()).orElseThrow(()->new ConflictException("La clave de idempotencia apunta a una venta inexistente.")));
   Sale sale=sales.findForUpdateById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id));
-  if(sale.getStatus()==SaleStatus.CANCELLED)return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow());
-  if(sale.getStatus()!=SaleStatus.COMPLETED)throw new ConflictException("La venta no se puede cancelar en su estado actual.");
-  if(returnLines.existsForSale(id))
-   throw new ConflictException("No se puede cancelar una venta que ya tiene devoluciones; registre la devolución o un ajuste separado.");
-  List<SaleItem> items=new ArrayList<>(sale.getItems());
-  items.sort(Comparator.comparing(i->i.getProduct().getId().toString()));
-  for(SaleItem item:items){
-   StockBalance balance=balances.findForUpdate(item.getProduct().getId(),sale.getWarehouse().getId())
-    .orElseThrow(()->new BusinessRuleException("No existe saldo para reponer "+item.getSkuSnapshot()+"."));
-   balance.increase(item.getQuantity());
-   String movementKey="SALE-CANCEL-"+sale.getId()+"-"+item.getProduct().getId();
-   movements.save(new StockMovement(item.getProduct(),sale.getWarehouse(),MovementType.SALE_CANCEL_IN,item.getQuantity(),
-    item.getProduct().getCostPrice(),"SALE_CANCELLATION",sale.getId(),movementKey,sha256(key+"|"+reason.trim()),
-    "Cancelación de venta "+sale.getSaleNumber()+": "+reason.trim(),actor));
-  }
-  sale.cancel();
-  outbox.save(new OutboxEvent("SALE",sale.getId(),"SALE_CANCELLED",
-   Map.of("saleId",sale.getId().toString(),"saleNumber",sale.getSaleNumber(),"reason",reason.trim(),"cancelledBy",actor)));
-  audit.record(actor,"SALE_CANCELLED","SALE",sale.getId(),
-   Map.of("saleNumber",sale.getSaleNumber(),"reason",reason.trim(),"lines",items.size()));
+  if(sale.getStatus()!=SaleStatus.COMPLETED)throw new ConflictException("Solo una venta completada puede iniciar una solicitud de cancelación.");
+  if(returnLines.existsForSale(id))throw new ConflictException("No se puede cancelar una venta que ya tiene devoluciones; registre una devolución o un ajuste separado.");
+  sale.requestCancellation(cleanReason,actor);
+  outbox.save(new OutboxEvent("SALE",sale.getId(),"SALE_CANCELLATION_REQUESTED",Map.of("saleId",sale.getId().toString(),"saleNumber",sale.getSaleNumber(),"reason",cleanReason,"requestedBy",actor)));
+  audit.record(actor,"SALE_CANCELLATION_REQUESTED","SALE",sale.getId(),Map.of("saleNumber",sale.getSaleNumber(),"reason",cleanReason));
+  record.markCompleted("SALE",sale.getId(),(short)200);idempotencyRecords.saveAndFlush(record);
   return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow());
+ }
+
+ @Transactional
+ public SaleDtos.View approveCancellation(UUID id,String suppliedKey,String actor){
+  String key=normalizeIdempotencyKey(suppliedKey);
+  IdempotencyRecord record=claimIdempotency("SALE_CANCEL_APPROVE",key,sha256("SALE_CANCEL_APPROVE|"+id));
+  if(record.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return SaleDtos.View.from(sales.findDetailedById(record.getResourceId()).orElseThrow(()->new ConflictException("La clave de idempotencia apunta a una venta inexistente.")));
+  Sale sale=sales.findForUpdateById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id));
+  if(sale.getStatus()!=SaleStatus.CANCELLATION_REQUESTED)throw new ConflictException("La venta no tiene una solicitud de cancelación pendiente.");
+  if(actor!=null&&actor.equals(sale.getCancellationRequestedBy()))throw new ConflictException("Quien solicita la cancelación no puede aprobarla.");
+  if(returnLines.existsForSale(id))throw new ConflictException("No se puede cancelar una venta que ya tiene devoluciones; registre una devolución o un ajuste separado.");
+  List<SaleItem> items=new ArrayList<>(sale.getItems());items.sort(Comparator.comparing(i->i.getProduct().getId().toString()));
+  for(SaleItem item:items){
+   StockBalance balance=balances.findForUpdate(item.getProduct().getId(),sale.getWarehouse().getId()).orElseThrow(()->new BusinessRuleException("No existe saldo para reponer "+item.getSkuSnapshot()+"."));
+   balance.increase(item.getQuantity());
+   UnitOfMeasure unit=units.findById(item.getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+item.getSkuSnapshot()+"."));
+   String movementKey="SALE-CANCEL-"+sale.getId()+"-"+item.getProduct().getId();
+   StockMovement movement=new StockMovement(item.getProduct(),sale.getWarehouse(),MovementType.SALE_CANCEL_IN,item.getQuantity(),item.getProduct().getCostPrice(),"SALE_CANCELLATION",sale.getId(),movementKey,sha256(sale.getId()+"|"+sale.getCancellationReason()+"|"+item.getId()),"Cancelación aprobada de venta "+sale.getSaleNumber()+": "+sale.getCancellationReason(),actor);
+   movement.assignLocations(null,balance.getLocation(),unit,sale.getId().toString(),item.getId(),null);movements.save(movement);
+  }
+  sale.approveCancellation(actor);
+  outbox.save(new OutboxEvent("SALE",sale.getId(),"SALE_CANCELLED",Map.of("saleId",sale.getId().toString(),"saleNumber",sale.getSaleNumber(),"reason",sale.getCancellationReason(),"requestedBy",sale.getCancellationRequestedBy(),"approvedBy",actor)));
+  audit.record(actor,"SALE_CANCELLED","SALE",sale.getId(),Map.of("saleNumber",sale.getSaleNumber(),"reason",sale.getCancellationReason(),"requestedBy",sale.getCancellationRequestedBy(),"approvedBy",actor,"lines",items.size()));
+  record.markCompleted("SALE",sale.getId(),(short)200);idempotencyRecords.saveAndFlush(record);
+  return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow());
+ }
+
+ private IdempotencyRecord claimIdempotency(String scope,String key,String hash){
+  int claimed=idempotencyRecords.insertIfAbsent(UUID.randomUUID(),scope,key,hash);
+  IdempotencyRecord record=idempotencyRecords.findForUpdate(scope,key).orElseThrow(()->new IllegalStateException("No se pudo reservar la clave de idempotencia."));
+  if(!hash.equals(record.getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
+  if(claimed==0&&record.getStatus()!=IdempotencyRecord.RecordStatus.COMPLETED)throw new ConflictException("Ya existe una operación con esta clave de idempotencia y aún no puede reproducirse.");
+  return record;
  }
 
  private String normalizeIdempotencyKey(String key){

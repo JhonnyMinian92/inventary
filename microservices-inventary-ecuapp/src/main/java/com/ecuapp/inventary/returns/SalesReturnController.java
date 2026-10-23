@@ -11,6 +11,6 @@ public class SalesReturnController {
  public SalesReturnController(SalesReturnService service){this.service=service;}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
  public SalesReturnDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAuthority('sales:manage')")
+ @PostMapping @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
  public SalesReturnDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SalesReturnDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
 }

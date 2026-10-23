@@ -11,6 +11,6 @@ public class PurchaseReturnController {
  public PurchaseReturnController(PurchaseReturnService service){this.service=service;}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
  public PurchaseReturnDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAuthority('purchasing:manage')")
+ @PostMapping @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('purchasing:manage')")
  public PurchaseReturnDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody PurchaseReturnDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
 }
