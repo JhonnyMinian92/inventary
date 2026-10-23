@@ -35,11 +35,13 @@ INSERT INTO app_permission(id,code,description) VALUES
 ('20000000-0000-0000-0000-000000000013','reports:financial','Consultar reportes financieros'),
 ('20000000-0000-0000-0000-000000000014','partners:read','Consultar clientes y proveedores'),
 ('20000000-0000-0000-0000-000000000015','partners:manage','Mantener clientes y proveedores'),
-('20000000-0000-0000-0000-000000000016','media:manage','Mantener medios del catálogo');
+('20000000-0000-0000-0000-000000000016','media:manage','Mantener medios del catálogo'),
+('20000000-0000-0000-0000-000000000017','customers:manage','Crear y mantener clientes'),
+('20000000-0000-0000-0000-000000000018','purchasing:approve','Aprobar órdenes de compra');
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r CROSS JOIN app_permission p WHERE r.code='SUPER_ADMIN';
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','inventory:read','purchasing:read','sales:read','audit:read','partners:read') WHERE r.code='AUDITOR';
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','catalog:manage','inventory:read','inventory:manage','purchasing:read','purchasing:manage','partners:read','partners:manage','media:manage') WHERE r.code='MANAGER_ALMACEN';
-INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','inventory:read','sales:read','sales:manage','partners:read') WHERE r.code='VENDEDOR';
+INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','inventory:read','sales:read','sales:manage','partners:read','customers:manage') WHERE r.code='VENDEDOR';
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code='technical:read' WHERE r.code='SOPORTE_TI';
 CREATE INDEX ix_app_user_active_role ON app_user(active,role);
 CREATE INDEX ix_app_role_permission_permission ON app_role_permission(permission_id,role_id);
