@@ -102,3 +102,24 @@ Los números de rendimiento/disponibilidad son objetivos iniciales, no métricas
 ## 6. Condiciones de salida del MVP
 
 El backend está “completo según alcance” cuando todas las tareas P0/P1 incluidas están implementadas, migraciones y OpenAPI están sincronizadas, los controles de seguridad se revisaron, todos los endpoints tienen semántica de error e idempotencia definida y el despliegue está documentado. Esta condición no equivale a garantía de ausencia de defectos ni sustituye las pruebas locales.
+
+## 7. Adenda: canal de venta con catálogo público, n8n y WhatsApp
+
+Se incorporan estos requisitos funcionales adicionales a la matriz RF:
+
+| ID | Requisito adicional | Criterio de aceptación |
+|---|---|---|
+| RF-023 | Catálogo público de venta | Endpoint paginado con nombre, descripción, SKU, imagen HTTPS, precio, moneda, variante y disponibilidad vendible; no incluye costos ni datos privados. |
+| RF-024 | Imágenes de producto | Modelo de metadatos de imagen, URL estable o entrega de medios; rechazar rutas locales como URL para clientes/Meta. Subidas futuras deben validar tipo, tamaño y contenido. |
+| RF-025 | Integración técnica n8n | Credencial de servicio con scopes limitados; endpoints para buscar catálogo, gestionar carrito, cotizar, crear y consultar pedidos. Sin acceso directo a DB. |
+| RF-026 | Compra desde WhatsApp | Pedido creado solo después de una confirmación explícita del resumen por parte del cliente; la confirmación se vincula a un mensaje entrante validado. |
+| RF-027 | Precio y stock autoritativos | Inventary calcula el total y revalida precio/disponibilidad al crear el pedido; nunca confía en cálculos del LLM o del cliente. |
+| RF-028 | Webhook idempotente | Reintentos del proveedor/workflow no duplican mensajes procesados, reservas ni pedidos. |
+| RF-029 | Estado correcto de cobro | Pedido pendiente de pago no se declara pagado; solo se marca pagado tras una señal de pago validada o una operación autorizada. |
+| RF-030 | Carrito/cotización con vencimiento | La cotización tiene quoteId y expiración; al confirmar se revalida y si algo cambió, se vuelve a pedir consentimiento. |
+
+### Requisitos de infraestructura del canal
+
+n8n y el backend pueden estar autoalojados/locales y hablar por una red privada, pero el webhook de WhatsApp necesita un callback HTTPS alcanzable desde fuera. En desarrollo puede usarse un túnel temporal protegido; en producción, un callback HTTPS estable con verificación y monitoreo. La IA utiliza OpenAI API, por tanto ese componente no es inferencia 100 % local aunque n8n esté autoalojado.
+
+El diagrama, contratos propuestos y flujo transaccional están en [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md).
