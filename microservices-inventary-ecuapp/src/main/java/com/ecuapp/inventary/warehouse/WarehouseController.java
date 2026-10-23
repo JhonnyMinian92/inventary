@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 @RestController
@@ -14,9 +15,9 @@ public class WarehouseController {
  @GetMapping public Page<WarehouseDtos.View> list(@PageableDefault(size=20,sort="name") Pageable p){return service.list(p);}
  @GetMapping("/{id}") public WarehouseDtos.View get(@PathVariable UUID id){return service.get(id);}
  @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
- public WarehouseDtos.View create(@Valid @RequestBody WarehouseDtos.WriteRequest r){return service.create(r);}
+ public WarehouseDtos.View create(@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.create(r,auth.getName());}
  @PutMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
- public WarehouseDtos.View update(@PathVariable UUID id,@Valid @RequestBody WarehouseDtos.WriteRequest r){return service.update(id,r);}
+ public WarehouseDtos.View update(@PathVariable UUID id,@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.update(id,r,auth.getName());}
  @PostMapping("/{id}/deactivate") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
- public void deactivate(@PathVariable UUID id){service.deactivate(id);}
+ public void deactivate(@PathVariable UUID id,Authentication auth){service.deactivate(id,auth.getName());}
 }

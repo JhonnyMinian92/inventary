@@ -1,6 +1,8 @@
 package com.ecuapp.inventary.catalog;
 
 import com.ecuapp.inventary.common.ConflictException;
+import com.ecuapp.inventary.audit.AuditService;
+import java.util.Map;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import com.ecuapp.inventary.inventory.StockBalanceRepository;
 import org.springframework.data.domain.*;
@@ -14,8 +16,8 @@ import java.util.UUID;
 
 @Service
 public class ProductService {
- private final ProductRepository products; private final CategoryRepository categories; private final StockBalanceRepository balances;
- public ProductService(ProductRepository products,CategoryRepository categories,StockBalanceRepository balances){this.products=products;this.categories=categories;this.balances=balances;}
+ private final ProductRepository products; private final CategoryRepository categories; private final StockBalanceRepository balances; private final AuditService audit;
+ public ProductService(ProductRepository products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit){this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;}
  @Transactional(readOnly=true) public Page<ProductDtos.View> list(String q,Pageable pageable){
   Pageable p=PageRequest.of(pageable.getPageNumber(),Math.min(pageable.getPageSize(),100),pageable.getSort());
   Page<Product> result=(q==null||q.isBlank())?products.findAll(p):products.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(q.trim(),q.trim(),p);
@@ -37,19 +39,22 @@ public class ProductService {
   boolean available=balances.findProductIdsWithAvailableStock(java.util.List.of(product.getId())).contains(product.getId());
   return ProductDtos.PublicView.from(product,available);
  }
- @Transactional public ProductDtos.View create(ProductDtos.WriteRequest r){
+ @Transactional public ProductDtos.View create(ProductDtos.WriteRequest r,String actor){
   String sku=normalizeSku(r.sku()); if(products.existsBySku(sku))throw new ConflictException("Ya existe un producto con ese SKU.");
   Category category=requireCategory(r.categoryId());
-  return ProductDtos.View.from(products.save(new Product(sku,r.name().trim(),clean(r.description()),category,money(r.costPrice()),money(r.salePrice()),currency(r.currency()),clean(r.imageUrl()))));
+  Product saved=products.save(new Product(sku,r.name().trim(),clean(r.description()),category,money(r.costPrice()),money(r.salePrice()),currency(r.currency()),clean(r.imageUrl())));
+  audit.record(actor,"PRODUCT_CREATED","PRODUCT",saved.getId(),Map.of("sku",saved.getSku(),"categoryId",category.getId().toString()));
+  return ProductDtos.View.from(saved);
  }
- @Transactional public ProductDtos.View update(UUID id,ProductDtos.WriteRequest r){
+ @Transactional public ProductDtos.View update(UUID id,ProductDtos.WriteRequest r,String actor){
   Product product=require(id);
   if(!product.getSku().equals(normalizeSku(r.sku())))throw new ConflictException("El SKU es inmutable para preservar las referencias históricas.");
   Category category=requireCategory(r.categoryId());
   product.update(r.name().trim(),clean(r.description()),category,money(r.costPrice()),money(r.salePrice()),currency(r.currency()),clean(r.imageUrl()));
+  audit.record(actor,"PRODUCT_UPDATED","PRODUCT",id,Map.of("sku",product.getSku(),"categoryId",category.getId().toString()));
   return ProductDtos.View.from(product);
  }
- @Transactional public void deactivate(UUID id){require(id).deactivate();}
+ @Transactional public void deactivate(UUID id,String actor){Product p=require(id);p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));}
  private Product require(UUID id){return products.findById(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));}
  private Category requireCategory(UUID id){Category c=categories.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
  private String normalizeSku(String sku){return sku.trim().toUpperCase(Locale.ROOT);}

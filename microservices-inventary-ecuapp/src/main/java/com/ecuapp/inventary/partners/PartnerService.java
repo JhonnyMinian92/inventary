@@ -18,23 +18,23 @@ public class PartnerService {
   return repo.findByTypeIn(List.of(type,PartnerType.BOTH),PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(PartnerDtos.View::from);
  }
  @Transactional(readOnly=true) public PartnerDtos.View get(PartnerType type,UUID id){return PartnerDtos.View.from(require(type,id));}
- @Transactional public PartnerDtos.View create(PartnerType type,PartnerDtos.WriteRequest r){
+ @Transactional public PartnerDtos.View create(PartnerType type,PartnerDtos.WriteRequest r,String actor){
   String code=r.code().trim().toUpperCase(Locale.ROOT);String tax=clean(r.taxId());
   if(repo.existsByCode(code))throw new ConflictException("Ya existe un contacto comercial con ese código.");
   if(tax!=null&&repo.existsByTaxId(tax))throw new ConflictException("Ya existe un contacto comercial con ese identificador fiscal.");
   BusinessPartner saved=repo.save(new BusinessPartner(code,type,r.name().trim(),tax,clean(r.email()),clean(r.phone()),clean(r.address())));
-  audit.record("system",type.name()+"_CREATED","BUSINESS_PARTNER",saved.getId(),java.util.Map.of("code",code,"partnerType",type.name()));
+  audit.record(actor,type.name()+"_CREATED,"BUSINESS_PARTNER",saved.getId(),java.util.Map.of("code",code,"partnerType",type.name()));
   return PartnerDtos.View.from(saved);
  }
- @Transactional public PartnerDtos.View update(PartnerType type,UUID id,PartnerDtos.WriteRequest r){
+ @Transactional public PartnerDtos.View update(PartnerType type,UUID id,PartnerDtos.WriteRequest r,String actor){
   BusinessPartner partner=require(type,id);String code=r.code().trim().toUpperCase(Locale.ROOT);
   if(!partner.getCode().equals(code))throw new ConflictException("El código del contacto es inmutable.");
   String tax=clean(r.taxId());
   if(tax!=null&&!tax.equals(partner.getTaxId())&&repo.existsByTaxId(tax))throw new ConflictException("Ya existe un contacto comercial con ese identificador fiscal.");
   partner.update(r.name().trim(),tax,clean(r.email()),clean(r.phone()),clean(r.address()));
-  audit.record("system",type.name()+"_UPDATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));return PartnerDtos.View.from(partner);
+  audit.record(actor,type.name()+"_UPDATED,"BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));return PartnerDtos.View.from(partner);
  }
- @Transactional public void deactivate(PartnerType type,UUID id){BusinessPartner partner=require(type,id);partner.deactivate();audit.record("system",type.name()+"_DEACTIVATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));}
+ @Transactional public void deactivate(PartnerType type,UUID id,String actor){BusinessPartner partner=require(type,id);partner.deactivate();audit.record(actor,type.name()+"_DEACTIVATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));}
  private BusinessPartner require(PartnerType type,UUID id){
   return repo.findByIdAndTypeIn(id,List.of(type,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException(type==PartnerType.SUPPLIER?"Proveedor":"Cliente",id));
  }
