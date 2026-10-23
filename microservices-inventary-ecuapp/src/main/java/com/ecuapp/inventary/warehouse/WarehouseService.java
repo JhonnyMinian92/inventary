@@ -16,7 +16,8 @@ public class WarehouseService {
  @Transactional(readOnly=true) public WarehouseDtos.View get(UUID id){return WarehouseDtos.View.from(require(id));}
  @Transactional public WarehouseDtos.View create(WarehouseDtos.WriteRequest r,String actor){
   String code=r.code().trim().toUpperCase(Locale.ROOT);if(repo.existsByCode(code))throw new ConflictException("Ya existe un almacén con ese código.");
-  Warehouse saved=repo.save(new Warehouse(code,r.name().trim(),clean(r.address())));\n  locations.save(new WarehouseLocation(saved,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE));
+  Warehouse saved=repo.save(new Warehouse(code,r.name().trim(),clean(r.address())));
+  locations.save(new WarehouseLocation(saved,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE));
   audit.record(actor,"WAREHOUSE_CREATED","WAREHOUSE",saved.getId(),Map.of("code",saved.getCode()));return WarehouseDtos.View.from(saved);
  }
  @Transactional public WarehouseDtos.View update(UUID id,WarehouseDtos.WriteRequest r,String actor){Warehouse w=require(id);String code=r.code().trim().toUpperCase(Locale.ROOT);if(!w.getCode().equals(code))throw new ConflictException("El código de almacén es inmutable; cree otro almacén para cambiarlo.");w.update(r.name().trim(),clean(r.address()));audit.record(actor,"WAREHOUSE_UPDATED","WAREHOUSE",id,Map.of("code",w.getCode()));return WarehouseDtos.View.from(w);}
