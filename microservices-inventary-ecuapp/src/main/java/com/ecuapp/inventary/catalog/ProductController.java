@@ -6,6 +6,9 @@ import com.ecuapp.inventary.catalog.application.ProductCommand;
 import com.ecuapp.inventary.catalog.application.ProductUseCases;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -17,7 +20,7 @@ import java.util.UUID;
 public class ProductController {
  private final ProductUseCases products;
  public ProductController(ProductUseCases products){this.products=products;}
- @GetMapping public PageResult<ProductDtos.View> list(@RequestParam(required=false) String q,@PageableDefault(size=20,sort="name") Pageable p){PageResult<com.ecuapp.inventary.catalog.application.ProductResult> result=products.listProducts(q,pageQuery(p));return new PageResult<>(result.content().stream().map(ProductDtos.View::from).toList(),result.page(),result.size(),result.totalElements(),result.totalPages());}
+ @GetMapping public Page<ProductDtos.View> list(@RequestParam(required=false) String q,@PageableDefault(size=20,sort="name") Pageable p){PageResult<com.ecuapp.inventary.catalog.application.ProductResult> result=products.listProducts(q,pageQuery(p));return new PageImpl<>(result.content().stream().map(ProductDtos.View::from).toList(),PageRequest.of(result.page(),result.size(),p.getSort()),result.totalElements());}
  @GetMapping("/{id}") public ProductDtos.View get(@PathVariable UUID id){return ProductDtos.View.from(products.getProduct(id));}
  @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
  public ProductDtos.View create(@Valid @RequestBody ProductDtos.WriteRequest r,Authentication auth){return ProductDtos.View.from(products.createProduct(command(r),auth.getName()));}
