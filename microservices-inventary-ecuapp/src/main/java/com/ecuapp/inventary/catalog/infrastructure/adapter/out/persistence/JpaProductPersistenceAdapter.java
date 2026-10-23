@@ -25,17 +25,17 @@ public class JpaProductPersistenceAdapter implements ProductPersistencePort {
 
     @Override
     public PageResult<Product> findAll(PageQuery query) {
-        return result(repository.findAll(pageable(query)), query);
+        return result(repository.findAll(pageable(query)));
     }
 
     @Override
     public PageResult<Product> searchByNameOrSku(String query, PageQuery page) {
-        return result(repository.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(query, query, pageable(page)), page);
+        return result(repository.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(query, query, pageable(page)));
     }
 
     @Override
     public PageResult<Product> findActivePublic(PageQuery page) {
-        return result(repository.findByActiveTrueAndCategory_ActiveTrue(pageable(page)), page);
+        return result(repository.findByActiveTrueAndCategory_ActiveTrue(pageable(page)));
     }
 
     @Override
@@ -65,7 +65,7 @@ public class JpaProductPersistenceAdapter implements ProductPersistencePort {
         return PageRequest.of(query.page(), Math.min(query.size(), 100), sort);
     }
 
-    private PageResult<Product> result(Page<Product> page, PageQuery query) {
+    private PageResult<Product> result(Page<Product> page) {
         return new PageResult<>(page.getContent(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 }
