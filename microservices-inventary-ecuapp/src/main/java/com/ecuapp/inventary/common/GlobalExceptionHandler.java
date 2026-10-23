@@ -10,6 +10,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -35,6 +37,8 @@ public class GlobalExceptionHandler {
  }
  @ExceptionHandler(InvalidQueryException.class)
  ResponseEntity<ProblemDetail> invalidQuery(InvalidQueryException ex,HttpServletRequest req){return response(HttpStatus.BAD_REQUEST,"Parámetros inválidos",ex.getMessage(),req);}
+ @ExceptionHandler({MissingServletRequestParameterException.class,MethodArgumentTypeMismatchException.class})
+ ResponseEntity<ProblemDetail> invalidParameter(Exception ex,HttpServletRequest req){return response(HttpStatus.BAD_REQUEST,"Parámetro inválido","Falta un parámetro obligatorio o uno de los parámetros tiene un formato no válido.",req);}
  @ExceptionHandler({BusinessRuleException.class,IllegalArgumentException.class})
  ResponseEntity<ProblemDetail> badRequest(RuntimeException ex,HttpServletRequest req){return response(HttpStatus.UNPROCESSABLE_ENTITY,"Regla de negocio no satisfecha",safeBusinessMessage(ex),req);}
  @ExceptionHandler(ConflictException.class)
