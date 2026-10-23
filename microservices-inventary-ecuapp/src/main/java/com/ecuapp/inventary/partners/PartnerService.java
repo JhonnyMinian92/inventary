@@ -23,7 +23,7 @@ public class PartnerService {
   if(repo.existsByCode(code))throw new ConflictException("Ya existe un contacto comercial con ese código.");
   if(tax!=null&&repo.existsByTaxId(tax))throw new ConflictException("Ya existe un contacto comercial con ese identificador fiscal.");
   BusinessPartner saved=repo.save(new BusinessPartner(code,type,r.name().trim(),tax,clean(r.email()),clean(r.phone()),clean(r.address())));
-  audit.record(actor,type.name()+"_CREATED,"BUSINESS_PARTNER",saved.getId(),java.util.Map.of("code",code,"partnerType",type.name()));
+  audit.record(actor,type.name()+"_CREATED","BUSINESS_PARTNER",saved.getId(),java.util.Map.of("code",code,"partnerType",type.name()));
   return PartnerDtos.View.from(saved);
  }
  @Transactional public PartnerDtos.View update(PartnerType type,UUID id,PartnerDtos.WriteRequest r,String actor){
@@ -32,7 +32,7 @@ public class PartnerService {
   String tax=clean(r.taxId());
   if(tax!=null&&!tax.equals(partner.getTaxId())&&repo.existsByTaxId(tax))throw new ConflictException("Ya existe un contacto comercial con ese identificador fiscal.");
   partner.update(r.name().trim(),tax,clean(r.email()),clean(r.phone()),clean(r.address()));
-  audit.record(actor,type.name()+"_UPDATED,"BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));return PartnerDtos.View.from(partner);
+  audit.record(actor,type.name()+"_UPDATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));return PartnerDtos.View.from(partner);
  }
  @Transactional public void deactivate(PartnerType type,UUID id,String actor){BusinessPartner partner=require(type,id);partner.deactivate();audit.record(actor,type.name()+"_DEACTIVATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));}
  private BusinessPartner require(PartnerType type,UUID id){
