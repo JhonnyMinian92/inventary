@@ -17,7 +17,7 @@ public class StockTransferController {
  public StockTransferController(StockTransferService service){this.service=service;}
  @GetMapping public Page<TransferDtos.View> list(@PageableDefault(size=20,sort="createdAt,desc") Pageable p){return service.list(p);}
  @GetMapping("/{id}") public TransferDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAuthority('inventory:manage')")
+ @PostMapping @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public TransferDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody TransferDtos.CreateRequest r,Authentication a){return service.create(key,r,a.getName());}
  @PostMapping("/{id}/dispatch") @PreAuthorize("hasAuthority('inventory:manage')")
  public TransferDtos.View dispatch(@PathVariable UUID id,Authentication a){return service.dispatch(id,a.getName());}
