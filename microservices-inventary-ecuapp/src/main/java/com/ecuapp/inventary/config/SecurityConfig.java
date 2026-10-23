@@ -61,6 +61,7 @@ public class SecurityConfig {
  }
  @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.security.allowed-origins:}") String configuredOrigins){
   List<String> origins=Arrays.stream(configuredOrigins.split(",")).map(String::trim).filter(s->!s.isEmpty()).distinct().toList();
+  if(origins.contains("*"))throw new IllegalStateException("CORS_ALLOWED_ORIGINS no admite el comodín *.");
   CorsConfiguration cors=new CorsConfiguration();cors.setAllowedOrigins(origins);
   cors.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
   cors.setAllowedHeaders(List.of("Authorization","Content-Type","Idempotency-Key","X-Integration-Key","X-Request-Id"));
@@ -75,6 +76,7 @@ public class SecurityConfig {
    .authorizeHttpRequests(auth->auth
     .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
     .requestMatchers(HttpMethod.GET,"/actuator/health","/actuator/health/**").permitAll()
+    .requestMatchers("/actuator/info").hasAuthority("technical:read")
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()

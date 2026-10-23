@@ -28,6 +28,7 @@ La entrega P03 establece una primera rebanada vertical en catálogo de productos
 | [12 — Decisiones P01](12-decisiones-p01.md) | Defaults de MVP, alcance, roles, permisos y reglas de negocio para desbloquear la implementación. |
 | [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md) | Estado real de capas, puertos, adaptadores, errores y límites de la migración. |
 | [14 — Implementación P04: esquema PostgreSQL y entidades](14-implementacion-p04-esquema.md) | Migración incremental V9, unidades, variantes, ubicaciones, reservas, costeo e idempotencia. |
+| [15 — Implementación P05: seguridad e identidad](15-implementacion-p05-seguridad.md) | JWT, roles/permisos RBAC, invalidación de tokens, bootstrap inicial seguro y CORS. |
 
 ## Convenciones
 

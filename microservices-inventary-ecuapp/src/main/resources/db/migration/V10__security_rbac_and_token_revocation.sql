@@ -36,7 +36,7 @@ INSERT INTO app_permission(id,code,description) VALUES
 ('20000000-0000-0000-0000-000000000015','partners:manage','Mantener clientes y proveedores'),
 ('20000000-0000-0000-0000-000000000016','media:manage','Mantener medios del catálogo');
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r CROSS JOIN app_permission p WHERE r.code='SUPER_ADMIN';
-INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','inventory:read','purchasing:read','sales:read','audit:read') WHERE r.code='AUDITOR';
+INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','inventory:read','purchasing:read','sales:read','audit:read','partners:read') WHERE r.code='AUDITOR';
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','catalog:manage','inventory:read','inventory:manage','purchasing:read','purchasing:manage','partners:read','partners:manage','media:manage') WHERE r.code='MANAGER_ALMACEN';
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code IN ('catalog:read','inventory:read','sales:read','sales:manage','partners:read') WHERE r.code='VENDEDOR';
 INSERT INTO app_role_permission(role_id,permission_id) SELECT r.id,p.id FROM app_role r JOIN app_permission p ON p.code='technical:read' WHERE r.code='SOPORTE_TI';
