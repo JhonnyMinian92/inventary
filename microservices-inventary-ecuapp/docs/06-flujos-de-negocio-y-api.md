@@ -304,3 +304,12 @@ Regla: un evento de Kafka solo comunica un cambio ya confirmado. Si Kafka o n8n 
 5. Para comprar, backend consulta la disponibilidad transaccional y reserva en PostgreSQL primary.
 6. Una consulta GraphQL tiene límites de coste/profundidad y usa DataLoader para no multiplicar consultas.
 7. La caché no se utiliza para autorizar una venta, validar pago ni confirmar el estado de un pedido.
+
+## P10 — Consistencia de transferencias entre almacenes
+
+1. Crear la transferencia como borrador sin afectar existencias.
+2. Despachar con `Idempotency-Key`: bloquear los saldos de origen en orden de producto, comprobar disponibilidad (incluidas reservas), descontar y registrar `TRANSFER_OUT` junto al estado, auditoría y Outbox.
+3. Recibir con otra clave idempotente: asegurar ubicación/saldo de destino sin duplicados, acreditar la cantidad exacta, registrar `TRANSFER_IN` y cerrar el documento.
+4. Cancelar en borrador sin ledger; cancelar en tránsito repone el origen mediante `TRANSFER_IN` compensatorio antes de pasar a CANCELLED.
+5. Revertir solo una transferencia completada: bloquear saldos de origen/destino en orden estable, comprobar que el destino tenga stock disponible, descontar destino y reponer origen con dos movimientos compensatorios. Marcar REVERSED con actor y motivo.
+6. Las claves idempotentes evitan aplicar dos veces una transición; los movimientos históricos son inmutables y toda la compensación comparte una transacción con auditoría y Outbox.

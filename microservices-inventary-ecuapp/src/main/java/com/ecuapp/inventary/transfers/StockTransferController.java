@@ -20,9 +20,11 @@ public class StockTransferController {
  @PostMapping @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public TransferDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody TransferDtos.CreateRequest r,Authentication a){return service.create(key,r,a.getName());}
  @PostMapping("/{id}/dispatch") @PreAuthorize("hasAuthority('inventory:manage')")
- public TransferDtos.View dispatch(@PathVariable UUID id,Authentication a){return service.dispatch(id,a.getName());}
+ public TransferDtos.View dispatch(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,Authentication a){return service.dispatch(id,key,a.getName());}
  @PostMapping("/{id}/receive") @PreAuthorize("hasAuthority('inventory:manage')")
- public TransferDtos.View receive(@PathVariable UUID id,Authentication a){return service.receive(id,a.getName());}
+ public TransferDtos.View receive(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,Authentication a){return service.receive(id,key,a.getName());}
  @PostMapping("/{id}/cancel") @PreAuthorize("hasAuthority('inventory:manage')")
- public TransferDtos.View cancel(@PathVariable UUID id,Authentication a){return service.cancel(id,a.getName());}
+ public TransferDtos.View cancel(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody TransferDtos.ReasonRequest request,Authentication a){return service.cancel(id,key,request.reason(),a.getName());}
+ @PostMapping("/{id}/reverse") @PreAuthorize("hasAuthority('inventory:manage')")
+ public TransferDtos.View reverse(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody TransferDtos.ReasonRequest request,Authentication a){return service.reverse(id,key,request.reason(),a.getName());}
 }
