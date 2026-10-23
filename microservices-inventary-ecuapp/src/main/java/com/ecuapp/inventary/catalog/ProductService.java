@@ -28,6 +28,14 @@ public class ProductService {
   return page.map(product->ProductDtos.PublicView.from(product,available.contains(product.getId())));
  }
  @Transactional(readOnly=true) public ProductDtos.View get(UUID id){return ProductDtos.View.from(require(id));}
+ @Transactional(readOnly=true) public ProductDtos.PublicView getPublic(String identifier){
+  Product product;
+  try { product=products.findById(UUID.fromString(identifier)).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
+  catch(IllegalArgumentException ex){ product=products.findBySkuIgnoreCase(identifier.trim()).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
+  if(!product.isActive()||!product.getCategory().isActive())throw new ResourceNotFoundException("Producto público",identifier);
+  boolean available=balances.findProductIdsWithAvailableStock(java.util.List.of(product.getId())).contains(product.getId());
+  return ProductDtos.PublicView.from(product,available);
+ }
  @Transactional public ProductDtos.View create(ProductDtos.WriteRequest r){
   String sku=normalizeSku(r.sku()); if(products.existsBySku(sku))throw new ConflictException("Ya existe un producto con ese SKU.");
   Category category=requireCategory(r.categoryId());

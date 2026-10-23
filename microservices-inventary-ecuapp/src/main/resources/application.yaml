@@ -45,6 +45,12 @@ app:
     # Solo para desarrollo local; en otros entornos configurar JWT_SECRET.
     jwt-secret: ${JWT_SECRET:inventary-local-dev-key-change-me-32bytes-minimum}
     token-ttl-minutes: ${JWT_TTL_MINUTES:60}
+  integrations:
+    whatsapp:
+      api-key: ${WHATSAPP_INTEGRATION_API_KEY:}
+      quote-ttl-minutes: ${WHATSAPP_QUOTE_TTL_MINUTES:10}
+      order-ttl-minutes: ${WHATSAPP_ORDER_TTL_MINUTES:20}
+      expiry-check-ms: ${WHATSAPP_EXPIRY_CHECK_MS:60000}
   bootstrap-admin:
     username: ${BOOTSTRAP_ADMIN_USERNAME:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
