@@ -22,10 +22,10 @@ import java.util.*;
 @Service
 public class StockTransferService {
  private final StockTransferRepository transfers;private final ProductRepository products;private final WarehouseRepository warehouses;
- private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final StockMovementRepository movements;private final ObjectMapper mapper;private final AuditService audit;
+ private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final StockMovementRepository movements;private final ObjectMapper mapper;private final AuditService audit;
  public StockTransferService(StockTransferRepository transfers,ProductRepository products,WarehouseRepository warehouses,
-  StockBalanceRepository balances,WarehouseLocationRepository locations,StockMovementRepository movements,ObjectMapper mapper,AuditService audit){
-  this.transfers=transfers;this.products=products;this.warehouses=warehouses;this.balances=balances;this.locations=locations;this.movements=movements;this.mapper=mapper;this.audit=audit;
+  StockBalanceRepository balances,WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,ObjectMapper mapper,AuditService audit){
+  this.transfers=transfers;this.products=products;this.warehouses=warehouses;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public Page<TransferDtos.View> list(Pageable p){return transfers.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(TransferDtos.View::from);}
  @Transactional(readOnly=true) public TransferDtos.View get(UUID id){return TransferDtos.View.from(transfers.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Transferencia",id)));}
@@ -65,7 +65,7 @@ public class StockTransferService {
    String movementKey="TRFO-"+line.getId();
    StockMovement movement = new StockMovement(line.getProduct(),transfer.getSourceWarehouse(),MovementType.TRANSFER_OUT,line.getRequestedQuantity(),line.getUnitCost(),
     "STOCK_TRANSFER",transfer.getId(),movementKey,hash(transfer.getId()+"|OUT|"+line.getId()),"Despacho de transferencia "+transfer.getTransferNumber(),actor);
-   movement.assignLocations(source.getLocation(), null, null, transfer.getTransferNumber(), line.getId(), null);
+   movement.assignLocations(source.getLocation(), null, units.findById(line.getProduct().getUnitOfMeasureId()).orElseThrow(() -> new ResourceNotFoundException("Unidad de medida", line.getProduct().getUnitOfMeasureId())), transfer.getTransferNumber(), line.getId(), null);
    movements.save(movement);
   }
   transfer.dispatch();
@@ -87,7 +87,7 @@ public class StockTransferService {
    line.receive();
    StockMovement movement = new StockMovement(line.getProduct(),transfer.getDestinationWarehouse(),MovementType.TRANSFER_IN,line.getRequestedQuantity(),line.getUnitCost(),
     "STOCK_TRANSFER",transfer.getId(),"TRFI-"+line.getId(),hash(transfer.getId()+"|IN|"+line.getId()),"Recepción de transferencia "+transfer.getTransferNumber(),actor);
-   movement.assignLocations(null, dest.getLocation(), null, transfer.getTransferNumber(), line.getId(), null);
+   movement.assignLocations(null, dest.getLocation(), units.findById(line.getProduct().getUnitOfMeasureId()).orElseThrow(() -> new ResourceNotFoundException("Unidad de medida", line.getProduct().getUnitOfMeasureId())), transfer.getTransferNumber(), line.getId(), null);
    movements.save(movement);
   }
   transfer.complete();
