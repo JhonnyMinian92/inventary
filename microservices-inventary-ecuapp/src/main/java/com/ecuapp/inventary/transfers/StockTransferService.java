@@ -63,8 +63,10 @@ public class StockTransferService {
    StockBalance source=balances.findForUpdate(line.getProduct().getId(),transfer.getSourceWarehouse().getId()).orElseThrow(()->new BusinessRuleException("No existe saldo de origen para "+line.getSkuSnapshot()));
    source.decrease(line.getRequestedQuantity());
    String movementKey="TRFO-"+line.getId();
-   movements.save(new StockMovement(line.getProduct(),transfer.getSourceWarehouse(),MovementType.TRANSFER_OUT,line.getRequestedQuantity(),line.getUnitCost(),
-    "STOCK_TRANSFER",transfer.getId(),movementKey,hash(transfer.getId()+"|OUT|"+line.getId()),"Despacho de transferencia "+transfer.getTransferNumber(),actor));
+   StockMovement movement = new StockMovement(line.getProduct(),transfer.getSourceWarehouse(),MovementType.TRANSFER_OUT,line.getRequestedQuantity(),line.getUnitCost(),
+    "STOCK_TRANSFER",transfer.getId(),movementKey,hash(transfer.getId()+"|OUT|"+line.getId()),"Despacho de transferencia "+transfer.getTransferNumber(),actor);
+   movement.assignLocations(source.getLocation(), null, null, transfer.getTransferNumber(), line.getId(), null);
+   movements.save(movement);
   }
   transfer.dispatch();
   audit.record(actor,"STOCK_TRANSFER_DISPATCHED","STOCK_TRANSFER",id,Map.of("transferNumber",transfer.getTransferNumber(),"lines",lines.size()));
@@ -83,8 +85,10 @@ public class StockTransferService {
    }
    dest.increase(line.getRequestedQuantity());
    line.receive();
-   movements.save(new StockMovement(line.getProduct(),transfer.getDestinationWarehouse(),MovementType.TRANSFER_IN,line.getRequestedQuantity(),line.getUnitCost(),
-    "STOCK_TRANSFER",transfer.getId(),"TRFI-"+line.getId(),hash(transfer.getId()+"|IN|"+line.getId()),"Recepción de transferencia "+transfer.getTransferNumber(),actor));
+   StockMovement movement = new StockMovement(line.getProduct(),transfer.getDestinationWarehouse(),MovementType.TRANSFER_IN,line.getRequestedQuantity(),line.getUnitCost(),
+    "STOCK_TRANSFER",transfer.getId(),"TRFI-"+line.getId(),hash(transfer.getId()+"|IN|"+line.getId()),"Recepción de transferencia "+transfer.getTransferNumber(),actor);
+   movement.assignLocations(null, dest.getLocation(), null, transfer.getTransferNumber(), line.getId(), null);
+   movements.save(movement);
   }
   transfer.complete();
   audit.record(actor,"STOCK_TRANSFER_RECEIVED","STOCK_TRANSFER",id,Map.of("transferNumber",transfer.getTransferNumber(),"lines",lines.size()));
