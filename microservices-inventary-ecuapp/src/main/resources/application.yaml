@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: inventary
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -7,18 +9,17 @@ spring:
   graphql:
     graphiql:
       enabled: ${GRAPHIQL_ENABLED:false}
-  application:
-    name: inventary
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inventary}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:CLAVESECRETA}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       pool-name: inventary-pool
       maximum-pool-size: ${DB_POOL_MAX:10}
-      minimum-idle: 2
-      connection-timeout: 30000
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:5000}
   jpa:
     open-in-view: false
     hibernate:
@@ -37,20 +38,21 @@ spring:
     deserialization.fail-on-unknown-properties: true
 server:
   port: ${PORT:8080}
+  shutdown: graceful
   error:
     include-message: never
     include-stacktrace: never
 springdoc:
-  api-docs.enabled: ${SWAGGER_ENABLED:true}
+  api-docs.enabled: ${SWAGGER_ENABLED:false}
   swagger-ui:
-    enabled: ${SWAGGER_ENABLED:true}
+    enabled: ${SWAGGER_ENABLED:false}
     path: /swagger-ui.html
 management:
   endpoints.web.exposure.include: health,info
   endpoint.health.show-details: never
 app:
   security:
-    # JWT_SECRET es obligatorio en todos los entornos; usa .env.example solo para desarrollo local.
+    # JWT_SECRET es obligatorio en todos los entornos; nunca se usa una clave predeterminada.
     jwt-secret: ${JWT_SECRET}
     token-ttl-minutes: ${JWT_TTL_MINUTES:60}
   kafka:
@@ -68,5 +70,5 @@ app:
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
 logging:
   level:
-    root: INFO
-    org.springframework.security: WARN
+    root: ${LOG_LEVEL_ROOT:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}

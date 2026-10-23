@@ -3,34 +3,44 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: inventary
-      POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-CLAVESECRETA}
+      POSTGRES_USER: ${DB_USERNAME:?Define DB_USERNAME en .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - inventary-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d inventary"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:?Define DB_USERNAME en .env} -d inventary"]
       interval: 5s
       timeout: 5s
       retries: 20
+      start_period: 5s
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inventary
-      DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-CLAVESECRETA}
-      JWT_SECRET: ${JWT_SECRET:-local-compose-jwt-secret-change-me-please-32-bytes}
+      DB_USERNAME: ${DB_USERNAME:?Define DB_USERNAME en .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-2}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       WHATSAPP_INTEGRATION_API_KEY: ${WHATSAPP_INTEGRATION_API_KEY:-}
       KAFKA_ENABLED: ${KAFKA_ENABLED:-false}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
-      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-inventary.domain-events}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      GRAPHIQL_ENABLED: ${GRAPHIQL_ENABLED:-false}
     ports:
       - "${API_PORT:-8080}:8080"
+    restart: unless-stopped
 volumes:
   inventary-postgres-data:
