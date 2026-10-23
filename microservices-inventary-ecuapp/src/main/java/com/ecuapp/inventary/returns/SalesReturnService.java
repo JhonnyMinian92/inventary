@@ -73,11 +73,11 @@ public class SalesReturnService {
      balance=balances.save(new StockBalance(c.item().getProduct(),warehouse,mainLocation));
     }
     balance.increase(c.quantity());
-    StockMovement movement=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Devolución "+number,actor);movement.assignLocations(null,balance.getLocation(),unit,number,line.getId(),null);movements.save(movement);
+    StockMovement movement=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Devolución "+number,actor);movement.assignLocations(null,balance.getLocation(),unit,number,c.item().getId(),null);movements.save(movement);
    }else{
     // Se registran entrada y salida compensadas: el artículo devuelto como merma no aumenta stock vendible.
-    StockMovement inbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Entrada no vendible por devolución "+number,actor);inbound.assignLocations(null,traceLocation,unit,number,line.getId(),null);movements.save(inbound);
-    StockMovement outbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_OUT,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-OUT",movementHash,"Merma por devolución "+number,actor);outbound.assignLocations(traceLocation,null,unit,number,line.getId(),null);movements.save(outbound);
+    StockMovement inbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Entrada no vendible por devolución "+number,actor);inbound.assignLocations(null,traceLocation,unit,number,c.item().getId(),null);movements.save(inbound);
+    StockMovement outbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_OUT,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-OUT",movementHash,"Merma por devolución "+number,actor);outbound.assignLocations(traceLocation,null,unit,number,c.item().getId(),null);movements.save(outbound);
    }
   }
   returns.save(salesReturn);

@@ -124,8 +124,8 @@ La consulta de disponibilidad no reserva stock. Los consumidores deben usar el c
 | PATCH /goods-receipts/{receiptId} | Editar recepción en borrador | GOODS_RECEIPT_UPDATE; cantidades contra pedido y tolerancias. |
 | POST /goods-receipts/{receiptId}/post | Contabilizar recepción | GOODS_RECEIPT_POST; Idempotency-Key; actualiza documento, ledger, saldo y costo atómicamente. |
 | POST /goods-receipts/{receiptId}/reject | Rechazar recepción en borrador | GOODS_RECEIPT_APPROVE; motivo auditado. |
-| POST /purchase-returns | Crear devolución a proveedor | PURCHASE_RETURN_CREATE; referencia recepción/lote y cantidad disponible para devolver. |
-| POST /purchase-returns/{returnId}/post | Contabilizar devolución | PURCHASE_RETURN_POST; movimiento de salida y ajuste de costo ligado al origen. |
+| POST /purchase-returns | Crear y contabilizar devolución a proveedor | `purchasing:manage`; Idempotency-Key; recepción contabilizada, cantidad no devuelta y stock disponible. |
+
 | GET /purchase-returns/{returnId} | Consultar devolución | PURCHASE_READ. |
 
 Facturas del proveedor, pagos y cuentas por pagar no quedan incluidas automáticamente. Si se requieren, deben modelarse con reglas fiscales/contables propias.
@@ -145,12 +145,12 @@ Facturas del proveedor, pagos y cuentas por pagar no quedan incluidas automátic
 | PATCH /sales-orders/{salesOrderId} | Editar borrador | SALE_UPDATE; no modificar un documento contabilizado. |
 | POST /sales-orders/{salesOrderId}/confirm | Confirmar y, según política, reservar stock | SALE_CONFIRM; Idempotency-Key, validación atómica de disponibilidad. |
 | POST /sales-orders/{salesOrderId}/dispatch | Despachar y emitir salida | SALE_DISPATCH; Idempotency-Key, saldo reservado y cantidades enviadas. |
-| POST /sales-orders/{salesOrderId}/request-cancellation | Solicitar cancelación | SALE_CANCEL_REQUEST; razón obligatoria, sin revertir aún el efecto. |
-| POST /sales-orders/{salesOrderId}/approve-cancellation | Aprobar y generar reversión/devolución correspondiente | SALE_CANCEL_APPROVE; actor autorizado distinto cuando la segregación lo requiera. |
-| POST /sales-returns | Crear devolución borrador | SALE_RETURN_CREATE; documento original, cantidades ya despachadas, razón y condición del stock. |
+| POST /sales/{saleId}/request-cancellation | Solicitar cancelación de venta | `sales:manage`; Idempotency-Key y razón obligatoria; no modifica stock. |
+| POST /sales/{saleId}/approve-cancellation | Aprobar anulación solicitada | `sales:cancel`; Idempotency-Key; actor distinto al solicitante; reversión de stock atómica. |
+| POST /sales-returns | Crear y contabilizar devolución de venta | `sales:manage`; Idempotency-Key; venta completada, línea original, cantidad disponible y destino RESTOCK/SCRAP. |
 | GET /sales-returns/{returnId} | Consultar devolución | SALE_READ. |
-| POST /sales-returns/{returnId}/approve | Aprobar devolución | SALE_RETURN_APPROVE; segregar funciones si se exige. |
-| POST /sales-returns/{returnId}/post | Contabilizar devolución | SALE_RETURN_POST; Idempotency-Key, movimiento de entrada a ubicación correcta y reversión de costo. |
+
+
 
 La emisión de factura fiscal electrónica, cobro, impuestos y notas de crédito legales quedan condicionados a definir integración SRI y requisitos contables. La orden/registro comercial no debe presentarse como comprobante fiscal si no tiene esa integración.
 

@@ -67,7 +67,7 @@ public class PurchaseReturnService {
    UnitOfMeasure unit=units.findById(c.source().getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+c.source().getProduct().getSku()+"."));
    String movementKey="PRTN-"+purchaseReturn.getId()+"-"+c.source().getId();
    StockMovement movement=new StockMovement(c.source().getProduct(),receipt.getWarehouse(),MovementType.RETURN_OUT,c.quantity(),c.source().getUnitCost(),"PURCHASE_RETURN",purchaseReturn.getId(),movementKey,hash(purchaseReturn.getId()+"|"+returnLine.getId()+"|"+c.quantity().toPlainString()),"Devolución al proveedor "+number,actor);
-   movement.assignLocations(balances.findForUpdate(c.source().getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow().getLocation(),null,unit,number,returnLine.getId(),null);movements.save(movement);
+   movement.assignLocations(balances.findForUpdate(c.source().getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow().getLocation(),null,unit,number,c.source().getId(),null);movements.save(movement);
   }
   returns.save(purchaseReturn);
   outbox.save(new OutboxEvent("PURCHASE_RETURN",purchaseReturn.getId(),"PURCHASE_RETURN_POSTED",Map.of("returnId",purchaseReturn.getId().toString(),"returnNumber",number,"receiptId",receipt.getId().toString())));
