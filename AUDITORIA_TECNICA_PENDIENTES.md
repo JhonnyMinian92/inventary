@@ -22,6 +22,7 @@ La rama contiene una base de backend considerable: catálogo, usuarios y RBAC, a
 - El test de carga de contexto (`InventaryApplicationTests`) necesita la configuración y la base de datos de la aplicación. No se puede inferir que pasa porque exista el archivo.
 - El workflow `.github/workflows/backend-ci.yml` está limitado intencionalmente a `workflow_dispatch`; está preparado, pero no hay resultado de CI asociado a esta auditoría.
 - El workspace `app-inventary-ecuapp/` es un placeholder (README corto y `docs/context.md`); no se observó implementación de frontend Angular en el árbol de `master` examinado.
+- El inventario de ramas remoto se revisó para esta consolidación: las ramas P01–P11 y `fix/p02-require-jwt-secret` están detrás de `master` sin commits exclusivos; la única rama de integración con contenido exclusivo era P12, cuyo commit `b310bd511f7663ff9d94c2602ce002e5ed36c8b8` se incorporó a `master` como snapshot base de esta auditoría.
 - Algunas capacidades son explícitamente pendientes según `microservices-inventary-ecuapp/README.md`: pagos, facturación electrónica/SRI, reglas fiscales, carga binaria de imágenes, consumidor/proyecciones Kafka, reportes, política de valoración completa, multiempresa y mayor cobertura de concurrencia.
 
 ## 2. Cómo debe trabajar el agente local
