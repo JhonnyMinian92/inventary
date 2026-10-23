@@ -32,6 +32,7 @@ La entrega P03 establece una primera rebanada vertical en catálogo de productos
 | [16 — Implementación P06: ventas atómicas e idempotencia](16-implementacion-p06-ventas-atomicas.md) | Precios del servidor, descuento de stock transaccional, movimientos por línea y deduplicación concurrente de solicitudes. |
 | [17 — Implementación P07: inventario operativo](17-implementacion-p07-inventario-operativo.md) | Conteos físicos, diferencias, ajustes transaccionales, idempotencia, trazabilidad y ledger append-only. |
 | [18 — Implementación P08: compras y recepciones parciales](18-implementacion-p08-compras-y-recepciones.md) | Proveedores, órdenes de compra idempotentes, estados, recepciones parciales y movimientos de entrada trazables. |
+| [19 — Implementación P09: devoluciones y anulaciones aprobadas](19-implementacion-p09-devoluciones-y-anulaciones.md) | Devoluciones idempotentes de compra/venta, trazabilidad de ledger y solicitud/aprobación segregadas de cancelaciones. |
 
 ## Convenciones
 

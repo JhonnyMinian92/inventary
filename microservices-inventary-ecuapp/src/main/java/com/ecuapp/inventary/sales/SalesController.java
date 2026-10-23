@@ -20,8 +20,9 @@ public class SalesController {
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
  public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
- // A seller cannot approve cancellation of a completed sale.
- @PostMapping("/{id}/cancel") @PreAuthorize("hasAuthority('sales:cancel')")
- public SaleDtos.View cancel(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody CancelRequest request,Authentication auth){return service.cancel(id,key,request.reason(),auth.getName());}
+ @PostMapping("/{id}/request-cancellation") @PreAuthorize("hasAuthority('sales:manage')")
+ public SaleDtos.View requestCancellation(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody CancelRequest request,Authentication auth){return service.requestCancellation(id,key,request.reason(),auth.getName());}
+ @PostMapping("/{id}/approve-cancellation") @PreAuthorize("hasAuthority('sales:cancel')")
+ public SaleDtos.View approveCancellation(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,Authentication auth){return service.approveCancellation(id,key,auth.getName());}
  public record CancelRequest(@NotBlank @Size(max=1000) String reason){}
 }

@@ -1,6 +1,8 @@
 package com.ecuapp.inventary.purchasing;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.catalog.UnitOfMeasure;
+import com.ecuapp.inventary.catalog.UnitOfMeasureRepository;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
 import com.ecuapp.inventary.sales.OutboxEvent;
@@ -22,18 +24,22 @@ import java.util.*;
 public class PurchaseReturnService {
  private final PurchaseReturnRepository returns;private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;
  private final GoodsReceiptLineRepository receiptLines;private final StockBalanceRepository balances;private final StockMovementRepository movements;
- private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;
+ private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;
  public PurchaseReturnService(PurchaseReturnRepository returns,PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,
-  StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
-  this.returns=returns;this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
+  StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units){
+  this.returns=returns;this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;
  }
  @Transactional(readOnly=true) public PurchaseReturnDtos.View get(UUID id){return PurchaseReturnDtos.View.from(returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución a proveedor",id)));}
  @Transactional public PurchaseReturnDtos.View create(String key,PurchaseReturnDtos.CreateRequest request,String actor){
-  if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio.");
-  String hash=hash(request.goodsReceiptId()+"|"+json(request));
-  Optional<PurchaseReturn> previous=returns.findByIdempotencyKey(key);
+  String normalizedKey=normalizeKey(key);String hash=canonicalHash(request);
+  int claimed=idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"PURCHASE_RETURN_CREATE",normalizedKey,hash);
+  IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("PURCHASE_RETURN_CREATE",normalizedKey).orElseThrow(()->new IllegalStateException("No se pudo reservar la clave de idempotencia."));
+  if(!hash.equals(idempotency.getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con otra devolución.");
+  if(claimed==0){if(idempotency.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED&&idempotency.getResourceId()!=null)return PurchaseReturnDtos.View.from(returns.findDetailedById(idempotency.getResourceId()).orElseThrow(()->new ConflictException("La devolución idempotente ya no existe.")));throw new ConflictException("Ya existe una operación con esta clave de idempotencia y aún no puede reproducirse.");}
+  Optional<PurchaseReturn> previous=returns.findByIdempotencyKey(normalizedKey);
   if(previous.isPresent()){
-   if(!hash.equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con otra devolución.");
+   if(!hash.equals(previous.get().getRequestHash())&&!legacyHash(request).equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con otra devolución.");
+   idempotency.markCompleted("PURCHASE_RETURN",previous.get().getId(),(short)201);idempotencyRecords.saveAndFlush(idempotency);
    return PurchaseReturnDtos.View.from(returns.findDetailedById(previous.get().getId()).orElseThrow());
   }
   GoodsReceipt receipt=receipts.findDetailedById(request.goodsReceiptId()).orElseThrow(()->new ResourceNotFoundException("Recepción",request.goodsReceiptId()));
@@ -47,24 +53,33 @@ public class PurchaseReturnService {
    BigDecimal quantity=item.quantity().setScale(3,RoundingMode.UNNECESSARY);
    BigDecimal alreadyReturned=receiptLines.sumReturned(source.getId());
    if(alreadyReturned.add(quantity).compareTo(source.getQuantity())>0)throw new BusinessRuleException("La devolución supera la cantidad aceptada en la recepción.");
-   StockBalance balance=balances.findForUpdate(source.getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow(()->new BusinessRuleException("No existe saldo para devolver "+source.getProduct().getSku()));
-   balance.decrease(quantity);
    calculated.add(new ReturnCalc(source,quantity));
   }
-  String number="DEV-C-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
-  PurchaseReturn purchaseReturn=returns.saveAndFlush(new PurchaseReturn(number,order,receipt,receipt.getWarehouse(),request.reason().trim(),key,hash,actor));
+  calculated.sort(Comparator.comparing(c->c.source().getProduct().getId().toString()));
   for(ReturnCalc c:calculated){
-   purchaseReturn.addLine(new PurchaseReturnLine(c.source(),c.quantity()));
+   StockBalance balance=balances.findForUpdate(c.source().getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow(()->new BusinessRuleException("No existe saldo para devolver "+c.source().getProduct().getSku()));
+   balance.decrease(c.quantity());
+  }
+  String number="DEV-C-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
+  PurchaseReturn purchaseReturn=returns.saveAndFlush(new PurchaseReturn(number,order,receipt,receipt.getWarehouse(),request.reason().trim(),normalizedKey,hash,actor));
+  for(ReturnCalc c:calculated){
+   PurchaseReturnLine returnLine=new PurchaseReturnLine(c.source(),c.quantity());purchaseReturn.addLine(returnLine);returns.saveAndFlush(purchaseReturn);
+   UnitOfMeasure unit=units.findById(c.source().getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+c.source().getProduct().getSku()+"."));
    String movementKey="PRTN-"+purchaseReturn.getId()+"-"+c.source().getId();
-   movements.save(new StockMovement(c.source().getProduct(),receipt.getWarehouse(),MovementType.RETURN_OUT,c.quantity(),c.source().getUnitCost(),"PURCHASE_RETURN",purchaseReturn.getId(),movementKey,
-    hash(purchaseReturn.getId()+"|"+c.source().getId()+"|"+c.quantity().toPlainString()),"Devolución al proveedor "+number,actor));
+   StockMovement movement=new StockMovement(c.source().getProduct(),receipt.getWarehouse(),MovementType.RETURN_OUT,c.quantity(),c.source().getUnitCost(),"PURCHASE_RETURN",purchaseReturn.getId(),movementKey,hash(purchaseReturn.getId()+"|"+returnLine.getId()+"|"+c.quantity().toPlainString()),"Devolución al proveedor "+number,actor);
+   movement.assignLocations(balances.findForUpdate(c.source().getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow().getLocation(),null,unit,number,returnLine.getId(),null);movements.save(movement);
   }
   returns.save(purchaseReturn);
   outbox.save(new OutboxEvent("PURCHASE_RETURN",purchaseReturn.getId(),"PURCHASE_RETURN_POSTED",Map.of("returnId",purchaseReturn.getId().toString(),"returnNumber",number,"receiptId",receipt.getId().toString())));
   audit.record(actor,"PURCHASE_RETURN_POSTED","PURCHASE_RETURN",purchaseReturn.getId(),Map.of("returnNumber",number,"receiptId",receipt.getId().toString(),"lines",calculated.size()));
+  idempotency.markCompleted("PURCHASE_RETURN",purchaseReturn.getId(),(short)201);idempotencyRecords.saveAndFlush(idempotency);
   return PurchaseReturnDtos.View.from(returns.findDetailedById(purchaseReturn.getId()).orElseThrow());
  }
  private record ReturnCalc(GoodsReceiptLine source,BigDecimal quantity){}
+ private String canonicalHash(PurchaseReturnDtos.CreateRequest r){List<String> lines=r.items().stream().map(x->x.receiptLineId()+"|"+x.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString()).sorted().toList();return hash(r.goodsReceiptId()+"|"+clean(r.reason())+"|"+String.join(";",lines));}
+ private String legacyHash(PurchaseReturnDtos.CreateRequest r){return hash(r.goodsReceiptId()+"|"+json(r));}
+ private String normalizeKey(String key){if(key==null||key.isBlank()||key.trim().length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");return key.trim();}
+ private String clean(String v){return v==null||v.isBlank()?"":v.trim();}
  private String json(PurchaseReturnDtos.CreateRequest r){try{return mapper.writeValueAsString(r);}catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar la devolución.");}}
  private String hash(String v){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException(ex);}}
 }

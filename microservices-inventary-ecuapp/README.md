@@ -104,13 +104,13 @@ Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálog
 | Reposición | `/api/v1/inventory/reorder-rules`, `GET /api/v1/inventory/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
 | Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho; ledger ligado a líneas y ubicaciones |
 | Conteos físicos | `/api/v1/inventory/counts` | Capturar cantidades, consultar diferencias, contabilizar ajustes o cancelar; snapshots inmutables e idempotencia |
-| Ventas | `/api/v1/sales` | Registrar ventas, consulta paginada y detalle |
-| Devoluciones de venta | `/api/v1/sales-returns` | Restock o merma, limitando el total devuelto a la cantidad original |
+| Ventas | `/api/v1/sales` | Registrar y consultar ventas; solicitud y aprobación segregadas de cancelaciones |
+| Devoluciones de venta | `/api/v1/sales-returns` | Idempotencia concurrente, restock/merma, límite por cantidad vendida y ledger trazable |
 | Clientes | `/api/v1/customers` | Crear y mantener contactos de cliente |
 | Proveedores | `/api/v1/suppliers` | CRUD de contactos; lectura protegida por `purchasing:read` |
 | Compras | `/api/v1/purchase-orders` | Crear idempotentemente, enviar, aprobar, cancelar antes de aprobación y consultar |
 | Recepciones | `POST /api/v1/purchase-orders/{id}/receipts`, `GET /api/v1/goods-receipts/{id}` | Recepción parcial idempotente; actualiza saldo, ledger, auditoría y Outbox en transacción |
-| Devoluciones a proveedor | `/api/v1/purchase-returns` | Devolver cantidades de recepciones verificadas; impide exceder el recibido o el stock |
+| Devoluciones a proveedor | `/api/v1/purchase-returns` | Idempotencia concurrente, recepción fuente verificada, límite recibido y ledger trazable |
 | Auditoría | `GET /api/v1/audit-events` | Lectura restringida a ADMIN/AUDITOR |
 | Integración WhatsApp/n8n | `/api/v1/integrations/whatsapp/**` | Catálogo por SKU/UUID, carrito, cotización temporal y orden pendiente de pago |
 | GraphQL | `/graphql` | Consultas públicas de productos/categorías con paginación acotada |
@@ -156,7 +156,13 @@ Content-Type: application/json
 
 La creación captura el saldo esperado y la cantidad física contada. Consulta el conteo en `GET /api/v1/inventory/counts/{id}`; después, `POST /api/v1/inventory/counts/{id}/post` aplica únicamente la diferencia. Si el saldo cambió desde la captura, la contabilización se rechaza para evitar sobrescribir movimientos posteriores. `POST /api/v1/inventory/counts/{id}/cancel` cancela solo conteos abiertos. Las líneas capturadas no se editan; una corrección requiere un nuevo conteo.
 
-### Compras y recepciones parciales
+### Devoluciones y anulaciones aprobadas
+
+Las devoluciones de clientes y proveedores exigen `Idempotency-Key`; repetir clave y contenido devuelve el documento original y cambiar el contenido produce conflicto. Los movimientos enlazan documento, línea fuente, ubicación y unidad de medida. Para cancelar una venta, primero se usa `POST /api/v1/sales/{id}/request-cancellation` con un motivo; no cambia el stock hasta que un actor autorizado distinto confirma con `POST /api/v1/sales/{id}/approve-cancellation`. Una venta con devoluciones no puede cancelarse.
+
+Detalle técnico: [P09 — devoluciones y anulaciones](docs/19-implementacion-p09-devoluciones-y-anulaciones.md).
+
+## Compras y recepciones parciales
 
 Crear una orden requiere `Idempotency-Key`:
 
