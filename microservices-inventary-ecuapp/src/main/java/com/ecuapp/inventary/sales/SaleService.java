@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.sales;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
 import com.ecuapp.inventary.warehouse.*;
@@ -22,9 +23,9 @@ import java.util.*;
 public class SaleService {
  private record CalculatedLine(Product product,BigDecimal quantity,BigDecimal unitPrice,BigDecimal lineTotal){}
  private final SaleRepository sales;private final ProductRepository products;private final WarehouseRepository warehouses;
- private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;
- public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper){
-  this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;
+ private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;
+ public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
+  this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public Page<SaleDtos.View> list(Pageable p){return sales.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(SaleDtos.View::from);}
  @Transactional(readOnly=true) public SaleDtos.View get(UUID id){return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id)));}
@@ -67,6 +68,7 @@ public class SaleService {
   }
   sales.save(sale);
   outbox.save(new OutboxEvent("SALE",sale.getId(),"SALE_COMPLETED",Map.of("saleId",sale.getId().toString(),"saleNumber",sale.getSaleNumber(),"total",sale.getTotal().toPlainString(),"currency",sale.getCurrency())));
+  audit.record(actor,"SALE_COMPLETED","SALE",sale.getId(),Map.of("saleNumber",sale.getSaleNumber(),"total",sale.getTotal().toPlainString(),"currency",sale.getCurrency(),"lines",lines.size()));
   return SaleDtos.View.from(sales.findDetailedById(sale.getId()).orElseThrow());
  }
  private String requestHash(SaleDtos.CreateRequest request){try{return sha256(mapper.writeValueAsString(request));}catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar el contenido de la solicitud.");}}

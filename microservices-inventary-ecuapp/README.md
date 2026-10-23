@@ -138,6 +138,20 @@ mvn -B verify
 
 Las pruebas de contexto e integración necesitan PostgreSQL disponible. GitHub Actions configura un servicio PostgreSQL y ejecuta Maven Verify en cada push o pull request relevante.
 
+## Compras, contactos y movimientos avanzados
+
+- Los contactos se administran en `/api/v1/suppliers` y `/api/v1/customers`; un contacto puede ser proveedor, cliente o ambos según su tipo.
+- Las órdenes de compra nacen como borrador en `POST /api/v1/purchase-orders`. Usa `POST /{id}/submit`, aprobación administrativa con `POST /{id}/approve` y recepciones parciales con `POST /{id}/receipts`.
+- Una recepción requiere `Idempotency-Key`; rechaza cantidad mayor a la pendiente, aumenta el saldo y registra movimiento y Outbox de forma transaccional. La huella idempotente incluye también el ID de la orden.
+- Las transferencias se crean en `POST /api/v1/inventory/transfers`, salen mediante `/{id}/dispatch` y entran al destino mediante `/{id}/receive`. Despacho y recepción son operaciones transaccionales; repetir un paso ya aplicado devuelve el estado actual. La recepción de una transferencia en esta versión es completa, no por líneas.
+- Las devoluciones se registran mediante `POST /api/v1/sales-returns`, con referencia obligatoria a una venta y a sus líneas, cantidades no superiores a lo aún retornable y disposición `RESTOCK` o `SCRAP`. Para SCRAP el ledger registra entrada/salida compensada para que la merma no incremente stock vendible. El endpoint no tramita reembolso monetario.
+- Las imágenes se registran como URL HTTPS en `/api/v1/catalog/products/{productId}/images`; la API almacena metadatos, no descarga URLs ni archivos, evitando convertir una URL de usuario en una petición SSRF.
+- La bitácora consultable `GET /api/v1/audit-events` requiere rol ADMIN o AUDITOR. Acciones de inventario, venta, recepción, transferencia, devolución e imágenes generan eventos dentro de la transacción.
+
+## Funcionalidad todavía pendiente
+
+GraphQL con límites de complejidad, cache distribuida, consumidor/outbox publisher Kafka, carrito/cotización y endpoints de máquina separados para n8n/WhatsApp, carga binaria con almacenamiento de objetos, devoluciones a proveedor, informes de valoración y reglas de reposición todavía requieren implementación. Tampoco están conectadas facturación SRI, cobros ni permisos por organización multiempresa. Cada requisito queda en [Issues](https://github.com/JhonnyMinian92/inventary/issues); no se debe interpretar el código parcial como cobertura del 100 % de la especificación original.
+
 ## Alcance pendiente
 
 Siguen abiertas tareas para compras y recepciones; clientes, devoluciones y transferencias; reservas; reabastecimiento y valoración; gestión de imágenes; integración n8n/WhatsApp; GraphQL; publicación de Outbox/Kafka; auditoría avanzada y hardening. No deben considerarse implementadas hasta que sus issues estén cerrados con código y pruebas.

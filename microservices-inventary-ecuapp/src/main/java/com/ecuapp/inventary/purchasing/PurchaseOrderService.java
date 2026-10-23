@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.purchasing;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
 import com.ecuapp.inventary.partners.*;
@@ -29,10 +30,10 @@ public class PurchaseOrderService {
  private record ReceiptCalc(PurchaseOrderLine line,BigDecimal quantity){}
  private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final BusinessPartnerRepository partners;
  private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;
- private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;
+ private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;
  public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,BusinessPartnerRepository partners,WarehouseRepository warehouses,
-   ProductRepository products,StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper){
-  this.orders=orders;this.receipts=receipts;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;
+   ProductRepository products,StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
+  this.orders=orders;this.receipts=receipts;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(Pageable p){return orders.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(PurchaseDtos.OrderView::from);}
  @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id){return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
@@ -56,15 +57,16 @@ public class PurchaseOrderService {
   String number="OC-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   PurchaseOrder order=orders.saveAndFlush(new PurchaseOrder(number,supplier,warehouse,currency==null?"USD":currency,subtotal,subtotal,clean(r.notes()),actor));
   newLines.forEach(order::addLine);orders.save(order);
+  audit.record(actor,"PURCHASE_ORDER_CREATED","PURCHASE_ORDER",order.getId(),Map.of("orderNumber",number,"lineCount",newLines.size()));
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
- @Transactional public PurchaseDtos.OrderView submit(UUID id){PurchaseOrder order=requireForUpdate(id);order.submit();return PurchaseDtos.OrderView.from(order);}
- @Transactional public PurchaseDtos.OrderView approve(UUID id){PurchaseOrder order=requireForUpdate(id);order.approve();return PurchaseDtos.OrderView.from(order);}
- @Transactional public PurchaseDtos.OrderView cancel(UUID id){PurchaseOrder order=requireForUpdate(id);order.cancel();return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView submit(UUID id){PurchaseOrder order=requireForUpdate(id);order.submit();audit.record("system","PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView approve(UUID id){PurchaseOrder order=requireForUpdate(id);order.approve();audit.record("system","PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView cancel(UUID id){PurchaseOrder order=requireForUpdate(id);order.cancel();audit.record("system","PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
  @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id){return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id)));}
  @Transactional public PurchaseDtos.ReceiptView receive(UUID orderId,String key,PurchaseDtos.ReceiptRequest request,String actor){
   if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
-  String hash=hashRequest(request);Optional<GoodsReceipt> previous=receipts.findByIdempotencyKey(key);
+  String hash=hashRequest(orderId,request);Optional<GoodsReceipt> previous=receipts.findByIdempotencyKey(key);
   if(previous.isPresent()){
    if(!hash.equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una recepción distinta.");
    return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(previous.get().getId()).orElseThrow());
@@ -96,10 +98,11 @@ public class PurchaseOrderService {
   }
   receipts.save(receipt);
   outbox.save(new OutboxEvent("GOODS_RECEIPT",receipt.getId(),"GOODS_RECEIPT_POSTED",Map.of("receiptId",receipt.getId().toString(),"receiptNumber",receipt.getReceiptNumber(),"purchaseOrderId",order.getId().toString())));
+  audit.record(actor,"GOODS_RECEIPT_POSTED","GOODS_RECEIPT",receipt.getId(),Map.of("receiptNumber",receipt.getReceiptNumber(),"purchaseOrderId",order.getId().toString(),"lines",calculated.size()));
   return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(receipt.getId()).orElseThrow());
  }
  private PurchaseOrder requireForUpdate(UUID id){return orders.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id));}
- private String hashRequest(PurchaseDtos.ReceiptRequest r){try{return sha256(mapper.writeValueAsString(r));}catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar la recepción.");}}
+ private String hashRequest(UUID orderId,PurchaseDtos.ReceiptRequest r){try{return sha256(orderId+"|"+mapper.writeValueAsString(r));}catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar la recepción.");}}
  private String sha256(String v){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(v.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException(ex);}}
  private String clean(String v){return v==null||v.isBlank()?null:v.trim();}
 }

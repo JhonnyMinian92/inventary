@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.inventory;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.warehouse.*;
 import com.ecuapp.inventary.common.*;
 import org.springframework.data.domain.*;
@@ -14,8 +15,8 @@ import java.util.UUID;
 
 @Service
 public class InventoryService {
- private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;
- public InventoryService(ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements){this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;}
+ private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final AuditService audit;
+ public InventoryService(ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,AuditService audit){this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.audit=audit;}
  @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(Pageable p){return balances.findAll(limited(p)).map(InventoryDtos.BalanceView::from);}
  @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(Pageable p){
   Pageable ordered=PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),Sort.by(Sort.Direction.DESC,"occurredAt"));
@@ -47,7 +48,9 @@ public class InventoryService {
   if(r.direction()==InventoryDtos.Direction.INCREASE){balance.increase(quantity);type=MovementType.ADJUSTMENT_IN;}
   else {balance.decrease(quantity);type=MovementType.ADJUSTMENT_OUT;}
   StockMovement movement=new StockMovement(product,warehouse,type,quantity,product.getCostPrice(),"ADJUSTMENT",null,key,hash,r.reason().trim(),actor);
-  return InventoryDtos.MovementView.from(movements.save(movement));
+  StockMovement persisted=movements.saveAndFlush(movement);
+  audit.record(actor,"STOCK_ADJUSTED","STOCK_MOVEMENT",persisted.getId(),java.util.Map.of("productId",product.getId().toString(),"warehouseId",warehouse.getId().toString(),"movementType",type.name(),"quantity",quantity.toPlainString()));
+  return InventoryDtos.MovementView.from(persisted);
  }
  private Pageable limited(Pageable p){return PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort());}
  private String hash(String value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException("No se pudo calcular huella de idempotencia.",ex);}}
