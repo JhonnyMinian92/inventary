@@ -25,7 +25,7 @@ public class OutboxEvent {
   this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=Map.copyOf(payload);
   this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
  }
- public void claim(Instant leaseUntil){
+ public boolean claim(Instant leaseUntil){
   Instant now=Instant.now();
   if(!"PENDING".equals(status)&&!"PROCESSING".equals(status))
    throw new IllegalStateException("Solo se pueden reclamar eventos Outbox pendientes o con lease vencido.");
@@ -33,9 +33,15 @@ public class OutboxEvent {
    throw new IllegalStateException("El evento Outbox todavía está en periodo de espera.");
   if(leaseUntil==null||!leaseUntil.isAfter(now))
    throw new IllegalArgumentException("El lease del evento Outbox debe estar en el futuro.");
+  if(attempts>=10){
+   status="FAILED";
+   nextAttemptAt=now;
+   return false;
+  }
   attempts++;
   status="PROCESSING";
   nextAttemptAt=leaseUntil;
+  return true;
  }
  public void markPublished(){if(!"PROCESSING".equals(status))throw new IllegalStateException("El evento Outbox no está reclamado.");this.status="PUBLISHED";this.publishedAt=Instant.now();}
  public void markFailed(){

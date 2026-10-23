@@ -1,12 +1,15 @@
 package com.ecuapp.inventary.sales;
 
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -15,6 +18,7 @@ import java.util.UUID;
  */
 @Service
 public class OutboxClaimService {
+    private static final Logger log = LoggerFactory.getLogger(OutboxClaimService.class);
     private static final int MAX_BATCH_SIZE = 50;
     private static final Duration LEASE = Duration.ofMinutes(10);
 
@@ -30,9 +34,16 @@ public class OutboxClaimService {
         Instant leaseUntil = now.plus(LEASE).truncatedTo(ChronoUnit.MICROS);
         List<OutboxEvent> events = repository.lockReadyForClaim(now, MAX_BATCH_SIZE);
         if (events.isEmpty()) return List.of();
-        events.forEach(event -> event.claim(leaseUntil));
+        List<OutboxEvent> claimed = new ArrayList<>(events.size());
+        for (OutboxEvent event : events) {
+            if (event.claim(leaseUntil)) {
+                claimed.add(event);
+            } else {
+                log.error("Evento Outbox agotó sus diez intentos tras vencer el lease; id={}", event.getId());
+            }
+        }
         repository.saveAllAndFlush(events);
-        return List.copyOf(events);
+        return List.copyOf(claimed);
     }
 
     @Transactional

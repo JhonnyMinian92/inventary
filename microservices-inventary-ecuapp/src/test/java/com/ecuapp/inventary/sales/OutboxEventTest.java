@@ -16,7 +16,7 @@ class OutboxEventTest {
                 Map.of("saleNumber", "VTA-1"));
         Instant lease = Instant.now().plus(Duration.ofMinutes(10));
 
-        event.claim(lease);
+        assertTrue(event.claim(lease));
 
         assertEquals("PROCESSING", event.getStatus());
         assertEquals(1, event.getAttempts());
