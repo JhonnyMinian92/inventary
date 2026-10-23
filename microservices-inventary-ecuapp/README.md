@@ -265,3 +265,13 @@ Los comandos de creación, despacho, recepción, cancelación y reversión requi
 - Los errores HTTP de `/api/**` generan eventos de auditoría con actor disponible, ruta sin query string, método, estado y correlación. Nunca se guardan cuerpos ni credenciales.
 - OpenAPI descubre las rutas de los controladores. JWT Bearer se documenta para rutas privadas y `X-Integration-Key` para WhatsApp. Habilita Swagger solo en desarrollo con `SWAGGER_ENABLED=true`.
 - Véase [21 — Implementación P11](docs/21-implementacion-p11-auditoria-documentacion-api.md) y [05 — Catálogo de APIs](docs/05-catalogo-apis.md).
+
+
+## Integración y entrega (P12)
+
+- La rama de integración P12 incluye las fases P01–P11, incluida la auditoría y el contrato OpenAPI.
+- Docker Compose levanta PostgreSQL 16 con healthcheck y volumen persistente; la API espera a que PostgreSQL esté saludable antes de arrancar.
+- El Dockerfile empaqueta con Java 21 y ejecuta la aplicación en JRE como usuario no root.
+- El workflow `.github/workflows/backend-ci.yml` está preparado para ejecutar `mvn -B verify` contra PostgreSQL 16, pero por ahora solo se inicia manualmente desde GitHub Actions para no disparar validaciones sin autorización.
+- No se ha ejecutado build, test, CI, arranque ni migraciones durante P12. La integración y publicación final en `master` quedan pendientes de la fase de validación autorizada.
+- Guía: [22 — P12: integración del código y entrega](docs/22-entrega-p12-integracion-codigo.md).

@@ -144,4 +144,4 @@ La especificación del backend, el contrato REST propuesto, los requerimientos, 
 
 ## Estado del backend
 
-El estado vigente se registra en [la documentación técnica del backend](microservices-inventary-ecuapp/docs/README.md). P11 incorpora trazabilidad de fallos HTTP, consulta acotada de auditoría, errores RFC 9457 y OpenAPI sincronizado con los controladores. La validación local permanece pendiente hasta completar la implementación fuente acordada.
+El estado vigente se registra en [la documentación técnica del backend](microservices-inventary-ecuapp/docs/README.md). P12 reúne en una rama de integración el código P01–P11, el procedimiento PostgreSQL/Docker y un workflow de verificación manual. No se han ejecutado pruebas, build, CI, arranque ni migraciones; la validación y el merge final permanecen pendientes de autorización.
