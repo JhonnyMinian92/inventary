@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUID>{
  @Lock(LockModeType.PESSIMISTIC_WRITE)
- @Query("select distinct p from PurchaseOrder p left join fetch p.lines where p.id=:id")
+ @Query("select p from PurchaseOrder p where p.id=:id")
  Optional<PurchaseOrder> findForUpdate(@Param("id") UUID id);
  @EntityGraph(attributePaths={"lines","lines.product","supplier","warehouse"})
  @Query("select distinct p from PurchaseOrder p where p.id=:id")

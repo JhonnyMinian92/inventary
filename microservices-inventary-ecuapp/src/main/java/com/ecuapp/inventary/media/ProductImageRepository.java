@@ -10,7 +10,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage,UUID>
  @Modifying(flushAutomatically=true,clearAutomatically=true)
  @Query("update ProductImage i set i.primaryImage=false where i.product.id=:productId and i.published=true")
  int clearPrimary(@Param("productId") UUID productId);
- @Modifying(flushAutomatically=true,clearAutomatically=true)
+ @Modifying(flushAutomatically=true)
  @Query("update ProductImage i set i.primaryImage=false where i.product.id=:productId and i.id<>:imageId and i.published=true")
  int clearPrimaryExcept(@Param("productId") UUID productId,@Param("imageId") UUID imageId);
 }

@@ -34,6 +34,7 @@ public class ProductImageService {
   if(!image.isPublished())throw new ResourceNotFoundException("Imagen publicada",imageId);
   if(r.primaryImage())images.clearPrimaryExcept(productId,imageId);
   image.update(clean(r.altText()),r.sortOrder(),r.primaryImage());
+  images.save(image);
   audit.record(actor,"PRODUCT_IMAGE_UPDATED","PRODUCT_IMAGE",imageId,Map.of("productId",productId.toString(),"primary",r.primaryImage()));
   return ProductImageDtos.View.from(image);
  }

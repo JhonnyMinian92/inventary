@@ -9,7 +9,6 @@ import java.util.UUID;
 public interface SaleRepository extends JpaRepository<Sale,UUID>{
  Optional<Sale> findByIdempotencyKey(String key);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
- @EntityGraph(attributePaths={"items","items.product","warehouse"})
  @Query("select s from Sale s where s.id=:id")
  Optional<Sale> findForUpdateById(@Param("id") UUID id);
  @EntityGraph(attributePaths={"items","items.product","warehouse"})

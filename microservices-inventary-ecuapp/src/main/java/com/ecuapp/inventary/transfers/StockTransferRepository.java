@@ -9,7 +9,7 @@ import java.util.UUID;
 public interface StockTransferRepository extends JpaRepository<StockTransfer,UUID>{
  Optional<StockTransfer> findByIdempotencyKey(String key);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
- @Query("select distinct t from StockTransfer t left join fetch t.lines where t.id=:id")
+ @Query("select t from StockTransfer t where t.id=:id")
  Optional<StockTransfer> findForUpdate(@Param("id") UUID id);
  @EntityGraph(attributePaths={"sourceWarehouse","destinationWarehouse","lines","lines.product"})
  @Query("select distinct t from StockTransfer t where t.id=:id")
