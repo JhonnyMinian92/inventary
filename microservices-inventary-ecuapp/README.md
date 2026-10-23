@@ -102,7 +102,8 @@ Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálog
 | Inventario | `/api/v1/inventory/balances`, `/api/v1/inventory/movements` | Consultar saldos y ledger |
 | Ajustes | `POST /api/v1/inventory/adjustments` | Entrada/salida con Idempotency-Key y motivo |
 | Reposición | `/api/v1/inventory/reorder-rules`, `GET /api/v1/inventory/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
-| Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho |
+| Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho; ledger ligado a líneas y ubicaciones |
+| Conteos físicos | `/api/v1/inventory/counts` | Capturar cantidades, consultar diferencias, contabilizar ajustes o cancelar; snapshots inmutables e idempotencia |
 | Ventas | `/api/v1/sales` | Registrar ventas, consulta paginada y detalle |
 | Devoluciones de venta | `/api/v1/sales-returns` | Restock o merma, limitando el total devuelto a la cantidad original |
 | Clientes | `/api/v1/customers` | Crear y mantener contactos de cliente |
@@ -136,6 +137,24 @@ Content-Type: application/json
 ```
 
 Las cantidades son positivas y admiten tres decimales. El servicio bloquea el saldo afectado, evita cantidades negativas o consumo del stock reservado y escribe el movimiento en la misma transacción. Misma clave y mismo contenido devuelve el resultado original; misma clave con contenido distinto responde conflicto.
+
+### Conteo físico
+
+```http
+POST /api/v1/inventory/counts
+Authorization: Bearer <JWT>
+Idempotency-Key: conteo-bodega-001
+Content-Type: application/json
+
+{
+  "warehouseId": "UUID_DEL_ALMACEN",
+  "items": [
+    {"productId": "UUID_DEL_PRODUCTO", "countedQuantity": 14.000}
+  ]
+}
+```
+
+La creación captura el saldo esperado y la cantidad física contada. Consulta el conteo en `GET /api/v1/inventory/counts/{id}`; después, `POST /api/v1/inventory/counts/{id}/post` aplica únicamente la diferencia. Si el saldo cambió desde la captura, la contabilización se rechaza para evitar sobrescribir movimientos posteriores. `POST /api/v1/inventory/counts/{id}/cancel` cancela solo conteos abiertos. Las líneas capturadas no se editan; una corrección requiere un nuevo conteo.
 
 ### Venta
 
@@ -179,7 +198,7 @@ La API solo almacena URLs HTTPS de imágenes; no descarga las URLs recibidas, lo
 - `NUMERIC(14,2)` para importes, `NUMERIC(14,3)` para cantidades.
 - Claves foráneas y `ON DELETE RESTRICT` para conservar documentos históricos.
 - Restricciones de dominio, unicidad, índices de consulta e idempotencia declarados mediante migraciones.
-- `StockBalance` es el saldo operativo; `StockMovement` es el ledger.
+- `StockBalance` es el saldo operativo; `StockMovement` es el ledger append-only protegido por triggers de base de datos. Las correcciones se representan con movimientos compensatorios.
 - Las órdenes de compra separan cantidad ordenada, recibida y pendiente.
 - Las órdenes conversacionales guardan snapshots de producto, precio y cantidad.
 
