@@ -167,3 +167,14 @@ Condiciones para revaluar WebFlux en un servicio aislado:
 - benchmark objetivo que demuestre una mejora con carga representativa.
 
 No combinar WebFlux con JPA bloqueante invocado directamente desde event loops; mover llamadas bloqueantes a boundedElastic evita bloquear el loop pero no convierte esa arquitectura en reactiva de extremo a extremo. Empezar con MVC reduce complejidad y deja la posibilidad de un adaptador/servicio WebFlux futuro. Véase también [09 — integración conversacional](09-webflux-n8n-whatsapp-openai.md).
+
+## 9. Arquitectura de escalabilidad
+
+La decisión detallada queda en [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md). En síntesis:
+- REST continúa siendo el contrato principal de comandos transaccionales y de integración con n8n.
+- Spring GraphQL se añade como capa de consulta compuesta del catálogo; resolver fields no debe crear consultas N+1 ni exponer costes sensibles.
+- Kafka + Transactional Outbox propaga eventos comprometidos a notificaciones WhatsApp, analítica y proyecciones. La aplicación confirma una venta en PostgreSQL antes de que el publicador emita el evento.
+- Caffeine se puede usar en un proceso; Redis proporciona caché compartida al escalar instancias. Ninguna de las dos cachés decide el stock de checkout.
+- HikariCP es el pool inicial; PgBouncer se evalúa cuando la cantidad total de conexiones lo amerite.
+- Particionamiento y read replicas se añaden en función de métricas de carga y consistencia; no se presupone que “millones de usuarios” determine por sí solo el tamaño de la base.
+- pgvector es una extensión opcional de búsqueda semántica, no una base transaccional sustituta.
