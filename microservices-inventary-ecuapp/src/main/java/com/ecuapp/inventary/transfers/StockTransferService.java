@@ -30,7 +30,8 @@ public class StockTransferService {
  @Transactional(readOnly=true) public Page<TransferDtos.View> list(Pageable p){return transfers.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(TransferDtos.View::from);}
  @Transactional(readOnly=true) public TransferDtos.View get(UUID id){return TransferDtos.View.from(transfers.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Transferencia",id)));}
  @Transactional public TransferDtos.View create(String key,TransferDtos.CreateRequest request,String actor){
-  if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio.");
+  if(key==null||key.isBlank()||key.trim().length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio.");
+  key=key.trim();
   String hash=hash(mapperValue(request));Optional<StockTransfer> previous=transfers.findByIdempotencyKey(key);
   if(previous.isPresent()){
    if(!hash.equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
@@ -53,6 +54,7 @@ public class StockTransferService {
    if(!seen.add(line.productId()))throw new BusinessRuleException("No repita un producto en más de una línea de transferencia.");
    Product product=products.findById(line.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
    if(!product.isActive())throw new BusinessRuleException("No se puede transferir un producto inactivo.");
+   if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control físico admiten transferencias.");
    BigDecimal qty=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
    lines.add(new StockTransferLine(product,qty,product.getCostPrice()));
   }
