@@ -42,7 +42,7 @@ mvn -B verify
 mvn spring-boot:run
 ```
 
-Ejecuta los comandos Maven desde `microservices-inventary-ecuapp/`. La configuración base no habilita Swagger y no incluye valores predeterminados para `DB_USERNAME`, `DB_PASSWORD` ni `JWT_SECRET`. Para desarrollo, activa explícitamente `SPRING_PROFILES_ACTIVE=dev`; para entornos compartidos o producción, proporciona secretos únicos mediante el gestor de secretos del entorno. El archivo `.env` está excluido de Git y nunca debe contener credenciales de producción en un entorno de desarrollo.
+Ejecuta los comandos Maven desde `microservices-inventary-ecuapp/`. La configuración base no habilita Swagger y no incluye valores predeterminados para `DB_USERNAME`, `DB_PASSWORD` ni `JWT_SECRET`. Para desarrollo, activa explícitamente `SPRING_PROFILES_ACTIVE=dev`; el perfil `prod` mantiene Swagger, OpenAPI y GraphiQL deshabilitados. Para entornos compartidos o producción, proporciona secretos únicos mediante el gestor de secretos del entorno. El archivo `.env` está excluido de Git y nunca debe contener credenciales de producción en un entorno de desarrollo.
 
 ### Con Docker Compose
 
