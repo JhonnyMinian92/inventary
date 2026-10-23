@@ -28,7 +28,7 @@ La migración V10 crea app_role, app_permission y app_role_permission, normaliza
 
 Las autoridades de permisos (catalog:read, inventory:manage, purchasing:manage, sales:manage, audit:read, security:manage, entre otras) derivan de la matriz persistida en PostgreSQL. Se conservan alias de rol transitorios para mantener compatibilidad con anotaciones históricas durante la migración gradual. SUPER_ADMIN puede consultar permisos, crear roles personalizados y asignar permisos existentes mediante /api/v1/admin/roles y /api/v1/admin/permissions; la matriz de SUPER_ADMIN es inmutable por API.
 
-La capa HTTP deniega por defecto y exige permisos específicos para catálogo, inventario, compras, ventas, administración y auditoría. La cancelación de ventas exige permiso de cancelación y autorización de administrador; un vendedor no puede autoaprobar la anulación. El catálogo público solo admite GET. WhatsApp continúa validando su propia clave de integración.
+La capa HTTP deniega por defecto las rutas no clasificadas y exige permisos específicos para catálogo, inventario, compras, ventas, administración y auditoría. La cancelación de ventas exige permiso de cancelación y autorización de administrador; un vendedor no puede autoaprobar la anulación. El catálogo público solo admite GET. WhatsApp continúa validando su propia clave de integración.
 
 ### Administración de roles y permisos
 

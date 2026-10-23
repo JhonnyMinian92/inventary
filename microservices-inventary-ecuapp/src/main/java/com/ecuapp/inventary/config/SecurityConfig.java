@@ -79,6 +79,8 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.GET,"/actuator/health","/actuator/health/**").permitAll()
     .requestMatchers("/actuator/info").hasAuthority("technical:read")
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
+    .requestMatchers("/api/v1/auth/**").authenticated()
+    .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()
     .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
@@ -96,7 +98,7 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.POST,"/api/v1/sales/*/cancel").hasAuthority("sales:cancel")
     .requestMatchers(HttpMethod.GET,"/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:read")
     .requestMatchers("/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:manage")
-    .requestMatchers("/graphql").hasAuthority("catalog:read").anyRequest().authenticated())
+    .requestMatchers("/graphql").hasAuthority("catalog:read").anyRequest().denyAll())
    .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users,roles))));
   return http.build();
  }
