@@ -11,7 +11,6 @@ import java.util.UUID;
 public interface WhatsAppOrderRepository extends JpaRepository<WhatsAppOrder,UUID> {
  Optional<WhatsAppOrder> findByIdempotencyKey(String key);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
- @EntityGraph(attributePaths={"items","items.product","cart","quote","warehouse"})
  @Query("select o from WhatsAppOrder o where o.id=:id")
  Optional<WhatsAppOrder> findForUpdate(@Param("id") UUID id);
  @EntityGraph(attributePaths={"items","items.product","cart","quote","warehouse"})

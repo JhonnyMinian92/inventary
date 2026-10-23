@@ -25,6 +25,7 @@ public class WhatsAppCart {
  public void removeItem(WhatsAppCartItem item){items.remove(item);}
  public void markQuoted(){if(status==CartStatus.ORDERED||status==CartStatus.EXPIRED)throw new IllegalStateException("El carrito ya no puede cotizarse.");status=CartStatus.QUOTED;}
  public void reopen(){if(status==CartStatus.ORDERED||status==CartStatus.EXPIRED)throw new IllegalStateException("El carrito ya no se puede modificar.");status=CartStatus.OPEN;expiresAt=Instant.now().plus(2,ChronoUnit.HOURS);}
+ public void reopenAfterOrderCancelled(){if(status!=CartStatus.ORDERED)throw new IllegalStateException("Solo se puede reabrir el carrito de una orden cancelada o expirada.");status=CartStatus.OPEN;expiresAt=Instant.now().plus(2,ChronoUnit.HOURS);}
  public void markOrdered(){status=CartStatus.ORDERED;}
  public void expire(){status=CartStatus.EXPIRED;}
  public UUID getId(){return id;} public String getCustomerRef(){return customerRef;} public CartStatus getStatus(){return status;}
