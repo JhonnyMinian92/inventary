@@ -50,8 +50,8 @@ management:
   endpoint.health.show-details: never
 app:
   security:
-    # Solo para desarrollo local; en otros entornos configurar JWT_SECRET.
-    jwt-secret: ${JWT_SECRET:inventary-local-dev-key-change-me-32bytes-minimum}
+    # JWT_SECRET es obligatorio en todos los entornos; usa .env.example solo para desarrollo local.
+    jwt-secret: ${JWT_SECRET}
     token-ttl-minutes: ${JWT_TTL_MINUTES:60}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
