@@ -2,9 +2,13 @@ package com.ecuapp.inventary.catalog.infrastructure.adapter.out.persistence;
 
 import com.ecuapp.inventary.catalog.Product;
 import com.ecuapp.inventary.catalog.ProductRepository;
+import com.ecuapp.inventary.catalog.application.PageQuery;
+import com.ecuapp.inventary.catalog.application.PageResult;
 import com.ecuapp.inventary.catalog.application.port.out.ProductPersistencePort;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -20,18 +24,18 @@ public class JpaProductPersistenceAdapter implements ProductPersistencePort {
     }
 
     @Override
-    public Page<Product> findAll(Pageable pageable) {
-        return repository.findAll(pageable);
+    public PageResult<Product> findAll(PageQuery query) {
+        return result(repository.findAll(pageable(query)), query);
     }
 
     @Override
-    public Page<Product> searchByNameOrSku(String query, Pageable pageable) {
-        return repository.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(query, query, pageable);
+    public PageResult<Product> searchByNameOrSku(String query, PageQuery page) {
+        return result(repository.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(query, query, pageable(page)), page);
     }
 
     @Override
-    public Page<Product> findActivePublic(Pageable pageable) {
-        return repository.findByActiveTrueAndCategory_ActiveTrue(pageable);
+    public PageResult<Product> findActivePublic(PageQuery page) {
+        return result(repository.findByActiveTrueAndCategory_ActiveTrue(pageable(page)), page);
     }
 
     @Override
@@ -52,5 +56,16 @@ public class JpaProductPersistenceAdapter implements ProductPersistencePort {
     @Override
     public Product save(Product product) {
         return repository.save(product);
+    }
+
+    private Pageable pageable(PageQuery query) {
+        Sort sort = query.sort().isEmpty() ? Sort.unsorted() : Sort.by(query.sort().stream()
+            .map(term -> new Sort.Order(term.direction() == PageQuery.Direction.DESC ? Sort.Direction.DESC : Sort.Direction.ASC, term.property()))
+            .toList());
+        return PageRequest.of(query.page(), Math.min(query.size(), 100), sort);
+    }
+
+    private PageResult<Product> result(Page<Product> page, PageQuery query) {
+        return new PageResult<>(page.getContent(), page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 }
