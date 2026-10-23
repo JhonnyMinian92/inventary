@@ -33,8 +33,8 @@ class ProcurementIntegrationTest {
     List.of(new PurchaseDtos.OrderLineRequest(product.getId(),new BigDecimal("5.000"),new BigDecimal("1.00"))));
   PurchaseDtos.OrderView order=purchases.create(orderRequest,"test");
   UUID orderLineId=order.items().get(0).id();
-  purchases.submit(order.id());
-  purchases.approve(order.id());
+  purchases.submit(order.id(),"test");
+  purchases.approve(order.id(),"test");
 
   PurchaseDtos.ReceiptRequest firstRequest=new PurchaseDtos.ReceiptRequest(List.of(new PurchaseDtos.ReceiptLineRequest(orderLineId,new BigDecimal("3.000"))));
   PurchaseDtos.ReceiptView first=purchases.receive(order.id(),"receipt-a-"+suffix,firstRequest,"test");
