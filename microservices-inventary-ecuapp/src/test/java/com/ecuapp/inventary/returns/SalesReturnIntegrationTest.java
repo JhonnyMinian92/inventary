@@ -24,17 +24,26 @@ class SalesReturnIntegrationTest {
  @Autowired SaleService sales;
  @Autowired SalesReturnService returns;
 
- @Test void returnMustReferenceSaleLineAndCannotExceedSoldQuantity(){
+ @Test void returnCannotExceedSoldQuantityAndIsIdempotent(){
   String suffix=UUID.randomUUID().toString().substring(0,8);
   Category category=categories.save(new Category("Return category "+suffix,"return-category-"+suffix,null));
   Product product=products.save(new Product("RET-"+suffix,"Return product",null,category,new BigDecimal("2.00"),new BigDecimal("5.00"),"USD",null));
   Warehouse warehouse=warehouses.save(new Warehouse("RET-"+suffix,"Return warehouse",null));
   StockBalance stock=balances.save(new StockBalance(product,warehouse));stock.increase(new BigDecimal("5.000"));balances.saveAndFlush(stock);
-  SaleDtos.CreateRequest request=new SaleDtos.CreateRequest(warehouse.getId(),"Return test",null,SaleChannel.POS,List.of(new SaleDtos.LineRequest(product.getId(),new BigDecimal("2.000"))));
-  SaleDtos.View sale=sales.create("return-sale-"+suffix,request,"test");
-  UUID saleItemId=sale.items().get(0).productId()!=null?sale.id():sale.id(); // SaleView returns product IDs, retrieve original item in the service DTO through its list below.
-  UUID itemId=sales.get(sale.id()).items().get(0).productId();
-  // Sale DTO line is keyed by product in this version; look up the persistent sale item through SaleRepository in follow-up API tests.
-  assertNotNull(itemId);
+  SaleDtos.CreateRequest saleRequest=new SaleDtos.CreateRequest(warehouse.getId(),"Return test",null,SaleChannel.POS,List.of(new SaleDtos.LineRequest(product.getId(),new BigDecimal("2.000"))));
+  SaleDtos.View sale=sales.create("return-sale-"+suffix,saleRequest,"test");
+  UUID saleItemId=sale.items().get(0).id();
+
+  SalesReturnDtos.CreateRequest returnRequest=new SalesReturnDtos.CreateRequest(sale.id(),"Customer returned one unit",
+    List.of(new SalesReturnDtos.LineRequest(saleItemId,new BigDecimal("1.000"),ReturnDisposition.RESTOCK)));
+  SalesReturnDtos.View first=returns.create("return-key-"+suffix,returnRequest,"test");
+  SalesReturnDtos.View retry=returns.create("return-key-"+suffix,returnRequest,"test");
+  assertEquals(first.id(),retry.id());
+  assertEquals(ReturnStatus.POSTED,first.status());
+  assertEquals(new BigDecimal("4.000"),balances.findByProductIdAndWarehouseId(product.getId(),warehouse.getId()).orElseThrow().getOnHand());
+
+  SalesReturnDtos.CreateRequest excessive=new SalesReturnDtos.CreateRequest(sale.id(),"Excess quantity",
+    List.of(new SalesReturnDtos.LineRequest(saleItemId,new BigDecimal("2.000"),ReturnDisposition.RESTOCK)));
+  assertThrows(BusinessRuleException.class,()->returns.create("return-excess-"+suffix,excessive,"test"));
  }
 }
