@@ -53,6 +53,7 @@ public class SaleService {
    if(!uniqueProducts.add(line.productId()))throw new BusinessRuleException("No repita el mismo producto en varias líneas de una venta; consolide las cantidades.");
    Product product=products.findById(line.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
    if(!product.isActive()||!product.getCategory().isActive())throw new BusinessRuleException("El producto "+product.getSku()+" está inactivo o su categoría no está publicada.");
+   if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo se pueden vender físicamente productos con control de stock.");
    if(saleCurrency==null)saleCurrency=product.getCurrency();else if(!saleCurrency.equals(product.getCurrency()))throw new BusinessRuleException("No se pueden combinar productos con monedas diferentes en una venta.");
    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
    StockBalance balance=balances.findForUpdate(product.getId(),warehouse.getId()).orElseThrow(()->new BusinessRuleException("No existe saldo de inventario para "+product.getSku()+" en el almacén."));
