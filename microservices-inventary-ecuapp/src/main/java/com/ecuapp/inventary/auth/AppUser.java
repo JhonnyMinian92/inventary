@@ -7,7 +7,7 @@ public class AppUser {
  @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
  @Column(nullable=false,length=80) private String username;
  @Column(name="password_hash",nullable=false,length=100) private String passwordHash;
- @Column(nullable=false,length=32) private String role;
+ @Column(nullable=false,length=40) private String role;
  @Column(nullable=false) private boolean active=true;
  @Column(name="token_version",nullable=false) private int tokenVersion;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;

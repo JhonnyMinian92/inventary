@@ -26,7 +26,7 @@ La migración V10 crea app_role, app_permission y app_role_permission, normaliza
 | VENDEDOR | Lectura de catálogo/stock y creación de ventas. |
 | SOPORTE_TI | Permiso técnico de solo lectura; sin permisos financieros. |
 
-Las autoridades de permisos (catalog:read, inventory:manage, purchasing:manage, sales:manage, audit:read, security:manage, entre otras) derivan de la matriz persistida en PostgreSQL. Se conservan alias de rol transitorios para mantener compatibilidad con anotaciones históricas durante la migración gradual.
+Las autoridades de permisos (catalog:read, inventory:manage, purchasing:manage, sales:manage, audit:read, security:manage, entre otras) derivan de la matriz persistida en PostgreSQL. Se conservan alias de rol transitorios para mantener compatibilidad con anotaciones históricas durante la migración gradual. SUPER_ADMIN puede consultar permisos, crear roles personalizados y asignar permisos existentes mediante /api/v1/admin/roles y /api/v1/admin/permissions; la matriz de SUPER_ADMIN es inmutable por API.
 
 La capa HTTP deniega por defecto y exige permisos específicos para catálogo, inventario, compras, ventas, administración y auditoría. La cancelación de ventas exige permiso de cancelación y autorización de administrador; un vendedor no puede autoaprobar la anulación. El catálogo público solo admite GET. WhatsApp continúa validando su propia clave de integración.
 
@@ -52,6 +52,7 @@ La capa HTTP deniega por defecto y exige permisos específicos para catálogo, i
 - HS256 se mantiene por decisión del MVP. Rotación de claves y federación OIDC/RS256 quedan para una fase posterior.
 - Algunas rutas históricas mantienen alias de roles mientras migran a permisos explícitos; la capa HTTP aplica permisos RBAC adicionales.
 - La autorización por objeto y el aislamiento por almacén deben completarse cuando cada endpoint incorpore contexto de recurso. P01 mantiene una empresa por instalación.
+- Los roles personalizados se asignan a permisos del catálogo existente; no se permite crear permisos arbitrarios desde HTTP. El rol SUPER_ADMIN y su matriz no se pueden modificar por API.
 
 ## Validación
 

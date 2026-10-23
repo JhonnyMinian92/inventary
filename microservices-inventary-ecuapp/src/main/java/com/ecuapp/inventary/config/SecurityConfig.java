@@ -52,7 +52,8 @@ public class SecurityConfig {
   return jwt->{
    AppUser user=users.findByUsername(jwt.getSubject()).filter(AppUser::isActive).orElseThrow(()->new BadCredentialsException("La sesión ya no es válida."));
    Integer version=jwt.getClaimAsInt("ver");if(version==null||version!=user.getTokenVersion())throw new BadCredentialsException("La sesión ya no es válida.");
-   String role=UserRole.valueOf(user.getRole()).name();
+   String role=user.getRole();
+   roles.findByCodeAndActiveTrue(role).orElseThrow(()->new BadCredentialsException("La sesión ya no es válida."));
    var authorities=new java.util.LinkedHashSet<SimpleGrantedAuthority>();authorities.add(new SimpleGrantedAuthority("ROLE_"+role));
    switch(role){case "SUPER_ADMIN"->authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));case "MANAGER_ALMACEN"->authorities.add(new SimpleGrantedAuthority("ROLE_INVENTORY_MANAGER"));case "VENDEDOR"->authorities.add(new SimpleGrantedAuthority("ROLE_SALES"));default->{}}
    roles.findActivePermissionCodes(role).stream().map(SimpleGrantedAuthority::new).forEach(authorities::add);
@@ -80,7 +81,7 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()
-    .requestMatchers("/api/v1/admin/users/**").hasAuthority("security:manage")
+    .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
     .requestMatchers("/api/v1/audit-events/**").hasAuthority("audit:read")
     .requestMatchers(HttpMethod.GET,"/api/v1/catalog/**").hasAuthority("catalog:read")
     .requestMatchers("/api/v1/catalog/**").hasAuthority("catalog:manage")
