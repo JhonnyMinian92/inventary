@@ -13,7 +13,7 @@ public class InventoryCostLayer {
  @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
  @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="product_id",nullable=false) private Product product;
  @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="warehouse_location_id",nullable=false) private WarehouseLocation location;
- @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="source_movement_id",nullable=false) private StockMovement sourceMovement;
+ @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="source_movement_id") private StockMovement sourceMovement;
  @Column(name="received_quantity",nullable=false,precision=14,scale=3) private BigDecimal receivedQuantity;
  @Column(name="remaining_quantity",nullable=false,precision=14,scale=3) private BigDecimal remainingQuantity;
  @Column(name="unit_cost",nullable=false,precision=14,scale=4) private BigDecimal unitCost;

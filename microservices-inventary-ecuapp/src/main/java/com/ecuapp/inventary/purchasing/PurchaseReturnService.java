@@ -24,10 +24,10 @@ import java.util.*;
 public class PurchaseReturnService {
  private final PurchaseReturnRepository returns;private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;
  private final GoodsReceiptLineRepository receiptLines;private final StockBalanceRepository balances;private final StockMovementRepository movements;
- private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;
+ private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;private final InventoryCostingService costing;
  public PurchaseReturnService(PurchaseReturnRepository returns,PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,
-  StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units){
-  this.returns=returns;this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;
+  StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units,InventoryCostingService costing){
+  this.returns=returns;this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;
  }
  @Transactional(readOnly=true) public PurchaseReturnDtos.View get(UUID id){return PurchaseReturnDtos.View.from(returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución a proveedor",id)));}
  @Transactional public PurchaseReturnDtos.View create(String key,PurchaseReturnDtos.CreateRequest request,String actor){
@@ -66,8 +66,11 @@ public class PurchaseReturnService {
    PurchaseReturnLine returnLine=new PurchaseReturnLine(c.source(),c.quantity());purchaseReturn.addLine(returnLine);returns.saveAndFlush(purchaseReturn);
    UnitOfMeasure unit=units.findById(c.source().getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+c.source().getProduct().getSku()+"."));
    String movementKey="PRTN-"+purchaseReturn.getId()+"-"+c.source().getId();
-   StockMovement movement=new StockMovement(c.source().getProduct(),receipt.getWarehouse(),MovementType.RETURN_OUT,c.quantity(),c.source().getUnitCost(),"PURCHASE_RETURN",purchaseReturn.getId(),movementKey,hash(purchaseReturn.getId()+"|"+returnLine.getId()+"|"+c.quantity().toPlainString()),"Devolución al proveedor "+number,actor);
-   movement.assignLocations(balances.findForUpdate(c.source().getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow().getLocation(),null,unit,number,c.source().getId(),null);movements.save(movement);
+   StockBalance balance=balances.findForUpdate(c.source().getProduct().getId(),receipt.getWarehouse().getId()).orElseThrow();
+   BigDecimal unitCost=costing.currentIssueUnitCost(c.source().getProduct(),balance.getLocation(),c.quantity(),c.source().getUnitCost());
+   StockMovement movement=new StockMovement(c.source().getProduct(),receipt.getWarehouse(),MovementType.RETURN_OUT,c.quantity(),unitCost,"PURCHASE_RETURN",purchaseReturn.getId(),movementKey,hash(purchaseReturn.getId()+"|"+returnLine.getId()+"|"+c.quantity().toPlainString()),"Devolución al proveedor "+number,actor);
+   movement.assignLocations(balance.getLocation(),null,unit,number,c.source().getId(),null);
+   StockMovement persisted=movements.saveAndFlush(movement);costing.recordOutbound(persisted);
   }
   returns.save(purchaseReturn);
   outbox.save(new OutboxEvent("PURCHASE_RETURN",purchaseReturn.getId(),"PURCHASE_RETURN_POSTED",Map.of("returnId",purchaseReturn.getId().toString(),"returnNumber",number,"receiptId",receipt.getId().toString())));

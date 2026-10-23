@@ -33,14 +33,14 @@ public class SaleService {
  private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
  private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;
  private final BusinessPartnerRepository partners;private final IdempotencyRecordRepository idempotencyRecords;
- private final UnitOfMeasureRepository units;
+ private final UnitOfMeasureRepository units;private final InventoryCostingService costing;
  public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,
   SalesReturnLineRepository returnLines,BusinessPartnerRepository partners,IdempotencyRecordRepository idempotencyRecords,
-  UnitOfMeasureRepository units){
+  UnitOfMeasureRepository units,InventoryCostingService costing){
   this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;
   this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;this.partners=partners;
-  this.idempotencyRecords=idempotencyRecords;this.units=units;
+  this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;
  }
  @Transactional(readOnly=true) public Page<SaleDtos.View> list(Pageable p){
   return sales.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(SaleDtos.View::from);
@@ -150,11 +150,13 @@ public class SaleService {
    SaleItem item=itemsByProduct.get(line.product().getId());
    String movementKey="SALE-"+sha256(key).substring(0,32)+"-"+line.product().getId();
    String movementHash=sha256(sale.getId()+"|"+item.getId()+"|"+line.product().getId()+"|"+line.quantity().toPlainString());
+   BigDecimal unitCost=costing.currentIssueUnitCost(line.product(),line.balance().getLocation(),line.quantity(),line.product().getCostPrice());
    StockMovement movement=new StockMovement(line.product(),warehouse,MovementType.SALE,line.quantity(),
-    line.product().getCostPrice(),"SALE",sale.getId(),movementKey,movementHash,
+    unitCost,"SALE",sale.getId(),movementKey,movementHash,
     "Salida por venta "+sale.getSaleNumber(),actor);
    movement.assignLocations(line.balance().getLocation(),null,line.unit(),sale.getId().toString(),item.getId(),null);
-   movements.save(movement);
+   StockMovement persisted=movements.saveAndFlush(movement);
+   costing.recordOutbound(persisted);
   }
   movements.flush();
 
@@ -200,8 +202,10 @@ public class SaleService {
    balance.increase(item.getQuantity());
    UnitOfMeasure unit=units.findById(item.getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+item.getSkuSnapshot()+"."));
    String movementKey="SALE-CANCEL-"+sale.getId()+"-"+item.getProduct().getId();
-   StockMovement movement=new StockMovement(item.getProduct(),sale.getWarehouse(),MovementType.SALE_CANCEL_IN,item.getQuantity(),item.getProduct().getCostPrice(),"SALE_CANCELLATION",sale.getId(),movementKey,sha256(sale.getId()+"|"+sale.getCancellationReason()+"|"+item.getId()),"Cancelación aprobada de venta "+sale.getSaleNumber()+": "+sale.getCancellationReason(),actor);
-   movement.assignLocations(null,balance.getLocation(),unit,sale.getId().toString(),item.getId(),null);movements.save(movement);
+   BigDecimal cancellationCost=costing.inboundUnitCost(item.getProduct(),MovementType.SALE_CANCEL_IN,"SALE_CANCELLATION",sale.getId(),item.getId(),item.getProduct().getCostPrice());
+   StockMovement movement=new StockMovement(item.getProduct(),sale.getWarehouse(),MovementType.SALE_CANCEL_IN,item.getQuantity(),cancellationCost,"SALE_CANCELLATION",sale.getId(),movementKey,sha256(sale.getId()+"|"+sale.getCancellationReason()+"|"+item.getId()),"Cancelación aprobada de venta "+sale.getSaleNumber()+": "+sale.getCancellationReason(),actor);
+   movement.assignLocations(null,balance.getLocation(),unit,sale.getId().toString(),item.getId(),null);
+   StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
   }
   sale.approveCancellation(actor);
   outbox.save(new OutboxEvent("SALE",sale.getId(),"SALE_CANCELLED",Map.of("saleId",sale.getId().toString(),"saleNumber",sale.getSaleNumber(),"reason",sale.getCancellationReason(),"requestedBy",sale.getCancellationRequestedBy(),"approvedBy",actor)));

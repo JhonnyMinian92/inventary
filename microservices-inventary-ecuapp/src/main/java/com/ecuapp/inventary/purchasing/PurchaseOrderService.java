@@ -30,10 +30,10 @@ public class PurchaseOrderService {
  private record ReceiptCalc(PurchaseOrderLine line,BigDecimal quantity){}
  private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final GoodsReceiptLineRepository receiptLines;private final IdempotencyRecordRepository idempotencyRecords;private final BusinessPartnerRepository partners;
  private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;
- private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;
+ private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final InventoryCostingService costing;
  public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,IdempotencyRecordRepository idempotencyRecords,BusinessPartnerRepository partners,WarehouseRepository warehouses,
-   ProductRepository products,StockBalanceRepository balances,WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
-  this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
+   ProductRepository products,StockBalanceRepository balances,WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,InventoryCostingService costing){
+  this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.costing=costing;
  }
  @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(Pageable p){return orders.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(PurchaseDtos.OrderView::from);}
  @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id){return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
@@ -127,7 +127,7 @@ public class PurchaseOrderService {
    movement.assignLocations(null,balances.findByProductIdAndWarehouseId(calc.line().getProduct().getId(),order.getWarehouse().getId()).orElseThrow().getLocation(),
     units.findById(calc.line().getProduct().getUnitOfMeasureId()).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",calc.line().getProduct().getUnitOfMeasureId())),
     receipt.getReceiptNumber(),receiptLine.getId(),null);
-   movements.save(movement);
+   StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
   }
   receipts.save(receipt);
   idempotency.markCompleted("GOODS_RECEIPT",receipt.getId(),(short)201);idempotencyRecords.save(idempotency);

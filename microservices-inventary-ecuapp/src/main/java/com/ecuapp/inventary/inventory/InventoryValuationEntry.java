@@ -18,6 +18,16 @@ public class InventoryValuationEntry {
  @Column(nullable=false,length=3) private String currency;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
  protected InventoryValuationEntry(){}
+ public InventoryValuationEntry(StockMovement stockMovement,InventoryCostLayer costLayer,CostingMethod method,
+   BigDecimal quantity,BigDecimal unitCost,String currency){
+  if(stockMovement==null||method==null||quantity==null||quantity.signum()<=0||unitCost==null||unitCost.signum()<0)
+   throw new IllegalArgumentException("La entrada de valoración requiere movimiento, método, cantidad y costo válidos.");
+  this.stockMovement=stockMovement;this.costLayer=costLayer;this.method=method;
+  this.quantity=quantity.setScale(3,java.math.RoundingMode.UNNECESSARY);
+  this.unitCost=unitCost.setScale(4,java.math.RoundingMode.HALF_UP);
+  this.totalCost=this.quantity.multiply(this.unitCost).setScale(4,java.math.RoundingMode.HALF_UP);
+  this.currency=currency;
+ }
  @PrePersist void create(){if(createdAt==null)createdAt=Instant.now();}
  public UUID getId(){return id;} public StockMovement getStockMovement(){return stockMovement;} public InventoryCostLayer getCostLayer(){return costLayer;} public CostingMethod getMethod(){return method;} public BigDecimal getQuantity(){return quantity;} public BigDecimal getUnitCost(){return unitCost;} public BigDecimal getTotalCost(){return totalCost;} public String getCurrency(){return currency;}
 }

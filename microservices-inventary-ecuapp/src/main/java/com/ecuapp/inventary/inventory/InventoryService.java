@@ -15,8 +15,8 @@ import java.util.UUID;
 
 @Service
 public class InventoryService {
- private final ProductRepository products;private final IdempotencyRecordRepository idempotencyRecords;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final AuditService audit;
- public InventoryService(ProductRepository products,IdempotencyRecordRepository idempotencyRecords,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,WarehouseLocationRepository locations,UnitOfMeasureRepository units,AuditService audit){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;}
+ private final ProductRepository products;private final IdempotencyRecordRepository idempotencyRecords;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final AuditService audit;private final InventoryCostingService costing;
+ public InventoryService(ProductRepository products,IdempotencyRecordRepository idempotencyRecords,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,WarehouseLocationRepository locations,UnitOfMeasureRepository units,AuditService audit,InventoryCostingService costing){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;}
  @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(Pageable p){return balances.findAll(limited(p)).map(InventoryDtos.BalanceView::from);}
  @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(Pageable p){
   Pageable ordered=PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),Sort.by(Sort.Direction.DESC,"occurredAt"));
@@ -60,10 +60,12 @@ public class InventoryService {
   MovementType type;
   if(r.direction()==InventoryDtos.Direction.INCREASE){balance.increase(quantity);type=MovementType.ADJUSTMENT_IN;}
   else {balance.decrease(quantity);type=MovementType.ADJUSTMENT_OUT;}
-  StockMovement movement=new StockMovement(product,warehouse,type,quantity,product.getCostPrice(),"ADJUSTMENT",null,key,hash,r.reason().trim(),actor);
+  BigDecimal unitCost=type==MovementType.ADJUSTMENT_OUT?costing.currentIssueUnitCost(product,balance.getLocation(),quantity,product.getCostPrice()):costing.inboundUnitCost(product,type,"ADJUSTMENT",null,null,product.getCostPrice());
+   StockMovement movement=new StockMovement(product,warehouse,type,quantity,unitCost,"ADJUSTMENT",null,key,hash,r.reason().trim(),actor);
   movement.assignLocations(type==MovementType.ADJUSTMENT_OUT?balance.getLocation():null,type==MovementType.ADJUSTMENT_IN?balance.getLocation():null,
    units.findById(product.getUnitOfMeasureId()).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",product.getUnitOfMeasureId())),key,null,null);
   StockMovement persisted=movements.saveAndFlush(movement);
+   if(type==MovementType.ADJUSTMENT_IN)costing.recordInbound(persisted);else costing.recordOutbound(persisted);
   idempotency.markCompleted("STOCK_MOVEMENT",persisted.getId(),(short) 200);
   idempotencyRecords.save(idempotency);
   audit.record(actor,"STOCK_ADJUSTED","STOCK_MOVEMENT",persisted.getId(),java.util.Map.of("productId",product.getId().toString(),"warehouseId",warehouse.getId().toString(),"movementType",type.name(),"quantity",quantity.toPlainString()));

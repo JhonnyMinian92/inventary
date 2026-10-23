@@ -25,10 +25,10 @@ import java.util.stream.Collectors;
 public class SalesReturnService {
  private final SaleRepository sales;private final SalesReturnRepository returns;private final SalesReturnLineRepository returnLines;
  private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
- private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;
+ private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;private final InventoryCostingService costing;
  public SalesReturnService(SaleRepository sales,SalesReturnRepository returns,SalesReturnLineRepository returnLines,StockBalanceRepository balances,WarehouseLocationRepository locations,
-   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units){
-  this.sales=sales;this.returns=returns;this.returnLines=returnLines;this.balances=balances;this.locations=locations;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;
+   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units,InventoryCostingService costing){
+  this.sales=sales;this.returns=returns;this.returnLines=returnLines;this.balances=balances;this.locations=locations;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;
  }
  @Transactional(readOnly=true) public SalesReturnDtos.View get(UUID id){return SalesReturnDtos.View.from(returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución de venta",id)));}
  @Transactional public SalesReturnDtos.View create(String key,SalesReturnDtos.CreateRequest request,String actor){
@@ -73,11 +73,20 @@ public class SalesReturnService {
      balance=balances.save(new StockBalance(c.item().getProduct(),warehouse,mainLocation));
     }
     balance.increase(c.quantity());
-    StockMovement movement=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Devolución "+number,actor);movement.assignLocations(null,balance.getLocation(),unit,number,c.item().getId(),null);movements.save(movement);
+    BigDecimal returnCost=costing.inboundUnitCost(c.item().getProduct(),MovementType.RETURN_IN,"SALES_RETURN",salesReturn.getId(),c.item().getId(),c.item().getProduct().getCostPrice());
+    StockMovement movement=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),returnCost,"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Devolución "+number,actor);
+    movement.assignLocations(null,balance.getLocation(),unit,number,c.item().getId(),null);
+    StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
    }else{
     // Se registran entrada y salida compensadas: el artículo devuelto como merma no aumenta stock vendible.
-    StockMovement inbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Entrada no vendible por devolución "+number,actor);inbound.assignLocations(null,traceLocation,unit,number,c.item().getId(),null);movements.save(inbound);
-    StockMovement outbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_OUT,c.quantity(),c.item().getProduct().getCostPrice(),"SALES_RETURN",salesReturn.getId(),base+"-OUT",movementHash,"Merma por devolución "+number,actor);outbound.assignLocations(traceLocation,null,unit,number,c.item().getId(),null);movements.save(outbound);
+    BigDecimal returnCost=costing.inboundUnitCost(c.item().getProduct(),MovementType.RETURN_IN,"SALES_RETURN",salesReturn.getId(),c.item().getId(),c.item().getProduct().getCostPrice());
+    StockMovement inbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_IN,c.quantity(),returnCost,"SALES_RETURN",salesReturn.getId(),base+"-IN",movementHash,"Entrada no vendible por devolución "+number,actor);
+    inbound.assignLocations(null,traceLocation,unit,number,c.item().getId(),null);
+    StockMovement persistedInbound=movements.saveAndFlush(inbound);costing.recordInbound(persistedInbound);
+    BigDecimal scrapCost=costing.currentIssueUnitCost(c.item().getProduct(),traceLocation,c.quantity(),returnCost);
+    StockMovement outbound=new StockMovement(c.item().getProduct(),warehouse,MovementType.RETURN_OUT,c.quantity(),scrapCost,"SALES_RETURN",salesReturn.getId(),base+"-OUT",movementHash,"Merma por devolución "+number,actor);
+    outbound.assignLocations(traceLocation,null,unit,number,c.item().getId(),null);
+    StockMovement persistedOutbound=movements.saveAndFlush(outbound);costing.recordOutbound(persistedOutbound);
    }
   }
   returns.save(salesReturn);
