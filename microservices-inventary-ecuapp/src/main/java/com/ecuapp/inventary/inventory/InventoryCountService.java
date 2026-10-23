@@ -4,6 +4,7 @@ import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.catalog.Product;
 import com.ecuapp.inventary.catalog.ProductKind;
 import com.ecuapp.inventary.catalog.ProductRepository;
+import com.ecuapp.inventary.catalog.UnitOfMeasureRepository;
 import com.ecuapp.inventary.common.BusinessRuleException;
 import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
@@ -32,18 +33,20 @@ public class InventoryCountService {
     private final StockBalanceRepository balances;
     private final StockMovementRepository movements;
     private final WarehouseLocationRepository locations;
+    private final UnitOfMeasureRepository units;
     private final AuditService audit;
 
     public InventoryCountService(InventoryCountRepository counts, ProductRepository products,
                                  WarehouseRepository warehouses, StockBalanceRepository balances,
                                  StockMovementRepository movements, WarehouseLocationRepository locations,
-                                 AuditService audit) {
+                                 UnitOfMeasureRepository units, AuditService audit) {
         this.counts = counts;
         this.products = products;
         this.warehouses = warehouses;
         this.balances = balances;
         this.movements = movements;
         this.locations = locations;
+        this.units = units;
         this.audit = audit;
     }
 
@@ -164,7 +167,8 @@ public class InventoryCountService {
                 hash(count.getId() + "|" + line.getId() + "|" + difference.toPlainString()),
                 "Ajuste por conteo físico " + count.getCountNumber(), actor);
             movement.assignLocations(type == MovementType.ADJUSTMENT_OUT ? balance.getLocation() : null,
-                type == MovementType.ADJUSTMENT_IN ? balance.getLocation() : null, null,
+                type == MovementType.ADJUSTMENT_IN ? balance.getLocation() : null,
+                units.findById(line.getProduct().getUnitOfMeasureId()).orElseThrow(() -> new ResourceNotFoundException("Unidad de medida", line.getProduct().getUnitOfMeasureId())),
                 count.getCountNumber(), line.getId(), null);
             movements.save(movement);
         }
