@@ -27,7 +27,9 @@ public class ApiRequestAuditFilter extends OncePerRequestFilter {
    if(path!=null&&path.startsWith("/api/")&&status>=400){
     try{
      Authentication auth=SecurityContextHolder.getContext().getAuthentication();
-     String actor=auth!=null&&auth.isAuthenticated()&&!"anonymousUser".equals(auth.getName())?auth.getName():"anonymous";
+     Object capturedActor=request.getAttribute(AuthenticatedActorCaptureFilter.ATTRIBUTE);
+     String actor=capturedActor instanceof String value&&!value.isBlank()?value:
+      (auth!=null&&auth.isAuthenticated()&&!"anonymousUser".equals(auth.getName())?auth.getName():"anonymous");
      String outcome=status==401||status==403?"DENIED":"FAILURE";
      Object correlation=request.getAttribute(RequestCorrelationFilter.ATTRIBUTE);
      String requestId=correlation instanceof String value?value:null;
