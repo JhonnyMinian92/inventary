@@ -144,4 +144,4 @@ La especificación del backend, el contrato REST propuesto, los requerimientos, 
 
 ## Estado del backend
 
-El estado vigente se registra en [la documentación técnica del backend](microservices-inventary-ecuapp/docs/README.md). P12 reúne en una rama de integración el código P01–P11, el procedimiento PostgreSQL/Docker y un workflow de verificación manual. No se han ejecutado pruebas, build, CI, arranque ni migraciones; la validación y el merge final permanecen pendientes de autorización.
+El estado vigente se registra en [la documentación técnica del backend](microservices-inventary-ecuapp/docs/README.md). La integración P12 de backend, Docker/PostgreSQL, workflow de validación manual y documentación está incorporada en `master`. La auditoría estática del código y de las APIs, con hallazgos priorizados, pendientes y matriz de pruebas para el agente local, se encuentra en [AUDITORIA_TECNICA_PENDIENTES.md](AUDITORIA_TECNICA_PENDIENTES.md). No se han ejecutado pruebas, build, CI, arranque ni migraciones; la validación funcional permanece pendiente.
