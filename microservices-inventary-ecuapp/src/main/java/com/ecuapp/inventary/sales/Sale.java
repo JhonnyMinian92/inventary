@@ -29,17 +29,17 @@ public class Sale {
  @Column(name="created_by",nullable=false,length=80) private String createdBy;
  @Column(name="sold_at",nullable=false) private Instant soldAt;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
- @OneToMany(mappedBy="sale",cascade=CascadeType.ALL,orphanRemoval=true)
- private List<SaleItem> items=new ArrayList<>();
+ @OneToMany(mappedBy="sale",cascade=CascadeType.ALL,orphanRemoval=true) private List<SaleItem> items=new ArrayList<>();
  protected Sale(){}
  public Sale(String saleNumber,String customerName,String customerPhone,SaleChannel channel,Warehouse warehouse,
-   BigDecimal subtotal,BigDecimal tax,BigDecimal total,String currency,String idempotencyKey,String requestHash,String createdBy){
-  this.saleNumber=saleNumber;this.status=SaleStatus.COMPLETED;this.customerName=customerName;this.customerPhone=customerPhone;this.channel=channel;
-  this.warehouse=warehouse;this.subtotal=subtotal;this.tax=tax;this.total=total;this.currency=currency;
+  BigDecimal subtotal,BigDecimal tax,BigDecimal total,String currency,String idempotencyKey,String requestHash,String createdBy){
+  this.saleNumber=saleNumber;this.status=SaleStatus.COMPLETED;this.customerName=customerName;this.customerPhone=customerPhone;
+  this.channel=channel;this.warehouse=warehouse;this.subtotal=subtotal;this.tax=tax;this.total=total;this.currency=currency;
   this.idempotencyKey=idempotencyKey;this.requestHash=requestHash;this.createdBy=createdBy;this.soldAt=Instant.now();
  }
  @PrePersist void onCreate(){if(createdAt==null)createdAt=Instant.now();if(soldAt==null)soldAt=Instant.now();}
  public void addItem(SaleItem item){items.add(item);item.setSale(this);}
+ public void cancel(){if(status!=SaleStatus.COMPLETED)throw new IllegalStateException("Solo se puede cancelar una venta completada.");status=SaleStatus.CANCELLED;}
  public UUID getId(){return id;} public String getSaleNumber(){return saleNumber;} public SaleStatus getStatus(){return status;}
  public String getCustomerName(){return customerName;} public String getCustomerPhone(){return customerPhone;} public SaleChannel getChannel(){return channel;}
  public Warehouse getWarehouse(){return warehouse;} public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getTax(){return tax;}

@@ -1,5 +1,7 @@
 package com.ecuapp.inventary.sales;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -18,4 +20,9 @@ public class SalesController {
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
  @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES')")
  public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
+ @PostMapping("/{id}/cancel") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES')")
+ public SaleDtos.View cancel(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody CancelRequest r,Authentication auth){
+  return service.cancel(id,key,r.reason(),auth.getName());
+ }
+ public record CancelRequest(@NotBlank @Size(max=1000) String reason){}
 }
