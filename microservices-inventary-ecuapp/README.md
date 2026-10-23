@@ -102,7 +102,8 @@ Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálog
 | Inventario | `/api/v1/inventory/balances`, `/api/v1/inventory/movements` | Consultar saldos y ledger |
 | Ajustes | `POST /api/v1/inventory/adjustments` | Entrada/salida con Idempotency-Key y motivo |
 | Reposición | `/api/v1/inventory/reorder-rules`, `GET /api/v1/inventory/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
-| Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho; ledger ligado a líneas y ubicaciones |\n| Conteos físicos | `/api/v1/inventory/counts` | Capturar cantidades, consultar diferencias, contabilizar ajustes o cancelar; snapshots inmutables e idempotencia |
+| Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho; ledger ligado a líneas y ubicaciones |
+| Conteos físicos | `/api/v1/inventory/counts` | Capturar cantidades, consultar diferencias, contabilizar ajustes o cancelar; snapshots inmutables e idempotencia |
 | Ventas | `/api/v1/sales` | Registrar ventas, consulta paginada y detalle |
 | Devoluciones de venta | `/api/v1/sales-returns` | Restock o merma, limitando el total devuelto a la cantidad original |
 | Clientes | `/api/v1/customers` | Crear y mantener contactos de cliente |
