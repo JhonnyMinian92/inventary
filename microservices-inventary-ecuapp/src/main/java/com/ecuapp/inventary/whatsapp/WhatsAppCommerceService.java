@@ -4,6 +4,9 @@ import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
+import com.ecuapp.inventary.inventory.MovementType;
+import com.ecuapp.inventary.inventory.StockMovement;
+import com.ecuapp.inventary.inventory.StockMovementRepository;
 import com.ecuapp.inventary.sales.OutboxEvent;
 import com.ecuapp.inventary.sales.OutboxEventRepository;
 import com.ecuapp.inventary.warehouse.*;
@@ -25,13 +28,13 @@ import java.util.*;
 @Service
 public class WhatsAppCommerceService {
  private final WhatsAppCartRepository carts;private final WhatsAppCartItemRepository cartItems;private final WhatsAppQuoteRepository quotes;private final WhatsAppOrderRepository orders;
- private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;
+ private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;
  private final OutboxEventRepository outbox;private final AuditService audit;private final int quoteTtlMinutes;private final int orderTtlMinutes;
  public WhatsAppCommerceService(WhatsAppCartRepository carts,WhatsAppCartItemRepository cartItems,WhatsAppQuoteRepository quotes,WhatsAppOrderRepository orders,
-  ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,OutboxEventRepository outbox,AuditService audit,
+  ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,AuditService audit,
   @Value("${app.integrations.whatsapp.quote-ttl-minutes:10}") int quoteTtlMinutes,
   @Value("${app.integrations.whatsapp.order-ttl-minutes:20}") int orderTtlMinutes){
-  this.carts=carts;this.cartItems=cartItems;this.quotes=quotes;this.orders=orders;this.products=products;this.warehouses=warehouses;this.balances=balances;
+  this.carts=carts;this.cartItems=cartItems;this.quotes=quotes;this.orders=orders;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;
   this.outbox=outbox;this.audit=audit;this.quoteTtlMinutes=Math.max(1,Math.min(quoteTtlMinutes,120));this.orderTtlMinutes=Math.max(1,Math.min(orderTtlMinutes,240));
  }
  @Transactional public WhatsAppDtos.CartView createCart(String customerRef,String actor){
@@ -149,7 +152,13 @@ public class WhatsAppCommerceService {
   String number="WA-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   WhatsAppOrder order=orders.saveAndFlush(new WhatsAppOrder(number,cart,quote,quote.getWarehouse(),cart.getCustomerRef(),key,requestHash,Instant.now().plus(orderTtlMinutes,ChronoUnit.MINUTES)));
   for(WhatsAppQuoteItem line:quoteLines)order.addItem(new WhatsAppOrderItem(line));
-  orders.save(order);quote.markOrdered();cart.markOrdered();carts.save(cart);quotes.save(quote);
+  orders.save(order);
+  for(WhatsAppOrderItem line:order.getItems()){
+   String mkey="WARS-"+order.getId()+"-"+line.getProduct().getId();
+   movements.save(new StockMovement(line.getProduct(),order.getWarehouse(),MovementType.RESERVE,line.getQuantity(),line.getProduct().getCostPrice(),
+    "WHATSAPP_ORDER",order.getId(),mkey,requestHash,"Reserva de inventario por orden "+number,"whatsapp-integration"));
+  }
+  quote.markOrdered();cart.markOrdered();carts.save(cart);quotes.save(quote);
   outbox.save(new OutboxEvent("WHATSAPP_ORDER",order.getId(),"WHATSAPP_ORDER_CREATED",Map.of("orderId",order.getId().toString(),"orderNumber",number,"total",order.getTotal().toPlainString(),"currency",order.getCurrency())));
   audit.record(actor,"WHATSAPP_ORDER_CREATED","WHATSAPP_ORDER",order.getId(),Map.of("orderNumber",number,"quoteId",quote.getId().toString(),"total",order.getTotal().toPlainString()));
   return WhatsAppDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
@@ -185,6 +194,9 @@ public class WhatsAppCommerceService {
   for(WhatsAppOrderItem line:lines){
    StockBalance balance=balances.findForUpdate(line.getProduct().getId(),order.getWarehouse().getId()).orElseThrow(()->new IllegalStateException("Falta saldo para liberar una reserva de inventario."));
    balance.releaseReservation(line.getQuantity());
+   String mkey="WARR-"+order.getId()+"-"+line.getProduct().getId();
+   movements.save(new StockMovement(line.getProduct(),order.getWarehouse(),MovementType.RELEASE,line.getQuantity(),line.getProduct().getCostPrice(),
+    "WHATSAPP_ORDER",order.getId(),mkey,order.getRequestHash(),"Liberación de reserva de orden "+order.getOrderNumber(),"whatsapp-integration"));
   }
  }
  private WhatsAppCart requireEditableCart(UUID cartId){
