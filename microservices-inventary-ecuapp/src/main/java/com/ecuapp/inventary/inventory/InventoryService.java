@@ -17,7 +17,10 @@ public class InventoryService {
  private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;
  public InventoryService(ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements){this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;}
  @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(Pageable p){return balances.findAll(limited(p)).map(InventoryDtos.BalanceView::from);}
- @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(Pageable p){return movements.findAll(limited(p).withSort(Sort.by(Sort.Direction.DESC,"occurredAt"))).map(InventoryDtos.MovementView::from);}
+ @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(Pageable p){
+  Pageable ordered=PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),Sort.by(Sort.Direction.DESC,"occurredAt"));
+  return movements.findAll(ordered).map(InventoryDtos.MovementView::from);
+ }
  @Transactional(readOnly=true) public InventoryDtos.BalanceView balance(UUID productId,UUID warehouseId){
   StockBalance b=balances.findByProductIdAndWarehouseId(productId,warehouseId).orElseThrow(()->new ResourceNotFoundException("Saldo de inventario",productId+"/"+warehouseId));
   return InventoryDtos.BalanceView.from(b);
@@ -47,8 +50,5 @@ public class InventoryService {
   return InventoryDtos.MovementView.from(movements.save(movement));
  }
  private Pageable limited(Pageable p){return PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort());}
- private String hash(String value){
-  try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
-  catch(Exception ex){throw new IllegalStateException("No se pudo calcular huella de idempotencia.",ex);}
- }
+ private String hash(String value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException("No se pudo calcular huella de idempotencia.",ex);}}
 }
