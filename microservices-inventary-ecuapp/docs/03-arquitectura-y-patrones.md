@@ -150,3 +150,20 @@ No hace falta duplicar la estructura exacta de paquetes para cada submódulo si 
 - RabbitMQ/Kafka solo ante necesidad demostrada de eventos asíncronos.
 
 Referencia de implementación de JWT en Spring Security: [OAuth 2.0 Resource Server JWT](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html).
+
+## 8. Evaluación explícita de Spring WebFlux
+
+**Decisión para el MVP: mantener Spring MVC como servidor HTTP principal y usar WebClient solo donde aporta valor.** La persistencia propuesta es PostgreSQL con JPA/Hibernate y el backend realiza transacciones multi-escritura críticas para stock, ventas y recepciones. Spring documenta que MVC es la elección más natural cuando se usan APIs de persistencia bloqueantes como JPA/JDBC; WebFlux aprovecha su modelo no bloqueante cuando toda la cadena puede evitar bloquear y hay suficiente concurrencia de E/S.
+
+Referencia: [Spring Framework — Spring MVC or WebFlux?](https://docs.spring.io/spring-framework/reference/web/webflux/new-framework.html).
+
+El canal WhatsApp no obliga a que el backend haga streaming reactivo: el webhook y la conversación los orquesta n8n, mientras Inventary responde con operaciones breves de catálogo/carrito/cotización/pedido. Por tanto, el LLM no debe mantenerse dentro de una transacción del backend.
+
+Condiciones para revaluar WebFlux en un servicio aislado:
+- carga medida de conexiones simultáneas/streaming que lo justifique;
+- cliente HTTP no bloqueante en toda la cadena;
+- persistencia reactiva real (por ejemplo, R2DBC) en la ruta seleccionada;
+- diseño y revisión específicos de transacciones, locking, backpressure, cancelación y timeouts;
+- benchmark objetivo que demuestre una mejora con carga representativa.
+
+No combinar WebFlux con JPA bloqueante invocado directamente desde event loops; mover llamadas bloqueantes a boundedElastic evita bloquear el loop pero no convierte esa arquitectura en reactiva de extremo a extremo. Empezar con MVC reduce complejidad y deja la posibilidad de un adaptador/servicio WebFlux futuro. Véase también [09 — integración conversacional](09-webflux-n8n-whatsapp-openai.md).
