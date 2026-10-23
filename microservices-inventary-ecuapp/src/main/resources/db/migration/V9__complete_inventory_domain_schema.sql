@@ -93,6 +93,8 @@ ALTER TABLE stock_balance ADD CONSTRAINT fk_stock_balance_location
  FOREIGN KEY(location_id) REFERENCES warehouse_location(id) ON DELETE RESTRICT;
 ALTER TABLE stock_balance DROP CONSTRAINT uk_stock_balance_product_warehouse;
 ALTER TABLE stock_balance ADD CONSTRAINT uk_stock_balance_product_location UNIQUE(product_id,location_id);
+-- Keep the current one-balance-per-product-per-warehouse API compatible during the location-aware rollout.
+ALTER TABLE stock_balance ADD CONSTRAINT uk_stock_balance_product_warehouse UNIQUE(product_id,warehouse_id);
 CREATE INDEX ix_stock_balance_location_product ON stock_balance(location_id,product_id);
 
 ALTER TABLE stock_movement
