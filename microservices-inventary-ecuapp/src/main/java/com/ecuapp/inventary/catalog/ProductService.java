@@ -1,5 +1,10 @@
 package com.ecuapp.inventary.catalog;
 
+import com.ecuapp.inventary.catalog.application.ProductCommand;
+import com.ecuapp.inventary.catalog.application.ProductResult;
+import com.ecuapp.inventary.catalog.application.ProductResultMapper;
+import com.ecuapp.inventary.catalog.application.ProductUseCases;
+
 import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.audit.AuditService;
 import java.util.Map;
@@ -15,7 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-public class ProductService {
+public class ProductService implements ProductUseCases {
  private final ProductRepository products; private final CategoryRepository categories; private final StockBalanceRepository balances; private final AuditService audit;
  public ProductService(ProductRepository products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit){this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;}
  @Transactional(readOnly=true) public Page<ProductDtos.View> list(String q,Pageable pageable){
@@ -55,6 +60,26 @@ public class ProductService {
   return ProductDtos.View.from(product);
  }
  @Transactional public void deactivate(UUID id,String actor){Product p=require(id);p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));}
+ @Override @Transactional(readOnly=true)
+ public Page<ProductResult> listProducts(String query,Pageable pageable){
+  return list(query,pageable).map(view->new ProductResult(view.id(),view.sku(),view.name(),view.description(),view.categoryId(),view.categoryName(),view.salePrice(),view.currency(),view.imageUrl(),view.active(),view.createdAt(),view.updatedAt()));
+ }
+ @Override @Transactional(readOnly=true)
+ public ProductResult getProduct(UUID id){return ProductResultMapper.from(require(id));}
+ @Override @Transactional
+ public ProductResult createProduct(ProductCommand command,String actor){
+  ProductDtos.WriteRequest request=new ProductDtos.WriteRequest(command.sku(),command.name(),command.description(),command.categoryId(),command.costPrice(),command.salePrice(),command.currency(),command.imageUrl());
+  create(request,actor);
+  return ProductResultMapper.from(products.findBySkuIgnoreCase(normalizeSku(command.sku())).orElseThrow(()->new ResourceNotFoundException("Producto",command.sku())));
+ }
+ @Override @Transactional
+ public ProductResult updateProduct(UUID id,ProductCommand command,String actor){
+  ProductDtos.WriteRequest request=new ProductDtos.WriteRequest(command.sku(),command.name(),command.description(),command.categoryId(),command.costPrice(),command.salePrice(),command.currency(),command.imageUrl());
+  update(id,request,actor);
+  return ProductResultMapper.from(require(id));
+ }
+ @Override
+ public void deactivateProduct(UUID id,String actor){deactivate(id,actor);}
  private Product require(UUID id){return products.findById(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));}
  private Category requireCategory(UUID id){Category c=categories.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
  private String normalizeSku(String sku){return sku.trim().toUpperCase(Locale.ROOT);}
