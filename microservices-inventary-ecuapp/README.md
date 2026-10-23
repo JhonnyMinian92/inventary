@@ -1,90 +1,115 @@
-# Inventary — backend API
+# Inventary Backend
 
-Backend modular sobre Java 21, Spring Boot 3.5, Spring MVC, Spring Data JPA y PostgreSQL. Este primer tramo implementa autenticación JWT, categorías, productos, almacenes, saldos, ajustes, movimientos de inventario y ventas con descuento transaccional de stock. El trabajo restante se rastrea en GitHub Issues.
+Backend de inventario y ventas construido con Java 21, Spring Boot 3.5, Spring MVC, Spring Data JPA y PostgreSQL. Las entidades usan UUID, importes `NUMERIC(14,2)`, cantidades `NUMERIC(14,3)`, marcas temporales `TIMESTAMPTZ`, claves foráneas y restricciones explícitas.
 
-## Requisitos
+## Requisitos y ejecución
 
-- Java 21 y Maven 3.9+.
-- PostgreSQL 15+; Docker Compose ofrece PostgreSQL 16 para desarrollo.
-- Docker Engine y Docker Compose, si se desea levantar la API y la base en contenedores.
+- Java 21 y Maven 3.9 o superior.
+- PostgreSQL 15 o superior. Docker Compose usa PostgreSQL 16.
+- Docker Engine y Docker Compose son opcionales.
 
-## PostgreSQL local
+### Con PostgreSQL instalado localmente
 
-La configuración predeterminada local usa la dirección JDBC jdbc:postgresql://localhost:5432/inventary, el usuario postgres y la contraseña CLAVESECRETA, coincidiendo con la conexión compartida. La contraseña es solo una comodidad de desarrollo: usa variables de entorno en cualquier entorno compartido o de producción.
+La configuración JDBC por defecto apunta a `jdbc:postgresql://localhost:5432/inventary`, usuario `postgres` y contraseña local `CLAVESECRETA`, según la cadena suministrada para este proyecto.
 
 PowerShell:
+
 ```powershell
 $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://localhost:5432/inventary"
 $env:DB_USERNAME = "postgres"
 $env:DB_PASSWORD = "CLAVESECRETA"
-$env:JWT_SECRET = "reemplaza-esta-clave-por-una-secreta-de-al-menos-32-bytes"
+$env:JWT_SECRET = "usa-un-secreto-aleatorio-de-al-menos-32-bytes"
+$env:BOOTSTRAP_ADMIN_USERNAME = "admin"
+$env:BOOTSTRAP_ADMIN_PASSWORD = "cambia-esta-clave-administrativa-123!"
+mvn -B verify
+mvn spring-boot:run
 ```
 
 Bash:
+
 ```bash
 export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/inventary'
 export DB_USERNAME='postgres'
 export DB_PASSWORD='CLAVESECRETA'
-export JWT_SECRET='reemplaza-esta-clave-por-una-secreta-de-al-menos-32-bytes'
+export JWT_SECRET='usa-un-secreto-aleatorio-de-al-menos-32-bytes'
+export BOOTSTRAP_ADMIN_USERNAME='admin'
+export BOOTSTRAP_ADMIN_PASSWORD='cambia-esta-clave-administrativa-123!'
+mvn -B verify
+mvn spring-boot:run
 ```
 
-Flyway ejecuta las migraciones en src/main/resources/db/migration. Hibernate está configurado con ddl-auto validate: no altera el esquema implícitamente; comprueba que las entidades concuerden con las tablas migradas. No cambies a update para ocultar diferencias del modelo.
+Ejecuta los comandos Maven desde `microservices-inventary-ecuapp/`. Para entornos compartidos o producción, no uses estas credenciales de ejemplo: proporciona los secretos con el gestor de secretos del entorno. No guardes contraseñas reales en commits.
 
-## Ejecutar con Docker Compose
+### Con Docker Compose
 
 ```bash
+cd microservices-inventary-ecuapp
 cp .env.example .env
-# Edita .env y cambia JWT_SECRET y BOOTSTRAP_ADMIN_PASSWORD antes de ejecutar.
+# Edita .env: reemplaza al menos DB_PASSWORD, JWT_SECRET y BOOTSTRAP_ADMIN_PASSWORD.
 docker compose up --build
 ```
 
-- API: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
-- Health: http://localhost:8080/actuator/health
+API: http://localhost:8080  
+Swagger/OpenAPI: http://localhost:8080/swagger-ui.html  
+Health: http://localhost:8080/actuator/health  
+GraphQL: http://localhost:8080/graphql (consulta únicamente datos públicos de catálogo)
 
-Si PostgreSQL ya corre en tu máquina, arranca solo la API con Maven y configura las variables anteriores.
+### Creación del esquema
 
-## Administrador inicial
+Flyway controla las migraciones en `src/main/resources/db/migration/V*__*.sql`. Hibernate se configura con `ddl-auto: validate`: al arrancar verifica el mapeo contra PostgreSQL, pero no modifica ni “adivina” el esquema. No sustituyas Flyway por `ddl-auto=update` en producción. Nunca se ejecuta `flyway clean` automáticamente.
 
-La aplicación no contiene un administrador ni una contraseña predeterminada. Para crear el primero, configura ambas variables: BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD. La contraseña requiere mínimo 12 caracteres. El bootstrap crea el usuario solo si no existe y nunca reemplaza una contraseña ya guardada. El rol inicial es ADMIN. Si no se definen ambas variables, no se crea ningún administrador.
+Si la base contiene tablas creadas manualmente o una tabla `flyway_schema_history` ajena a estas migraciones, revisa primero el estado y haz una copia de seguridad; no borres datos para forzar el arranque.
+
+## Autenticación y roles
+
+`POST /api/v1/auth/login` recibe `{"username":"admin","password":"..."}` y devuelve un JWT. Envíalo como `Authorization: Bearer <token>`. `GET /api/v1/auth/me` devuelve la identidad autenticada.
+
+No se crea administrador por defecto. El bootstrap inicial solo se ejecuta si configuras `BOOTSTRAP_ADMIN_USERNAME` y `BOOTSTRAP_ADMIN_PASSWORD`; la contraseña requiere 12 caracteres y el proceso no sobreescribe usuarios existentes. El bootstrap es para inicializar el entorno; luego los usuarios se gestionan mediante:
+
+- `GET/POST /api/v1/admin/users`
+- `GET/PATCH /api/v1/admin/users/{id}`
+- `PUT /api/v1/admin/users/{id}/password`
+
+Roles disponibles: `ADMIN`, `INVENTORY_MANAGER`, `SALES` y `AUDITOR`. En cada solicitud autenticada el backend comprueba en PostgreSQL que el usuario siga activo y lee su rol actual; no confía únicamente en los roles embebidos en el JWT.
 
 ## API implementada
 
-Todas las rutas requieren JWT Bearer salvo login, catálogo público, health y OpenAPI.
+Todas las rutas requieren JWT, salvo login, health, OpenAPI/Swagger, catálogo público, GraphQL y las rutas de integración WhatsApp que exigen su propia clave de máquina.
 
-| Método | Ruta | Uso |
+| Área | Rutas | Funcionalidad |
 |---|---|---|
-| POST | /api/v1/auth/login | Devuelve JWT tras validar credenciales |
-| GET | /api/v1/auth/me | Identidad del JWT |
-| GET/POST | /api/v1/catalog/categories | Listar y crear categorías |
-| GET/PUT | /api/v1/catalog/categories/{id} | Consultar o editar categoría |
-| POST | /api/v1/catalog/categories/{id}/deactivate | Inactivar categoría |
-| GET/POST | /api/v1/catalog/products | Buscar o crear productos |
-| GET/PUT | /api/v1/catalog/products/{id} | Consultar o editar producto |
-| POST | /api/v1/catalog/products/{id}/deactivate | Inactivar producto |
-| GET | /api/v1/public/catalog/products | Catálogo público sin costo interno |
-| GET/POST | /api/v1/warehouses | Listar o crear almacenes |
-| GET/PUT | /api/v1/warehouses/{id} | Consultar o editar almacén |
-| POST | /api/v1/warehouses/{id}/deactivate | Inactivar almacén |
-| GET | /api/v1/inventory/balances | Consultar saldos paginados |
-| GET | /api/v1/inventory/balances/{productId}/{warehouseId} | Saldo por producto y almacén |
-| GET | /api/v1/inventory/movements | Consultar ledger |
-| POST | /api/v1/inventory/adjustments | Ajuste con Idempotency-Key |
-| GET/POST | /api/v1/sales | Consultar ventas o registrar venta |
-| GET | /api/v1/sales/{id} | Consultar una venta y sus líneas |
+| Categorías | `/api/v1/catalog/categories` | CRUD y desactivación lógica |
+| Productos | `/api/v1/catalog/products` | CRUD, búsqueda, SKU único; el SKU es inmutable después del alta |
+| Catálogo público | `/api/v1/public/catalog/products` | Información pública, precio, imagen y disponibilidad sin exponer costo interno |
+| Imágenes | `/api/v1/catalog/products/{productId}/images` | Metadatos por URL HTTPS, descripción alternativa y orden; no carga binarios |
+| Almacenes | `/api/v1/warehouses` | CRUD y desactivación lógica |
+| Inventario | `/api/v1/inventory/balances`, `/api/v1/inventory/movements` | Consultar saldos y ledger |
+| Ajustes | `POST /api/v1/inventory/adjustments` | Entrada/salida con Idempotency-Key y motivo |
+| Reposición | `/api/v1/inventory/reorder-rules`, `GET /api/v1/inventory/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
+| Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho |
+| Ventas | `/api/v1/sales` | Registrar ventas, consulta paginada y detalle |
+| Devoluciones de venta | `/api/v1/sales-returns` | Restock o merma, limitando el total devuelto a la cantidad original |
+| Clientes | `/api/v1/customers` | Crear y mantener contactos de cliente |
+| Proveedores | `/api/v1/suppliers` | Crear y mantener contactos de proveedor |
+| Compras | `/api/v1/purchase-orders` | Borrador, envío, aprobación, cancelación permitida y consulta |
+| Recepciones | `POST /api/v1/purchase-orders/{id}/receipts`, `GET /api/v1/goods-receipts/{id}` | Recepción parcial e idempotente, actualiza saldo y ledger en transacción |
+| Devoluciones a proveedor | `/api/v1/purchase-returns` | Devolver cantidades de recepciones verificadas; impide exceder el recibido o el stock |
+| Auditoría | `GET /api/v1/audit-events` | Lectura restringida a ADMIN/AUDITOR |
+| Integración WhatsApp/n8n | `/api/v1/integrations/whatsapp/**` | Catálogo por SKU/UUID, carrito, cotización temporal y orden pendiente de pago |
+| GraphQL | `/graphql` | Consultas públicas de productos/categorías con paginación acotada |
 
-Escrituras de catálogo e inventario requieren rol ADMIN o INVENTORY_MANAGER. Crear ventas requiere ADMIN, INVENTORY_MANAGER o SALES. AUDITOR tiene acceso de lectura a ventas y movimientos.
+Las rutas exactas y parámetros se exponen también en Swagger/OpenAPI.
 
-## Ajuste de stock
+## Contratos de inventario
+
+### Ajuste de stock
 
 ```http
 POST /api/v1/inventory/adjustments
 Authorization: Bearer <JWT>
 Idempotency-Key: ajuste-inicial-001
 Content-Type: application/json
-```
 
-```json
 {
   "productId": "UUID_DEL_PRODUCTO",
   "warehouseId": "UUID_DEL_ALMACEN",
@@ -94,64 +119,58 @@ Content-Type: application/json
 }
 ```
 
-La cantidad se guarda con hasta tres decimales y siempre es positiva; la dirección se expresa mediante INCREASE o DECREASE. El servicio no permite stock negativo ni consumir unidades reservadas. Una misma clave con el mismo payload devuelve el movimiento anterior; si el payload cambia, responde 409 Conflict.
+Las cantidades son positivas y admiten tres decimales. El servicio bloquea el saldo afectado, evita cantidades negativas o consumo del stock reservado y escribe el movimiento en la misma transacción. Misma clave y mismo contenido devuelve el resultado original; misma clave con contenido distinto responde conflicto.
 
-## Registrar una venta
+### Venta
 
 ```http
 POST /api/v1/sales
 Authorization: Bearer <JWT>
-Idempotency-Key: pedido-whatsapp-123
+Idempotency-Key: pedido-pos-123
 Content-Type: application/json
-```
 
-```json
 {
   "warehouseId": "UUID_DEL_ALMACEN",
   "customerName": "Cliente",
   "customerPhone": "+593...",
-  "channel": "WHATSAPP",
-  "items": [
-    {"productId": "UUID_DEL_PRODUCTO", "quantity": 2}
-  ]
+  "channel": "POS",
+  "items": [{"productId": "UUID_DEL_PRODUCTO", "quantity": 2.000}]
 }
 ```
 
-El servidor recupera el precio vigente desde PostgreSQL y calcula subtotal y total: el cliente no puede imponer un precio. En una transacción se bloquean los saldos, se comprueba disponibilidad, se descuenta inventario, se registra venta/líneas, se genera el movimiento de salida y se inserta un evento Outbox pendiente. Si falla un paso, la transacción revierte todas las escrituras. Por el momento, impuestos quedan en cero; esta API no emite factura electrónica ni registra pagos.
+El precio procede del producto guardado en PostgreSQL; el cliente no puede indicar el precio. En una transacción se bloquea el stock y se graban venta, líneas, movimiento y evento Outbox. Una falla revierte toda la operación. Los impuestos están temporalmente en cero porque la política fiscal/SRI no ha sido integrada; tampoco se emiten facturas ni se procesan pagos en esta ruta.
 
-## Convenciones de datos
+## Integración WhatsApp/n8n
 
-- UUID para identificadores.
-- Instantes UTC con PostgreSQL TIMESTAMPTZ.
-- Importes NUMERIC(14,2) y cantidades NUMERIC(14,3).
-- Relaciones con ON DELETE RESTRICT para preservar historia.
-- StockMovement es el historial; StockBalance es el saldo operativo.
-- Outbox tiene esquema y recibe eventos de venta, pero aún no hay publicador Kafka.
-- Los errores se presentan mediante ProblemDetail y no exponen consultas SQL, stacktraces o secretos.
-- La clave JWT predeterminada es solo para desarrollo local; reemplázala antes de exponer el servicio.
+Configura `WHATSAPP_INTEGRATION_API_KEY` con una clave aleatoria de al menos 32 bytes. Sin ella, estas llamadas son rechazadas. En cada solicitud de máquina envía `X-Integration-Key`; usa además `Idempotency-Key` al cotizar o crear una orden.
 
-## Pruebas
+Flujo: consulta catálogo → crea carrito → agrega productos → solicita cotización para un almacén → presenta al cliente el precio y vencimiento → registra orden solo con `consentConfirmed: true`. La cotización dura 10 minutos por defecto; la orden pendiente reserva stock por 20 minutos. Los TTL se configuran con `WHATSAPP_QUOTE_TTL_MINUTES` y `WHATSAPP_ORDER_TTL_MINUTES`. Una tarea programada libera reservas al cancelar o expirar la orden. No se integra todavía un proveedor de pagos ni una confirmación de cobro, así que la orden no se debe marcar pagada solo con la respuesta de un LLM o de n8n.
 
-```bash
-mvn -B verify
-```
+La API solo almacena URLs HTTPS de imágenes; no descarga las URLs recibidas, lo que evita usar el backend como proxy SSRF. Para subir archivos binarios hace falta un servicio de almacenamiento de objetos y validación de contenido real.
 
-Las pruebas de contexto e integración necesitan PostgreSQL disponible. GitHub Actions configura un servicio PostgreSQL y ejecuta Maven Verify en cada push o pull request relevante.
+## Consistencia, caché y eventos
 
-## Compras, contactos y movimientos avanzados
+- PostgreSQL es fuente de verdad de los precios, disponibilidad, ventas, compras y movimientos.
+- Caffeine almacena durante 60 segundos listados públicos; checkout y cotización vuelven a validar precio y saldo en la base.
+- El patrón Outbox registra eventos en la misma transacción que el documento de negocio.
+- El publicador Kafka es opcional y se activa con `KAFKA_ENABLED=true`, configurando `KAFKA_BOOTSTRAP_SERVERS`. Kafka no es necesario para iniciar el backend si la integración no se habilita.
+- Los consumidores externos deben deduplicar por `eventId` debido a la semántica de entrega/reintentos; no se debe asumir exactly-once entre PostgreSQL y Kafka.
+- La API no implementa todavía un consumidor de Kafka para proyecciones ni un proveedor de cache distribuido.
 
-- Los contactos se administran en `/api/v1/suppliers` y `/api/v1/customers`; un contacto puede ser proveedor, cliente o ambos según su tipo.
-- Las órdenes de compra nacen como borrador en `POST /api/v1/purchase-orders`. Usa `POST /{id}/submit`, aprobación administrativa con `POST /{id}/approve` y recepciones parciales con `POST /{id}/receipts`.
-- Una recepción requiere `Idempotency-Key`; rechaza cantidad mayor a la pendiente, aumenta el saldo y registra movimiento y Outbox de forma transaccional. La huella idempotente incluye también el ID de la orden.
-- Las transferencias se crean en `POST /api/v1/inventory/transfers`, salen mediante `/{id}/dispatch` y entran al destino mediante `/{id}/receive`. Despacho y recepción son operaciones transaccionales; repetir un paso ya aplicado devuelve el estado actual. La recepción de una transferencia en esta versión es completa, no por líneas.
-- Las devoluciones se registran mediante `POST /api/v1/sales-returns`, con referencia obligatoria a una venta y a sus líneas, cantidades no superiores a lo aún retornable y disposición `RESTOCK` o `SCRAP`. Para SCRAP el ledger registra entrada/salida compensada para que la merma no incremente stock vendible. El endpoint no tramita reembolso monetario.
-- Las imágenes se registran como URL HTTPS en `/api/v1/catalog/products/{productId}/images`; la API almacena metadatos, no descarga URLs ni archivos, evitando convertir una URL de usuario en una petición SSRF.
-- La bitácora consultable `GET /api/v1/audit-events` requiere rol ADMIN o AUDITOR. Acciones de inventario, venta, recepción, transferencia, devolución e imágenes generan eventos dentro de la transacción.
+## Convenciones de base de datos
 
-## Funcionalidad todavía pendiente
+- UUID como identificador; `TIMESTAMPTZ` para instantes.
+- `NUMERIC(14,2)` para importes, `NUMERIC(14,3)` para cantidades.
+- Claves foráneas y `ON DELETE RESTRICT` para conservar documentos históricos.
+- Restricciones de dominio, unicidad, índices de consulta e idempotencia declarados mediante migraciones.
+- `StockBalance` es el saldo operativo; `StockMovement` es el ledger.
+- Las órdenes de compra separan cantidad ordenada, recibida y pendiente.
+- Las órdenes conversacionales guardan snapshots de producto, precio y cantidad.
 
-GraphQL con límites de complejidad, cache distribuida, consumidor/outbox publisher Kafka, carrito/cotización y endpoints de máquina separados para n8n/WhatsApp, carga binaria con almacenamiento de objetos, devoluciones a proveedor, informes de valoración y reglas de reposición todavía requieren implementación. Tampoco están conectadas facturación SRI, cobros ni permisos por organización multiempresa. Cada requisito queda en [Issues](https://github.com/JhonnyMinian92/inventary/issues); no se debe interpretar el código parcial como cobertura del 100 % de la especificación original.
+## Pruebas y CI
 
-## Alcance pendiente
+Ejecuta `mvn -B verify` desde esta carpeta. El workflow `.github/workflows/backend-ci.yml` compila Java 21 y levanta PostgreSQL para las migraciones, validación de mappings JPA y pruebas de integración. No consideres un cambio listo hasta que el workflow del último commit termine correctamente.
 
-Siguen abiertas tareas para compras y recepciones; clientes, devoluciones y transferencias; reservas; reabastecimiento y valoración; gestión de imágenes; integración n8n/WhatsApp; GraphQL; publicación de Outbox/Kafka; auditoría avanzada y hardening. No deben considerarse implementadas hasta que sus issues estén cerrados con código y pruebas.
+## Pendiente de alcance original
+
+Aún requieren validación/implementación adicional: integración de pagos y estados de pago, facturación electrónica/SRI y reglas fiscales Ecuador; subida binaria/almacenamiento de imágenes; confirmación y conciliación externa para WhatsApp; consumidores Kafka con deduplicación/observabilidad; controles de tasa y límites explícitos de complejidad GraphQL; informes, valoración de existencias según política contable, separación multiempresa y pruebas de concurrencia amplias. El código actual no significa cobertura completa de esos requisitos hasta cerrar sus issues con código y tests.
