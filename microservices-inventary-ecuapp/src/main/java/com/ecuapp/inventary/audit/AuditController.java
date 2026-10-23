@@ -10,9 +10,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 @RestController
+@Validated
 @RequestMapping("/api/v1/audit-events")
 @PreAuthorize("hasAuthority('audit:read')")
 @Tag(name="Auditoría",description="Consulta de eventos de trazabilidad; solo lectura.")
