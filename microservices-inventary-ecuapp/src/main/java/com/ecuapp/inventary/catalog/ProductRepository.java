@@ -6,5 +6,6 @@ import java.util.UUID;
 public interface ProductRepository extends JpaRepository<Product,UUID> {
  boolean existsBySku(String sku);
  Page<Product> findByActiveTrue(Pageable pageable);
+ Page<Product> findByActiveTrueAndCategory_ActiveTrue(Pageable pageable);
  Page<Product> findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(String name,String sku,Pageable pageable);
 }
