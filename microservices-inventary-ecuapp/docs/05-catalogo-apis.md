@@ -93,9 +93,10 @@ No se aceptarán atributos dinámicos arbitrarios sin esquema. Los atributos que
 | POST /inventory/transfers | Crear transferencia en borrador | STOCK_TRANSFER; origen/destino distintos y líneas válidas. |
 | GET /inventory/transfers/{transferId} | Consultar transferencia | STOCK_READ. |
 | POST /inventory/transfers/{transferId}/approve | Aprobar transferencia | STOCK_TRANSFER_APPROVE si la política lo exige. |
-| POST /inventory/transfers/{transferId}/dispatch | Despachar transferencia | STOCK_TRANSFER; Idempotency-Key; salida de origen a ubicación EN_TRÁNSITO si el flujo la utiliza. |
-| POST /inventory/transfers/{transferId}/receive | Confirmar recepción | STOCK_TRANSFER; validar cantidades, destino y diferencia; generar entrada de destino y tratamiento de faltantes. |
-| POST /inventory/transfers/{transferId}/cancel | Cancelar transferencia no completada | STOCK_TRANSFER; solo si la transición y stock permiten revertir de forma segura. |
+| POST /inventory/transfers/{transferId}/dispatch | Despachar transferencia | `inventory:manage`; Idempotency-Key; descuento de origen y ledger atómicos. |
+| POST /inventory/transfers/{transferId}/receive | Confirmar recepción completa | `inventory:manage`; Idempotency-Key; entrada de destino y ledger atómicos. |
+| POST /inventory/transfers/{transferId}/cancel | Cancelar borrador o transferencia en tránsito | `inventory:manage`; Idempotency-Key y motivo; si está en tránsito, repone el origen con movimiento compensatorio. |
+| POST /inventory/transfers/{transferId}/reverse | Revertir transferencia completada | `inventory:manage`; Idempotency-Key y motivo; debita destino y repone origen en una transacción. |
 | GET /inventory/reorder-rules | Consultar mínimos/máximos | REORDER_READ. |
 | POST /inventory/reorder-rules | Crear regla de reabastecimiento | REORDER_ADMIN; rango mínimo/máximo consistente y proveedor/método si aplica. |
 | PATCH /inventory/reorder-rules/{ruleId} | Modificar regla | REORDER_ADMIN. |

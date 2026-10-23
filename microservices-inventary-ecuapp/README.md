@@ -102,7 +102,7 @@ Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálog
 | Inventario | `/api/v1/inventory/balances`, `/api/v1/inventory/movements` | Consultar saldos y ledger |
 | Ajustes | `POST /api/v1/inventory/adjustments` | Entrada/salida con Idempotency-Key y motivo |
 | Reposición | `/api/v1/inventory/reorder-rules`, `GET /api/v1/inventory/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
-| Transferencias | `/api/v1/inventory/transfers` | Crear, despachar, recibir completo o cancelar antes del despacho; ledger ligado a líneas y ubicaciones |
+| Transferencias | `/api/v1/inventory/transfers` | Despacho/recepción idempotentes, cancelación compensatoria en tránsito y reversión de transferencias completadas; ledger, auditoría y Outbox atómicos |
 | Conteos físicos | `/api/v1/inventory/counts` | Capturar cantidades, consultar diferencias, contabilizar ajustes o cancelar; snapshots inmutables e idempotencia |
 | Ventas | `/api/v1/sales` | Registrar y consultar ventas; solicitud y aprobación segregadas de cancelaciones |
 | Devoluciones de venta | `/api/v1/sales-returns` | Idempotencia concurrente, restock/merma, límite por cantidad vendida y ledger trazable |
@@ -251,3 +251,7 @@ Ejecuta `mvn -B verify` desde esta carpeta. El workflow `.github/workflows/backe
 ## Pendiente de alcance original
 
 Aún requieren validación/implementación adicional: integración de pagos y estados de pago, facturación electrónica/SRI y reglas fiscales Ecuador; subida binaria/almacenamiento de imágenes; confirmación y conciliación externa para WhatsApp; consumidores Kafka con deduplicación/observabilidad; controles de tasa y límites explícitos de complejidad GraphQL; informes, valoración de existencias según política contable, separación multiempresa y pruebas de concurrencia amplias. El código actual no significa cobertura completa de esos requisitos hasta cerrar sus issues con código y tests.
+
+## Transferencias entre almacenes
+
+Los comandos de creación, despacho, recepción, cancelación y reversión requieren `Idempotency-Key`. Si una transferencia en tránsito se cancela, se restaura el stock del origen con un movimiento compensatorio; una transferencia completada se revierte mediante `POST /api/v1/inventory/transfers/{id}/reverse` y un motivo obligatorio. La reversión descuenta el destino y repone el origen en una transacción, sin editar movimientos históricos. Ver [P10 — Transferencias consistentes](docs/20-implementacion-p10-transferencias-consistentes.md).
