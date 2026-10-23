@@ -2,6 +2,9 @@ package com.ecuapp.inventary.sales;
 
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.partners.BusinessPartner;
+import com.ecuapp.inventary.partners.BusinessPartnerRepository;
+import com.ecuapp.inventary.partners.PartnerType;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
 import com.ecuapp.inventary.returns.ReturnStatus;
@@ -26,11 +29,11 @@ public class SaleService {
  private record CalculatedLine(Product product,BigDecimal quantity,BigDecimal unitPrice,BigDecimal lineTotal){}
  private final SaleRepository sales;private final ProductRepository products;private final WarehouseRepository warehouses;
  private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
- private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;
+ private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;private final BusinessPartnerRepository partners;
  public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
-  StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,SalesReturnLineRepository returnLines){
+  StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,SalesReturnLineRepository returnLines,BusinessPartnerRepository partners){
   this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;
-  this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;
+  this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;this.partners=partners;
  }
  @Transactional(readOnly=true) public Page<SaleDtos.View> list(Pageable p){return sales.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(SaleDtos.View::from);}
  @Transactional(readOnly=true) public SaleDtos.View get(UUID id){return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id)));}
@@ -59,9 +62,16 @@ public class SaleService {
    lines.add(new CalculatedLine(product,quantity,unitPrice,lineTotal));
   }
   if(lines.isEmpty())throw new BusinessRuleException("La venta debe contener al menos una línea.");
+  BusinessPartner customer=null;String customerName=clean(request.customerName()),customerPhone=clean(request.customerPhone());
+  if(request.customerId()!=null){
+   customer=partners.findByIdAndTypeIn(request.customerId(),List.of(PartnerType.CUSTOMER,PartnerType.BOTH))
+    .orElseThrow(()->new ResourceNotFoundException("Cliente",request.customerId()));
+   if(!customer.isActive())throw new BusinessRuleException("El cliente está inactivo.");
+   customerName=customer.getName();customerPhone=customer.getPhone();
+  }
   String saleNumber="VTA-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
-  Sale sale=sales.saveAndFlush(new Sale(saleNumber,clean(request.customerName()),clean(request.customerPhone()),request.channel(),warehouse,
-   subtotal,BigDecimal.ZERO.setScale(2),subtotal,saleCurrency==null?"USD":saleCurrency,key,hash,actor));
+  Sale sale=sales.saveAndFlush(new Sale(saleNumber,customerName,customerPhone,request.channel(),warehouse,
+   subtotal,BigDecimal.ZERO.setScale(2),subtotal,saleCurrency==null?"USD":saleCurrency,key,hash,actor,customer));
   for(CalculatedLine line:lines){
    sale.addItem(new SaleItem(line.product(),line.quantity(),line.unitPrice(),line.lineTotal()));
    String movementKey="SALE-"+sha256(key).substring(0,32)+"-"+line.product().getId();

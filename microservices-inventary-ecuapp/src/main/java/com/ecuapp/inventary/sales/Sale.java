@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.sales;
 
 import com.ecuapp.inventary.warehouse.Warehouse;
+import com.ecuapp.inventary.partners.BusinessPartner;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,6 +21,7 @@ public class Sale {
  @Column(name="customer_phone",length=40) private String customerPhone;
  @Enumerated(EnumType.STRING) @Column(nullable=false,length=24) private SaleChannel channel;
  @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="warehouse_id",nullable=false) private Warehouse warehouse;
+ @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="customer_id") private BusinessPartner customer;
  @Column(nullable=false,precision=14,scale=2) private BigDecimal subtotal;
  @Column(nullable=false,precision=14,scale=2) private BigDecimal tax;
  @Column(nullable=false,precision=14,scale=2) private BigDecimal total;
@@ -32,9 +34,9 @@ public class Sale {
  @OneToMany(mappedBy="sale",cascade=CascadeType.ALL,orphanRemoval=true) private List<SaleItem> items=new ArrayList<>();
  protected Sale(){}
  public Sale(String saleNumber,String customerName,String customerPhone,SaleChannel channel,Warehouse warehouse,
-  BigDecimal subtotal,BigDecimal tax,BigDecimal total,String currency,String idempotencyKey,String requestHash,String createdBy){
+  BigDecimal subtotal,BigDecimal tax,BigDecimal total,String currency,String idempotencyKey,String requestHash,String createdBy,BusinessPartner customer){
   this.saleNumber=saleNumber;this.status=SaleStatus.COMPLETED;this.customerName=customerName;this.customerPhone=customerPhone;
-  this.channel=channel;this.warehouse=warehouse;this.subtotal=subtotal;this.tax=tax;this.total=total;this.currency=currency;
+  this.channel=channel;this.warehouse=warehouse;this.customer=customer;this.subtotal=subtotal;this.tax=tax;this.total=total;this.currency=currency;
   this.idempotencyKey=idempotencyKey;this.requestHash=requestHash;this.createdBy=createdBy;this.soldAt=Instant.now();
  }
  @PrePersist void onCreate(){if(createdAt==null)createdAt=Instant.now();if(soldAt==null)soldAt=Instant.now();}
@@ -42,7 +44,7 @@ public class Sale {
  public void cancel(){if(status!=SaleStatus.COMPLETED)throw new IllegalStateException("Solo se puede cancelar una venta completada.");status=SaleStatus.CANCELLED;}
  public UUID getId(){return id;} public String getSaleNumber(){return saleNumber;} public SaleStatus getStatus(){return status;}
  public String getCustomerName(){return customerName;} public String getCustomerPhone(){return customerPhone;} public SaleChannel getChannel(){return channel;}
- public Warehouse getWarehouse(){return warehouse;} public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getTax(){return tax;}
+ public Warehouse getWarehouse(){return warehouse;} public BusinessPartner getCustomer(){return customer;} public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getTax(){return tax;}
  public BigDecimal getTotal(){return total;} public String getCurrency(){return currency;} public String getIdempotencyKey(){return idempotencyKey;}
  public String getRequestHash(){return requestHash;} public String getCreatedBy(){return createdBy;} public Instant getSoldAt(){return soldAt;}
  public Instant getCreatedAt(){return createdAt;} public List<SaleItem> getItems(){return items;}

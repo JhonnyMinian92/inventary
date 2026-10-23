@@ -42,6 +42,7 @@ public class CategoryService {
  private String slug(String name){
   String n=Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","");
   String result=NON_SLUG.matcher(n.toLowerCase(Locale.ROOT)).replaceAll("-").replaceAll("(^-|-$)","");
+  if(result.isBlank())result="category-"+UUID.randomUUID().toString().substring(0,8);
   return result.length()>140?result.substring(0,140).replaceAll("-$",""):result;
  }
 }
