@@ -1,11 +1,11 @@
-# 05 — Catálogo de APIs REST y contrato propuesto
+# 05 — Catálogo de APIs REST y contrato
 
 ## 1. Convenciones del contrato
 
-- Base path: /api/v1.
-- Formato: JSON UTF-8. Errores con application/problem+json.
-- Autorización: Bearer token OIDC/JWT o mecanismo aprobado; cada endpoint exige autenticación salvo health/metadata públicos explícitos.
-- Las rutas siguientes son **propuestas**, todavía no existen en el backend revisado.
+- Base path: `/api/v1`.
+- Formato: JSON UTF-8. Errores REST con `application/problem+json` (RFC 9457) e identificador `requestId` cuando está disponible.
+- Autorización: JWT Bearer HS256 y permisos RBAC vigentes; login y catálogo público son excepciones. La integración WhatsApp usa `X-Integration-Key`.
+- Este documento conserva secciones de diseño histórico marcadas como propuestas; el OpenAPI generado desde los controladores es la referencia para las rutas implementadas.
 - Colecciones paginadas responden con items, page, size, totalElements y totalPages. Límite inicial sugerido: size <= 100.
 - Fechas ISO 8601 con zona. Dinero mediante decimal como string JSON o número decimal validado, con currency explícita y escala fija.
 - No exponer entidades JPA directamente. DTOs independientes para requests/responses y allowlist de campos editables.
@@ -274,3 +274,19 @@ Cualquier endpoint de confirmación o creación de pedido —REST o GraphQL— d
 Kafka se alimenta de Outbox posterior al commit; no se usa una secuencia “publicar evento y luego intentar escribir venta”. Los consumidores de Kafka pueden actualizar proyecciones, Redis, índices de búsqueda o solicitar notificaciones; el consumidor es idempotente y ningún mensaje aislado equivale a una venta confirmada.
 
 La estrategia de rendimiento, caché y escala de PostgreSQL está en [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md).
+
+## 12. P11 — Auditoría y contrato de errores
+
+### Consulta de auditoría implementada
+
+`GET /api/v1/audit-events` requiere `audit:read`. Devuelve eventos ordenados por `occurredAt` descendente con paginación de máximo 100 elementos. Filtros exactos opcionales: `actor`, `action`, `resourceType`, `outcome` (`SUCCESS`, `DENIED`, `FAILURE`), `from` inclusivo y `to` exclusivo en ISO-8601. Si se proporcionan ambos límites, `from` debe ser anterior a `to`.
+
+Los errores HTTP de rutas `/api/**` generan eventos con actor disponible, acción `HTTP_REQUEST_FAILED`, recurso `HTTP_REQUEST`, método, ruta sin query string, código HTTP y requestId. El filtro no lee cuerpos ni registra Authorization, cookies, claves de integración, parámetros de consulta o contraseñas. La persistencia se intenta en una transacción independiente; si falla, no se sustituye la respuesta original.
+
+### Errores REST
+
+Los errores de aplicación usan `application/problem+json`, título, estado, detalle seguro, instancia, código y `requestId` cuando existe. Los errores inesperados devuelven un mensaje genérico; SQL, secretos, mensajes internos y stack traces se reservan para logs del servidor. Los errores de validación pueden incluir nombres de campos rechazados, nunca valores enviados.
+
+### Idempotencia
+
+Cuando un endpoint de comando documenta `Idempotency-Key`, el cliente debe conservar la clave en reintentos de la misma operación. La misma clave con contenido distinto produce conflicto; no reutilizar una clave para una operación nueva.

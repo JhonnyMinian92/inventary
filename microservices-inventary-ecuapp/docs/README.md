@@ -33,7 +33,7 @@ La entrega P03 establece una primera rebanada vertical en catálogo de productos
 | [17 — Implementación P07: inventario operativo](17-implementacion-p07-inventario-operativo.md) | Conteos físicos, diferencias, ajustes transaccionales, idempotencia, trazabilidad y ledger append-only. |
 | [18 — Implementación P08: compras y recepciones parciales](18-implementacion-p08-compras-y-recepciones.md) | Proveedores, órdenes de compra idempotentes, estados, recepciones parciales y movimientos de entrada trazables. |
 | [19 — Implementación P09: devoluciones y anulaciones aprobadas](19-implementacion-p09-devoluciones-y-anulaciones.md) | Devoluciones idempotentes de compra/venta, trazabilidad de ledger y solicitud/aprobación segregadas de cancelaciones. |
-| [20 — Implementación P10: transferencias consistentes](20-implementacion-p10-transferencias-consistentes.md) | Transiciones idempotentes, compensación de cancelación, reversión bilateral, bloqueo estable, auditoría y Outbox. |
+| [20 — Implementación P10: transferencias consistentes](20-implementacion-p10-transferencias-consistentes.md) | Transiciones idempotentes, compensación de cancelación, reversión bilateral, bloqueo estable, auditoría y Outbox. |\n| [21 — Implementación P11: auditoría, documentación y API](21-implementacion-p11-auditoria-documentacion-api.md) | Auditoría de fallos HTTP, filtros de consulta, errores RFC 9457 y contrato OpenAPI. |
 
 ## Convenciones
 
