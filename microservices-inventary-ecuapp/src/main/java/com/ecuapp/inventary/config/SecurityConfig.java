@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -44,14 +45,16 @@ public class SecurityConfig {
  @Bean PasswordEncoder passwordEncoder(){return new BCryptPasswordEncoder(12);}
 
  // Las autoridades se vuelven a leer de PostgreSQL en cada solicitud: desactivar o cambiar de rol invalida los privilegios inmediatamente.
- @Bean Converter<Jwt,? extends AbstractAuthenticationToken> jwtAuthenticationConverter(AppUserRepository users){
-  return jwt -> {
-   AppUser user=users.findByUsername(jwt.getSubject()).filter(AppUser::isActive)
-    .orElseThrow(()->new BadCredentialsException("El usuario asociado al token ya no está activo."));
-   return new JwtAuthenticationToken(jwt,List.of(new SimpleGrantedAuthority("ROLE_"+user.getRole())),user.getUsername());
+ private Converter<Jwt,AbstractAuthenticationToken> jwtAuthenticationConverter(AppUserRepository users){
+  return new Converter<>() {
+   @Override public AbstractAuthenticationToken convert(Jwt jwt) {
+    AppUser user=users.findByUsername(jwt.getSubject()).filter(AppUser::isActive)
+     .orElseThrow(()->new BadCredentialsException("El usuario asociado al token ya no está activo."));
+    return new JwtAuthenticationToken(jwt,List.of(new SimpleGrantedAuthority("ROLE_"+user.getRole())),user.getUsername());
+   }
   };
  }
- @Bean SecurityFilterChain securityFilterChain(HttpSecurity http,Converter<Jwt,? extends AbstractAuthenticationToken> converter)throws Exception{
+ @Bean SecurityFilterChain securityFilterChain(HttpSecurity http,AppUserRepository users)throws Exception{
   http.csrf(csrf->csrf.disable())
    .sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
    .authorizeHttpRequests(auth->auth
@@ -59,7 +62,7 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
     .requestMatchers("/api/v1/public/**","/graphql","/api/v1/integrations/whatsapp/**").permitAll()
     .anyRequest().authenticated())
-   .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(converter)));
+   .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users))));
   return http.build();
  }
  @Bean ApplicationRunner bootstrapAdmin(AppUserRepository users,PasswordEncoder encoder,
