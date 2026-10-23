@@ -13,9 +13,9 @@ import java.util.UUID;
 public class SalesController {
  private final SaleService service;
  public SalesController(SaleService service){this.service=service;}
- @GetMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES','AUDITOR')")
+ @GetMapping @PreAuthorize("hasAuthority('sales:read')")
  public Page<SaleDtos.View> list(@PageableDefault(size=20,sort="soldAt,desc") Pageable p){return service.list(p);}
- @GetMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES','AUDITOR')")
+ @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
  @PostMapping @PreAuthorize("hasAuthority('sales:manage')")
  public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}

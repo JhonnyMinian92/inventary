@@ -22,11 +22,11 @@ public class ProductController {
  public ProductController(ProductUseCases products){this.products=products;}
  @GetMapping public Page<ProductDtos.View> list(@RequestParam(required=false) String q,@PageableDefault(size=20,sort="name") Pageable p){PageResult<com.ecuapp.inventary.catalog.application.ProductResult> result=products.listProducts(q,pageQuery(p));return new PageImpl<>(result.content().stream().map(ProductDtos.View::from).toList(),PageRequest.of(result.page(),result.size(),p.getSort()),result.totalElements());}
  @GetMapping("/{id}") public ProductDtos.View get(@PathVariable UUID id){return ProductDtos.View.from(products.getProduct(id));}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping @PreAuthorize("hasAuthority('catalog:manage')")
  public ProductDtos.View create(@Valid @RequestBody ProductDtos.WriteRequest r,Authentication auth){return ProductDtos.View.from(products.createProduct(command(r),auth.getName()));}
- @PutMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PutMapping("/{id}") @PreAuthorize("hasAuthority('catalog:manage')")
  public ProductDtos.View update(@PathVariable UUID id,@Valid @RequestBody ProductDtos.WriteRequest r,Authentication auth){return ProductDtos.View.from(products.updateProduct(id,command(r),auth.getName()));}
- @PostMapping("/{id}/deactivate") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping("/{id}/deactivate") @PreAuthorize("hasAuthority('catalog:manage')")
  public void deactivate(@PathVariable UUID id,Authentication auth){products.deactivateProduct(id,auth.getName());}
  private PageQuery pageQuery(Pageable pageable){return new PageQuery(pageable.getPageNumber(),pageable.getPageSize(),pageable.getSort().stream().map(order -> new PageQuery.SortTerm(order.getProperty(),order.isDescending()?PageQuery.Direction.DESC:PageQuery.Direction.ASC)).toList());}
  private ProductCommand command(ProductDtos.WriteRequest r){return new ProductCommand(r.sku(),r.name(),r.description(),r.categoryId(),r.costPrice(),r.salePrice(),r.currency(),r.imageUrl());}

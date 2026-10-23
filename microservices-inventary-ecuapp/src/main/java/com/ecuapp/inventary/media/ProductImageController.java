@@ -15,10 +15,10 @@ public class ProductImageController {
  private final ProductImageService service;
  public ProductImageController(ProductImageService service){this.service=service;}
  @GetMapping public List<ProductImageDtos.View> list(@PathVariable UUID productId){return service.list(productId);}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping @PreAuthorize("hasAuthority('catalog:manage')")
  public ProductImageDtos.View create(@PathVariable UUID productId,@Valid @RequestBody ProductImageDtos.CreateRequest r,Authentication a){return service.create(productId,r,a.getName());}
- @PatchMapping("/{imageId}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PatchMapping("/{imageId}") @PreAuthorize("hasAuthority('catalog:manage')")
  public ProductImageDtos.View update(@PathVariable UUID productId,@PathVariable UUID imageId,@Valid @RequestBody ProductImageDtos.UpdateRequest r,Authentication a){return service.update(productId,imageId,r,a.getName());}
- @DeleteMapping("/{imageId}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @DeleteMapping("/{imageId}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
  public void unpublish(@PathVariable UUID productId,@PathVariable UUID imageId,Authentication a){service.unpublish(productId,imageId,a.getName());}
 }

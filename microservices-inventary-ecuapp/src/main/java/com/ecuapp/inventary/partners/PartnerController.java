@@ -29,6 +29,6 @@ public class PartnerController {
  public PartnerDtos.View createCustomer(@Valid @RequestBody PartnerDtos.WriteRequest r,Authentication a){return service.create(PartnerType.CUSTOMER,r,a.getName());}
  @PutMapping("/api/v1/customers/{id}") @PreAuthorize("hasAuthority('customers:manage')")
  public PartnerDtos.View updateCustomer(@PathVariable UUID id,@Valid @RequestBody PartnerDtos.WriteRequest r,Authentication a){return service.update(PartnerType.CUSTOMER,id,r,a.getName());}
- @PostMapping("/api/v1/customers/{id}/deactivate") @PreAuthorize("hasAuthority('partners:manage')")
+ @PostMapping("/api/v1/customers/{id}/deactivate") @PreAuthorize("hasAuthority('customers:manage')")
  public void deactivateCustomer(@PathVariable UUID id,Authentication a){service.deactivate(PartnerType.CUSTOMER,id,a.getName());}
 }
