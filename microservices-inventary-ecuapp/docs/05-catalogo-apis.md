@@ -251,3 +251,25 @@ Reglas:
 - Validar tamaño, formato y contenido real del archivo; ignorar el nombre/extensión enviados por el usuario; no ejecutar ni servir SVG/HTML arbitrario como contenido confiable.
 - No incrustar secretos o enlaces temporales que expongan archivos internos. Las imágenes comerciales publicadas pueden usar URL pública estable; activos privados deben seguir una política diferente.
 - Las respuestas del endpoint público deben incluir solo medios publicados y autorizados.
+
+## 12. GraphQL y semántica de comandos
+
+Añadir un endpoint GraphQL (habitualmente /graphql) mediante Spring for GraphQL para consultas flexibles del catálogo y vistas agregadas. La selección de campos incluye nombre, descripción, imágenes, precio público vigente, variantes y estado de disponibilidad. No se expone costo/margen en el esquema público.
+
+Reglas de implementación:
+- REST sigue siendo el contrato preferido para n8n, webhooks, comandos operativos y ventas de WhatsApp.
+- GraphQL se usa cuando la consulta compuesta evita requests múltiples; no se añade por sustitución total de REST.
+- Las mutaciones GraphQL opcionales llaman exactamente a los mismos casos de uso que REST. No hay lógica duplicada de venta ni acceso directo al repositorio desde resolvers.
+- Los listados usan paginación cursor-based y filtros allowlisted.
+- Activar límites de profundidad, aliases, tamaño de página y complejidad de query; DataLoader/batching para evitar N+1; rate limits ponderados por coste de query.
+- Autorización por recurso/campo; no confiar en ocultación de campos como único control de seguridad.
+- Queries públicas de catálogo pueden cachearse según política de la sección de caché; la disponibilidad expuesta nunca representa reserva.
+- No cachear en CDN compartido estado de checkout, costos ni datos de cliente.
+
+## 13. Consistencia y eventos
+
+Cualquier endpoint de confirmación o creación de pedido —REST o GraphQL— debe delegar en un caso de uso transaccional único. La transacción local verifica quote y expiración, recalcula total, reserva stock atómicamente, persiste pedido/líneas, idempotencia, movimientos/saldo cuando corresponda y Outbox. Si un paso falla, todo revierte.
+
+Kafka se alimenta de Outbox posterior al commit; no se usa una secuencia “publicar evento y luego intentar escribir venta”. Los consumidores de Kafka pueden actualizar proyecciones, Redis, índices de búsqueda o solicitar notificaciones; el consumidor es idempotente y ningún mensaje aislado equivale a una venta confirmada.
+
+La estrategia de rendimiento, caché y escala de PostgreSQL está en [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md).
