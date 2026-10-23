@@ -102,3 +102,39 @@ Los números de rendimiento/disponibilidad son objetivos iniciales, no métricas
 ## 6. Condiciones de salida del MVP
 
 El backend está “completo según alcance” cuando todas las tareas P0/P1 incluidas están implementadas, migraciones y OpenAPI están sincronizadas, los controles de seguridad se revisaron, todos los endpoints tienen semántica de error e idempotencia definida y el despliegue está documentado. Esta condición no equivale a garantía de ausencia de defectos ni sustituye las pruebas locales.
+
+## 7. Adenda: canal de venta con catálogo público, n8n y WhatsApp
+
+Se incorporan estos requisitos funcionales adicionales a la matriz RF:
+
+| ID | Requisito adicional | Criterio de aceptación |
+|---|---|---|
+| RF-023 | Catálogo público de venta | Endpoint paginado con nombre, descripción, SKU, imagen HTTPS, precio, moneda, variante y disponibilidad vendible; no incluye costos ni datos privados. |
+| RF-024 | Imágenes de producto | Modelo de metadatos de imagen, URL estable o entrega de medios; rechazar rutas locales como URL para clientes/Meta. Subidas futuras deben validar tipo, tamaño y contenido. |
+| RF-025 | Integración técnica n8n | Credencial de servicio con scopes limitados; endpoints para buscar catálogo, gestionar carrito, cotizar, crear y consultar pedidos. Sin acceso directo a DB. |
+| RF-026 | Compra desde WhatsApp | Pedido creado solo después de una confirmación explícita del resumen por parte del cliente; la confirmación se vincula a un mensaje entrante validado. |
+| RF-027 | Precio y stock autoritativos | Inventary calcula el total y revalida precio/disponibilidad al crear el pedido; nunca confía en cálculos del LLM o del cliente. |
+| RF-028 | Webhook idempotente | Reintentos del proveedor/workflow no duplican mensajes procesados, reservas ni pedidos. |
+| RF-029 | Estado correcto de cobro | Pedido pendiente de pago no se declara pagado; solo se marca pagado tras una señal de pago validada o una operación autorizada. |
+| RF-030 | Carrito/cotización con vencimiento | La cotización tiene quoteId y expiración; al confirmar se revalida y si algo cambió, se vuelve a pedir consentimiento. |
+
+### Requisitos de infraestructura del canal
+
+n8n y el backend pueden estar autoalojados/locales y hablar por una red privada, pero el webhook de WhatsApp necesita un callback HTTPS alcanzable desde fuera. En desarrollo puede usarse un túnel temporal protegido; en producción, un callback HTTPS estable con verificación y monitoreo. La IA utiliza OpenAI API, por tanto ese componente no es inferencia 100 % local aunque n8n esté autoalojado.
+
+El diagrama, contratos propuestos y flujo transaccional están en [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md).
+
+## 8. Adenda: escalabilidad y consistencia transaccional
+
+| ID | Requisito adicional | Criterio de aceptación |
+|---|---|---|
+| RF-031 | API GraphQL de consulta | Consultas compuestas del catálogo con paginación cursor-based y DTOs públicos; todos los resolvers usan casos de uso/repositorios optimizados. |
+| RF-032 | Protección GraphQL | Límite de profundidad, complejidad, aliases, tamaño de página, duración y tasa; autorización por objeto/campo y sin fuga de costos. |
+| RF-033 | Eventos Kafka | Publicar eventos de negocio después del commit mediante Outbox; contratos versionados, claves de partición e idempotencia del consumidor. |
+| RF-034 | Venta ACID | Pedido, líneas, reserva, ledger/saldo, idempotencia y Outbox se confirman o revierten según una frontera transaccional definida. Ninguna llamada externa/LLM permanece dentro de la transacción. |
+| RF-035 | Caché por frescura | Imagen y metadatos relativamente estables tienen cache versionada; stock y checkout se revalidan desde PostgreSQL. |
+| RF-036 | Gestión de conexiones | Pool global dimensionado considerando instancias de aplicación, jobs, n8n y conexiones operativas; métricas de espera y saturación. |
+| RF-037 | Escalado basado en métricas | Registrar latencia, QPS, locks, pool, I/O, lag de Kafka/outbox, caché y lag de réplica antes de introducir réplicas o sharding. |
+| RF-038 | Búsqueda semántica opcional | Si se aprueba, indexar embeddings reconstruibles del catálogo; resultados semánticos siempre revalidan producto, precio y stock relacional. |
+
+Estos requisitos no prometen capacidad ilimitada ni que una base primaria baste para cualquier carga. Capacidad objetivo se confirma a partir de usuarios concurrentes, tasa de transacciones, tamaño de datos, hardware y medición.

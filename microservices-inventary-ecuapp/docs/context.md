@@ -21,6 +21,8 @@ Implementar un backend de inventario mantenible y seguro para administrar catál
 5. [Flujos de negocio](06-flujos-de-negocio-y-api.md).
 6. [Seguridad y definición de hecho](07-seguridad-y-definicion-de-hecho.md).
 7. [Plan de trabajo](08-plan-de-trabajo.md).
+8. [WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md).
+9. [Estimación de tiempo de agente IA y tokens](10-estimacion-agente-ia-tokens.md).
 
 ## Principios no negociables
 
@@ -41,3 +43,17 @@ Multiempresa/tenant; autenticación OIDC externa frente a proveedor propio; alca
 ## Convenciones técnicas previstas
 
 Java 21; Spring Boot compatible con la versión fijada en POM tras comprobar compatibilidad; PostgreSQL; Flyway; Spring Web MVC; Bean Validation; Spring Security Resource Server; JPA/Hibernate; OpenAPI; Actuator/Micrometer. El despliegue inicial recomendado es un monolito modular hexagonal; microservicios y broker se incorporan solo con una razón de negocio/operación.
+
+## Canal comercial prioritario
+
+El primer flujo de venta por mensajería debe contemplar catálogo público con imagen, descripción, precio y disponibilidad vendible; carritos y cotizaciones con expiración; y creación idempotente de pedidos desde n8n tras consentimiento explícito del cliente. La IA no decide stock ni precio y no accede directamente a la base de datos. El callback de WhatsApp necesita HTTPS accesible desde Internet aunque n8n esté autoalojado/local en desarrollo.
+
+La decisión del backend para el MVP es Spring MVC + PostgreSQL/JPA. WebFlux se reevalúa solo si una carga representativa demuestra una necesidad no bloqueante de extremo a extremo.
+
+## Escalabilidad y transacciones
+
+La fuente de verdad comercial es PostgreSQL. Pedido, líneas, cotización vigente, reserva de stock, clave de idempotencia y Outbox deben confirmarse en una transacción local cuando forman parte del mismo caso de uso. Kafka se utiliza para propagar eventos posteriores al commit mediante Transactional Outbox; no es la autoridad de stock.
+
+REST se conserva para comandos e integraciones n8n. GraphQL se añade para consultas compuestas de catálogo/lecturas que se benefician de selección de campos. Redis/Caffeine cachean producto e imágenes con frescura explícita; la confirmación de compra siempre valida precio y stock contra la fuente transaccional.
+
+HikariCP es el pool de conexiones inicial. PgBouncer, réplicas de lectura, particionamiento o distribución PostgreSQL son mecanismos de evolución condicionados por métricas, no un requisito de partida solo por una previsión de usuarios. Base vectorial separada no se requiere para el MVP; pgvector es opción para búsqueda semántica de productos. Véase [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md).

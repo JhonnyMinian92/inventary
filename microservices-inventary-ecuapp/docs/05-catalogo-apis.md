@@ -198,3 +198,78 @@ Cuerpo estándar problem+json, con campos como type, title, status, detail segur
 - Posting: identificador idempotente, actor autenticado y recurso objetivo; no confiar actorId en el body.
 
 Estos DTOs deben recibir Bean Validation, límites de longitud/número de elementos y rechazo de propiedades desconocidas si no rompen compatibilidad pactada.
+
+## 10. Catálogo público e integración comercial n8n + WhatsApp
+
+Estas rutas amplían el contrato para el requisito de venta directa por WhatsApp. Su diseño detallado y diagramas están en [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md).
+
+| Método y ruta | Objetivo / permiso | Validaciones clave |
+|---|---|---|
+| GET /public/catalog/products | Catálogo público paginado: imagen principal, SKU, nombre, descripción, precio vigente, moneda y disponibilidad de venta | Público con rate limit; solo productos activos/publicables; límite de página; nunca exponer costo/margen. |
+| GET /public/catalog/products/{productIdOrSlug} | Ficha de producto/variantes | Campos públicos allowlisted e imagen HTTPS accesible. |
+| GET /public/catalog/categories | Categorías visibles en el canal | Solo categorías activas/publicables. |
+| GET /integrations/whatsapp/catalog/products | Búsqueda de catálogo para n8n | Credencial de máquina con scope catalog:read; no usa datos directos de DB. |
+| GET /integrations/whatsapp/catalog/products/{idOrSku} | Detalle actualizado para la conversación | Scope de integración; oculta campos internos. |
+| POST /integrations/whatsapp/carts | Crear/recuperar carrito asociado a la identidad del workflow | Autenticación de servicio; customerRef derivado de wa_id verificado por el workflow, nunca del texto propuesto por el LLM. |
+| GET /integrations/whatsapp/carts/{cartId} | Estado del carrito | Verifica acceso del canal al carrito y devuelve importes recalculados. |
+| PUT /integrations/whatsapp/carts/{cartId}/items/{variantId} | Añadir o fijar cantidad de variante | Cantidad positiva, producto activo y variante válida. |
+| DELETE /integrations/whatsapp/carts/{cartId}/items/{variantId} | Retirar una línea | Solo carrito modificable, no pedido confirmado. |
+| POST /integrations/whatsapp/carts/{cartId}/quote | Cotización final con quoteId/expiración | Recalcula precio y stock en servidor; no representa pago ni reserva permanente. |
+| POST /integrations/whatsapp/orders | Crear pedido desde una cotización válida tras consentimiento expreso | Idempotency-Key, quote sin expirar, confirmación vinculada a mensaje entrante real, revalidación y reserva atómicas. |
+| GET /integrations/whatsapp/orders/{orderId} | Consultar estado de pedido del canal | Scope limitado y comprobación de customerRef. |
+| POST /integrations/whatsapp/orders/{orderId}/cancel-request | Solicitar cancelación | No borra ni revierte silenciosamente una venta contabilizada. |
+
+Prefijo completo de las rutas de la tabla: /api/v1. El token de integración no puede usar endpoints administrativos ni recibir costos. El endpoint público devuelve stock vendible; puede devolver cifra exacta o estado IN_STOCK/LOW_STOCK/OUT_OF_STOCK según decisión comercial. Una consulta de stock no lo reserva.
+
+### Datos mínimos de producto en el catálogo público
+
+- Identificador estable, SKU, slug/nombre, descripción breve y categoría publicable.
+- Precio de venta actual, código de moneda e información comercial visible.
+- Imagen principal y, opcionalmente, galería con URL HTTPS estable y texto alternativo.
+- Variantes comprables y disponibilidad vendible según permisos/canal.
+- No incluir costo promedio, margen, precio de proveedor, movimientos ni información de cliente.
+
+Si las imágenes se almacenan inicialmente en una máquina local, la API no debe devolver rutas de disco ni localhost. Para enviar imágenes mediante WhatsApp, usar una URL accesible por el proveedor o descargar/cargar el archivo mediante una operación de medios soportada por WhatsApp Cloud API.
+
+### Regla de confirmación
+
+Un pedido significa una obligación comercial y no solo una respuesta del chatbot. El LLM no crea la venta directamente: debe presentar al cliente las líneas, cantidad, precio unitario, total, método de entrega y estado de pago; después de una confirmación inequívoca, n8n ejecuta el POST. Inventary recalcula precios, revalida stock y crea el pedido con reserva en una sola transacción idempotente. AWAITING_PAYMENT no significa PAID.
+
+## 11. Imágenes y medios de producto
+
+| Método y ruta | Objetivo / permiso | Validaciones clave |
+|---|---|---|
+| GET /catalog/products/{productId}/images | Listar medios de producto | PRODUCT_READ; devuelve imagen principal, alt, orden y URL apta para el consumidor autorizado. |
+| POST /catalog/products/{productId}/images | Subir imagen o registrar medio gestionado | PRODUCT_MEDIA_MANAGE; límite de bytes, allowlist MIME, inspección real de contenido, dimensiones/tipo permitidos, nombre generado por el servidor y almacenamiento aislado. |
+| PATCH /catalog/products/{productId}/images/{imageId} | Cambiar texto alternativo, orden o principal | PRODUCT_MEDIA_MANAGE; campos permitidos; auditar cambio relevante. |
+| DELETE /catalog/products/{productId}/images/{imageId} | Retirar una imagen de publicación | PRODUCT_MEDIA_MANAGE; solo desasocia/despublica la imagen, no elimina documentos ni datos de producto. |
+
+Reglas:
+- No aceptar una URL arbitraria para que el backend la descargue; esto puede introducir SSRF. Si se admite importar una URL, requiere un flujo separado con hosts allowlisted y controles de red.
+- Guardar bytes en almacenamiento de objetos (servicio compatible con S3, CDN o equivalente) y metadatos en PostgreSQL. No guardar archivos enormes como BLOB por defecto.
+- En local, puede usarse almacenamiento de desarrollo compatible con S3. Las URL que el cliente de WhatsApp o Meta deba recuperar han de ser HTTPS públicamente alcanzables, o el workflow debe subir el medio por la API de media de WhatsApp y usar el identificador devuelto.
+- Validar tamaño, formato y contenido real del archivo; ignorar el nombre/extensión enviados por el usuario; no ejecutar ni servir SVG/HTML arbitrario como contenido confiable.
+- No incrustar secretos o enlaces temporales que expongan archivos internos. Las imágenes comerciales publicadas pueden usar URL pública estable; activos privados deben seguir una política diferente.
+- Las respuestas del endpoint público deben incluir solo medios publicados y autorizados.
+
+## 12. GraphQL y semántica de comandos
+
+Añadir un endpoint GraphQL (habitualmente /graphql) mediante Spring for GraphQL para consultas flexibles del catálogo y vistas agregadas. La selección de campos incluye nombre, descripción, imágenes, precio público vigente, variantes y estado de disponibilidad. No se expone costo/margen en el esquema público.
+
+Reglas de implementación:
+- REST sigue siendo el contrato preferido para n8n, webhooks, comandos operativos y ventas de WhatsApp.
+- GraphQL se usa cuando la consulta compuesta evita requests múltiples; no se añade por sustitución total de REST.
+- Las mutaciones GraphQL opcionales llaman exactamente a los mismos casos de uso que REST. No hay lógica duplicada de venta ni acceso directo al repositorio desde resolvers.
+- Los listados usan paginación cursor-based y filtros allowlisted.
+- Activar límites de profundidad, aliases, tamaño de página y complejidad de query; DataLoader/batching para evitar N+1; rate limits ponderados por coste de query.
+- Autorización por recurso/campo; no confiar en ocultación de campos como único control de seguridad.
+- Queries públicas de catálogo pueden cachearse según política de la sección de caché; la disponibilidad expuesta nunca representa reserva.
+- No cachear en CDN compartido estado de checkout, costos ni datos de cliente.
+
+## 13. Consistencia y eventos
+
+Cualquier endpoint de confirmación o creación de pedido —REST o GraphQL— debe delegar en un caso de uso transaccional único. La transacción local verifica quote y expiración, recalcula total, reserva stock atómicamente, persiste pedido/líneas, idempotencia, movimientos/saldo cuando corresponda y Outbox. Si un paso falla, todo revierte.
+
+Kafka se alimenta de Outbox posterior al commit; no se usa una secuencia “publicar evento y luego intentar escribir venta”. Los consumidores de Kafka pueden actualizar proyecciones, Redis, índices de búsqueda o solicitar notificaciones; el consumidor es idempotente y ningún mensaje aislado equivale a una venta confirmada.
+
+La estrategia de rendimiento, caché y escala de PostgreSQL está en [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md).

@@ -191,3 +191,116 @@ flowchart TD
 - Clave idempotente igual y payload igual: devolver respuesta original; mismo key con payload diferente: 409.
 - Error inesperado: rollback y 500 genérico + correlation ID; detalle solo en logs protegidos.
 - Fallo de API externa: no mantener locks de inventario durante la llamada; marcar operación pendiente/reintentar con outbox o compensación definida.
+
+## 11. Catálogo público para sitio/canal de venta
+
+~~~mermaid
+flowchart TD
+    A[GET public catalog] --> B[Rate limit + validate filters/page]
+    B --> C[Filter active and publishable products]
+    C --> D[Project public DTO]
+    D --> E[Expose price, description, image URL and sale availability]
+    E --> F[Return paginated response]
+~~~
+
+- Consultar los filtros con parámetros validados y orden allowlisted.
+- Leer precio de venta vigente y disponibilidad vendible; nunca enviar precio de compra/margen.
+- URL de imagen estable HTTPS o medio subido al proveedor de mensajería; un path local no es accesible por Meta.
+- No usar el número devuelto de stock como reserva. Una orden ejecuta su propia validación transaccional.
+- Aplicar rate limiting, paginación pequeña, caché prudente y protección contra scraping.
+
+## 12. Compra por WhatsApp mediante n8n + OpenAI
+
+~~~mermaid
+sequenceDiagram
+    actor Customer as Cliente
+    participant Meta as WhatsApp Cloud API
+    participant N8N as n8n
+    participant AI as OpenAI API
+    participant API as Inventary API
+    participant DB as PostgreSQL
+    Customer->>Meta: "Quiero comprar dos artículos"
+    Meta->>N8N: Webhook con mensaje y wa_id
+    N8N->>N8N: Validar evento y deduplicar messageId
+    N8N->>AI: Mensaje y herramientas limitadas
+    AI-->>N8N: Llamada sugerida para buscar producto
+    N8N->>API: GET catálogo con credencial de servicio
+    API->>DB: Leer datos publicables
+    DB-->>API: Productos actuales
+    API-->>N8N: Precio, descripción, imagen y disponibilidad
+    N8N->>AI: Resultado del catálogo
+    AI-->>N8N: Propuesta de producto/cantidad
+    N8N->>API: Actualizar carrito y crear cotización
+    API->>DB: Validar líneas y recalcular precio
+    API-->>N8N: Quote ID, líneas, total y expiración
+    N8N->>Meta: Enviar resumen de compra
+    Meta->>Customer: Mostrar resumen y pedir confirmación
+    Customer->>Meta: Confirmación explícita
+    Meta->>N8N: Confirmación con messageId verificado
+    N8N->>API: POST order + quoteId + Idempotency-Key
+    API->>DB: TX: revalidar quote/stock, crear pedido + reserva + auditoría
+    DB-->>API: Commit o conflicto
+    API-->>N8N: Número y estado real del pedido
+    N8N->>Meta: Confirmación o mensaje para recotizar
+    Meta->>Customer: Resultado
+~~~
+
+### Flujo por endpoint
+
+1. GET catálogo: devolver solo DTO público y disponibilidad de venta; respuesta no crea reserva.
+2. Crear/recuperar carrito: asociar a un identificador del canal derivado del webhook validado y guardar la relación en servidor.
+3. Añadir/quitar líneas: validar producto/variante, estado y cantidad; no aceptar precio ni descuento impuestos del agente.
+4. Cotizar: volver a leer los precios; calcular subtotales y total en backend; aplicar caducidad a quote; no confirmar stock reservado todavía.
+5. Mostrar resumen: n8n envía al cliente los productos, cantidades, precios, total y método de entrega. Un mensaje tipo “sí” fuera de contexto o un tool call del modelo no es suficiente; la confirmación debe estar ligada al quote actual.
+6. Crear pedido: verificar expiración, versión/precios de quote, identidad del workflow, mensaje real de confirmación y clave idempotente; dentro de una transacción, revalidar disponibilidad y crear pedido/reservas.
+7. Resultado: informar AWAITING_PAYMENT o el estado que realmente esté almacenado. No llamar PAID a un pedido sin confirmación de pago verificada.
+8. Si se agotó stock o cambió el precio: no crear el pedido silenciosamente; devolver conflicto y pedir al cliente que acepte una nueva cotización.
+9. Si webhook/workflow reintenta: la combinación de messageId, quoteId y Idempotency-Key evita duplicidad de pedidos.
+
+### Condición de red para webhook
+
+Meta necesita un HTTPS accesible desde internet para los webhooks; localhost no basta. El backend puede permanecer privado y n8n self-hosted puede ejecutarse en local durante desarrollo si el callback se publica mediante túnel HTTPS temporal seguro. En producción se debe configurar un callback estable con TLS, protección y monitoreo.
+
+### Responsabilidades estrictas
+
+- OpenAI interpreta intención y propone funciones, pero no determina stock, precio, descuentos, pago ni identidad.
+- n8n valida las llamadas sugeridas, pasa credenciales de máquina protegidas y registra el resultado del backend.
+- Inventary es la única autoridad para cotizar, reservar stock y persistir el pedido.
+- La creación de pedido exige confirmación explícita de resumen al cliente.
+- No facilitar al LLM SQL, administración de catálogo, modificación de stock o acceso general a clientes.
+
+## 13. Venta transaccional con Outbox/Kafka
+
+~~~mermaid
+sequenceDiagram
+    actor Customer as Cliente
+    participant API as REST o GraphQL
+    participant UC as Caso de uso transaccional
+    participant PG as PostgreSQL primary
+    participant Relay as Outbox publisher
+    participant K as Kafka
+    participant N as Consumidores (n8n/notificaciones/reportes)
+    Customer->>API: Confirmar cotización
+    API->>UC: submitOrder(quoteId, idempotencyKey)
+    UC->>PG: BEGIN
+    UC->>PG: Revalidar precio, expiry, stock y permisos
+    UC->>PG: Reserva atómica + pedido + líneas + ledger + idempotencia + outbox
+    PG-->>UC: COMMIT o ROLLBACK
+    UC-->>API: Estado confirmado o conflicto
+    Relay->>PG: Leer eventos Outbox comprometidos
+    Relay->>K: Publicar OrderCreated / StockReserved
+    K-->>N: Evento con eventId y aggregateId
+    N->>N: Deduplicar y ejecutar efecto asíncrono
+~~~
+
+Regla: un evento de Kafka solo comunica un cambio ya confirmado. Si Kafka o n8n están caídos después del commit, el pedido permanece confirmado en PostgreSQL y el evento queda reintentable en Outbox. Si PostgreSQL rechaza el stock, no se publica evento de pedido confirmado. La respuesta al cliente comunica exactamente el estado durable del pedido.
+
+## 14. Catálogo con caché selectiva y GraphQL
+
+1. REST o GraphQL consulta la proyección pública del catálogo.
+2. Nombre, descripción, categoría e imagen pueden proceder de una caché versionada.
+3. Redis se invalida/actualiza por evento Outbox/Kafka después de modificar un producto; el sistema debe tolerar retrasos de invalidación.
+4. Stock público usa una proyección de frescura breve o una disponibilidad discretizada. No se presenta como reserva.
+5. Para comprar, backend consulta la disponibilidad transaccional y reserva en PostgreSQL primary.
+6. Una consulta GraphQL tiene límites de coste/profundidad y usa DataLoader para no multiplicar consultas.
+7. La caché no se utiliza para autorizar una venta, validar pago ni confirmar el estado de un pedido.
