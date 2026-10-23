@@ -23,6 +23,15 @@ public class IdempotencyRecord {
  @Column(name="completed_at") private Instant completedAt;
  protected IdempotencyRecord(){}
  @PrePersist void create(){if(createdAt==null)createdAt=Instant.now();}
- public UUID getId(){return id;} public String getScope(){return scope;} public String getIdempotencyKey(){return idempotencyKey;} public String getRequestHash(){return requestHash;} public RecordStatus getStatus(){return status;} public UUID getResourceId(){return resourceId;} public Instant getCreatedAt(){return createdAt;} public Instant getCompletedAt(){return completedAt;}
+ public void markCompleted(String resourceType,UUID resourceId,short responseStatus){
+  if(resourceType==null||resourceType.isBlank()||resourceId==null||responseStatus<200||responseStatus>=300)
+   throw new IllegalArgumentException("La finalización de idempotencia requiere recurso y respuesta exitosa.");
+  this.resourceType=resourceType;this.resourceId=resourceId;this.responseStatus=responseStatus;
+  this.status=RecordStatus.COMPLETED;this.completedAt=Instant.now();
+ }
+ public UUID getId(){return id;} public String getScope(){return scope;} public String getIdempotencyKey(){return idempotencyKey;}
+ public String getRequestHash(){return requestHash;} public RecordStatus getStatus(){return status;} public UUID getResourceId(){return resourceId;}
+ public String getResourceType(){return resourceType;} public Short getResponseStatus(){return responseStatus;}
+ public Instant getCreatedAt(){return createdAt;} public Instant getCompletedAt(){return completedAt;}
  public enum RecordStatus { IN_PROGRESS, COMPLETED, FAILED }
 }

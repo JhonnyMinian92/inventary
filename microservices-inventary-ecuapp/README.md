@@ -84,6 +84,10 @@ Los permisos RBAC se guardan en PostgreSQL y se derivan de la asignación vigent
 
 Configura JWT_SECRET con al menos 32 bytes aleatorios y CORS_ALLOWED_ORIGINS con orígenes exactos separados por coma. El comodín * no está permitido. El límite de login es por instancia; producción debe complementarlo en gateway/WAF.
 
+## Ventas e idempotencia
+
+La creación de ventas usa `POST /api/v1/sales` con el header `Idempotency-Key`. El servidor obtiene los precios del catálogo; el cliente envía únicamente producto y cantidad. Stock, venta, líneas, movimientos, auditoría, Outbox y registro de idempotencia se guardan en una sola transacción. Los reintentos con la misma clave y contenido devuelven la venta creada; reutilizar la clave con otra solicitud devuelve conflicto. Ver [P06 — Ventas con descuento atómico de stock](docs/16-implementacion-p06-ventas-atomicas.md).
+
 ## API implementada
 
 Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálogo público y la integración WhatsApp (con clave de máquina propia) son excepciones. GraphQL requiere permiso de lectura del catálogo. OpenAPI/Swagger está deshabilitado por defecto y no sustituye autenticación.
