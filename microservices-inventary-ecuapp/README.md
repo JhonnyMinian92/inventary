@@ -13,6 +13,8 @@ Backend planificado sobre Java 21 y Spring Boot. El código actual es un esquele
 - [Flujos de negocio y API](docs/06-flujos-de-negocio-y-api.md)
 - [Seguridad y definición de hecho](docs/07-seguridad-y-definicion-de-hecho.md)
 - [Backlog y estimación](docs/08-plan-de-trabajo.md)
+- [WebFlux, n8n, WhatsApp y OpenAI](docs/09-webflux-n8n-whatsapp-openai.md)
+- [Estimación del agente IA y tokens](docs/10-estimacion-agente-ia-tokens.md)
 
 ## Reglas de contribución
 
