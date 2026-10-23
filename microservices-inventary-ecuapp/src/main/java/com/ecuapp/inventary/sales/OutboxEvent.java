@@ -22,6 +22,17 @@ public class OutboxEvent {
  @Column(name="published_at") private Instant publishedAt;
  protected OutboxEvent(){}
  public OutboxEvent(String aggregateType,UUID aggregateId,String eventType,Map<String,Object> payload){
-  this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=payload;this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
+  this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=Map.copyOf(payload);
+  this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
  }
+ public void markPublished(){this.status="PUBLISHED";this.publishedAt=Instant.now();}
+ public void markFailed(){
+  this.attempts++;
+  if(this.attempts>=10){this.status="FAILED";return;}
+  long delay=Math.min(3600L,1L<<Math.min(this.attempts,11));
+  this.status="PENDING";this.nextAttemptAt=Instant.now().plusSeconds(delay);
+ }
+ public UUID getId(){return id;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
+ public String getEventType(){return eventType;} public Map<String,Object> getPayload(){return payload;} public String getStatus(){return status;}
+ public int getAttempts(){return attempts;} public Instant getNextAttemptAt(){return nextAttemptAt;} public Instant getCreatedAt(){return createdAt;} public Instant getPublishedAt(){return publishedAt;}
 }

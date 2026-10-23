@@ -1,4 +1,12 @@
 spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  graphql:
+    graphiql:
+      enabled: ${GRAPHIQL_ENABLED:false}
   application:
     name: inventary
   datasource:
@@ -45,6 +53,10 @@ app:
     # Solo para desarrollo local; en otros entornos configurar JWT_SECRET.
     jwt-secret: ${JWT_SECRET:inventary-local-dev-key-change-me-32bytes-minimum}
     token-ttl-minutes: ${JWT_TTL_MINUTES:60}
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+    topic: ${KAFKA_TOPIC:inventary.domain-events}
+    poll-delay-ms: ${KAFKA_POLL_DELAY_MS:1000}
   integrations:
     whatsapp:
       api-key: ${WHATSAPP_INTEGRATION_API_KEY:}

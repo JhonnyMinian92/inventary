@@ -4,4 +4,5 @@ import java.util.UUID;
 public interface CategoryRepository extends JpaRepository<Category,UUID> {
  boolean existsByNameIgnoreCase(String name);
  boolean existsBySlug(String slug);
+ org.springframework.data.domain.Page<Category> findByActiveTrue(org.springframework.data.domain.Pageable pageable);
 }

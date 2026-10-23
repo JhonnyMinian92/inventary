@@ -21,6 +21,7 @@ public class ProductService {
   Page<Product> result=(q==null||q.isBlank())?products.findAll(p):products.findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(q.trim(),q.trim(),p);
   return result.map(ProductDtos.View::from);
  }
+ @org.springframework.cache.annotation.Cacheable(cacheNames="publicProductList",key="#pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
  @Transactional(readOnly=true) public Page<ProductDtos.PublicView> publicList(Pageable pageable){
   Pageable p=PageRequest.of(pageable.getPageNumber(),Math.min(pageable.getPageSize(),100),pageable.getSort());
   Page<Product> page=products.findByActiveTrueAndCategory_ActiveTrue(p);
