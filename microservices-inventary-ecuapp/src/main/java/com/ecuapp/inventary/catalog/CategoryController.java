@@ -14,10 +14,10 @@ public class CategoryController {
  public CategoryController(CategoryService service){this.service=service;}
  @GetMapping public Page<CategoryDtos.View> list(@PageableDefault(size=20,sort="name") Pageable pageable){return service.list(pageable);}
  @GetMapping("/{id}") public CategoryDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping @PreAuthorize("hasAuthority('catalog:manage')")
  public CategoryDtos.View create(@Valid @RequestBody CategoryDtos.WriteRequest request,Authentication auth){return service.create(request,auth.getName());}
- @PutMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PutMapping("/{id}") @PreAuthorize("hasAuthority('catalog:manage')")
  public CategoryDtos.View update(@PathVariable UUID id,@Valid @RequestBody CategoryDtos.WriteRequest request,Authentication auth){return service.update(id,request,auth.getName());}
- @PostMapping("/{id}/deactivate") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping("/{id}/deactivate") @PreAuthorize("hasAuthority('catalog:manage')")
  public void deactivate(@PathVariable UUID id,Authentication auth){service.deactivate(id,auth.getName());}
 }

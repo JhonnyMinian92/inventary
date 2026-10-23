@@ -22,7 +22,7 @@ $env:SPRING_PROFILES_ACTIVE = "dev"
 $env:SWAGGER_ENABLED = "true"
 $env:JWT_SECRET = "usa-un-secreto-aleatorio-de-al-menos-32-bytes"
 $env:BOOTSTRAP_ADMIN_USERNAME = "admin"
-$env:BOOTSTRAP_ADMIN_PASSWORD = "cambia-esta-clave-administrativa-123!"
+$env:BOOTSTRAP_ADMIN_PASSWORD = "Cambia-esta-clave-inicial-segura-123!"
 mvn -B verify
 mvn spring-boot:run
 ```
@@ -37,7 +37,7 @@ export SPRING_PROFILES_ACTIVE='dev'
 export SWAGGER_ENABLED='true'
 export JWT_SECRET='usa-un-secreto-aleatorio-de-al-menos-32-bytes'
 export BOOTSTRAP_ADMIN_USERNAME='admin'
-export BOOTSTRAP_ADMIN_PASSWORD='cambia-esta-clave-administrativa-123!'
+export BOOTSTRAP_ADMIN_PASSWORD='Cambia-esta-clave-inicial-segura-123!'
 mvn -B verify
 mvn spring-boot:run
 ```
@@ -67,19 +67,26 @@ Si la base contiene tablas creadas manualmente o una tabla `flyway_schema_histor
 
 ## Autenticación y roles
 
-`POST /api/v1/auth/login` recibe `{"username":"admin","password":"..."}` y devuelve un JWT. Envíalo como `Authorization: Bearer <token>`. `GET /api/v1/auth/me` devuelve la identidad autenticada.
+POST /api/v1/auth/login recibe credenciales y devuelve un JWT. Envíalo como Authorization: Bearer <token>. GET /api/v1/auth/me devuelve la identidad autenticada.
 
-No se crea administrador por defecto. El bootstrap inicial solo se ejecuta si configuras `BOOTSTRAP_ADMIN_USERNAME` y `BOOTSTRAP_ADMIN_PASSWORD`; la contraseña requiere 12 caracteres y el proceso no sobreescribe usuarios existentes. El bootstrap es para inicializar el entorno; luego los usuarios se gestionan mediante:
+No existen credenciales administrativas predeterminadas. Si la base no tiene usuarios, el arranque exige BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD; el primer usuario recibe SUPER_ADMIN. La contraseña inicial debe tener al menos 16 caracteres e incluir mayúscula, minúscula, número y símbolo. El bootstrap solo actúa con la tabla vacía.
 
-- `GET/POST /api/v1/admin/users`
-- `GET/PATCH /api/v1/admin/users/{id}`
-- `PUT /api/v1/admin/users/{id}/password`
+Roles canónicos iniciales: SUPER_ADMIN, AUDITOR, MANAGER_ALMACEN, VENDEDOR y SOPORTE_TI. SUPER_ADMIN puede crear roles personalizados, consultar el catálogo de permisos y asignar permisos existentes. No se pueden modificar los permisos de SUPER_ADMIN desde la API.
 
-Roles disponibles: `ADMIN`, `INVENTORY_MANAGER`, `SALES` y `AUDITOR`. En cada solicitud autenticada el backend comprueba en PostgreSQL que el usuario siga activo y lee su rol actual; no confía únicamente en los roles embebidos en el JWT.
+- GET/POST /api/v1/admin/users
+- GET/PATCH /api/v1/admin/users/{id}
+- PUT /api/v1/admin/users/{id}/password
+- GET/POST /api/v1/admin/roles
+- GET /api/v1/admin/permissions
+- PUT /api/v1/admin/roles/{code}/permissions
+
+Los permisos RBAC se guardan en PostgreSQL y se derivan de la asignación vigente en cada solicitud. JWT valida firma HS256, emisor, audiencia y expiración. Cambiar rol, desactivar usuario o restablecer contraseña invalida tokens anteriores mediante una versión de sesión.
+
+Configura JWT_SECRET con al menos 32 bytes aleatorios y CORS_ALLOWED_ORIGINS con orígenes exactos separados por coma. El comodín * no está permitido. El límite de login es por instancia; producción debe complementarlo en gateway/WAF.
 
 ## API implementada
 
-Todas las rutas requieren JWT, salvo login, health, OpenAPI/Swagger, catálogo público, GraphQL y las rutas de integración WhatsApp que exigen su propia clave de máquina.
+Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálogo público y la integración WhatsApp (con clave de máquina propia) son excepciones. GraphQL requiere permiso de lectura del catálogo. OpenAPI/Swagger está deshabilitado por defecto y no sustituye autenticación.
 
 | Área | Rutas | Funcionalidad |
 |---|---|---|

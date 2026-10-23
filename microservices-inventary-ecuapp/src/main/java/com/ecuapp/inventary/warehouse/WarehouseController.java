@@ -14,10 +14,10 @@ public class WarehouseController {
  public WarehouseController(WarehouseService service){this.service=service;}
  @GetMapping public Page<WarehouseDtos.View> list(@PageableDefault(size=20,sort="name") Pageable p){return service.list(p);}
  @GetMapping("/{id}") public WarehouseDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping @PreAuthorize("hasAuthority('inventory:manage')")
  public WarehouseDtos.View create(@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.create(r,auth.getName());}
- @PutMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PutMapping("/{id}") @PreAuthorize("hasAuthority('inventory:manage')")
  public WarehouseDtos.View update(@PathVariable UUID id,@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.update(id,r,auth.getName());}
- @PostMapping("/{id}/deactivate") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping("/{id}/deactivate") @PreAuthorize("hasAuthority('inventory:manage')")
  public void deactivate(@PathVariable UUID id,Authentication auth){service.deactivate(id,auth.getName());}
 }

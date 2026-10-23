@@ -14,8 +14,8 @@ public class InventoryController {
  public InventoryController(InventoryService service){this.service=service;}
  @GetMapping("/balances") public Page<InventoryDtos.BalanceView> balances(@PageableDefault(size=20) Pageable p){return service.balances(p);}
  @GetMapping("/balances/{productId}/{warehouseId}") public InventoryDtos.BalanceView balance(@PathVariable UUID productId,@PathVariable UUID warehouseId){return service.balance(productId,warehouseId);}
- @GetMapping("/movements") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','AUDITOR')")
+ @GetMapping("/movements") @PreAuthorize("hasAnyAuthority('inventory:manage','audit:read')")
  public Page<InventoryDtos.MovementView> movements(@PageableDefault(size=20) Pageable p){return service.movements(p);}
- @PostMapping("/adjustments") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping("/adjustments") @PreAuthorize("hasAuthority('inventory:manage')")
  public InventoryDtos.MovementView adjust(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody InventoryDtos.AdjustmentRequest r,Authentication auth){return service.adjust(key,r,auth.getName());}
 }

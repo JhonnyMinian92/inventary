@@ -7,7 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/audit-events")
-@PreAuthorize("hasAnyRole('ADMIN','AUDITOR')")
+@PreAuthorize("hasAuthority('audit:read')")
 public class AuditController {
  private final AuditEventRepository repository;
  public AuditController(AuditEventRepository repository){this.repository=repository;}
