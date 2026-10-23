@@ -16,6 +16,7 @@ public class WarehouseLocation {
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
  @Column(name="updated_at",nullable=false) private Instant updatedAt;
  protected WarehouseLocation(){}
+ public WarehouseLocation(Warehouse warehouse,String code,String name,LocationType locationType){this.warehouse=warehouse;this.code=code;this.name=name;this.locationType=locationType;this.active=true;}
  @PrePersist void create(){Instant now=Instant.now();createdAt=now;updatedAt=now;}
  @PreUpdate void updateTimestamp(){updatedAt=Instant.now();}
  public UUID getId(){return id;} public Warehouse getWarehouse(){return warehouse;} public String getCode(){return code;} public String getName(){return name;} public LocationType getLocationType(){return locationType;} public boolean isActive(){return active;}
