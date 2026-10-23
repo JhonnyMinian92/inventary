@@ -55,11 +55,11 @@ Horas = tiempo activo estimado del agente por trabajo (lectura, edición, llamad
 
 ### Totales iniciales
 
-- **Tiempo activo del agente:** aproximadamente 55–100 horas para implementar y autocorregir el MVP documentado.
-- **Tokens sumados por tarea (sin contingencia):** aproximadamente 1.35–2.4 millones de tokens.
-- **Reserva para retrabajo de código, cambios de contexto y decisiones posteriores (25 %):** 0.35–0.6 millones de tokens.
-- **Presupuesto recomendado del proyecto completo:** **1.7–3.0 millones de tokens agregados**.
-- **Tiempo de pared orientativo:** 7–15 días laborables de ejecución continua de un agente competente si las herramientas, el modelo y el repositorio no se bloquean y las decisiones se responden rápidamente. Con aprobaciones manuales, límites de proveedor o iteraciones largas: 2–4 semanas o más.
+- **Tiempo activo del agente:** aproximadamente 67–125 horas para implementar y autocorregir el MVP extendido con GraphQL, Kafka/Outbox, caché y estrategia de escalado.
+- **Tokens sumados por tarea (sin contingencia):** aproximadamente 1.65–2.95 millones de tokens incluyendo los componentes de escalabilidad añadidos.
+- **Reserva para retrabajo de código, cambios de contexto y decisiones posteriores (25 %):** aproximadamente 0.4–0.75 millones de tokens.
+- **Presupuesto recomendado del proyecto completo actualizado:** **2.1–3.7 millones de tokens agregados**.
+- **Tiempo de pared orientativo actualizado:** 9–18 días laborables de ejecución continua de un agente competente; para trabajo con aprobaciones, límites de proveedor e iteraciones: 3–5 semanas o más.
 
 Las sumas tienen margen y no son mediciones observadas. AI-16 es condicional; si se pospone lote/serie/FEFO puede reducir consumo inicial, pero incorporarlo posteriormente puede causar migraciones que aumenten el costo. Las tareas parcialmente paralelizables no garantizan que el tiempo total sea la suma exacta de horas activas.
 
@@ -102,3 +102,20 @@ El 100 % significa que el alcance acordado de backend MVP está implementado y d
 - [n8n: WhatsApp Business Cloud](https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.whatsapp)
 - [OpenAI: Function Calling](https://developers.openai.com/api/docs/guides/function-calling)
 - [WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api)
+
+## 9. Adenda de tareas para GraphQL, Kafka, caché y escalabilidad
+
+Esta adenda complementa y reemplaza cualquier total anterior que no incluya estas decisiones tecnológicas. Los rangos son agentes-hora activas y tokens agregados aproximados.
+
+| ID | Tarea de agente IA | Tiempo IA | Tokens estimados |
+|---|---|---:|---:|
+| AI-25 | Contrato GraphQL, schema, resolvers de catálogo, paginación cursor-based y delegación a casos de uso | 2–4 h | 50k–90k |
+| AI-26 | Persistencia Outbox, publicación Kafka, contratos/event versions, deduplicación e idempotencia del consumidor | 3–6 h | 80k–160k |
+| AI-27 | Cache-aside Caffeine/Redis para catálogo/metadatos, TTL, invalidación por eventos y reglas de no cachear checkout | 2–4 h | 45k–100k |
+| AI-28 | Configuración y métricas de HikariCP; guía de uso/compatibilidad de PgBouncer y presupuesto global de conexiones | 1–3 h | 30k–55k |
+| AI-29 | Observabilidad de persistencia, índices/particionado candidato, lag de Outbox/Kafka/caché y criterios de futura lectura en replica | 2–4 h | 40k–75k |
+| AI-30 | Revisión estática de boundaries transaccionales y coherencia REST/GraphQL/Kafka/Redis | 2–4 h | 35k–65k |
+
+La cifra actualizada de 2.1–3.7 millones contempla una contingencia aproximada; el total de entrada/salida dependerá del modelo de codificación, tamaño de contexto, herramientas y retrabajo. No debe sumarse otra vez la tabla AI-25 a AI-30 sobre el nuevo total, pues esos rangos ya están incluidos en él.
+
+No se incluyen pruebas ejecutadas por el agente, tuning a partir de una carga real ni licencias/infraestructura de producción. Tampoco se garantiza que un solo PostgreSQL aguante cualquier tráfico; esta fase implementa medidas y telemetría para decidir el escalado basándose en datos.
