@@ -13,19 +13,19 @@ SELECT
     b.product_id,
     b.location_id,
     NULL,
-    b.on_hand,
-    b.on_hand,
+    b.on_hand - COALESCE(open_layers.quantity, 0),
+    b.on_hand - COALESCE(open_layers.quantity, 0),
     p.cost_price::NUMERIC(14,4),
     p.currency,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 FROM stock_balance b
 JOIN product p ON p.id = b.product_id
-WHERE b.on_hand > 0
-  AND NOT EXISTS (
-      SELECT 1
-      FROM inventory_cost_layer existing
-      WHERE existing.product_id = b.product_id
-        AND existing.warehouse_location_id = b.location_id
-        AND existing.remaining_quantity > 0
-  );
+LEFT JOIN LATERAL (
+    SELECT SUM(remaining_quantity) AS quantity
+    FROM inventory_cost_layer existing
+    WHERE existing.product_id = b.product_id
+      AND existing.warehouse_location_id = b.location_id
+      AND existing.remaining_quantity > 0
+) open_layers ON TRUE
+WHERE b.on_hand > COALESCE(open_layers.quantity, 0);

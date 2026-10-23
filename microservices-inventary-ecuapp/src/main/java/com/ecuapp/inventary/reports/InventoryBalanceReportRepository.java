@@ -4,7 +4,8 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
@@ -146,8 +147,8 @@ public class InventoryBalanceReportRepository {
         return new MapSqlParameterSource()
                 .addValue("warehouseId", warehouseId)
                 .addValue("productId", productId, Types.OTHER)
-                .addValue("fromInclusive", Timestamp.from(fromInclusive))
-                .addValue("toExclusive", Timestamp.from(toExclusive))
-                .addValue("now", Timestamp.from(now));
+                .addValue("fromInclusive", OffsetDateTime.ofInstant(fromInclusive, ZoneOffset.UTC))
+                .addValue("toExclusive", OffsetDateTime.ofInstant(toExclusive, ZoneOffset.UTC))
+                .addValue("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
     }
 }

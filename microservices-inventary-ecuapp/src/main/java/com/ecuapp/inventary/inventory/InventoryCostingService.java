@@ -108,6 +108,11 @@ public class InventoryCostingService {
             if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
             return;
         }
+        if (movement.getMovementType() == MovementType.TRANSFER_IN
+                && receiveTransferLayers(movement, method, currency, quantity, location)) {
+            if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
+            return;
+        }
 
         BigDecimal unitCost = scaleCost(movement.getUnitCost());
         InventoryCostLayer layer = layers.saveAndFlush(new InventoryCostLayer(
@@ -152,6 +157,47 @@ public class InventoryCostingService {
         }
         entries.flush();
         if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
+    }
+
+    /**
+     * Moves FIFO layer costs intact across warehouses. If a transfer is cancelled before receipt,
+     * the original source layers are replenished instead of manufacturing a new cost layer.
+     */
+    private boolean receiveTransferLayers(StockMovement inbound, CostingMethod method, String currency,
+                                          BigDecimal quantity, WarehouseLocation destinationLocation) {
+        if (inbound.getReferenceType() == null || inbound.getReferenceId() == null
+                || inbound.getSourceLineId() == null) return false;
+        StockMovement outbound = movements.findFirstByMovementTypeAndReferenceTypeAndReferenceIdAndSourceLineIdOrderByOccurredAtAsc(
+                MovementType.TRANSFER_OUT, inbound.getReferenceType(), inbound.getReferenceId(), inbound.getSourceLineId())
+                .orElse(null);
+        if (outbound == null) return false;
+        List<InventoryValuationEntry> allocations = entries.findByStockMovementIdOrderByCreatedAtAsc(outbound.getId());
+        if (allocations.isEmpty()) return false;
+
+        boolean restoringOrigin = outbound.getWarehouse().getId().equals(inbound.getWarehouse().getId());
+        BigDecimal remaining = quantity;
+        for (InventoryValuationEntry allocation : allocations) {
+            if (remaining.signum() == 0) break;
+            BigDecimal moved = remaining.min(allocation.getQuantity());
+            BigDecimal unitCost = scaleCost(allocation.getUnitCost());
+            InventoryCostLayer layer = allocation.getCostLayer();
+            if (restoringOrigin && layer != null) {
+                layer.restore(moved);
+            } else {
+                layer = layers.saveAndFlush(new InventoryCostLayer(inbound.getProduct(), destinationLocation,
+                        inbound, moved, moved, unitCost, currency, inbound.getOccurredAt()));
+            }
+            entries.save(new InventoryValuationEntry(inbound, layer, method, moved, unitCost, currency));
+            remaining = remaining.subtract(moved);
+        }
+        if (remaining.signum() > 0) {
+            BigDecimal unitCost = scaleCost(inbound.getUnitCost());
+            InventoryCostLayer fallback = layers.saveAndFlush(new InventoryCostLayer(inbound.getProduct(),
+                    destinationLocation, inbound, remaining, remaining, unitCost, currency, inbound.getOccurredAt()));
+            entries.save(new InventoryValuationEntry(inbound, fallback, method, remaining, unitCost, currency));
+        }
+        entries.flush();
+        return true;
     }
 
     private boolean restoreCancelledSaleLayers(StockMovement cancellation, CostingMethod method,
