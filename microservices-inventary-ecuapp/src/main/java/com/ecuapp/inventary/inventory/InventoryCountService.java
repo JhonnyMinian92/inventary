@@ -58,8 +58,7 @@ public class InventoryCountService {
     public Page<InventoryCountDtos.View> list(Pageable pageable) {
         Pageable limited = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100),
             Sort.by(Sort.Direction.DESC, "createdAt"));
-        return counts.findAll(limited).map(c -> InventoryCountDtos.View.from(
-            counts.findDetailedById(c.getId()).orElseThrow()));
+        return counts.findAll(limited).map(InventoryCountDtos.View::from);
     }
 
     @Transactional(readOnly = true)
