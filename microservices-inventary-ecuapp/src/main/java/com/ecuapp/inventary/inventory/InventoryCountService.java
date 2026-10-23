@@ -6,6 +6,8 @@ import com.ecuapp.inventary.catalog.ProductKind;
 import com.ecuapp.inventary.catalog.ProductRepository;
 import com.ecuapp.inventary.catalog.UnitOfMeasureRepository;
 import com.ecuapp.inventary.common.BusinessRuleException;
+import com.ecuapp.inventary.common.IdempotencyRecord;
+import com.ecuapp.inventary.common.IdempotencyRecordRepository;
 import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import com.ecuapp.inventary.warehouse.Warehouse;
@@ -28,6 +30,7 @@ import java.util.*;
 @Service
 public class InventoryCountService {
     private final InventoryCountRepository counts;
+    private final IdempotencyRecordRepository idempotencyRecords;
     private final ProductRepository products;
     private final WarehouseRepository warehouses;
     private final StockBalanceRepository balances;
@@ -36,11 +39,12 @@ public class InventoryCountService {
     private final UnitOfMeasureRepository units;
     private final AuditService audit;
 
-    public InventoryCountService(InventoryCountRepository counts, ProductRepository products,
+    public InventoryCountService(InventoryCountRepository counts, IdempotencyRecordRepository idempotencyRecords, ProductRepository products,
                                  WarehouseRepository warehouses, StockBalanceRepository balances,
                                  StockMovementRepository movements, WarehouseLocationRepository locations,
                                  UnitOfMeasureRepository units, AuditService audit) {
         this.counts = counts;
+        this.idempotencyRecords = idempotencyRecords;
         this.products = products;
         this.warehouses = warehouses;
         this.balances = balances;
@@ -67,11 +71,26 @@ public class InventoryCountService {
     public InventoryCountDtos.View create(String rawKey, InventoryCountDtos.CreateRequest request, String actor) {
         String key = normalizeKey(rawKey);
         String hash = requestHash(request);
+        // Reserve the key atomically in PostgreSQL so concurrent retries converge on one count.
+        idempotencyRecords.insertIfAbsent(UUID.randomUUID(), "INVENTORY_COUNT_CREATE", key, hash);
+        IdempotencyRecord idempotency = idempotencyRecords.findForUpdate("INVENTORY_COUNT_CREATE", key)
+            .orElseThrow(() -> new ConflictException("No se pudo reservar la clave de idempotencia."));
+        if (!hash.equals(idempotency.getRequestHash())) {
+            throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
+        }
+        if (idempotency.getStatus() == IdempotencyRecord.RecordStatus.COMPLETED && idempotency.getResourceId() != null) {
+            return InventoryCountDtos.View.from(requireDetailed(idempotency.getResourceId()));
+        }
+        if (idempotency.getStatus() != IdempotencyRecord.RecordStatus.IN_PROGRESS) {
+            throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
+        }
         Optional<InventoryCount> previous = counts.findByIdempotencyKey(key);
         if (previous.isPresent()) {
             if (!hash.equals(previous.get().getRequestHash())) {
                 throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
             }
+            idempotency.markCompleted("INVENTORY_COUNT", previous.get().getId(), (short) 201);
+            idempotencyRecords.save(idempotency);
             return InventoryCountDtos.View.from(requireDetailed(previous.get().getId()));
         }
 
@@ -115,6 +134,8 @@ public class InventoryCountService {
             count.addLine(new InventoryCountLine(product, expected, counted, product.getCostPrice()));
         }
         InventoryCount saved = counts.saveAndFlush(count);
+        idempotency.markCompleted("INVENTORY_COUNT", saved.getId(), (short) 201);
+        idempotencyRecords.save(idempotency);
         audit.record(actor, "INVENTORY_COUNT_CREATED", "INVENTORY_COUNT", saved.getId(),
             Map.of("countNumber", number, "warehouseId", warehouse.getId().toString(), "lineCount", ordered.size()));
         return InventoryCountDtos.View.from(requireDetailed(saved.getId()));
