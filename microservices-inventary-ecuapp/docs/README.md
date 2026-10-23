@@ -58,3 +58,5 @@ La estimación de 08 — Plan de trabajo identifica estos supuestos y no conside
 ## Canal comercial y medios
 
 El contrato de catálogo público y las rutas de pedidos WhatsApp están documentados en [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md); los endpoints de administración y exposición de medios se amplían en [05 — Catálogo de APIs](05-catalogo-apis.md), sección 11.
+
+| [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md) | Decisiones sobre transacciones, eventos, caché, DataSource/pools, réplicas, particionamiento y vector search. |
