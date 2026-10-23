@@ -28,6 +28,8 @@ Por tanto, el backend se considera **esqueleto inicial** y la API que sigue es u
 | [06 — Flujos de negocio y APIs](06-flujos-de-negocio-y-api.md) | Diagramas Mermaid y flujo por familia de endpoints/comandos. |
 | [07 — Seguridad y definición de hecho](07-seguridad-y-definicion-de-hecho.md) | Controles, amenazas, revisión estática y checklist para cada API. |
 | [08 — Plan de trabajo](08-plan-de-trabajo.md) | Backlog, dependencias, hitos y estimación del 100 % del backend descrito. |
+| [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md) | Decisión MVC/WebFlux, arquitectura del canal comercial, catálogo público y compra conversacional. |
+| [10 — Estimación del agente IA y tokens](10-estimacion-agente-ia-tokens.md) | Tiempo por tarea, tokens orientativos, presupuesto total y factores que modifican la estimación. |
 
 ## Convenciones
 
@@ -52,3 +54,7 @@ Antes de cerrar el modelo y estimación, confirmar:
 6. Volumen esperado: usuarios concurrentes, productos/SKUs, almacenes y movimientos diarios.
 
 La estimación de 08 — Plan de trabajo identifica estos supuestos y no considera que “cero errores” pueda garantizarse solo mediante revisión estática.
+
+## Canal comercial y medios
+
+El contrato de catálogo público y las rutas de pedidos WhatsApp están documentados en [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md); los endpoints de administración y exposición de medios se amplían en [05 — Catálogo de APIs](05-catalogo-apis.md), sección 11.
