@@ -41,7 +41,7 @@ Todas las rutas de administración requieren el permiso security:manage. SUPER_A
 | GET | /api/v1/admin/permissions | Consultar permisos disponibles |
 | PUT | /api/v1/admin/roles/{code}/permissions | Reemplazar la matriz de permisos de un rol existente |
 
-No se crean permisos arbitrarios desde HTTP. El rol SUPER_ADMIN y su matriz están protegidos contra cambios desde estos endpoints. Los roles personalizados pueden asignarse a usuarios mediante la API de administración de usuarios.
+No se crean permisos arbitrarios desde HTTP. El rol SUPER_ADMIN y su matriz están protegidos contra cambios desde estos endpoints, y security:manage no puede asignarse a roles personalizados. Los roles personalizados pueden asignarse a usuarios mediante la API de administración de usuarios.
 
 ### Alta inicial segura
 

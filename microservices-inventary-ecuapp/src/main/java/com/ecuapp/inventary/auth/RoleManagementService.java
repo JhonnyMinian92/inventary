@@ -55,6 +55,7 @@ public class RoleManagementService {
   for(String raw:codes){
    if(raw==null)throw new BusinessRuleException("El conjunto de permisos contiene un valor nulo.");
    String code=raw.trim().toLowerCase(Locale.ROOT);
+   if("security:manage".equals(code))throw new BusinessRuleException("security:manage solo puede pertenecer a SUPER_ADMIN.");
    AppPermission permission=permissions.findByCodeAndActiveTrue(code)
     .orElseThrow(()->new BusinessRuleException("Uno o más permisos no existen o están inactivos."));
    result.add(permission);
