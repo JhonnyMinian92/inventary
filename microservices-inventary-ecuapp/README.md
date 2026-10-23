@@ -71,7 +71,16 @@ POST /api/v1/auth/login recibe credenciales y devuelve un JWT. Envíalo como Aut
 
 No existen credenciales administrativas predeterminadas. Si la base no tiene usuarios, el arranque exige BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD; el primer usuario recibe SUPER_ADMIN. La contraseña inicial debe tener al menos 16 caracteres e incluir mayúscula, minúscula, número y símbolo. El bootstrap solo actúa con la tabla vacía.
 
-Roles canónicos: SUPER_ADMIN, AUDITOR, MANAGER_ALMACEN, VENDEDOR y SOPORTE_TI. Los permisos RBAC se guardan en PostgreSQL y se derivan de la asignación vigente en cada solicitud. JWT valida firma HS256, emisor, audiencia y expiración. Cambiar rol, desactivar usuario o restablecer contraseña invalida tokens anteriores mediante una versión de sesión.
+Roles canónicos iniciales: SUPER_ADMIN, AUDITOR, MANAGER_ALMACEN, VENDEDOR y SOPORTE_TI. SUPER_ADMIN puede crear roles personalizados, consultar el catálogo de permisos y asignar permisos existentes. No se pueden modificar los permisos de SUPER_ADMIN desde la API.
+
+- GET/POST /api/v1/admin/users
+- GET/PATCH /api/v1/admin/users/{id}
+- PUT /api/v1/admin/users/{id}/password
+- GET/POST /api/v1/admin/roles
+- GET /api/v1/admin/permissions
+- PUT /api/v1/admin/roles/{code}/permissions
+
+Los permisos RBAC se guardan en PostgreSQL y se derivan de la asignación vigente en cada solicitud. JWT valida firma HS256, emisor, audiencia y expiración. Cambiar rol, desactivar usuario o restablecer contraseña invalida tokens anteriores mediante una versión de sesión.
 
 Configura JWT_SECRET con al menos 32 bytes aleatorios y CORS_ALLOWED_ORIGINS con orígenes exactos separados por coma. El comodín * no está permitido. El límite de login es por instancia; producción debe complementarlo en gateway/WAF.
 

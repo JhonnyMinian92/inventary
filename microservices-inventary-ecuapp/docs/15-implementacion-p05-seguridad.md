@@ -30,6 +30,19 @@ Las autoridades de permisos (catalog:read, inventory:manage, purchasing:manage, 
 
 La capa HTTP deniega por defecto y exige permisos específicos para catálogo, inventario, compras, ventas, administración y auditoría. La cancelación de ventas exige permiso de cancelación y autorización de administrador; un vendedor no puede autoaprobar la anulación. El catálogo público solo admite GET. WhatsApp continúa validando su propia clave de integración.
 
+### Administración de roles y permisos
+
+Todas las rutas de administración requieren el permiso security:manage. SUPER_ADMIN puede consultar la matriz y crear roles personalizados con permisos del catálogo existente:
+
+| Verbo | Ruta | Uso |
+|---|---|---|
+| GET | /api/v1/admin/roles | Listar roles y permisos asignados |
+| POST | /api/v1/admin/roles | Crear rol personalizado con una lista de permisos válidos |
+| GET | /api/v1/admin/permissions | Consultar permisos disponibles |
+| PUT | /api/v1/admin/roles/{code}/permissions | Reemplazar la matriz de permisos de un rol existente |
+
+No se crean permisos arbitrarios desde HTTP. El rol SUPER_ADMIN y su matriz están protegidos contra cambios desde estos endpoints. Los roles personalizados pueden asignarse a usuarios mediante la API de administración de usuarios.
+
 ### Alta inicial segura
 
 - No hay usuario ni contraseña predeterminados en el código.
