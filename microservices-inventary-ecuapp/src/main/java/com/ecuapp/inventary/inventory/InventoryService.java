@@ -15,8 +15,8 @@ import java.util.UUID;
 
 @Service
 public class InventoryService {
- private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final AuditService audit;
- public InventoryService(ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,AuditService audit){this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.audit=audit;}
+ private final ProductRepository products;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final WarehouseLocationRepository locations;private final AuditService audit;
+ public InventoryService(ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,WarehouseLocationRepository locations,AuditService audit){this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.audit=audit;}
  @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(Pageable p){return balances.findAll(limited(p)).map(InventoryDtos.BalanceView::from);}
  @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(Pageable p){
   Pageable ordered=PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),Sort.by(Sort.Direction.DESC,"occurredAt"));
@@ -38,11 +38,14 @@ public class InventoryService {
   Product product=products.findById(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
   Warehouse warehouse=warehouses.findById(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
   if(!product.isActive())throw new BusinessRuleException("No se puede ajustar un producto inactivo.");
+  if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control de stock admiten movimientos físicos.");
   if(!warehouse.isActive())throw new BusinessRuleException("No se puede ajustar un almacén inactivo.");
   StockBalance balance=balances.findForUpdate(product.getId(),warehouse.getId()).orElse(null);
   if(balance==null){
    if(r.direction()==InventoryDtos.Direction.DECREASE)throw new BusinessRuleException("No existe saldo disponible para disminuir.");
-   balance=balances.save(new StockBalance(product,warehouse));
+   WarehouseLocation mainLocation=locations.findByWarehouseIdAndCode(warehouse.getId(),"MAIN")
+    .orElseGet(()->locations.save(new WarehouseLocation(warehouse,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE)));
+   balance=balances.save(new StockBalance(product,warehouse,mainLocation));
   }
   MovementType type;
   if(r.direction()==InventoryDtos.Direction.INCREASE){balance.increase(quantity);type=MovementType.ADJUSTMENT_IN;}

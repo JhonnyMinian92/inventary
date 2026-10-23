@@ -29,11 +29,11 @@ import java.util.stream.Collectors;
 public class PurchaseOrderService {
  private record ReceiptCalc(PurchaseOrderLine line,BigDecimal quantity){}
  private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final BusinessPartnerRepository partners;
- private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;
+ private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;
  private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;
  public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,BusinessPartnerRepository partners,WarehouseRepository warehouses,
-   ProductRepository products,StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
-  this.orders=orders;this.receipts=receipts;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
+   ProductRepository products,StockBalanceRepository balances,WarehouseLocationRepository locations,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit){
+  this.orders=orders;this.receipts=receipts;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.locations=locations;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(Pageable p){return orders.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(PurchaseDtos.OrderView::from);}
  @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id){return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
@@ -49,6 +49,7 @@ public class PurchaseOrderService {
    if(!unique.add(line.productId()))throw new BusinessRuleException("No repita el mismo producto en varias líneas de una orden de compra.");
    Product product=products.findById(line.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
    if(!product.isActive())throw new BusinessRuleException("No se puede comprar un producto inactivo.");
+   if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo se pueden recibir físicamente productos con control de stock.");
    if(currency==null)currency=product.getCurrency();else if(!currency.equals(product.getCurrency()))throw new BusinessRuleException("Todos los productos de una orden deben usar la misma moneda.");
    BigDecimal qty=line.quantity().setScale(3,RoundingMode.UNNECESSARY),unitCost=line.unitCost().setScale(2,RoundingMode.UNNECESSARY);
    BigDecimal total=unitCost.multiply(qty).setScale(2,RoundingMode.HALF_UP);subtotal=subtotal.add(total).setScale(2,RoundingMode.HALF_UP);
@@ -84,7 +85,10 @@ public class PurchaseOrderService {
    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
    if(poLine.remaining().compareTo(quantity)<0)throw new BusinessRuleException("La cantidad recibida supera la cantidad pendiente para "+poLine.getSkuSnapshot()+".");
    StockBalance balance=balances.findForUpdate(poLine.getProduct().getId(),order.getWarehouse().getId()).orElse(null);
-   if(balance==null)balance=balances.save(new StockBalance(poLine.getProduct(),order.getWarehouse()));
+   if(balance==null){
+    WarehouseLocation mainLocation=locations.findByWarehouseIdAndCode(order.getWarehouse().getId(),"MAIN").orElseGet(()->locations.save(new WarehouseLocation(order.getWarehouse(),"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE)));
+    balance=balances.save(new StockBalance(poLine.getProduct(),order.getWarehouse(),mainLocation));
+   }
    balance.increase(quantity);poLine.receive(quantity);calculated.add(new ReceiptCalc(poLine,quantity));
   }
   order.recalculateReceiptStatus();
