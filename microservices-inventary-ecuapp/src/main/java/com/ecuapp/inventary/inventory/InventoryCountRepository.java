@@ -12,6 +12,10 @@ import java.util.UUID;
 public interface InventoryCountRepository extends JpaRepository<InventoryCount, UUID> {
     Optional<InventoryCount> findByIdempotencyKey(String idempotencyKey);
 
+    @Override
+    @EntityGraph(attributePaths = {"warehouse", "lines", "lines.product"})
+    org.springframework.data.domain.Page<InventoryCount> findAll(org.springframework.data.domain.Pageable pageable);
+
     @EntityGraph(attributePaths = {"warehouse", "lines", "lines.product"})
     @Query("select distinct c from InventoryCount c where c.id = :id")
     Optional<InventoryCount> findDetailedById(@Param("id") UUID id);
