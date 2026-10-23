@@ -268,3 +268,39 @@ Meta necesita un HTTPS accesible desde internet para los webhooks; localhost no 
 - Inventary es la única autoridad para cotizar, reservar stock y persistir el pedido.
 - La creación de pedido exige confirmación explícita de resumen al cliente.
 - No facilitar al LLM SQL, administración de catálogo, modificación de stock o acceso general a clientes.
+
+## 13. Venta transaccional con Outbox/Kafka
+
+~~~mermaid
+sequenceDiagram
+    actor Customer as Cliente
+    participant API as REST o GraphQL
+    participant UC as Caso de uso transaccional
+    participant PG as PostgreSQL primary
+    participant Relay as Outbox publisher
+    participant K as Kafka
+    participant N as Consumidores (n8n/notificaciones/reportes)
+    Customer->>API: Confirmar cotización
+    API->>UC: submitOrder(quoteId, idempotencyKey)
+    UC->>PG: BEGIN
+    UC->>PG: Revalidar precio, expiry, stock y permisos
+    UC->>PG: Reserva atómica + pedido + líneas + ledger + idempotencia + outbox
+    PG-->>UC: COMMIT o ROLLBACK
+    UC-->>API: Estado confirmado o conflicto
+    Relay->>PG: Leer eventos Outbox comprometidos
+    Relay->>K: Publicar OrderCreated / StockReserved
+    K-->>N: Evento con eventId y aggregateId
+    N->>N: Deduplicar y ejecutar efecto asíncrono
+~~~
+
+Regla: un evento de Kafka solo comunica un cambio ya confirmado. Si Kafka o n8n están caídos después del commit, el pedido permanece confirmado en PostgreSQL y el evento queda reintentable en Outbox. Si PostgreSQL rechaza el stock, no se publica evento de pedido confirmado. La respuesta al cliente comunica exactamente el estado durable del pedido.
+
+## 14. Catálogo con caché selectiva y GraphQL
+
+1. REST o GraphQL consulta la proyección pública del catálogo.
+2. Nombre, descripción, categoría e imagen pueden proceder de una caché versionada.
+3. Redis se invalida/actualiza por evento Outbox/Kafka después de modificar un producto; el sistema debe tolerar retrasos de invalidación.
+4. Stock público usa una proyección de frescura breve o una disponibilidad discretizada. No se presenta como reserva.
+5. Para comprar, backend consulta la disponibilidad transaccional y reserva en PostgreSQL primary.
+6. Una consulta GraphQL tiene límites de coste/profundidad y usa DataLoader para no multiplicar consultas.
+7. La caché no se utiliza para autorizar una venta, validar pago ni confirmar el estado de un pedido.
