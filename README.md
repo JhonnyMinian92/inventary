@@ -43,7 +43,7 @@ Un sistema monolítico con columnas fijas en base de datos es obsoleto y genera 
 
 ### Cómo el sistema protegerá a cada usuario (Privacidad y Aislamiento)
 
-* **Autenticación Stateless Segura:** Uso de tokens JWT firmados asimétricamente (RS256) con tiempos de expiración cortos y *Refresh Tokens* rotatorios.
+* **Autenticación Stateless Segura:** Para el MVP, JWT firmado con HS256 y secreto `JWT_SECRET` obligatorio por entorno, con expiración configurada y validación en endpoints privados. La integración OIDC y la firma asimétrica RS256 quedan como evolución explícita, no como capacidad implementada por defecto.
 * **Principio de Mínimo Privilegio (RBAC):** Las vistas del frontend y los endpoints del backend se bloquean según el rol del usuario.
 * **Enmascaramiento de Datos:** Los usuarios sin permisos administrativos no podrán ver los márgenes de ganancia (costo de compra vs precio de venta), solo el precio de venta final.
 * **Sanitización:** Prevención de ataques XSS (Cross-Site Scripting) delegando la sanitización al motor de plantillas de Angular.
