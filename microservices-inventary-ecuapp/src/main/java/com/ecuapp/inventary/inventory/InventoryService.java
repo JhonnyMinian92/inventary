@@ -38,6 +38,7 @@ public class InventoryService {
   Product product=products.findById(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
   Warehouse warehouse=warehouses.findById(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
   if(!product.isActive())throw new BusinessRuleException("No se puede ajustar un producto inactivo.");
+  if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control de stock admiten movimientos físicos.");
   if(!warehouse.isActive())throw new BusinessRuleException("No se puede ajustar un almacén inactivo.");
   StockBalance balance=balances.findForUpdate(product.getId(),warehouse.getId()).orElse(null);
   if(balance==null){
