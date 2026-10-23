@@ -64,6 +64,7 @@ public class RoleManagementService {
  private String normalizeCode(String code){
   String normalized=code.trim().toUpperCase(Locale.ROOT);
   if(!normalized.matches("^[A-Z][A-Z0-9_]{1,39}$"))throw new BusinessRuleException("Código de rol inválido.");
+  if(Set.of("ADMIN","INVENTORY_MANAGER","SALES").contains(normalized))throw new BusinessRuleException("El código solicitado está reservado para compatibilidad y no se puede crear.");
   return normalized;
  }
 }

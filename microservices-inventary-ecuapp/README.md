@@ -22,7 +22,7 @@ $env:SPRING_PROFILES_ACTIVE = "dev"
 $env:SWAGGER_ENABLED = "true"
 $env:JWT_SECRET = "usa-un-secreto-aleatorio-de-al-menos-32-bytes"
 $env:BOOTSTRAP_ADMIN_USERNAME = "admin"
-$env:BOOTSTRAP_ADMIN_PASSWORD = "cambia-esta-clave-administrativa-123!"
+$env:BOOTSTRAP_ADMIN_PASSWORD = "Cambia-esta-clave-inicial-segura-123!"
 mvn -B verify
 mvn spring-boot:run
 ```
@@ -37,7 +37,7 @@ export SPRING_PROFILES_ACTIVE='dev'
 export SWAGGER_ENABLED='true'
 export JWT_SECRET='usa-un-secreto-aleatorio-de-al-menos-32-bytes'
 export BOOTSTRAP_ADMIN_USERNAME='admin'
-export BOOTSTRAP_ADMIN_PASSWORD='cambia-esta-clave-administrativa-123!'
+export BOOTSTRAP_ADMIN_PASSWORD='Cambia-esta-clave-inicial-segura-123!'
 mvn -B verify
 mvn spring-boot:run
 ```
