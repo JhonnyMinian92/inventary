@@ -136,3 +136,8 @@ microservices-inventary-ecuapp/
 ## 7. Conclusión del Diseño
 
 Este diseño garantiza que **Inventary** no sea un simple CRUD. Al combinar el poder de **PostgreSQL JSONB** para la adaptabilidad de productos, **Spring Boot Hexagonal** para la mantenibilidad empresarial y testabilidad, y **Angular 21 (Signals)** para un rendimiento hiper-reactivo en el cliente, el sistema está preparado para escalar, auditar cada milímetro de la operación y blindar los datos comerciales contra errores humanos o manipulaciones malintencionadas.
+
+
+## Documentación de implementación del backend
+
+La especificación del backend, el contrato REST propuesto, los requerimientos, los diagramas, los controles de seguridad y el plan de trabajo se encuentran en [la documentación del backend](microservices-inventary-ecuapp/docs/README.md).
