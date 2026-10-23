@@ -25,6 +25,12 @@ public class PurchaseOrder {
  @Column(name="created_by",nullable=false,length=80) private String createdBy;
  @Column(name="ordered_at",nullable=false) private Instant orderedAt;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
+ @Column(name="submitted_by",length=80) private String submittedBy;
+ @Column(name="submitted_at") private Instant submittedAt;
+ @Column(name="approved_by",length=80) private String approvedBy;
+ @Column(name="approved_at") private Instant approvedAt;
+ @Column(name="cancelled_by",length=80) private String cancelledBy;
+ @Column(name="cancelled_at") private Instant cancelledAt;
  @OneToMany(mappedBy="purchaseOrder",cascade=CascadeType.ALL,orphanRemoval=true)
  private List<PurchaseOrderLine> lines=new ArrayList<>();
  protected PurchaseOrder(){}
@@ -33,9 +39,26 @@ public class PurchaseOrder {
  }
  @PrePersist void onCreate(){if(createdAt==null)createdAt=Instant.now();if(orderedAt==null)orderedAt=Instant.now();}
  public void addLine(PurchaseOrderLine line){lines.add(line);line.setPurchaseOrder(this);}
- public void submit(){if(status!=PurchaseOrderStatus.DRAFT)throw new ConflictException("Solo se puede enviar una orden en borrador.");status=PurchaseOrderStatus.SUBMITTED;}
- public void approve(){if(status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede aprobar una orden enviada.");status=PurchaseOrderStatus.APPROVED;}
- public void cancel(){if(status!=PurchaseOrderStatus.DRAFT&&status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede cancelar una orden antes de aprobar/recibir.");status=PurchaseOrderStatus.CANCELLED;}
+ /** @return false when the order was already submitted (idempotent retry). */
+ public boolean submit(String actor){
+  if(status==PurchaseOrderStatus.SUBMITTED)return false;
+  if(status!=PurchaseOrderStatus.DRAFT)throw new ConflictException("Solo se puede enviar una orden en borrador.");
+  status=PurchaseOrderStatus.SUBMITTED;submittedBy=actor;submittedAt=Instant.now();return true;
+ }
+ /** @return false when the order was already approved or is being received (idempotent retry). */
+ public boolean approve(String actor,boolean requireDistinctApprover){
+  if(status==PurchaseOrderStatus.APPROVED||status==PurchaseOrderStatus.PARTIALLY_RECEIVED||status==PurchaseOrderStatus.RECEIVED)return false;
+  if(status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede aprobar una orden enviada.");
+  if(requireDistinctApprover&&actor!=null&&(actor.equals(createdBy)||actor.equals(submittedBy)))
+   throw new ConflictException("La orden debe ser aprobada por un usuario distinto de quien la creó o envió.");
+  status=PurchaseOrderStatus.APPROVED;approvedBy=actor;approvedAt=Instant.now();return true;
+ }
+ /** @return false when the order was already cancelled (idempotent retry). */
+ public boolean cancel(String actor){
+  if(status==PurchaseOrderStatus.CANCELLED)return false;
+  if(status!=PurchaseOrderStatus.DRAFT&&status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede cancelar una orden antes de aprobar/recibir.");
+  status=PurchaseOrderStatus.CANCELLED;cancelledBy=actor;cancelledAt=Instant.now();return true;
+ }
  public void recalculateReceiptStatus(){
   if(lines.stream().allMatch(l->l.remaining().signum()==0)){status=PurchaseOrderStatus.RECEIVED;return;}
   if(lines.stream().anyMatch(l->l.getReceivedQuantity().signum()>0))status=PurchaseOrderStatus.PARTIALLY_RECEIVED;
@@ -45,4 +68,6 @@ public class PurchaseOrder {
  public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getTotal(){return total;} public String getNotes(){return notes;}
  public String getCreatedBy(){return createdBy;} public Instant getOrderedAt(){return orderedAt;} public Instant getCreatedAt(){return createdAt;}
  public List<PurchaseOrderLine> getLines(){return lines;}
+ public String getSubmittedBy(){return submittedBy;} public Instant getSubmittedAt(){return submittedAt;} public String getApprovedBy(){return approvedBy;}
+ public Instant getApprovedAt(){return approvedAt;} public String getCancelledBy(){return cancelledBy;} public Instant getCancelledAt(){return cancelledAt;}
 }

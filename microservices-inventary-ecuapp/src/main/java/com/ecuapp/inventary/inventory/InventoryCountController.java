@@ -20,8 +20,10 @@ public class InventoryCountController {
     }
 
     @GetMapping
-    public Page<InventoryCountDtos.View> list(@PageableDefault(size = 20) Pageable pageable) {
-        return service.list(pageable);
+    public Page<InventoryCountDtos.View> list(@RequestParam(required = false) UUID warehouseId,
+                                              @RequestParam(required = false) InventoryCountStatus status,
+                                              @PageableDefault(size = 20) Pageable pageable) {
+        return service.list(warehouseId, status, pageable);
     }
 
     @GetMapping("/{id}")

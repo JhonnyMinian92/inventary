@@ -13,7 +13,11 @@ public class InventoryCostingConfig {
  @Column(name="effective_from",nullable=false) private Instant effectiveFrom;
  @Column(name="created_by",nullable=false,length=80) private String createdBy;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
+ @Column(name="updated_by",length=80) private String updatedBy;
+ @Column(name="updated_at") private Instant updatedAt;
  protected InventoryCostingConfig(){}
  @PrePersist void create(){if(createdAt==null)createdAt=Instant.now();}
+ void changeMethod(CostingMethod method,String actor){this.method=method;this.effectiveFrom=Instant.now();this.updatedBy=actor;this.updatedAt=Instant.now();}
  public UUID getId(){return id;} public String getSingletonKey(){return singletonKey;} public CostingMethod getMethod(){return method;} public Instant getEffectiveFrom(){return effectiveFrom;} public String getCreatedBy(){return createdBy;}
+ public String getUpdatedBy(){return updatedBy;} public Instant getUpdatedAt(){return updatedAt;}
 }

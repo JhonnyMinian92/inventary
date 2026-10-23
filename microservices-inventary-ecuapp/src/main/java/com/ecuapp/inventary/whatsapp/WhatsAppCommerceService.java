@@ -49,9 +49,14 @@ public class WhatsAppCommerceService {
   audit.record(actor,"WHATSAPP_CART_CREATED","WHATSAPP_CART",cart.getId(),Map.of("customerRef",reference));
   return cartView(carts.findDetailedById(cart.getId()).orElseThrow());
  }
- @Transactional(readOnly=true) public WhatsAppDtos.CartView getCart(UUID cartId){
-  return cartView(carts.findDetailedById(cartId).orElseThrow(()->new ResourceNotFoundException("Carrito",cartId)));
+ /** When customerRef is supplied the resource must belong to that customer; otherwise it is reported as not found. */
+ @Transactional(readOnly=true) public WhatsAppDtos.CartView getCart(UUID cartId,String customerRef){
+  WhatsAppCart cart=carts.findDetailedById(cartId).orElseThrow(()->new ResourceNotFoundException("Carrito",cartId));
+  if(!belongsTo(cart.getCustomerRef(),customerRef))throw new ResourceNotFoundException("Carrito",cartId);
+  return cartView(cart);
  }
+ @Transactional(readOnly=true) public WhatsAppDtos.CartView getCart(UUID cartId){return getCart(cartId,null);}
+ private boolean belongsTo(String owner,String requested){return requested==null||requested.isBlank()||owner.equals(normalizeCustomerRef(requested));}
  @Transactional public WhatsAppDtos.CartView setItem(UUID cartId,UUID productId,WhatsAppDtos.CartItemRequest request,String actor){
   WhatsAppCart cart=requireEditableCart(cartId);
   Product product=products.findById(productId).orElseThrow(()->new ResourceNotFoundException("Producto",productId));
@@ -112,10 +117,15 @@ public class WhatsAppCommerceService {
   audit.record(actor,"WHATSAPP_QUOTE_CREATED","WHATSAPP_QUOTE",quote.getId(),Map.of("quoteNumber",number,"cartId",cartId.toString(),"total",subtotal.toPlainString(),"currency",quote.getCurrency()));
   return WhatsAppDtos.QuoteView.from(quotes.findDetailedById(quote.getId()).orElseThrow());
  }
- @Transactional(readOnly=true) public WhatsAppDtos.QuoteView getQuote(UUID quoteId){
-  return WhatsAppDtos.QuoteView.from(quotes.findDetailedById(quoteId).orElseThrow(()->new ResourceNotFoundException("Cotización",quoteId)));
+ @Transactional(readOnly=true) public WhatsAppDtos.QuoteView getQuote(UUID quoteId,String customerRef){
+  WhatsAppQuote quote=quotes.findDetailedById(quoteId).orElseThrow(()->new ResourceNotFoundException("Cotización",quoteId));
+  if(!belongsTo(quote.getCart().getCustomerRef(),customerRef))throw new ResourceNotFoundException("Cotización",quoteId);
+  return WhatsAppDtos.QuoteView.from(quote);
  }
- @Transactional public WhatsAppDtos.OrderView createOrder(String key,WhatsAppDtos.CreateOrderRequest request,String actor){
+ @Transactional(readOnly=true) public WhatsAppDtos.QuoteView getQuote(UUID quoteId){return getQuote(quoteId,null);}
+ /** An expired quote is persisted as EXPIRED even though the request fails with 409. */
+ @Transactional(noRollbackFor=QuoteExpiredException.class)
+ public WhatsAppDtos.OrderView createOrder(String key,WhatsAppDtos.CreateOrderRequest request,String actor){
   requireIdempotencyKey(key);
   if(!request.consentConfirmed())throw new BusinessRuleException("Se requiere confirmación explícita de la orden por parte del cliente.");
   String requestHash=hash(request.quoteId()+"|CONSENT_CONFIRMED");
@@ -131,7 +141,7 @@ public class WhatsAppCommerceService {
    return WhatsAppDtos.OrderView.from(orders.findDetailedById(previous.get().getId()).orElseThrow());
   }
   if(quote.getStatus()!=QuoteStatus.ACTIVE)throw new ConflictException("La cotización no está activa.");
-  if(!quote.getExpiresAt().isAfter(Instant.now())){quote.expire();throw new ConflictException("La cotización venció; genere una nueva cotización.");}
+  if(!quote.getExpiresAt().isAfter(Instant.now())){quote.expire();quotes.flush();throw new QuoteExpiredException();}
   WhatsAppCart cart=carts.findForUpdate(quote.getCart().getId()).orElseThrow(()->new ResourceNotFoundException("Carrito",quote.getCart().getId()));
   if(cart.getStatus()!=CartStatus.QUOTED)throw new ConflictException("El carrito cambió después de la cotización; cotice nuevamente.");
   Map<UUID,WhatsAppCartItem> cartItemsByProduct=new HashMap<>();
@@ -163,9 +173,12 @@ public class WhatsAppCommerceService {
   audit.record(actor,"WHATSAPP_ORDER_CREATED","WHATSAPP_ORDER",order.getId(),Map.of("orderNumber",number,"quoteId",quote.getId().toString(),"total",order.getTotal().toPlainString()));
   return WhatsAppDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
- @Transactional(readOnly=true) public WhatsAppDtos.OrderView getOrder(UUID orderId){
-  return WhatsAppDtos.OrderView.from(orders.findDetailedById(orderId).orElseThrow(()->new ResourceNotFoundException("Orden WhatsApp",orderId)));
+ @Transactional(readOnly=true) public WhatsAppDtos.OrderView getOrder(UUID orderId,String customerRef){
+  WhatsAppOrder order=orders.findDetailedById(orderId).orElseThrow(()->new ResourceNotFoundException("Orden WhatsApp",orderId));
+  if(!belongsTo(order.getCustomerRef(),customerRef))throw new ResourceNotFoundException("Orden WhatsApp",orderId);
+  return WhatsAppDtos.OrderView.from(order);
  }
+ @Transactional(readOnly=true) public WhatsAppDtos.OrderView getOrder(UUID orderId){return getOrder(orderId,null);}
  @Transactional public WhatsAppDtos.OrderView cancelOrder(UUID orderId,String actor){
   WhatsAppOrder order=orders.findForUpdate(orderId).orElseThrow(()->new ResourceNotFoundException("Orden WhatsApp",orderId));
   if(order.getStatus()==WhatsAppOrderStatus.CANCELLED||order.getStatus()==WhatsAppOrderStatus.EXPIRED)return WhatsAppDtos.OrderView.from(orders.findDetailedById(orderId).orElseThrow());
@@ -221,4 +234,5 @@ public class WhatsAppCommerceService {
  private void requireIdempotencyKey(String key){if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");}
  private String hash(String value){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException("No se pudo calcular huella idempotente.",ex);}}
  private record QuoteCalc(Product product,BigDecimal quantity,BigDecimal unitPrice,BigDecimal lineTotal){}
+ static final class QuoteExpiredException extends ConflictException{QuoteExpiredException(){super("La cotización venció; genere una nueva cotización.");}}
 }

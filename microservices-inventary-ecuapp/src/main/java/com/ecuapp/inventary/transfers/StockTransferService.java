@@ -36,6 +36,7 @@ public class StockTransferService {
  private final ObjectMapper mapper;
  private final AuditService audit;
  private final InventoryCostingService costing;
+ private static final Set<String> SORT=Set.of("createdAt","transferNumber","status","dispatchedAt","completedAt");
 
  public StockTransferService(StockTransferRepository transfers,IdempotencyRecordRepository idempotencyRecords,
   ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
@@ -47,8 +48,8 @@ public class StockTransferService {
  }
 
  @Transactional(readOnly=true)
- public Page<TransferDtos.View> list(Pageable p){
-  return transfers.findAll(PageRequest.of(Math.max(0,p.getPageNumber()),Math.min(Math.max(1,p.getPageSize()),100),p.getSort())).map(TransferDtos.View::from);
+ public Page<TransferDtos.View> list(TransferStatus status,UUID sourceWarehouseId,UUID destinationWarehouseId,Pageable p){
+  return transfers.search(status,sourceWarehouseId,destinationWarehouseId,Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"createdAt"))).map(TransferDtos.View::from);
  }
  @Transactional(readOnly=true)
  public TransferDtos.View get(UUID id){return TransferDtos.View.from(requireDetailed(id));}
@@ -117,12 +118,12 @@ public class StockTransferService {
    StockBalance source=balances.findForUpdate(line.getProduct().getId(),transfer.getSourceWarehouse().getId())
     .orElseThrow(()->new BusinessRuleException("No existe saldo de origen para "+line.getSkuSnapshot()+"."));
    source.decrease(line.getRequestedQuantity());
-   BigDecimal unitCost=costing.currentIssueUnitCost(line.getProduct(),source.getLocation(),line.getRequestedQuantity(),line.getUnitCost());
+   InventoryCostingService.Valuation valuation=costing.outbound(line.getProduct(),source.getLocation(),line.getRequestedQuantity());
    StockMovement movement=new StockMovement(line.getProduct(),transfer.getSourceWarehouse(),MovementType.TRANSFER_OUT,
-    line.getRequestedQuantity(),unitCost,"STOCK_TRANSFER",transfer.getId(),"TRFO-"+line.getId(),
+    line.getRequestedQuantity(),valuation.movementUnitCost(),"STOCK_TRANSFER",transfer.getId(),"TRFO-"+line.getId(),
     hash(transfer.getId()+"|OUT|"+line.getId()),"Despacho de transferencia "+transfer.getTransferNumber(),actor);
-   movement.assignLocations(source.getLocation(),null,measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),null);
-   StockMovement persisted=movements.saveAndFlush(movement);costing.recordOutbound(persisted);
+   movement.assignLocations(source.getLocation(),null,measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),valuation.method());
+   costing.post(movements.save(movement),valuation);
   }
   transfer.dispatch();
   audit.record(actor,"STOCK_TRANSFER_DISPATCHED","STOCK_TRANSFER",id,Map.of("transferNumber",transfer.getTransferNumber(),"lines",lines.size()));
@@ -150,12 +151,13 @@ public class StockTransferService {
      .orElseThrow(()->new ConflictException("No se pudo crear el saldo de destino de forma concurrente."));
    }
    destination.increase(line.getRequestedQuantity());line.receive();
-   BigDecimal inboundCost=costing.inboundUnitCost(line.getProduct(),MovementType.TRANSFER_IN,"STOCK_TRANSFER",transfer.getId(),line.getId(),line.getUnitCost());
+   // The destination receives the goods at the exact cost they left the source warehouse with.
+   InventoryCostingService.Valuation valuation=costing.inbound(line.getProduct(),destination.getLocation(),line.getRequestedQuantity(),dispatchedUnitCost(line));
    StockMovement movement=new StockMovement(line.getProduct(),transfer.getDestinationWarehouse(),MovementType.TRANSFER_IN,
-    line.getRequestedQuantity(),inboundCost,"STOCK_TRANSFER",transfer.getId(),"TRFI-"+line.getId(),
+    line.getRequestedQuantity(),valuation.movementUnitCost(),"STOCK_TRANSFER",transfer.getId(),"TRFI-"+line.getId(),
     hash(transfer.getId()+"|IN|"+line.getId()),"Recepción de transferencia "+transfer.getTransferNumber(),actor);
-   movement.assignLocations(null,destination.getLocation(),measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),null);
-   StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
+   movement.assignLocations(null,destination.getLocation(),measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),valuation.method());
+   costing.post(movements.save(movement),valuation);
   }
   transfer.complete();
   audit.record(actor,"STOCK_TRANSFER_RECEIVED","STOCK_TRANSFER",id,Map.of("transferNumber",transfer.getTransferNumber(),"lines",lines.size()));
@@ -180,12 +182,12 @@ public class StockTransferService {
     StockBalance source=balances.findForUpdate(line.getProduct().getId(),transfer.getSourceWarehouse().getId())
      .orElseThrow(()->new BusinessRuleException("No existe saldo de origen para compensar "+line.getSkuSnapshot()+"."));
     source.increase(line.getRequestedQuantity());
-    BigDecimal inboundCost=costing.inboundUnitCost(line.getProduct(),MovementType.TRANSFER_IN,"STOCK_TRANSFER",transfer.getId(),line.getId(),line.getUnitCost());
+    InventoryCostingService.Valuation valuation=costing.inbound(line.getProduct(),source.getLocation(),line.getRequestedQuantity(),dispatchedUnitCost(line));
     StockMovement movement=new StockMovement(line.getProduct(),transfer.getSourceWarehouse(),MovementType.TRANSFER_IN,
-     line.getRequestedQuantity(),inboundCost,"STOCK_TRANSFER",transfer.getId(),"TRFC-IN-"+line.getId(),
+     line.getRequestedQuantity(),valuation.movementUnitCost(),"STOCK_TRANSFER",transfer.getId(),"TRFC-IN-"+line.getId(),
      hash(transfer.getId()+"|CANCEL_IN_TRANSIT|"+line.getId()),"Compensación de cancelación de transferencia "+transfer.getTransferNumber()+": "+clean,actor);
-    movement.assignLocations(null,source.getLocation(),measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),null);
-    StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
+    movement.assignLocations(null,source.getLocation(),measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),valuation.method());
+    costing.post(movements.save(movement),valuation);
    }
   }
   transfer.cancel(clean,actor);
@@ -215,18 +217,18 @@ public class StockTransferService {
    StockBalance destination=first.equals(transfer.getDestinationWarehouse().getId())?firstBalance:secondBalance;
    destination.decrease(line.getReceivedQuantity());
    source.increase(line.getReceivedQuantity());
-   BigDecimal issueCost=costing.currentIssueUnitCost(line.getProduct(),destination.getLocation(),line.getReceivedQuantity(),line.getUnitCost());
+   InventoryCostingService.Valuation outValuation=costing.outbound(line.getProduct(),destination.getLocation(),line.getReceivedQuantity());
    StockMovement out=new StockMovement(line.getProduct(),transfer.getDestinationWarehouse(),MovementType.TRANSFER_OUT,
-    line.getReceivedQuantity(),issueCost,"STOCK_TRANSFER_REVERSAL",transfer.getId(),"TRFR-OUT-"+line.getId(),
+    line.getReceivedQuantity(),outValuation.movementUnitCost(),"STOCK_TRANSFER_REVERSAL",transfer.getId(),"TRFR-OUT-"+line.getId(),
     hash(transfer.getId()+"|REVERSE_OUT|"+line.getId()),"Salida compensatoria de reversión "+transfer.getTransferNumber()+": "+clean,actor);
-   out.assignLocations(destination.getLocation(),null,measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),null);
-   StockMovement persistedOut=movements.saveAndFlush(out);costing.recordOutbound(persistedOut);
-   BigDecimal inboundCost=costing.inboundUnitCost(line.getProduct(),MovementType.TRANSFER_IN,"STOCK_TRANSFER_REVERSAL",transfer.getId(),line.getId(),issueCost);
+   out.assignLocations(destination.getLocation(),null,measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),outValuation.method());
+   costing.post(movements.save(out),outValuation);
+   InventoryCostingService.Valuation inValuation=costing.inbound(line.getProduct(),source.getLocation(),line.getReceivedQuantity(),outValuation.unitCost());
    StockMovement in=new StockMovement(line.getProduct(),transfer.getSourceWarehouse(),MovementType.TRANSFER_IN,
-    line.getReceivedQuantity(),inboundCost,"STOCK_TRANSFER_REVERSAL",transfer.getId(),"TRFR-IN-"+line.getId(),
+    line.getReceivedQuantity(),inValuation.movementUnitCost(),"STOCK_TRANSFER_REVERSAL",transfer.getId(),"TRFR-IN-"+line.getId(),
     hash(transfer.getId()+"|REVERSE_IN|"+line.getId()),"Entrada compensatoria de reversión "+transfer.getTransferNumber()+": "+clean,actor);
-   in.assignLocations(null,source.getLocation(),measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),null);
-   StockMovement persistedIn=movements.saveAndFlush(in);costing.recordInbound(persistedIn);
+   in.assignLocations(null,source.getLocation(),measureByProduct.get(line.getProduct().getId()),transfer.getTransferNumber(),line.getId(),inValuation.method());
+   costing.post(movements.save(in),inValuation);
   }
   transfer.reverse(clean,actor);
   audit.record(actor,"STOCK_TRANSFER_REVERSED","STOCK_TRANSFER",id,Map.of("transferNumber",transfer.getTransferNumber(),"reason",clean,"lines",lines.size()));
@@ -235,6 +237,10 @@ public class StockTransferService {
   return TransferDtos.View.from(requireDetailed(id));
  }
 
+ private java.math.BigDecimal dispatchedUnitCost(StockTransferLine line){
+  return movements.findByIdempotencyKey("TRFO-"+line.getId()).map(m->costing.valuedUnitCost(m.getId())).filter(Objects::nonNull)
+   .orElse(line.getUnitCost());
+ }
  private StockBalance lockBalance(StockTransferLine line,UUID warehouseId,StockTransfer transfer){
   StockBalance balance=balances.findForUpdate(line.getProduct().getId(),warehouseId).orElse(null);
   if(balance!=null)return balance;

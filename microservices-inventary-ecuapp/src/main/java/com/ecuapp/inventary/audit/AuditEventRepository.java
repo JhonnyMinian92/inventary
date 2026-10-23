@@ -13,8 +13,8 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent,UUID>{
  and (:action is null or e.action=:action)
  and (:resourceType is null or e.resourceType=:resourceType)
  and (:outcome is null or e.outcome=:outcome)
- and (:fromTime is null or e.occurredAt>=:fromTime)
- and (:toTime is null or e.occurredAt<:toTime)
+ and e.occurredAt>=:fromTime
+ and e.occurredAt<:toTime
   """)
  Page<AuditEvent> search(@Param("actor") String actor,@Param("action") String action,
  @Param("resourceType") String resourceType,@Param("outcome") String outcome,

@@ -1,10 +1,13 @@
 package com.ecuapp.inventary.catalog.application;
 
+import com.ecuapp.inventary.catalog.ProductKind;
+
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
-/** Application-layer result; controllers decide how it is represented over HTTP. */
+/** Application-layer result; controllers decide how it is represented over HTTP (cost is filtered by permission). */
 public record ProductResult(
     UUID id,
     String sku,
@@ -12,9 +15,14 @@ public record ProductResult(
     String description,
     UUID categoryId,
     String categoryName,
+    BigDecimal costPrice,
     BigDecimal salePrice,
     String currency,
     String imageUrl,
+    ProductKind kind,
+    UUID unitOfMeasureId,
+    Map<String, Object> attributes,
+    int attributeSchemaVersion,
     boolean active,
     Instant createdAt,
     Instant updatedAt

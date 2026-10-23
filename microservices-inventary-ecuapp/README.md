@@ -78,7 +78,12 @@ Roles canónicos iniciales: SUPER_ADMIN, AUDITOR, MANAGER_ALMACEN, VENDEDOR y SO
 - PUT /api/v1/admin/users/{id}/password
 - GET/POST /api/v1/admin/roles
 - GET /api/v1/admin/permissions
+- GET/PATCH /api/v1/admin/roles/{code}
 - PUT /api/v1/admin/roles/{code}/permissions
+- POST /api/v1/auth/logout (revoca todos los tokens del usuario)
+- PUT /api/v1/auth/me/password (cambio de contraseña propia con la actual)
+
+Los roles personalizados creados por API se asignan a usuarios igual que los canónicos (`role` es el código del rol). Cambiar los permisos de un rol tiene efecto inmediato; desactivarlo bloquea a sus usuarios. La API garantiza, incluso con peticiones concurrentes, que siempre quede un SUPER_ADMIN activo.
 
 Los permisos RBAC se guardan en PostgreSQL y se derivan de la asignación vigente en cada solicitud. JWT valida firma HS256, emisor, audiencia y expiración. Cambiar rol, desactivar usuario o restablecer contraseña invalida tokens anteriores mediante una versión de sesión.
 
@@ -90,32 +95,61 @@ La creación de ventas usa `POST /api/v1/sales` con el header `Idempotency-Key`.
 
 ## API implementada
 
-Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálogo público y la integración WhatsApp (con clave de máquina propia) son excepciones. GraphQL requiere permiso de lectura del catálogo. OpenAPI/Swagger está deshabilitado por defecto y no sustituye autenticación.
+Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálogo público y la integración WhatsApp (con clave de máquina propia) son excepciones. GraphQL requiere permiso de lectura del catálogo. OpenAPI/Swagger está deshabilitado por defecto y no sustituye autenticación. Todos los listados son paginados (`?page=&size=&sort=`, tamaño máximo 100, ordenamiento solo por propiedades permitidas) y responden `{"content":[...],"page":{"size","number","totalElements","totalPages"}}`.
 
 | Área | Rutas | Funcionalidad |
 |---|---|---|
-| Categorías | `/api/v1/catalog/categories` | CRUD y desactivación lógica |
-| Productos | `/api/v1/catalog/products` | CRUD, búsqueda, SKU único; el SKU es inmutable después del alta |
-| Catálogo público | `/api/v1/public/catalog/products` | Información pública, precio, imagen y disponibilidad sin exponer costo interno |
-| Imágenes | `/api/v1/catalog/products/{productId}/images` | Metadatos por URL HTTPS, descripción alternativa y orden; no carga binarios |
-| Almacenes | `/api/v1/warehouses` | CRUD y desactivación lógica |
-| Inventario | `/api/v1/inventory/balances`, `/api/v1/inventory/movements` | Consultar saldos y ledger |
-| Ajustes | `POST /api/v1/inventory/adjustments` | Entrada/salida con Idempotency-Key y motivo |
-| Reposición | `/api/v1/inventory/reorder-rules`, `GET /api/v1/inventory/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
-| Transferencias | `/api/v1/inventory/transfers` | Despacho/recepción idempotentes, cancelación compensatoria en tránsito y reversión de transferencias completadas; ledger, auditoría y Outbox atómicos |
-| Conteos físicos | `/api/v1/inventory/counts` | Capturar cantidades, consultar diferencias, contabilizar ajustes o cancelar; snapshots inmutables e idempotencia |
-| Ventas | `/api/v1/sales` | Registrar y consultar ventas; solicitud y aprobación segregadas de cancelaciones |
-| Devoluciones de venta | `/api/v1/sales-returns` | Idempotencia concurrente, restock/merma, límite por cantidad vendida y ledger trazable |
-| Clientes | `/api/v1/customers` | Crear y mantener contactos de cliente |
-| Proveedores | `/api/v1/suppliers` | CRUD de contactos; lectura protegida por `purchasing:read` |
-| Compras | `/api/v1/purchase-orders` | Crear idempotentemente, enviar, aprobar, cancelar antes de aprobación y consultar |
-| Recepciones | `POST /api/v1/purchase-orders/{id}/receipts`, `GET /api/v1/goods-receipts/{id}` | Recepción parcial idempotente; actualiza saldo, ledger, auditoría y Outbox en transacción |
-| Devoluciones a proveedor | `/api/v1/purchase-returns` | Idempotencia concurrente, recepción fuente verificada, límite recibido y ledger trazable |
-| Auditoría | `GET /api/v1/audit-events` | Lectura restringida a ADMIN/AUDITOR |
-| Integración WhatsApp/n8n | `/api/v1/integrations/whatsapp/**` | Catálogo por SKU/UUID, carrito, cotización temporal y orden pendiente de pago |
-| GraphQL | `/graphql` | Consultas públicas de productos/categorías con paginación acotada |
+| Autenticación | `/api/v1/auth/login`, `/me`, `/logout`, `/me/password` | JWT, permisos efectivos, revocación y cambio de contraseña |
+| Administración | `/api/v1/admin/users`, `/api/v1/admin/roles`, `/api/v1/admin/permissions` | Usuarios, roles personalizados y permisos |
+| Categorías | `/api/v1/catalog/categories` | CRUD, activar/desactivar, filtro `active` |
+| Plantillas de atributos | `GET/PUT /api/v1/catalog/categories/{id}/attributes` | Esquema versionado (STRING, NUMBER, BOOLEAN, DATE, ENUM, STRING_LIST) con obligatorios, opciones y rangos |
+| Unidades | `/api/v1/catalog/units`, `/api/v1/catalog/unit-conversions` | Unidades por dimensión y factores de conversión |
+| Productos | `/api/v1/catalog/products` | CRUD, filtros `q`, `categoryId`, `active`, `kind`; tipo (`STOCKED_GOOD`, `NON_STOCKED_GOOD`, `SERVICE`), unidad y atributos validados; SKU inmutable; el costo solo se muestra con `catalog:manage` o `reports:financial` |
+| Variantes | `/api/v1/catalog/products/{productId}/variants`, `/api/v1/catalog/variants/{variantId}` | SKU, código de barras y combinación de opciones únicos; precio propio opcional. El stock se lleva por producto |
+| Imágenes | `/api/v1/catalog/products/{productId}/images` | Metadatos por URL HTTPS, una principal, despublicación idempotente; no carga binarios |
+| Catálogo público | `/api/v1/public/catalog/products`, `/products/{sku|uuid|sku de variante|código de barras}`, `/categories` | Solo activos, disponibilidad vendible, variantes e imágenes publicadas; nunca costos |
+| Almacenes | `/api/v1/warehouses`, `/{id}/locations` | CRUD, activar/desactivar (bloqueado con stock o reservas), ubicaciones |
+| Inventario | `/api/v1/inventory/balances`, `/availability`, `/movements`, `/movements/{id}` | Saldos filtrables, disponibilidad informativa, kardex filtrable por producto, almacén, tipo, referencia y fechas, detalle con valoración |
+| Ajustes | `POST /api/v1/inventory/adjustments` | Entrada/salida con `Idempotency-Key`, motivo y costo unitario opcional para entradas |
+| Conteos físicos | `/api/v1/inventory/counts` | Captura, contabilización de diferencias (rechaza snapshot obsoleto) y cancelación |
+| Reposición | `/api/v1/inventory/reorder-rules`, `/replenishment-suggestions` | Mínimos, objetivos, plazo y proveedor preferido |
+| Transferencias | `/api/v1/inventory/transfers` | Despacho/recepción idempotentes al costo de salida, cancelación compensatoria y reversión |
+| Clientes y proveedores | `/api/v1/customers`, `/api/v1/suppliers` | CRUD, búsqueda `q`, activar/desactivar |
+| Compras | `/api/v1/purchase-orders`, `/api/v1/goods-receipts` | Órdenes idempotentes, envío/aprobación/cancelación idempotentes por estado, aprobador distinto del creador, recepciones parciales valorizadas, filtros |
+| Devoluciones a proveedor | `/api/v1/purchase-returns` | Límite por cantidad recibida (también concurrente), salida al costo de la recepción |
+| Ventas | `/api/v1/sales` | Precio del servidor, costo de venta según política, filtros por estado, almacén, cliente, canal y fechas; cancelación solicitada y aprobada por actores distintos |
+| Devoluciones de venta | `/api/v1/sales-returns` | RESTOCK o SCRAP al costo de la venta original, límite por cantidad vendida |
+| Integración WhatsApp/n8n | `/api/v1/integrations/whatsapp/**` | Catálogo, carrito, cotización, pedido con reserva y cancelación |
+| Pedidos WhatsApp (personal) | `/api/v1/whatsapp-orders`, `/{id}/confirm-payment` | Seguimiento y confirmación de un pago verificado que convierte el pedido en venta |
+| Costeo | `/api/v1/costing/policy` | Consultar y fijar FIFO o promedio ponderado (solo antes del primer movimiento valorizado) |
+| Reportes | `/api/v1/reports/inventory-balance`, `/valuation`, `/sales`, `/purchases`, `/kardex`, `/low-stock` | Ver "Costeo y reportes" |
+| Auditoría | `GET /api/v1/audit-events`, `/{id}` | Lectura con `audit:read` |
+| Operaciones | `/api/v1/operations/outbox` | Estado, diagnóstico y redrive del Outbox (`operations:manage`) |
+| GraphQL | `/graphql` | Consultas públicas de productos/categorías con límites de profundidad y complejidad |
 
-Las rutas exactas y parámetros se exponen también en Swagger/OpenAPI.
+Las rutas exactas, parámetros y esquemas se exponen en Swagger/OpenAPI. La matriz de permisos por rol está en [docs/RESULTADO_AUDITORIA_EJECUCION.md](docs/RESULTADO_AUDITORIA_EJECUCION.md#6-matriz-rbac-verificada-rolematrixapitest).
+
+## Costeo y reportes
+
+Cada movimiento físico se valoriza en la misma transacción que cambia el saldo:
+
+- **Promedio ponderado** (por defecto) o **FIFO**, configurable en `PUT /api/v1/costing/policy` mientras no existan movimientos valorizados.
+- Las entradas abren capas de costo (recepción al costo de la orden; ajuste al costo indicado o al promedio vigente). Las salidas consumen capas en orden FIFO y se valoran según la política.
+- Cancelaciones de venta, devoluciones de cliente y transferencias reingresan al costo exacto con el que salieron; las devoluciones a proveedor salen al costo de su recepción.
+- El ledger de valoración (`inventory_valuation_entry`) es append-only y se consulta en `GET /api/v1/inventory/movements/{id}`.
+
+Reportes (permiso `reports:financial`; fechas `YYYY-MM-DD` inclusivas, máximo 366 días, en la zona `REPORTS_TIME_ZONE`, por defecto `America/Guayaquil`, o el parámetro `zone`):
+
+| Reporte | Contenido |
+|---|---|
+| `GET /api/v1/reports/inventory-balance?from&to&warehouseId[&productId]` | Por producto: existencia inicial y final del periodo, compras netas e importe, ventas netas e importe, existencia actual/reservada/disponible, **valor inicial y final, costo de ventas y utilidad bruta** |
+| `GET /api/v1/reports/valuation[?warehouseId&productId&includeEmpty]` | Cantidad, costo promedio y valor por producto y almacén, conciliado contra el saldo físico, con totales por moneda |
+| `GET /api/v1/reports/sales?from&to[&warehouseId]` | Ventas brutas, cancelaciones, devoluciones, ventas netas, costo de ventas, utilidad bruta, detalle diario y por producto |
+| `GET /api/v1/reports/purchases?from&to[&warehouseId&supplierId]` | Recepciones y devoluciones a proveedor por proveedor y producto |
+| `GET /api/v1/reports/kardex?productId&warehouseId&from&to` | Movimientos del periodo con saldo acumulado en cantidad y valor |
+| `GET /api/v1/reports/low-stock[?warehouseId]` | Productos bajo su mínimo de reposición |
+
+Reponer un producto agotado no requiere crear un producto nuevo: las recepciones del mismo `productId` vuelven a sumar existencias y el reporte consolidado distingue la existencia al cierre del periodo de la existencia actual.
 
 ## Contratos de inventario
 
@@ -221,7 +255,9 @@ El precio procede del producto guardado en PostgreSQL; el cliente no puede indic
 
 Configura `WHATSAPP_INTEGRATION_API_KEY` con una clave aleatoria de al menos 32 bytes. Sin ella, estas llamadas son rechazadas. En cada solicitud de máquina envía `X-Integration-Key`; usa además `Idempotency-Key` al cotizar o crear una orden.
 
-Flujo: consulta catálogo → crea carrito → agrega productos → solicita cotización para un almacén → presenta al cliente el precio y vencimiento → registra orden solo con `consentConfirmed: true`. La cotización dura 10 minutos por defecto; la orden pendiente reserva stock por 20 minutos. Los TTL se configuran con `WHATSAPP_QUOTE_TTL_MINUTES` y `WHATSAPP_ORDER_TTL_MINUTES`. Una tarea programada libera reservas al cancelar o expirar la orden. No se integra todavía un proveedor de pagos ni una confirmación de cobro, así que la orden no se debe marcar pagada solo con la respuesta de un LLM o de n8n.
+Flujo: consulta catálogo → crea carrito → agrega productos → solicita cotización para un almacén → presenta al cliente el precio y vencimiento → registra orden solo con `consentConfirmed: true`. La cotización dura 10 minutos por defecto; la orden pendiente reserva stock por 20 minutos. Los TTL se configuran con `WHATSAPP_QUOTE_TTL_MINUTES` y `WHATSAPP_ORDER_TTL_MINUTES`. Una tarea programada libera reservas al cancelar o expirar la orden. Las consultas de carrito, cotización y orden aceptan `?customerRef=` para comprobar que el recurso pertenece al cliente de la conversación (si no coincide, 404).
+
+No se integra un proveedor de pagos. Cuando el personal verifica el pago (transferencia, efectivo, tarjeta), lo registra con `POST /api/v1/whatsapp-orders/{id}/confirm-payment` (`sales:manage`, `Idempotency-Key`, referencia y método de pago): la reserva se consume y se crea la venta de canal `WHATSAPP` con su costo de venta. La orden nunca se marca pagada por la respuesta de un LLM o de n8n.
 
 La API solo almacena URLs HTTPS de imágenes; no descarga las URLs recibidas, lo que evita usar el backend como proxy SSRF. Para subir archivos binarios hace falta un servicio de almacenamiento de objetos y validación de contenido real.
 
@@ -246,11 +282,29 @@ La API solo almacena URLs HTTPS de imágenes; no descarga las URLs recibidas, lo
 
 ## Pruebas y CI
 
-Ejecuta `mvn -B verify` desde esta carpeta. El workflow `.github/workflows/backend-ci.yml` compila Java 21 y levanta PostgreSQL para las migraciones, validación de mappings JPA y pruebas de integración. No consideres un cambio listo hasta que el workflow del último commit termine correctamente.
+Las pruebas usan PostgreSQL real (nunca H2) con el perfil `test`. Crea una base aislada y ejecuta desde esta carpeta:
 
-## Pendiente de alcance original
+```bash
+createdb inventary_test   # o CREATE DATABASE inventary_test;
+export TEST_DATASOURCE_URL=jdbc:postgresql://localhost:5432/inventary_test
+export TEST_DB_USERNAME=postgres TEST_DB_PASSWORD='<clave>'
+mvn -B verify
+```
 
-Aún requieren validación/implementación adicional: integración de pagos y estados de pago, facturación electrónica/SRI y reglas fiscales Ecuador; subida binaria/almacenamiento de imágenes; confirmación y conciliación externa para WhatsApp; consumidores Kafka con deduplicación/observabilidad; controles de tasa y límites explícitos de complejidad GraphQL; informes, valoración de existencias según política contable, separación multiempresa y pruebas de concurrencia amplias. El código actual no significa cobertura completa de esos requisitos hasta cerrar sus issues con código y tests.
+La suite (76 pruebas) incluye pruebas unitarias, de integración PostgreSQL, de contrato HTTP con JWT real para todas las áreas, una matriz RBAC ejecutable y pruebas de concurrencia (sobreventa, idempotencia, devoluciones, último administrador, reservas, Outbox). Cada prueba crea sus datos con claves aleatorias, por lo que puede repetirse sobre la misma base.
+
+Prueba extremo a extremo con la API levantada (`SWAGGER_ENABLED=true`), que recorre las 138 operaciones REST y verifica la cobertura contra OpenAPI:
+
+```bash
+python scripts/smoke_test_api.py --base-url http://localhost:8080 \
+  --admin-user <usuario> --admin-password '<clave>' --integration-key '<WHATSAPP_INTEGRATION_API_KEY>'
+```
+
+El workflow `.github/workflows/backend-ci.yml` (manual) ejecuta `mvn -B verify` con PostgreSQL 16. Resultados de la última ejecución: [docs/RESULTADO_AUDITORIA_EJECUCION.md](docs/RESULTADO_AUDITORIA_EJECUCION.md). Operación, respaldos y redrive: [docs/23-runbook-operacion.md](docs/23-runbook-operacion.md).
+
+## Fuera de alcance de esta versión
+
+No implementado y no debe presentarse como disponible: proveedor de pagos, reembolsos y conciliación; impuestos y facturación electrónica SRI (el impuesto es 0 y los totales no son comprobantes fiscales); carga binaria de imágenes; stock por ubicación múltiple dentro de un almacén y stock por variante; consumidores Kafka y proyecciones; multiempresa; rate limit distribuido (debe hacerlo el gateway/WAF); frontend Angular.
 
 ## Transferencias entre almacenes
 
@@ -273,5 +327,5 @@ Los comandos de creación, despacho, recepción, cancelación y reversión requi
 - Docker Compose levanta PostgreSQL 16 con healthcheck y volumen persistente; la API espera a que PostgreSQL esté saludable antes de arrancar.
 - El Dockerfile empaqueta con Java 21 y ejecuta la aplicación en JRE como usuario no root.
 - El workflow `.github/workflows/backend-ci.yml` está preparado para ejecutar `mvn -B verify` contra PostgreSQL 16, pero por ahora solo se inicia manualmente desde GitHub Actions para no disparar validaciones sin autorización.
-- No se ha ejecutado build, test, CI, arranque ni migraciones durante P12. La integración y publicación final en `master` quedan pendientes de la fase de validación autorizada.
+- P12 se entregó sin ejecutar build ni pruebas; la validación completa se realizó después (ver [resultado de la auditoría](docs/RESULTADO_AUDITORIA_EJECUCION.md)).
 - Guía: [22 — P12: integración del código y entrega](docs/22-entrega-p12-integracion-codigo.md).

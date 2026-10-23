@@ -18,7 +18,10 @@ public class ReorderService {
  public ReorderService(ReorderRuleRepository rules,ProductRepository products,WarehouseRepository warehouses,BusinessPartnerRepository partners,StockBalanceRepository balances,AuditService audit){
   this.rules=rules;this.products=products;this.warehouses=warehouses;this.partners=partners;this.balances=balances;this.audit=audit;
  }
- @Transactional(readOnly=true) public List<ReorderDtos.View> list(){return rules.findAll().stream().map(ReorderDtos.View::from).toList();}
+ @Transactional(readOnly=true) public List<ReorderDtos.View> list(UUID warehouseId,Boolean active){
+  return rules.findAll().stream().filter(r->warehouseId==null||r.getWarehouse().getId().equals(warehouseId)).filter(r->active==null||r.isActive()==active)
+   .sorted(Comparator.comparing((ReorderRule r)->r.getWarehouse().getCode()).thenComparing(r->r.getProduct().getSku())).map(ReorderDtos.View::from).toList();
+ }
  @Transactional(readOnly=true) public List<ReorderDtos.Suggestion> suggestions(){
   List<ReorderDtos.Suggestion> result=new ArrayList<>();
   for(ReorderRule rule:rules.findByActiveTrue()){
@@ -39,7 +42,7 @@ public class ReorderService {
   if(!product.isActive()||!warehouse.isActive())throw new BusinessRuleException("El producto y almacén deben estar activos.");
   if(rules.existsByProductIdAndWarehouseId(product.getId(),warehouse.getId()))throw new ConflictException("Ya existe una regla de reposición para ese producto y almacén.");
   BusinessPartner supplier=supplier(r.preferredSupplierId());
-  ReorderRule rule=rules.save(new ReorderRule(product,warehouse,scale(r.minimumQuantity()),scale(r.targetQuantity()),r.leadTimeDays(),supplier));
+  ReorderRule rule=rules.saveAndFlush(new ReorderRule(product,warehouse,scale(r.minimumQuantity()),scale(r.targetQuantity()),r.leadTimeDays(),supplier));
   audit.record(actor,"REORDER_RULE_CREATED","REORDER_RULE",rule.getId(),Map.of("productId",product.getId().toString(),"warehouseId",warehouse.getId().toString()));
   return ReorderDtos.View.from(rule);
  }
@@ -51,7 +54,7 @@ public class ReorderService {
   audit.record(actor,"REORDER_RULE_UPDATED","REORDER_RULE",id,Map.of("productId",r.productId().toString(),"warehouseId",r.warehouseId().toString()));
   return ReorderDtos.View.from(rule);
  }
- @Transactional public void deactivate(UUID id,String actor){ReorderRule rule=rules.findById(id).orElseThrow(()->new ResourceNotFoundException("Regla de reposición",id));rule.deactivate();audit.record(actor,"REORDER_RULE_DEACTIVATED","REORDER_RULE",id,Map.of());}
+ @Transactional public void deactivate(UUID id,String actor){ReorderRule rule=rules.findById(id).orElseThrow(()->new ResourceNotFoundException("Regla de reposición",id));if(!rule.isActive())return;rule.deactivate();audit.record(actor,"REORDER_RULE_DEACTIVATED","REORDER_RULE",id,Map.of());}
  private BusinessPartner supplier(UUID id){
   if(id==null)return null;
   BusinessPartner p=partners.findByIdAndTypeIn(id,List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",id));

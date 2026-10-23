@@ -22,6 +22,7 @@ public class Category {
     @PreUpdate void onUpdate(){updatedAt=Instant.now();}
     public void update(String name,String slug,String description){this.name=name;this.slug=slug;this.description=description;}
     public void deactivate(){active=false;}
+    public void activate(){active=true;}
     public UUID getId(){return id;} public String getName(){return name;} public String getSlug(){return slug;}
     public String getDescription(){return description;} public boolean isActive(){return active;}
     public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}

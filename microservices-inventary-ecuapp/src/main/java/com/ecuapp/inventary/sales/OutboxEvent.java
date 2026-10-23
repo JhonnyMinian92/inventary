@@ -7,9 +7,14 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Transactional outbox row. Delivery is at-least-once: consumers must deduplicate by the event id
+ * (sent as Kafka key and as {@code eventId} in the envelope).
+ */
 @Entity
 @Table(name="outbox_event")
 public class OutboxEvent {
+ public static final int MAX_ATTEMPTS=10;
  @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
  @Column(name="aggregate_type",nullable=false,length=80) private String aggregateType;
  @Column(name="aggregate_id",nullable=false) private UUID aggregateId;
@@ -20,41 +25,30 @@ public class OutboxEvent {
  @Column(name="next_attempt_at",nullable=false) private Instant nextAttemptAt;
  @Column(name="created_at",nullable=false) private Instant createdAt;
  @Column(name="published_at") private Instant publishedAt;
+ @Column(name="locked_until") private Instant lockedUntil;
+ @Column(name="last_error",length=500) private String lastError;
  protected OutboxEvent(){}
  public OutboxEvent(String aggregateType,UUID aggregateId,String eventType,Map<String,Object> payload){
   this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=Map.copyOf(payload);
   this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
  }
- public boolean claim(Instant leaseUntil){
-  Instant now=Instant.now();
-  if(!"PENDING".equals(status)&&!"PROCESSING".equals(status))
-   throw new IllegalStateException("Solo se pueden reclamar eventos Outbox pendientes o con lease vencido.");
-  if(nextAttemptAt!=null&&nextAttemptAt.isAfter(now))
-   throw new IllegalStateException("El evento Outbox todavía está en periodo de espera.");
-  if(leaseUntil==null||!leaseUntil.isAfter(now))
-   throw new IllegalArgumentException("El lease del evento Outbox debe estar en el futuro.");
-  if(attempts>=10){
-   status="FAILED";
-   nextAttemptAt=now;
-   return false;
-  }
-  attempts++;
-  status="PROCESSING";
-  nextAttemptAt=leaseUntil;
-  return true;
- }
- public void markPublished(){if(!"PROCESSING".equals(status))throw new IllegalStateException("El evento Outbox no está reclamado.");this.status="PUBLISHED";this.publishedAt=Instant.now();}
- public void markFailed(){
-  if(!"PROCESSING".equals(status))throw new IllegalStateException("Solo se puede fallar un evento Outbox reclamado.");
-  if(this.attempts>=10){this.status="FAILED";return;}
+ public void markPublished(){this.status="PUBLISHED";this.publishedAt=Instant.now();this.lockedUntil=null;this.lastError=null;}
+ public void markFailed(String error){
+  this.attempts++;this.lockedUntil=null;
+  this.lastError=error==null?null:error.substring(0,Math.min(error.length(),500));
+  if(this.attempts>=MAX_ATTEMPTS){this.status="FAILED";return;}
   long delay=Math.min(3600L,1L<<Math.min(this.attempts,11));
   this.status="PENDING";this.nextAttemptAt=Instant.now().plusSeconds(delay);
  }
- public void redrive(){
-  if(!"FAILED".equals(status))throw new IllegalStateException("Solo se pueden reactivar eventos Outbox en estado FAILED.");
-  this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();
+ public void markFailed(){markFailed(null);}
+ /** Manual redrive after the cause was diagnosed; the attempt counter restarts. */
+ public boolean requeue(){
+  if("PUBLISHED".equals(status))return false;
+  this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.lockedUntil=null;
+  return true;
  }
  public UUID getId(){return id;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
  public String getEventType(){return eventType;} public Map<String,Object> getPayload(){return payload;} public String getStatus(){return status;}
  public int getAttempts(){return attempts;} public Instant getNextAttemptAt(){return nextAttemptAt;} public Instant getCreatedAt(){return createdAt;} public Instant getPublishedAt(){return publishedAt;}
+ public Instant getLockedUntil(){return lockedUntil;} public String getLastError(){return lastError;}
 }

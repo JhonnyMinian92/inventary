@@ -1,0 +1,50 @@
+name: backend-ci
+
+# Manual trigger only, as agreed for this project. Runs the full suite (unit, PostgreSQL integration,
+# HTTP/security contract and concurrency tests) against a real PostgreSQL 16 service.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: inventary_test
+          POSTGRES_USER: inventary
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inventary -d inventary_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATASOURCE_URL: jdbc:postgresql://localhost:5432/inventary_test
+      TEST_DB_USERNAME: inventary
+      TEST_DB_PASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Locate backend module
+        id: module
+        run: |
+          if [ -f microservices-inventary-ecuapp/pom.xml ]; then echo "dir=microservices-inventary-ecuapp" >> "$GITHUB_OUTPUT"; else echo "dir=." >> "$GITHUB_OUTPUT"; fi
+      - name: mvn verify
+        working-directory: ${{ steps.module.outputs.dir }}
+        run: mvn -B verify
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: ${{ steps.module.outputs.dir }}/target/surefire-reports

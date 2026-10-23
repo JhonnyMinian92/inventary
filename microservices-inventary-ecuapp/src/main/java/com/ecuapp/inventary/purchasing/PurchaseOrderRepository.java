@@ -13,6 +13,15 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
  @EntityGraph(attributePaths={"lines","lines.product","supplier","warehouse"})
  @Query("select distinct p from PurchaseOrder p where p.id=:id")
  Optional<PurchaseOrder> findDetailedById(@Param("id") UUID id);
- @Override @EntityGraph(attributePaths={"supplier","warehouse"})
- Page<PurchaseOrder> findAll(Pageable pageable);
+ @EntityGraph(attributePaths={"supplier","warehouse"})
+ @Query("""
+  select p from PurchaseOrder p
+  where (:status is null or p.status=:status)
+  and (:supplierId is null or p.supplier.id=:supplierId)
+  and (:warehouseId is null or p.warehouse.id=:warehouseId)
+  and p.orderedAt>=:fromTime
+  and p.orderedAt<:toTime
+  """)
+ Page<PurchaseOrder> search(@Param("status") PurchaseOrderStatus status,@Param("supplierId") UUID supplierId,@Param("warehouseId") UUID warehouseId,
+  @Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,Pageable pageable);
 }

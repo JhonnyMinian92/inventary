@@ -1,5 +1,6 @@
 package com.ecuapp.inventary.whatsapp;
 
+import com.ecuapp.inventary.sales.Sale;
 import com.ecuapp.inventary.warehouse.Warehouse;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -30,6 +31,11 @@ public class WhatsAppOrder {
  @Column(name="expires_at",nullable=false) private Instant expiresAt;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
  @Column(name="updated_at",nullable=false) private Instant updatedAt;
+ @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="sale_id") private Sale sale;
+ @Column(name="payment_reference",length=120) private String paymentReference;
+ @Column(name="payment_method",length=40) private String paymentMethod;
+ @Column(name="confirmed_by",length=80) private String confirmedBy;
+ @Column(name="confirmed_at") private Instant confirmedAt;
  @OneToMany(mappedBy="order",cascade=CascadeType.ALL,orphanRemoval=true) private List<WhatsAppOrderItem> items=new ArrayList<>();
  protected WhatsAppOrder(){}
  public WhatsAppOrder(String number,WhatsAppCart cart,WhatsAppQuote quote,Warehouse warehouse,String customerRef,String key,String hash,Instant expiresAt){
@@ -41,7 +47,14 @@ public class WhatsAppOrder {
  public void addItem(WhatsAppOrderItem item){items.add(item);item.setOrder(this);}
  public void cancel(){status=WhatsAppOrderStatus.CANCELLED;}
  public void expire(){status=WhatsAppOrderStatus.EXPIRED;}
- public void confirm(){status=WhatsAppOrderStatus.CONFIRMED;}
+ /** Records a payment verified by authorized staff and links the resulting sale. */
+ public void confirm(Sale sale,String paymentReference,String paymentMethod,String actor){
+  if(status!=WhatsAppOrderStatus.AWAITING_PAYMENT)throw new IllegalStateException("Solo se puede confirmar una orden pendiente de pago.");
+  this.status=WhatsAppOrderStatus.CONFIRMED;this.sale=sale;this.paymentReference=paymentReference;this.paymentMethod=paymentMethod;
+  this.confirmedBy=actor;this.confirmedAt=Instant.now();
+ }
+ public Sale getSale(){return sale;} public String getPaymentReference(){return paymentReference;} public String getPaymentMethod(){return paymentMethod;}
+ public String getConfirmedBy(){return confirmedBy;} public Instant getConfirmedAt(){return confirmedAt;}
  public UUID getId(){return id;} public String getOrderNumber(){return orderNumber;} public WhatsAppCart getCart(){return cart;} public WhatsAppQuote getQuote(){return quote;}
  public Warehouse getWarehouse(){return warehouse;} public String getCustomerRef(){return customerRef;} public WhatsAppOrderStatus getStatus(){return status;}
  public String getCurrency(){return currency;} public BigDecimal getSubtotal(){return subtotal;} public BigDecimal getTax(){return tax;} public BigDecimal getTotal(){return total;}

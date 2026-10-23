@@ -19,7 +19,7 @@ public class GraphqlCatalogController {
  @QueryMapping
  public ProductPage publicProducts(@Argument Integer page,@Argument Integer size){
   int safePage=Math.max(0,page==null?0:page);int safeSize=Math.max(1,Math.min(size==null?20:size,100));
-  Page<ProductDtos.PublicView> result=products.publicList(PageRequest.of(safePage,safeSize,Sort.by(Sort.Direction.ASC,"name")));
+  Page<ProductDtos.PublicView> result=products.publicList(null,null,PageRequest.of(safePage,safeSize,Sort.by(Sort.Direction.ASC,"name")));
   return new ProductPage(result.getContent().stream().map(ProductGraphqlView::from).toList(),result.getNumber(),result.getSize(),Long.toString(result.getTotalElements()),result.getTotalPages());
  }
  @QueryMapping

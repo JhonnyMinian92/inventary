@@ -7,87 +7,149 @@ import com.ecuapp.inventary.catalog.application.ProductResult;
 import com.ecuapp.inventary.catalog.application.ProductResultMapper;
 import com.ecuapp.inventary.catalog.application.ProductUseCases;
 import com.ecuapp.inventary.catalog.application.port.out.ProductPersistencePort;
-
-import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.audit.AuditService;
-import java.util.Map;
+import com.ecuapp.inventary.common.BusinessRuleException;
+import com.ecuapp.inventary.common.ConflictException;
+import com.ecuapp.inventary.common.InvalidQueryException;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import com.ecuapp.inventary.inventory.StockBalanceRepository;
+import com.ecuapp.inventary.inventory.StockMovementRepository;
+import com.ecuapp.inventary.media.ProductImageRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class ProductService implements ProductUseCases {
- private final ProductPersistencePort products; private final CategoryRepository categories; private final StockBalanceRepository balances; private final AuditService audit;
- public ProductService(ProductPersistencePort products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit){this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;}
- @Transactional(readOnly=true) public Page<ProductDtos.View> list(String q,Pageable pageable){
-  PageQuery query=pageQuery(pageable);
-  PageResult<Product> result=(q==null||q.isBlank())?products.findAll(query):products.searchByNameOrSku(q.trim(),query);
-  return new PageImpl<>(result.content().stream().map(ProductDtos.View::from).toList(),PageRequest.of(result.page(),result.size(),pageable.getSort()),result.totalElements());
+ public static final Map<String,String> PUBLIC_SORT=Map.of("name","name","price","salePrice","createdAt","createdAt");
+ private final ProductPersistencePort products;private final CategoryRepository categories;private final StockBalanceRepository balances;private final AuditService audit;
+ private final UnitOfMeasureRepository units;private final CategoryAttributeDefinitionRepository definitions;private final AttributeSchemaValidator validator;
+ private final ProductVariantRepository variants;private final StockMovementRepository movements;private final ProductImageRepository images;
+ public ProductService(ProductPersistencePort products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit,UnitOfMeasureRepository units,
+  CategoryAttributeDefinitionRepository definitions,AttributeSchemaValidator validator,ProductVariantRepository variants,StockMovementRepository movements,ProductImageRepository images){
+  this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;this.units=units;this.definitions=definitions;this.validator=validator;
+  this.variants=variants;this.movements=movements;this.images=images;
  }
- @org.springframework.cache.annotation.Cacheable(cacheNames="publicProductList",key="#pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
- @Transactional(readOnly=true) public Page<ProductDtos.PublicView> publicList(Pageable pageable){
-  PageQuery query=pageQuery(pageable);
-  PageResult<Product> page=products.findActivePublic(query);
+
+ @Cacheable(cacheNames="publicProductList",key="'q=' + #query + '|c=' + #categoryId + '|' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
+ @Transactional(readOnly=true) public Page<ProductDtos.PublicView> publicList(String query,UUID categoryId,Pageable pageable){
+  Pageable safe=com.ecuapp.inventary.common.Pages.of(pageable,PUBLIC_SORT,Sort.by("name"));
+  PageResult<Product> page=products.findActivePublic(query,categoryId,pageQuery(safe));
   Set<UUID> available=page.content().isEmpty()?Set.of():balances.findProductIdsWithAvailableStock(page.content().stream().map(Product::getId).toList());
-  return new PageImpl<>(page.content().stream().map(product->ProductDtos.PublicView.from(product,available.contains(product.getId()))).toList(),PageRequest.of(page.page(),page.size(),pageable.getSort()),page.totalElements());
+  List<ProductDtos.PublicView> content=page.content().stream().map(product->ProductDtos.PublicView.from(product,available.contains(product.getId()))).toList();
+  return new PageImpl<>(content,PageRequest.of(page.page(),page.size(),safe.getSort()),page.totalElements());
  }
- @Transactional(readOnly=true) public ProductDtos.View get(UUID id){return ProductDtos.View.from(require(id));}
  @Transactional(readOnly=true) public ProductDtos.PublicView getPublic(String identifier){
-  Product product;
-  try { product=products.findById(UUID.fromString(identifier)).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
-  catch(IllegalArgumentException ex){ product=products.findBySku(identifier.trim()).orElseThrow(()->new ResourceNotFoundException("Producto",identifier)); }
-  if(!product.isActive()||!product.getCategory().isActive())throw new ResourceNotFoundException("Producto público",identifier);
-  boolean available=balances.findProductIdsWithAvailableStock(java.util.List.of(product.getId())).contains(product.getId());
+  Product product=resolvePublic(identifier);
+  boolean available=balances.findProductIdsWithAvailableStock(List.of(product.getId())).contains(product.getId());
   return ProductDtos.PublicView.from(product,available);
  }
- @Transactional public ProductDtos.View create(ProductDtos.WriteRequest r,String actor){
-  String sku=normalizeSku(r.sku()); if(products.existsBySku(sku))throw new ConflictException("Ya existe un producto con ese SKU.");
-  Category category=requireCategory(r.categoryId());
-  Product saved=products.save(new Product(sku,r.name().trim(),clean(r.description()),category,money(r.costPrice()),money(r.salePrice()),currency(r.currency()),clean(r.imageUrl())));
-  audit.record(actor,"PRODUCT_CREATED","PRODUCT",saved.getId(),Map.of("sku",saved.getSku(),"categoryId",category.getId().toString()));
-  return ProductDtos.View.from(saved);
+ @Transactional(readOnly=true) public ProductDtos.PublicDetailView getPublicDetail(String identifier){
+  Product product=resolvePublic(identifier);
+  boolean available=balances.findProductIdsWithAvailableStock(List.of(product.getId())).contains(product.getId());
+  List<ProductDtos.PublicVariantView> variantViews=variants.findByProductIdAndActiveTrue(product.getId()).stream()
+   .sorted(Comparator.comparing(ProductVariant::getSku))
+   .map(v->new ProductDtos.PublicVariantView(v.getSku(),v.getBarcode(),v.getOptionValues(),v.getSalePrice()==null?product.getSalePrice():v.getSalePrice())).toList();
+  List<ProductDtos.PublicImageView> imageViews=images.findByProductIdAndPublishedTrueOrderBySortOrderAsc(product.getId()).stream()
+   .map(i->new ProductDtos.PublicImageView(i.getImageUrl(),i.getAltText(),i.isPrimaryImage(),i.getSortOrder())).toList();
+  return new ProductDtos.PublicDetailView(product.getId(),product.getSku(),product.getName(),product.getDescription(),product.getCategory().getId(),
+   product.getCategory().getName(),product.getSalePrice(),product.getCurrency(),product.getImageUrl(),available,product.getAttributes(),variantViews,imageViews);
  }
- @Transactional public ProductDtos.View update(UUID id,ProductDtos.WriteRequest r,String actor){
-  Product product=require(id);
-  if(!product.getSku().equals(normalizeSku(r.sku())))throw new ConflictException("El SKU es inmutable para preservar las referencias históricas.");
-  Category category=requireCategory(r.categoryId());
-  product.update(r.name().trim(),clean(r.description()),category,money(r.costPrice()),money(r.salePrice()),currency(r.currency()),clean(r.imageUrl()));
-  audit.record(actor,"PRODUCT_UPDATED","PRODUCT",id,Map.of("sku",product.getSku(),"categoryId",category.getId().toString()));
-  return ProductDtos.View.from(product);
+ @Transactional(readOnly=true) public Page<ProductDtos.PublicCategoryView> publicCategories(Pageable pageable){
+  return categories.findByActiveTrue(com.ecuapp.inventary.common.Pages.of(pageable,Set.of("name"),Sort.by("name"))).map(ProductDtos.PublicCategoryView::from);
  }
- @Transactional public void deactivate(UUID id,String actor){Product p=require(id);p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));}
+
  @Override @Transactional(readOnly=true)
- public PageResult<ProductResult> listProducts(String query,PageQuery page){
-  PageResult<Product> result = (query == null || query.isBlank()) ? products.findAll(page) : products.searchByNameOrSku(query.trim(), page);
-  return new PageResult<>(result.content().stream().map(ProductResultMapper::from).toList(), result.page(), result.size(), result.totalElements(), result.totalPages());
+ public PageResult<ProductResult> listProducts(String query,UUID categoryId,Boolean active,ProductKind kind,PageQuery page){
+  PageResult<Product> result=products.search(query,categoryId,active,kind,page);
+  return new PageResult<>(result.content().stream().map(ProductResultMapper::from).toList(),result.page(),result.size(),result.totalElements(),result.totalPages());
  }
  @Override @Transactional(readOnly=true)
  public ProductResult getProduct(UUID id){return ProductResultMapper.from(require(id));}
- @Override @Transactional
+ @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public ProductResult createProduct(ProductCommand command,String actor){
-  ProductDtos.WriteRequest request=new ProductDtos.WriteRequest(command.sku(),command.name(),command.description(),command.categoryId(),command.costPrice(),command.salePrice(),command.currency(),command.imageUrl());
-  create(request,actor);
-  return ProductResultMapper.from(products.findBySku(normalizeSku(command.sku())).orElseThrow(()->new ResourceNotFoundException("Producto",command.sku())));
+  String sku=normalizeSku(command.sku());
+  if(products.existsBySku(sku)||variants.existsBySkuIgnoreCase(sku))throw new ConflictException("Ya existe un producto o variante con ese SKU.");
+  Category category=requireActiveCategory(command.categoryId());
+  ProductKind kind=command.kind()==null?ProductKind.STOCKED_GOOD:command.kind();
+  UnitOfMeasure unit=requireActiveUnit(command.unitOfMeasureId()==null?UnitOfMeasure.DEFAULT_UNIT_ID:command.unitOfMeasureId());
+  List<CategoryAttributeDefinition> schema=definitions.findByCategoryIdAndActiveTrueOrderByAttributeKeyAsc(category.getId());
+  Map<String,Object> attributes=validator.validateValues(command.attributes(),schema,true);
+  Product product=new Product(sku,command.name().trim(),clean(command.description()),category,money(command.costPrice()),money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
+  product.configureClassification(kind,unit.getId(),attributes,schemaVersion(category.getId(),schema));
+  Product saved=products.save(product);
+  audit.record(actor,"PRODUCT_CREATED","PRODUCT",saved.getId(),Map.of("sku",saved.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
+  return ProductResultMapper.from(saved);
  }
- @Override @Transactional
+ @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public ProductResult updateProduct(UUID id,ProductCommand command,String actor){
-  ProductDtos.WriteRequest request=new ProductDtos.WriteRequest(command.sku(),command.name(),command.description(),command.categoryId(),command.costPrice(),command.salePrice(),command.currency(),command.imageUrl());
-  update(id,request,actor);
-  return ProductResultMapper.from(require(id));
+  Product product=require(id);
+  if(!product.getSku().equalsIgnoreCase(normalizeSku(command.sku())))throw new ConflictException("El SKU es inmutable para preservar las referencias históricas.");
+  Category category=requireActiveCategory(command.categoryId());
+  ProductKind kind=command.kind()==null?product.getKind():command.kind();
+  if(kind!=product.getKind()&&product.getKind()==ProductKind.STOCKED_GOOD&&balances.hasPhysicalStock(product.getId()))
+   throw new ConflictException("No se puede cambiar el tipo de un producto con existencias o reservas.");
+  UUID unitId=command.unitOfMeasureId()==null?product.getUnitOfMeasureId():command.unitOfMeasureId();
+  if(!unitId.equals(product.getUnitOfMeasureId())&&movements.existsByProductId(product.getId()))
+   throw new ConflictException("No se puede cambiar la unidad de medida de un producto con movimientos registrados.");
+  requireActiveUnit(unitId);
+  List<CategoryAttributeDefinition> schema=definitions.findByCategoryIdAndActiveTrueOrderByAttributeKeyAsc(category.getId());
+  Map<String,Object> attributes=validator.validateValues(command.attributes()==null?product.getAttributes():command.attributes(),schema,true);
+  product.update(command.name().trim(),clean(command.description()),category,money(command.costPrice()),money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
+  product.configureClassification(kind,unitId,attributes,schemaVersion(category.getId(),schema));
+  audit.record(actor,"PRODUCT_UPDATED","PRODUCT",id,Map.of("sku",product.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
+  return ProductResultMapper.from(product);
  }
- @Override
- public void deactivateProduct(UUID id,String actor){deactivate(id,actor);}
- private PageQuery pageQuery(Pageable pageable){return new PageQuery(pageable.getPageNumber(),pageable.getPageSize(),pageable.getSort().stream().map(order -> new PageQuery.SortTerm(order.getProperty(),order.isDescending()?PageQuery.Direction.DESC:PageQuery.Direction.ASC)).toList());}
+ @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
+ public void deactivateProduct(UUID id,String actor){
+  Product p=require(id);
+  if(!p.isActive())return;
+  p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));
+ }
+ @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
+ public void activateProduct(UUID id,String actor){
+  Product p=require(id);
+  if(p.isActive())return;
+  if(!p.getCategory().isActive())throw new ConflictException("Active primero la categoría del producto.");
+  p.activate();audit.record(actor,"PRODUCT_ACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));
+ }
+ private Product resolvePublic(String identifier){
+  if(identifier==null||identifier.isBlank()||identifier.length()>128)throw new ResourceNotFoundException("Producto",identifier);
+  String value=identifier.trim();
+  Optional<Product> product;
+  try{product=products.findById(UUID.fromString(value));}
+  catch(IllegalArgumentException ex){
+   product=products.findBySku(value);
+   if(product.isEmpty())product=variants.findFirstBySkuIgnoreCaseAndActiveTrue(value).map(ProductVariant::getProduct);
+   if(product.isEmpty())product=variants.findFirstByBarcodeAndActiveTrue(value).map(ProductVariant::getProduct);
+  }
+  Product found=product.orElseThrow(()->new ResourceNotFoundException("Producto",value));
+  if(!found.isActive()||!found.getCategory().isActive())throw new ResourceNotFoundException("Producto público",value);
+  return found;
+ }
+ private int schemaVersion(UUID categoryId,List<CategoryAttributeDefinition> schema){
+  if(!schema.isEmpty())return schema.get(0).getSchemaVersion();
+  return Math.max(1,definitions.maxSchemaVersion(categoryId));
+ }
+ private PageQuery pageQuery(Pageable pageable){
+  return new PageQuery(pageable.getPageNumber(),pageable.getPageSize(),pageable.getSort().stream().map(order->new PageQuery.SortTerm(order.getProperty(),order.isDescending()?PageQuery.Direction.DESC:PageQuery.Direction.ASC)).toList());
+ }
  private Product require(UUID id){return products.findById(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));}
- private Category requireCategory(UUID id){Category c=categories.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
- private String normalizeSku(String sku){return sku.trim().toUpperCase(Locale.ROOT);}
+ private Category requireActiveCategory(UUID id){Category c=categories.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
+ private UnitOfMeasure requireActiveUnit(UUID id){
+  UnitOfMeasure unit=units.findById(id).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",id));
+  if(!unit.isActive())throw new BusinessRuleException("La unidad de medida está inactiva.");
+  return unit;
+ }
+ private String normalizeSku(String sku){
+  if(sku==null||sku.isBlank())throw new InvalidQueryException("El SKU es obligatorio.");
+  return sku.trim().toUpperCase(Locale.ROOT);
+ }
  private String currency(String c){return c==null||c.isBlank()?"USD":c.trim().toUpperCase(Locale.ROOT);}
  private BigDecimal money(BigDecimal v){return v.setScale(2,RoundingMode.UNNECESSARY);}
  private String clean(String v){return v==null||v.isBlank()?null:v.trim();}

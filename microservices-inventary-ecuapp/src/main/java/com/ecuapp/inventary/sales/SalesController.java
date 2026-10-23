@@ -15,7 +15,11 @@ public class SalesController {
  private final SaleService service;
  public SalesController(SaleService service){this.service=service;}
  @GetMapping @PreAuthorize("hasAuthority('sales:read')")
- public Page<SaleDtos.View> list(@PageableDefault(size=20,sort="soldAt,desc") Pageable p){return service.list(p);}
+ public Page<SaleDtos.View> list(@RequestParam(required=false) SaleStatus status,@RequestParam(required=false) UUID warehouseId,
+  @RequestParam(required=false) UUID customerId,@RequestParam(required=false) SaleChannel channel,
+  @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant from,
+  @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant to,
+  @PageableDefault(size=20) Pageable p){return service.list(status,warehouseId,customerId,channel,from,to,p);}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")

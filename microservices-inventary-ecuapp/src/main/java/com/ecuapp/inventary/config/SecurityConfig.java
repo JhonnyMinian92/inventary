@@ -16,6 +16,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
@@ -28,6 +29,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import jakarta.servlet.DispatcherType;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
@@ -52,7 +54,7 @@ public class SecurityConfig {
  private Converter<Jwt,AbstractAuthenticationToken> jwtAuthenticationConverter(AppUserRepository users,AppRoleRepository roles){
   return jwt->{
    AppUser user=users.findByUsername(jwt.getSubject()).filter(AppUser::isActive).orElseThrow(()->new BadCredentialsException("La sesión ya no es válida."));
-   Integer version=jwt.getClaimAsInt("ver");if(version==null||version!=user.getTokenVersion())throw new BadCredentialsException("La sesión ya no es válida.");
+   Object claim=jwt.getClaim("ver");if(!(claim instanceof Number version)||version.longValue()!=user.getTokenVersion())throw new BadCredentialsException("La sesión ya no es válida.");
    String role=user.getRole();
    roles.findByCodeAndActiveTrue(role).orElseThrow(()->new BadCredentialsException("La sesión ya no es válida."));
    var authorities=new java.util.LinkedHashSet<SimpleGrantedAuthority>();authorities.add(new SimpleGrantedAuthority("ROLE_"+role));
@@ -76,18 +78,22 @@ public class SecurityConfig {
     .referrerPolicy(r->r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
     .httpStrictTransportSecurity(hsts->hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
    .authorizeHttpRequests(auth->auth
+    .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
     .requestMatchers(HttpMethod.OPTIONS,"/**").permitAll()
     .requestMatchers(HttpMethod.GET,"/actuator/health","/actuator/health/**").permitAll()
     .requestMatchers("/actuator/info").hasAuthority("technical:read")
+    .requestMatchers("/actuator/metrics","/actuator/metrics/**").hasAnyAuthority("technical:read","operations:manage")
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
     .requestMatchers("/api/v1/auth/**").authenticated()
     .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()
-    .requestMatchers("/api/v1/admin/outbox-events/**").hasAuthority("outbox:manage")
     .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
     .requestMatchers("/api/v1/audit-events/**").hasAuthority("audit:read")
+    .requestMatchers("/api/v1/operations/**").hasAuthority("operations:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/reports/**").hasAuthority("reports:financial")
+    .requestMatchers(HttpMethod.GET,"/api/v1/costing/**").hasAnyAuthority("reports:financial","costing:manage")
+    .requestMatchers("/api/v1/costing/**").hasAuthority("costing:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/catalog/**").hasAuthority("catalog:read")
     .requestMatchers("/api/v1/catalog/**").hasAuthority("catalog:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/inventory/**","/api/v1/warehouses/**").hasAuthority("inventory:read")
@@ -96,16 +102,19 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.POST,"/api/v1/purchase-orders/*/approve").hasAuthority("purchasing:approve")
     .requestMatchers("/api/v1/purchase-orders/**","/api/v1/goods-receipts/**","/api/v1/purchase-returns/**").hasAuthority("purchasing:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/suppliers/**").hasAuthority("purchasing:read")
-    .requestMatchers(HttpMethod.GET,"/api/v1/customers/**","/api/v1/partners/**").hasAuthority("partners:read")
+    .requestMatchers(HttpMethod.GET,"/api/v1/customers/**").hasAuthority("partners:read")
     .requestMatchers("/api/v1/customers/**").hasAuthority("customers:manage")
-    .requestMatchers("/api/v1/suppliers/**","/api/v1/partners/**").hasAuthority("partners:manage")
+    .requestMatchers("/api/v1/suppliers/**").hasAuthority("partners:manage")
     .requestMatchers(HttpMethod.POST,"/api/v1/sales/*/approve-cancellation").hasAuthority("sales:cancel")
     .requestMatchers(HttpMethod.POST,"/api/v1/sales/*/request-cancellation").hasAuthority("sales:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:read")
     .requestMatchers("/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:manage")
+    .requestMatchers(HttpMethod.GET,"/api/v1/whatsapp-orders/**").hasAuthority("sales:read")
+    .requestMatchers("/api/v1/whatsapp-orders/**").hasAuthority("sales:manage")
     .requestMatchers("/graphql").hasAuthority("catalog:read").anyRequest().denyAll())
    .exceptionHandling(errors->errors.authenticationEntryPoint(apiProblems).accessDeniedHandler(apiProblems))
-   .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users,roles))))
+   .oauth2ResourceServer(oauth->oauth.authenticationEntryPoint(apiProblems).accessDeniedHandler(apiProblems)
+    .jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users,roles))))
    .addFilterAfter(new AuthenticatedActorCaptureFilter(), BearerTokenAuthenticationFilter.class);
   return http.build();
  }

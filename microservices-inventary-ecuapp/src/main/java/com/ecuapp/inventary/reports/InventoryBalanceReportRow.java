@@ -3,7 +3,10 @@ package com.ecuapp.inventary.reports;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Operational stock, purchase and sales totals for one product in one warehouse. */
+/**
+ * Stock, purchase and sales totals for one product in one warehouse, plus inventory value at the period
+ * boundaries and the cost of goods sold taken from the valuation ledger (FIFO or moving average).
+ */
 public record InventoryBalanceReportRow(
         UUID productId,
         String sku,
@@ -17,5 +20,9 @@ public record InventoryBalanceReportRow(
         BigDecimal closingStock,
         BigDecimal currentStock,
         BigDecimal currentReserved,
-        BigDecimal currentAvailable) {
+        BigDecimal currentAvailable,
+        BigDecimal openingValue,
+        BigDecimal closingValue,
+        BigDecimal costOfSales,
+        BigDecimal grossProfit) {
 }

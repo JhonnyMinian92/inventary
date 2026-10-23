@@ -6,6 +6,8 @@ Esta carpeta es la especificación de referencia para diseñar e implementar el 
 
 ## Estado comprobado del repositorio
 
+**Actualización 2026-10-23 (P13):** el backend compila, migra (Flyway V1–V14) y pasa 76 pruebas contra PostgreSQL real, y las 138 operaciones REST se probaron por HTTP contra la base `inventary`. Evidencia, estado de cada hallazgo de la auditoría y exclusiones: [Resultado de la auditoría](RESULTADO_AUDITORIA_EJECUCION.md). Operación: [23 — Runbook](23-runbook-operacion.md). Los párrafos siguientes describen el estado previo a esa validación.
+
 El backend ya contiene una aplicación Spring Boot con endpoints REST, servicios, entidades JPA, repositorios, migraciones Flyway y configuración de seguridad. La arquitectura se está migrando gradualmente hacia un monolito modular con límites hexagonales; no todos los módulos históricos están migrados todavía.
 
 La entrega P03 establece una primera rebanada vertical en catálogo de productos: puerto de entrada de casos de uso, comandos/resultados de aplicación, puerto de persistencia, adaptador JPA, DTOs HTTP y errores RFC 9457. El alcance exacto y el límite pendiente del modelo JPA se describen en [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md). Las pruebas y la compilación no se ejecutaron y quedan para la fase final.
@@ -33,8 +35,11 @@ La entrega P03 establece una primera rebanada vertical en catálogo de productos
 | [17 — Implementación P07: inventario operativo](17-implementacion-p07-inventario-operativo.md) | Conteos físicos, diferencias, ajustes transaccionales, idempotencia, trazabilidad y ledger append-only. |
 | [18 — Implementación P08: compras y recepciones parciales](18-implementacion-p08-compras-y-recepciones.md) | Proveedores, órdenes de compra idempotentes, estados, recepciones parciales y movimientos de entrada trazables. |
 | [19 — Implementación P09: devoluciones y anulaciones aprobadas](19-implementacion-p09-devoluciones-y-anulaciones.md) | Devoluciones idempotentes de compra/venta, trazabilidad de ledger y solicitud/aprobación segregadas de cancelaciones. |
-| [20 — Implementación P10: transferencias consistentes](20-implementacion-p10-transferencias-consistentes.md) | Transiciones idempotentes, compensación de cancelación, reversión bilateral, bloqueo estable, auditoría y Outbox. |\n| [21 — Implementación P11: auditoría, documentación y API](21-implementacion-p11-auditoria-documentacion-api.md) | Auditoría de fallos HTTP, filtros de consulta, errores RFC 9457 y contrato OpenAPI. |
+| [20 — Implementación P10: transferencias consistentes](20-implementacion-p10-transferencias-consistentes.md) | Transiciones idempotentes, compensación de cancelación, reversión bilateral, bloqueo estable, auditoría y Outbox. |
+| [21 — Implementación P11: auditoría, documentación y API](21-implementacion-p11-auditoria-documentacion-api.md) | Auditoría de fallos HTTP, filtros de consulta, errores RFC 9457 y contrato OpenAPI. |
 | [22 — P12: integración del código y entrega](22-entrega-p12-integracion-codigo.md) | Rama de integración, Docker/PostgreSQL, CI manual y lista de entrega pendiente de validación. |
+| [23 — Runbook de operación](23-runbook-operacion.md) | Variables, despliegue, rollback, respaldos, Outbox, métricas, rate limit e idempotencia por comando. |
+| [Resultado de la auditoría](RESULTADO_AUDITORIA_EJECUCION.md) | Comandos ejecutados, pruebas, cobertura de APIs, matriz RBAC, estado de cada hallazgo y exclusiones. |
 
 ## Convenciones
 

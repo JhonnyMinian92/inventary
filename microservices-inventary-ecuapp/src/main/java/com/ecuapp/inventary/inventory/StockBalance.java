@@ -33,6 +33,12 @@ public class StockBalance {
   if(reserved.compareTo(quantity)<0)throw new BusinessRuleException("La cantidad a liberar supera la reserva existente.");
   reserved=reserved.subtract(quantity).setScale(3);
  }
+ /** Converts an active reservation into a physical issue: both reserved and on-hand decrease by the same amount. */
+ public void consumeReservation(BigDecimal quantity){
+  if(quantity==null||quantity.signum()<=0)throw new BusinessRuleException("La cantidad debe ser mayor que cero.");
+  if(reserved.compareTo(quantity)<0||onHand.compareTo(quantity)<0)throw new BusinessRuleException("La reserva no cubre la cantidad a despachar.");
+  reserved=reserved.subtract(quantity).setScale(3);onHand=onHand.subtract(quantity).setScale(3);
+ }
  public void increase(BigDecimal quantity){if(quantity==null||quantity.signum()<=0)throw new BusinessRuleException("La cantidad debe ser mayor que cero.");onHand=onHand.add(quantity).setScale(3);}
  public void decrease(BigDecimal quantity){if(quantity==null||quantity.signum()<=0)throw new BusinessRuleException("La cantidad debe ser mayor que cero.");if(available().compareTo(quantity)<0)throw new BusinessRuleException("Stock insuficiente: la operación no puede dejar existencias negativas ni consumir stock reservado.");onHand=onHand.subtract(quantity).setScale(3);}
  public BigDecimal available(){return onHand.subtract(reserved).setScale(3);}

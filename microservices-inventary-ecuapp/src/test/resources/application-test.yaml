@@ -1,0 +1,31 @@
+# Test profile: real PostgreSQL (never H2) so JSONB, ON CONFLICT, row locks and ledger triggers are exercised.
+# Point TEST_DATASOURCE_URL to an isolated database; Flyway migrates it on startup and data is never cleaned.
+spring:
+  datasource:
+    url: ${TEST_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inventary_test}
+    username: ${TEST_DB_USERNAME:${DB_USERNAME:postgres}}
+    password: ${TEST_DB_PASSWORD:${DB_PASSWORD:postgres}}
+    hikari:
+      maximum-pool-size: 20
+app:
+  security:
+    jwt-secret: test-only-jwt-secret-with-more-than-32-bytes!!
+    allowed-origins: http://localhost:4200
+    max-request-body-bytes: 65536
+  rate-limit:
+    login-per-minute: 5
+    whatsapp-per-minute: 100000
+    public-per-minute: 100000
+  integrations:
+    whatsapp:
+      api-key: test-integration-key-0123456789-abcdefghij
+      expiry-check-ms: 3600000
+  bootstrap-admin:
+    username: bootstrap.root
+    password: Test-Only-Bootstrap-Passw0rd!
+springdoc:
+  api-docs.enabled: true
+logging:
+  level:
+    root: WARN
+    com.ecuapp.inventary: INFO

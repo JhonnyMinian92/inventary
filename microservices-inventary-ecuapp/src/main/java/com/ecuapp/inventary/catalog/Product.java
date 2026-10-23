@@ -38,6 +38,7 @@ public class Product {
   this.name=name;this.description=description;this.category=category;this.costPrice=costPrice;this.salePrice=salePrice;this.currency=currency;this.imageUrl=imageUrl;
  }
  public void deactivate(){active=false;}
+ public void activate(){active=true;}
  public ProductKind getKind(){return kind;} public UUID getUnitOfMeasureId(){return unitOfMeasureId;} public Map<String,Object> getAttributes(){return attributes;} public int getAttributeSchemaVersion(){return attributeSchemaVersion;}
  public void configureClassification(ProductKind kind,UUID unitOfMeasureId,Map<String,Object> attributes,int schemaVersion){
   if(kind==null)throw new IllegalArgumentException("El tipo de producto es obligatorio.");

@@ -11,12 +11,12 @@ public class ReorderController {
  private final ReorderService service;
  public ReorderController(ReorderService service){this.service=service;}
  @GetMapping("/reorder-rules") @PreAuthorize("hasAnyAuthority('inventory:manage','audit:read')")
- public List<ReorderDtos.View> list(){return service.list();}
- @PostMapping("/reorder-rules") @PreAuthorize("hasAuthority('inventory:manage')")
+ public List<ReorderDtos.View> list(@RequestParam(required=false) UUID warehouseId,@RequestParam(required=false) Boolean active){return service.list(warehouseId,active);}
+ @PostMapping("/reorder-rules") @ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public ReorderDtos.View create(@Valid @RequestBody ReorderDtos.WriteRequest r,Authentication a){return service.create(r,a.getName());}
  @PutMapping("/reorder-rules/{id}") @PreAuthorize("hasAuthority('inventory:manage')")
  public ReorderDtos.View update(@PathVariable UUID id,@Valid @RequestBody ReorderDtos.WriteRequest r,Authentication a){return service.update(id,r,a.getName());}
- @PostMapping("/reorder-rules/{id}/deactivate") @PreAuthorize("hasAuthority('inventory:manage')")
+ @PostMapping("/reorder-rules/{id}/deactivate") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('inventory:manage')")
  public void deactivate(@PathVariable UUID id,Authentication a){service.deactivate(id,a.getName());}
  @GetMapping("/replenishment-suggestions") @PreAuthorize("hasAnyAuthority('inventory:manage','audit:read')")
  public List<ReorderDtos.Suggestion> suggestions(){return service.suggestions();}

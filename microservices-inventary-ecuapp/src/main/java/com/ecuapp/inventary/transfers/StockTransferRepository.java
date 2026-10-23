@@ -14,6 +14,13 @@ public interface StockTransferRepository extends JpaRepository<StockTransfer,UUI
  @EntityGraph(attributePaths={"sourceWarehouse","destinationWarehouse","lines","lines.product"})
  @Query("select distinct t from StockTransfer t where t.id=:id")
  Optional<StockTransfer> findDetailedById(@Param("id") UUID id);
- @Override @EntityGraph(attributePaths={"sourceWarehouse","destinationWarehouse"})
- Page<StockTransfer> findAll(Pageable pageable);
+ @EntityGraph(attributePaths={"sourceWarehouse","destinationWarehouse"})
+ @Query("""
+  select t from StockTransfer t
+  where (:status is null or t.status=:status)
+  and (:sourceWarehouseId is null or t.sourceWarehouse.id=:sourceWarehouseId)
+  and (:destinationWarehouseId is null or t.destinationWarehouse.id=:destinationWarehouseId)
+  """)
+ Page<StockTransfer> search(@Param("status") TransferStatus status,@Param("sourceWarehouseId") UUID sourceWarehouseId,
+  @Param("destinationWarehouseId") UUID destinationWarehouseId,Pageable pageable);
 }

@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.catalog.application.port.out;
 
 import com.ecuapp.inventary.catalog.Product;
+import com.ecuapp.inventary.catalog.ProductKind;
 import com.ecuapp.inventary.catalog.application.PageQuery;
 import com.ecuapp.inventary.catalog.application.PageResult;
 
@@ -13,9 +14,8 @@ import java.util.UUID;
  * documented as a follow-up migration rather than hidden by this port.
  */
 public interface ProductPersistencePort {
-    PageResult<Product> findAll(PageQuery page);
-    PageResult<Product> searchByNameOrSku(String query, PageQuery page);
-    PageResult<Product> findActivePublic(PageQuery page);
+    PageResult<Product> search(String query, UUID categoryId, Boolean active, ProductKind kind, PageQuery page);
+    PageResult<Product> findActivePublic(String query, UUID categoryId, PageQuery page);
     Optional<Product> findById(UUID id);
     Optional<Product> findBySku(String sku);
     boolean existsBySku(String sku);

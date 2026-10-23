@@ -1,5 +1,13 @@
 # 05 — Catálogo de APIs REST y contrato
 
+> **Implementado (P13, 2026-10-23).** Las rutas vigentes son las de la tabla "API implementada" del `README.md` y el OpenAPI generado (138 operaciones REST, todas probadas). Este documento conserva el diseño de referencia; algunas rutas propuestas se implementaron con otra forma:
+> - Usuarios y roles bajo `/api/v1/admin/**`; activación/desactivación de usuario mediante `PATCH /admin/users/{id}`.
+> - Edición con `PUT` (reemplazo validado) en lugar de `PATCH` en categorías, productos, almacenes, clientes y proveedores; variantes aceptan `PUT` y `PATCH`.
+> - Ventas como comando atómico `POST /api/v1/sales` (no hay borrador `sales-orders`); recepciones contabilizadas al crearse (no hay borrador de recepción).
+> - Ajustes de inventario contabilizados al crearse; la segregación se aplica a conteos (snapshot), compras y cancelación de ventas.
+> - Implementados: `GET/PUT /catalog/categories/{id}/attributes`, `/catalog/units`, `/catalog/unit-conversions`, variantes, `/warehouses/{id}/locations`, `/inventory/availability`, `/inventory/movements/{id}`, `/costing/policy`, `/reports/{inventory-balance,valuation,sales,purchases,kardex,low-stock}`, `/audit-events/{id}`, `/auth/logout`, `/auth/me/password`, `/public/catalog/products/{identifier}`, `/public/catalog/categories`, `/whatsapp-orders` y `/operations/outbox`.
+> - No implementados por exclusión de alcance: refresh token, código de barras como recurso separado (se gestiona en la variante), aprobación de transferencias, edición de órdenes en borrador, `reports/stock` y `reports/movements` (cubiertos por `inventory/balances`, `reports/valuation` y `reports/kardex`).
+
 ## 1. Convenciones del contrato
 
 - Base path: `/api/v1`.
@@ -309,12 +317,3 @@ Parámetros opcionales:
 Cada fila contiene existencias de apertura y cierre estimadas desde el saldo vigente y el ledger de movimientos, compras netas recibidas y su importe, ventas netas y su importe, y existencias actuales/reservadas/disponibles. La compra se reconoce cuando se contabiliza la recepción, no al crear una orden. Las devoluciones a proveedores reducen compras; cancelaciones aprobadas y devoluciones de clientes reducen ventas en la fecha en que se registran. Las reservas y liberaciones no alteran existencias físicas.
 
 **Alcance financiero:** los importes son agregados operativos por producto; no constituyen un balance contable/fiscal completo ni calculan utilidad neta. La valoración histórica FIFO/promedio debe estar integrada y verificada antes de presentar el costo de inventario o el margen como cifras contables definitivas.
-
-
-## Operación del Outbox
-
-- El publicador reclama eventos en un lote pequeño usando `FOR UPDATE SKIP LOCKED`, marca un lease y cierra la transacción antes de publicar en Kafka.
-- Los estados `PROCESSING` con lease vencido vuelven a ser reclamables después de una caída.
-- La entrega es **al menos una vez**: el consumidor debe deduplicar por `eventId`. Un envío aceptado por Kafka seguido de un fallo al guardar el acuse en PostgreSQL puede reenviarse tras vencer el lease.
-- `POST /api/v1/admin/outbox-events/{id}/redrive` permite reactivar manualmente un evento `FAILED`. Solo la autoridad `outbox:manage` (asignada a `SUPER_ADMIN` por V15) puede realizarlo; la operación queda auditada. Eventos pendientes o ya publicados responden conflicto.
-- El lease actual es de 10 minutos y el publicador espera hasta 5 segundos por evento. Para lotes mayores o publicaciones potencialmente lentas hay que revisar el lease y el tamaño del lote.

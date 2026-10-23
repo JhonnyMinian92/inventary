@@ -20,6 +20,7 @@ public class Warehouse {
  @PreUpdate void onUpdate(){updatedAt=Instant.now();}
  public void update(String name,String address){this.name=name;this.address=address;}
  public void deactivate(){active=false;}
+ public void activate(){active=true;}
  public UUID getId(){return id;} public String getCode(){return code;} public String getName(){return name;}
  public String getAddress(){return address;} public boolean isActive(){return active;}
  public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}

@@ -1,10 +1,11 @@
 package com.ecuapp.inventary.audit;
 
+import com.ecuapp.inventary.common.InvalidQueryException;
+import com.ecuapp.inventary.common.TimeRange;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,15 +25,15 @@ class AuditControllerTest {
 
     @Test
     void clampsPageSizeAndUsesNewestFirstOrdering() {
-        when(repository.search(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+        when(repository.search(isNull(), isNull(), isNull(), isNull(), any(Instant.class), any(Instant.class), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of()));
         AuditController controller = new AuditController(repository);
 
         controller.list(null, null, null, null, null, null,
             PageRequest.of(0, 500, Sort.by(Sort.Direction.ASC, "actor")));
 
-        verify(repository).search(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
-            PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "occurredAt")));
+        verify(repository).search(isNull(), isNull(), isNull(), isNull(), eq(TimeRange.MIN), eq(TimeRange.MAX),
+            eq(PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "occurredAt"))));
     }
 
     @Test
@@ -41,7 +42,7 @@ class AuditControllerTest {
         Instant from = Instant.parse("2026-10-02T00:00:00Z");
         Instant to = Instant.parse("2026-10-01T00:00:00Z");
 
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(InvalidQueryException.class,
             () -> controller.list(null, null, null, null, from, to, PageRequest.of(0, 20)));
         verifyNoInteractions(repository);
     }

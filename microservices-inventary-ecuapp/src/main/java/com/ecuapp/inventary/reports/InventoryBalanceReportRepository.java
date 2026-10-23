@@ -4,8 +4,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
@@ -13,6 +12,18 @@ import java.util.UUID;
 
 @Repository
 public class InventoryBalanceReportRepository {
+    static final String INBOUND_TYPES = "'ADJUSTMENT_IN','RECEIPT','RETURN_IN','TRANSFER_IN','SALE_CANCEL_IN'";
+    static final String OUTBOUND_TYPES = "'ADJUSTMENT_OUT','SALE','RETURN_OUT','TRANSFER_OUT'";
+    /** Cost of goods sold: sales minus approved cancellations and customer returns (scrapped returns net to zero). */
+    static final String COGS_EXPRESSION = """
+        CASE
+          WHEN sm.movement_type = 'SALE' THEN e.total_cost
+          WHEN sm.movement_type = 'SALE_CANCEL_IN' THEN -e.total_cost
+          WHEN sm.movement_type = 'RETURN_IN' AND sm.reference_type = 'SALES_RETURN' THEN -e.total_cost
+          WHEN sm.movement_type = 'RETURN_OUT' AND sm.reference_type = 'SALES_RETURN' THEN e.total_cost
+          ELSE 0
+        END""";
+
     private static final String DATA_SQL = """
         WITH movement_delta AS (
           SELECT m.product_id,
@@ -21,8 +32,8 @@ public class InventoryBalanceReportRepository {
           FROM (
             SELECT product_id, occurred_at,
               CASE
-                WHEN movement_type IN ('ADJUSTMENT_IN','RECEIPT','RETURN_IN','TRANSFER_IN','SALE_CANCEL_IN') THEN quantity
-                WHEN movement_type IN ('ADJUSTMENT_OUT','SALE','RETURN_OUT','TRANSFER_OUT') THEN -quantity
+                WHEN movement_type IN (%1$s) THEN quantity
+                WHEN movement_type IN (%2$s) THEN -quantity
                 ELSE 0
               END AS signed_quantity
             FROM stock_movement
@@ -31,6 +42,20 @@ public class InventoryBalanceReportRepository {
               AND (CAST(:productId AS UUID) IS NULL OR product_id = CAST(:productId AS UUID))
           ) m
           GROUP BY m.product_id
+        ),
+        valuation AS (
+          SELECT sm.product_id,
+            COALESCE(SUM(CASE WHEN sm.occurred_at < :fromInclusive THEN
+              CASE WHEN sm.movement_type IN (%1$s) THEN e.total_cost WHEN sm.movement_type IN (%2$s) THEN -e.total_cost ELSE 0 END
+              ELSE 0 END), 0) AS opening_value,
+            COALESCE(SUM(
+              CASE WHEN sm.movement_type IN (%1$s) THEN e.total_cost WHEN sm.movement_type IN (%2$s) THEN -e.total_cost ELSE 0 END), 0) AS closing_value,
+            COALESCE(SUM(CASE WHEN sm.occurred_at >= :fromInclusive THEN %3$s ELSE 0 END), 0) AS cost_of_sales
+          FROM inventory_valuation_entry e
+          JOIN stock_movement sm ON sm.id = e.stock_movement_id
+          WHERE sm.warehouse_id = :warehouseId AND sm.occurred_at < :toExclusive
+            AND (CAST(:productId AS UUID) IS NULL OR sm.product_id = CAST(:productId AS UUID))
+          GROUP BY sm.product_id
         ),
         purchase_events AS (
           SELECT grl.product_id, grl.quantity AS quantity, grl.line_total AS amount
@@ -86,17 +111,22 @@ public class InventoryBalanceReportRepository {
           (COALESCE(sb.on_hand, 0) - COALESCE(md.after_net, 0)) AS closing_stock,
           COALESCE(sb.on_hand, 0) AS current_stock,
           COALESCE(sb.reserved, 0) AS current_reserved,
-          (COALESCE(sb.on_hand, 0) - COALESCE(sb.reserved, 0)) AS current_available
+          (COALESCE(sb.on_hand, 0) - COALESCE(sb.reserved, 0)) AS current_available,
+          ROUND(COALESCE(v.opening_value, 0), 2) AS opening_value,
+          ROUND(COALESCE(v.closing_value, 0), 2) AS closing_value,
+          ROUND(COALESCE(v.cost_of_sales, 0), 2) AS cost_of_sales,
+          ROUND(COALESCE(sa.amount, 0) - COALESCE(v.cost_of_sales, 0), 2) AS gross_profit
         FROM product p
         LEFT JOIN stock_balance sb ON sb.product_id = p.id AND sb.warehouse_id = :warehouseId
         LEFT JOIN movement_delta md ON md.product_id = p.id
+        LEFT JOIN valuation v ON v.product_id = p.id
         LEFT JOIN purchases pur ON pur.product_id = p.id
         LEFT JOIN sales sa ON sa.product_id = p.id
         WHERE (sb.id IS NOT NULL OR md.product_id IS NOT NULL)
           AND (CAST(:productId AS UUID) IS NULL OR p.id = CAST(:productId AS UUID))
         ORDER BY p.sku ASC
         LIMIT :limit OFFSET :offset
-        """;
+        """.formatted(INBOUND_TYPES, OUTBOUND_TYPES, COGS_EXPRESSION);
 
     private static final String COUNT_SQL = """
         SELECT COUNT(*) FROM (
@@ -132,7 +162,11 @@ public class InventoryBalanceReportRepository {
                 rs.getBigDecimal("closing_stock"),
                 rs.getBigDecimal("current_stock"),
                 rs.getBigDecimal("current_reserved"),
-                rs.getBigDecimal("current_available")));
+                rs.getBigDecimal("current_available"),
+                rs.getBigDecimal("opening_value"),
+                rs.getBigDecimal("closing_value"),
+                rs.getBigDecimal("cost_of_sales"),
+                rs.getBigDecimal("gross_profit")));
     }
 
     public long count(UUID warehouseId, UUID productId, Instant fromInclusive, Instant now) {
@@ -142,13 +176,13 @@ public class InventoryBalanceReportRepository {
         return total == null ? 0L : total;
     }
 
-    private MapSqlParameterSource parameters(UUID warehouseId, UUID productId, Instant fromInclusive,
-                                              Instant toExclusive, Instant now) {
+    static MapSqlParameterSource parameters(UUID warehouseId, UUID productId, Instant fromInclusive,
+                                            Instant toExclusive, Instant now) {
         return new MapSqlParameterSource()
                 .addValue("warehouseId", warehouseId)
                 .addValue("productId", productId, Types.OTHER)
-                .addValue("fromInclusive", OffsetDateTime.ofInstant(fromInclusive, ZoneOffset.UTC))
-                .addValue("toExclusive", OffsetDateTime.ofInstant(toExclusive, ZoneOffset.UTC))
-                .addValue("now", OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+                .addValue("fromInclusive", Timestamp.from(fromInclusive))
+                .addValue("toExclusive", Timestamp.from(toExclusive))
+                .addValue("now", Timestamp.from(now));
     }
 }

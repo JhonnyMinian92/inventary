@@ -34,6 +34,7 @@ public class SaleService {
  private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;
  private final BusinessPartnerRepository partners;private final IdempotencyRecordRepository idempotencyRecords;
  private final UnitOfMeasureRepository units;private final InventoryCostingService costing;
+ private static final Set<String> SORT=Set.of("soldAt","saleNumber","total","status");
  public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,
   SalesReturnLineRepository returnLines,BusinessPartnerRepository partners,IdempotencyRecordRepository idempotencyRecords,
@@ -42,8 +43,9 @@ public class SaleService {
   this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;this.partners=partners;
   this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;
  }
- @Transactional(readOnly=true) public Page<SaleDtos.View> list(Pageable p){
-  return sales.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(SaleDtos.View::from);
+ @Transactional(readOnly=true) public Page<SaleDtos.View> list(SaleStatus status,UUID warehouseId,UUID customerId,SaleChannel channel,java.time.Instant from,java.time.Instant to,Pageable p){
+  if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
+  return sales.search(status,warehouseId,customerId,channel,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"soldAt"))).map(SaleDtos.View::from);
  }
  @Transactional(readOnly=true) public SaleDtos.View get(UUID id){
   return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id)));
@@ -150,13 +152,13 @@ public class SaleService {
    SaleItem item=itemsByProduct.get(line.product().getId());
    String movementKey="SALE-"+sha256(key).substring(0,32)+"-"+line.product().getId();
    String movementHash=sha256(sale.getId()+"|"+item.getId()+"|"+line.product().getId()+"|"+line.quantity().toPlainString());
-   BigDecimal unitCost=costing.currentIssueUnitCost(line.product(),line.balance().getLocation(),line.quantity(),line.product().getCostPrice());
+   // The cost of goods sold comes from the valuation policy (FIFO layers or moving average), never from the catalog.
+   InventoryCostingService.Valuation valuation=costing.outbound(line.product(),line.balance().getLocation(),line.quantity());
    StockMovement movement=new StockMovement(line.product(),warehouse,MovementType.SALE,line.quantity(),
-    unitCost,"SALE",sale.getId(),movementKey,movementHash,
+    valuation.movementUnitCost(),"SALE",sale.getId(),movementKey,movementHash,
     "Salida por venta "+sale.getSaleNumber(),actor);
-   movement.assignLocations(line.balance().getLocation(),null,line.unit(),sale.getId().toString(),item.getId(),null);
-   StockMovement persisted=movements.saveAndFlush(movement);
-   costing.recordOutbound(persisted);
+   movement.assignLocations(line.balance().getLocation(),null,line.unit(),sale.getId().toString(),item.getId(),valuation.method());
+   costing.post(movements.save(movement),valuation);
   }
   movements.flush();
 
@@ -201,11 +203,11 @@ public class SaleService {
    StockBalance balance=balances.findForUpdate(item.getProduct().getId(),sale.getWarehouse().getId()).orElseThrow(()->new BusinessRuleException("No existe saldo para reponer "+item.getSkuSnapshot()+"."));
    balance.increase(item.getQuantity());
    UnitOfMeasure unit=units.findById(item.getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+item.getSkuSnapshot()+"."));
+   // Goods return to stock at the exact cost recorded when they were sold.
+   InventoryCostingService.Valuation valuation=costing.inbound(item.getProduct(),balance.getLocation(),item.getQuantity(),soldUnitCost(sale,item,balance));
    String movementKey="SALE-CANCEL-"+sale.getId()+"-"+item.getProduct().getId();
-   BigDecimal cancellationCost=costing.inboundUnitCost(item.getProduct(),MovementType.SALE_CANCEL_IN,"SALE_CANCELLATION",sale.getId(),item.getId(),item.getProduct().getCostPrice());
-   StockMovement movement=new StockMovement(item.getProduct(),sale.getWarehouse(),MovementType.SALE_CANCEL_IN,item.getQuantity(),cancellationCost,"SALE_CANCELLATION",sale.getId(),movementKey,sha256(sale.getId()+"|"+sale.getCancellationReason()+"|"+item.getId()),"Cancelación aprobada de venta "+sale.getSaleNumber()+": "+sale.getCancellationReason(),actor);
-   movement.assignLocations(null,balance.getLocation(),unit,sale.getId().toString(),item.getId(),null);
-   StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
+   StockMovement movement=new StockMovement(item.getProduct(),sale.getWarehouse(),MovementType.SALE_CANCEL_IN,item.getQuantity(),valuation.movementUnitCost(),"SALE_CANCELLATION",sale.getId(),movementKey,sha256(sale.getId()+"|"+sale.getCancellationReason()+"|"+item.getId()),"Cancelación aprobada de venta "+sale.getSaleNumber()+": "+sale.getCancellationReason(),actor);
+   movement.assignLocations(null,balance.getLocation(),unit,sale.getId().toString(),item.getId(),valuation.method());costing.post(movements.save(movement),valuation);
   }
   sale.approveCancellation(actor);
   outbox.save(new OutboxEvent("SALE",sale.getId(),"SALE_CANCELLED",Map.of("saleId",sale.getId().toString(),"saleNumber",sale.getSaleNumber(),"reason",sale.getCancellationReason(),"requestedBy",sale.getCancellationRequestedBy(),"approvedBy",actor)));
@@ -214,6 +216,12 @@ public class SaleService {
   return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow());
  }
 
+ /** Unit cost assigned to the original SALE movement of a sale line; falls back to the current valued cost. */
+ public java.math.BigDecimal soldUnitCost(Sale sale,SaleItem item,StockBalance balance){
+  return movements.findFirstByReferenceTypeAndReferenceIdAndSourceLineIdAndMovementType("SALE",sale.getId(),item.getId(),MovementType.SALE)
+   .map(m->costing.valuedUnitCost(m.getId())).filter(java.util.Objects::nonNull)
+   .orElseGet(()->costing.currentUnitCost(item.getProduct(),balance.getLocation()));
+ }
  private IdempotencyRecord claimIdempotency(String scope,String key,String hash){
   int claimed=idempotencyRecords.insertIfAbsent(UUID.randomUUID(),scope,key,hash);
   IdempotencyRecord record=idempotencyRecords.findForUpdate(scope,key).orElseThrow(()->new IllegalStateException("No se pudo reservar la clave de idempotencia."));

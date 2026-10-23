@@ -28,6 +28,7 @@ public class BusinessPartner {
  @PreUpdate void onUpdate(){updatedAt=Instant.now();}
  public void update(String name,String taxId,String email,String phone,String address){this.name=name;this.taxId=taxId;this.email=email;this.phone=phone;this.address=address;}
  public void deactivate(){active=false;}
+ public void activate(){active=true;}
  public UUID getId(){return id;} public String getCode(){return code;} public PartnerType getType(){return type;}
  public String getName(){return name;} public String getTaxId(){return taxId;} public String getEmail(){return email;}
  public String getPhone(){return phone;} public String getAddress(){return address;} public boolean isActive(){return active;}

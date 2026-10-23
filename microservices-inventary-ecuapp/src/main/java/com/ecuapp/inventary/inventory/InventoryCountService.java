@@ -38,11 +38,12 @@ public class InventoryCountService {
     private final WarehouseLocationRepository locations;
     private final UnitOfMeasureRepository units;
     private final AuditService audit;
+    private final InventoryCostingService costing;
 
     public InventoryCountService(InventoryCountRepository counts, IdempotencyRecordRepository idempotencyRecords, ProductRepository products,
                                  WarehouseRepository warehouses, StockBalanceRepository balances,
                                  StockMovementRepository movements, WarehouseLocationRepository locations,
-                                 UnitOfMeasureRepository units, AuditService audit) {
+                                 UnitOfMeasureRepository units, AuditService audit, InventoryCostingService costing) {
         this.counts = counts;
         this.idempotencyRecords = idempotencyRecords;
         this.products = products;
@@ -52,13 +53,14 @@ public class InventoryCountService {
         this.locations = locations;
         this.units = units;
         this.audit = audit;
+        this.costing = costing;
     }
 
     @Transactional(readOnly = true)
-    public Page<InventoryCountDtos.View> list(Pageable pageable) {
-        Pageable limited = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100),
+    public Page<InventoryCountDtos.View> list(UUID warehouseId, InventoryCountStatus status, Pageable pageable) {
+        Pageable limited = com.ecuapp.inventary.common.Pages.of(pageable, Set.of("createdAt", "postedAt", "countNumber", "status"),
             Sort.by(Sort.Direction.DESC, "createdAt"));
-        return counts.findAll(limited).map(InventoryCountDtos.View::from);
+        return counts.search(warehouseId, status, limited).map(InventoryCountDtos.View::from);
     }
 
     @Transactional(readOnly = true)
@@ -165,32 +167,38 @@ public class InventoryCountService {
             BigDecimal difference = line.getDifference();
             if (difference.signum() == 0) continue;
             if (balance == null) {
+                locations.insertIfAbsent(UUID.randomUUID(), count.getWarehouse().getId(), "MAIN", "Ubicación principal", "STORAGE");
                 WarehouseLocation main = locations.findByWarehouseIdAndCode(count.getWarehouse().getId(), "MAIN")
-                    .orElseGet(() -> locations.save(new WarehouseLocation(count.getWarehouse(), "MAIN",
-                        "Ubicación principal", WarehouseLocation.LocationType.STORAGE)));
-                balance = balances.save(new StockBalance(line.getProduct(), count.getWarehouse(), main));
+                    .orElseThrow(() -> new ConflictException("No se pudo asegurar la ubicación principal del almacén."));
+                balances.insertIfAbsent(UUID.randomUUID(), productId, count.getWarehouse().getId(), main.getId());
+                balance = balances.findForUpdate(productId, count.getWarehouse().getId())
+                    .orElseThrow(() -> new ConflictException("No se pudo crear el saldo de inventario."));
             }
 
             MovementType type;
             BigDecimal quantity = difference.abs().setScale(3);
+            InventoryCostingService.Valuation valuation;
             if (difference.signum() > 0) {
                 balance.increase(quantity);
                 type = MovementType.ADJUSTMENT_IN;
+                valuation = costing.inbound(line.getProduct(), balance.getLocation(), quantity,
+                    costing.currentUnitCost(line.getProduct(), balance.getLocation()));
             } else {
                 // decrease() also protects stock reserved for active orders.
                 balance.decrease(quantity);
                 type = MovementType.ADJUSTMENT_OUT;
+                valuation = costing.outbound(line.getProduct(), balance.getLocation(), quantity);
             }
             String movementKey = "CNT-" + count.getId() + "-" + line.getId();
             StockMovement movement = new StockMovement(line.getProduct(), count.getWarehouse(), type, quantity,
-                line.getUnitCost(), "INVENTORY_COUNT", count.getId(), movementKey,
+                valuation.movementUnitCost(), "INVENTORY_COUNT", count.getId(), movementKey,
                 hash(count.getId() + "|" + line.getId() + "|" + difference.toPlainString()),
                 "Ajuste por conteo físico " + count.getCountNumber(), actor);
             movement.assignLocations(type == MovementType.ADJUSTMENT_OUT ? balance.getLocation() : null,
                 type == MovementType.ADJUSTMENT_IN ? balance.getLocation() : null,
                 units.findById(line.getProduct().getUnitOfMeasureId()).orElseThrow(() -> new ResourceNotFoundException("Unidad de medida", line.getProduct().getUnitOfMeasureId())),
-                count.getCountNumber(), line.getId(), null);
-            movements.save(movement);
+                count.getCountNumber(), line.getId(), valuation.method());
+            costing.post(movements.save(movement), valuation);
         }
 
         count.post();

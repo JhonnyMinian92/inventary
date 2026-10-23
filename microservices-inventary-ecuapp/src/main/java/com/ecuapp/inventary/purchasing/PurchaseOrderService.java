@@ -10,6 +10,7 @@ import com.ecuapp.inventary.sales.OutboxEventRepository;
 import com.ecuapp.inventary.warehouse.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,16 +28,28 @@ import java.util.stream.Collectors;
 
 @Service
 public class PurchaseOrderService {
- private record ReceiptCalc(PurchaseOrderLine line,BigDecimal quantity){}
+ private record ReceiptCalc(PurchaseOrderLine line,BigDecimal quantity,StockBalance balance){}
+ private static final Set<String> ORDER_SORT=Set.of("orderedAt","orderNumber","status","total");
+ private static final Set<String> RECEIPT_SORT=Set.of("receivedAt","receiptNumber");
  private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final GoodsReceiptLineRepository receiptLines;private final IdempotencyRecordRepository idempotencyRecords;private final BusinessPartnerRepository partners;
- private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;
+ private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceLocks balanceLocks;private final UnitOfMeasureRepository units;
  private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final InventoryCostingService costing;
+ private final boolean requireDistinctApprover;
  public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,IdempotencyRecordRepository idempotencyRecords,BusinessPartnerRepository partners,WarehouseRepository warehouses,
-   ProductRepository products,StockBalanceRepository balances,WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,InventoryCostingService costing){
-  this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.costing=costing;
+   ProductRepository products,StockBalanceLocks balanceLocks,UnitOfMeasureRepository units,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,InventoryCostingService costing,
+   @Value("${app.purchasing.require-distinct-approver:true}") boolean requireDistinctApprover){
+  this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balanceLocks=balanceLocks;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.costing=costing;
+  this.requireDistinctApprover=requireDistinctApprover;
  }
- @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(Pageable p){return orders.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(PurchaseDtos.OrderView::from);}
+ @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(PurchaseOrderStatus status,UUID supplierId,UUID warehouseId,Instant from,Instant to,Pageable p){
+  validateRange(from,to);
+  return orders.search(status,supplierId,warehouseId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,ORDER_SORT,Sort.by(Sort.Direction.DESC,"orderedAt"))).map(PurchaseDtos.OrderView::from);
+ }
  @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id){return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
+ @Transactional(readOnly=true) public Page<PurchaseDtos.ReceiptView> listReceipts(UUID purchaseOrderId,UUID warehouseId,Instant from,Instant to,Pageable p){
+  validateRange(from,to);
+  return receipts.search(purchaseOrderId,warehouseId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,RECEIPT_SORT,Sort.by(Sort.Direction.DESC,"receivedAt"))).map(PurchaseDtos.ReceiptView::from);
+ }
  @Transactional public PurchaseDtos.OrderView create(String key,PurchaseDtos.CreateOrderRequest r,String actor){
   key=normalizeKey(key);
   String requestHash=hashOrderRequest(r);
@@ -70,9 +83,21 @@ public class PurchaseOrderService {
   audit.record(actor,"PURCHASE_ORDER_CREATED","PURCHASE_ORDER",order.getId(),Map.of("orderNumber",number,"lineCount",newLines.size()));
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
- @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.submit();audit.record(actor,"PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
- @Transactional public PurchaseDtos.OrderView approve(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.approve();audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
- @Transactional public PurchaseDtos.OrderView cancel(UUID id,String actor){PurchaseOrder order=requireForUpdate(id);order.cancel();audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));return PurchaseDtos.OrderView.from(order);}
+ @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){
+  PurchaseOrder order=requireForUpdate(id);
+  if(order.submit(actor))audit.record(actor,"PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
+  return detailed(id);
+ }
+ @Transactional public PurchaseDtos.OrderView approve(UUID id,String actor){
+  PurchaseOrder order=requireForUpdate(id);
+  if(order.approve(actor,requireDistinctApprover))audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
+  return detailed(id);
+ }
+ @Transactional public PurchaseDtos.OrderView cancel(UUID id,String actor){
+  PurchaseOrder order=requireForUpdate(id);
+  if(order.cancel(actor))audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
+  return detailed(id);
+ }
  @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id){return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id)));}
  @Transactional public PurchaseDtos.ReceiptView receive(UUID orderId,String rawKey,PurchaseDtos.ReceiptRequest request,String actor){
   String key=normalizeKey(rawKey);
@@ -93,6 +118,7 @@ public class PurchaseOrderService {
   if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   PurchaseOrder order=orders.findForUpdate(orderId).orElseThrow(()->new ResourceNotFoundException("Orden de compra",orderId));
   if(order.getStatus()!=PurchaseOrderStatus.APPROVED&&order.getStatus()!=PurchaseOrderStatus.PARTIALLY_RECEIVED)throw new BusinessRuleException("Solo se reciben órdenes aprobadas o parcialmente recibidas.");
+  if(!order.getWarehouse().isActive())throw new BusinessRuleException("El almacén de destino está inactivo.");
   Map<UUID,PurchaseOrderLine> lineById=order.getLines().stream().collect(Collectors.toMap(PurchaseOrderLine::getId,Function.identity()));
   List<PurchaseDtos.ReceiptLineRequest> sorted=new ArrayList<>(request.items());
   sorted.sort(Comparator.comparing(x->{PurchaseOrderLine l=lineById.get(x.purchaseOrderLineId());return l==null?"~":l.getProduct().getId().toString();}));
@@ -103,31 +129,26 @@ public class PurchaseOrderService {
    if(poLine==null)throw new BusinessRuleException("La línea indicada no pertenece a la orden de compra.");
    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
    if(poLine.remaining().compareTo(quantity)<0)throw new BusinessRuleException("La cantidad recibida supera la cantidad pendiente para "+poLine.getSkuSnapshot()+".");
-   StockBalance balance=balances.findForUpdate(poLine.getProduct().getId(),order.getWarehouse().getId()).orElse(null);
-   if(balance==null){
-    WarehouseLocation mainLocation=locations.findByWarehouseIdAndCode(order.getWarehouse().getId(),"MAIN").orElseGet(()->locations.save(new WarehouseLocation(order.getWarehouse(),"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE)));
-    balance=balances.save(new StockBalance(poLine.getProduct(),order.getWarehouse(),mainLocation));
-   }
-   balance.increase(quantity);poLine.receive(quantity);calculated.add(new ReceiptCalc(poLine,quantity));
+   StockBalance balance=balanceLocks.lockOrCreate(poLine.getProduct(),order.getWarehouse());
+   balance.increase(quantity);poLine.receive(quantity);calculated.add(new ReceiptCalc(poLine,quantity,balance));
   }
   order.recalculateReceiptStatus();
   String number="REC-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   GoodsReceipt receipt=receipts.saveAndFlush(new GoodsReceipt(number,order,order.getWarehouse(),key,hash,actor));
-  List<Map.Entry<ReceiptCalc,GoodsReceiptLine>> persistedLines=new ArrayList<>();
   for(ReceiptCalc calc:calculated){
    GoodsReceiptLine receiptLine=new GoodsReceiptLine(calc.line(),calc.quantity());
    receipt.addLine(receiptLine);
-   persistedLines.add(Map.entry(calc,receiptLines.saveAndFlush(receiptLine)));
-  }
-  for(Map.Entry<ReceiptCalc,GoodsReceiptLine> item:persistedLines){
-   ReceiptCalc calc=item.getKey();GoodsReceiptLine receiptLine=item.getValue();
-   String movementKey="RCV-"+sha256(key).substring(0,32)+"-"+calc.line().getProduct().getId();
-   StockMovement movement=new StockMovement(calc.line().getProduct(),order.getWarehouse(),MovementType.RECEIPT,calc.quantity(),calc.line().getUnitCost(),
+   receiptLines.saveAndFlush(receiptLine);
+   Product product=calc.line().getProduct();
+   // Receipts open a FIFO layer at the purchase order cost and update the moving average.
+   InventoryCostingService.Valuation valuation=costing.inbound(product,calc.balance().getLocation(),calc.quantity(),calc.line().getUnitCost());
+   String movementKey="RCV-"+sha256(key).substring(0,32)+"-"+product.getId();
+   StockMovement movement=new StockMovement(product,order.getWarehouse(),MovementType.RECEIPT,calc.quantity(),valuation.movementUnitCost(),
     "GOODS_RECEIPT",receipt.getId(),movementKey,sha256(receipt.getId()+"|"+receiptLine.getId()+"|"+calc.quantity().toPlainString()),"Recepción "+receipt.getReceiptNumber(),actor);
-   movement.assignLocations(null,balances.findByProductIdAndWarehouseId(calc.line().getProduct().getId(),order.getWarehouse().getId()).orElseThrow().getLocation(),
-    units.findById(calc.line().getProduct().getUnitOfMeasureId()).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",calc.line().getProduct().getUnitOfMeasureId())),
-    receipt.getReceiptNumber(),receiptLine.getId(),null);
-   StockMovement persisted=movements.saveAndFlush(movement);costing.recordInbound(persisted);
+   movement.assignLocations(null,calc.balance().getLocation(),
+    units.findById(product.getUnitOfMeasureId()).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",product.getUnitOfMeasureId())),
+    receipt.getReceiptNumber(),receiptLine.getId(),valuation.method());
+   costing.post(movements.save(movement),valuation);
   }
   receipts.save(receipt);
   idempotency.markCompleted("GOODS_RECEIPT",receipt.getId(),(short)201);idempotencyRecords.save(idempotency);
@@ -135,7 +156,9 @@ public class PurchaseOrderService {
   audit.record(actor,"GOODS_RECEIPT_POSTED","GOODS_RECEIPT",receipt.getId(),Map.of("receiptNumber",receipt.getReceiptNumber(),"purchaseOrderId",order.getId().toString(),"lines",calculated.size()));
   return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(receipt.getId()).orElseThrow());
  }
+ private PurchaseDtos.OrderView detailed(UUID id){orders.flush();return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
  private PurchaseOrder requireForUpdate(UUID id){return orders.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id));}
+ private void validateRange(Instant from,Instant to){if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");}
  private String hashOrderRequest(PurchaseDtos.CreateOrderRequest r){
   List<String> lines=r.items().stream().map(x->x.productId()+"|"+x.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString()+"|"+x.unitCost().setScale(2,RoundingMode.UNNECESSARY).toPlainString()).sorted().toList();
   return sha256(r.supplierId()+"|"+r.warehouseId()+"|"+Objects.toString(clean(r.notes()),"")+"|"+String.join(";",lines));

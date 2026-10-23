@@ -25,10 +25,14 @@ public final class WhatsAppDtos {
    q.getItems().stream().map(i->new QuoteLineView(i.getProduct().getId(),i.getSkuSnapshot(),i.getProductNameSnapshot(),i.getQuantity(),i.getUnitPrice(),i.getLineTotal())).toList());}
  }
  public record OrderLineView(UUID productId,String sku,String productName,BigDecimal quantity,BigDecimal unitPrice,BigDecimal lineTotal){}
+ public record ConfirmPaymentRequest(@NotBlank @Size(max=120) @Pattern(regexp="[A-Za-z0-9._:/#-]{3,120}",message="Referencia de pago inválida") String paymentReference,
+  @NotBlank @Size(max=40) @Pattern(regexp="[A-Z_]{3,40}",message="Use un método en mayúsculas, por ejemplo TRANSFER, CASH o CARD") String paymentMethod){}
  public record OrderView(UUID id,String orderNumber,WhatsAppOrderStatus status,UUID cartId,UUID quoteId,String customerRef,UUID warehouseId,String warehouseCode,
-  String currency,BigDecimal subtotal,BigDecimal tax,BigDecimal total,Instant expiresAt,Instant createdAt,Instant updatedAt,List<OrderLineView> items){
+  String currency,BigDecimal subtotal,BigDecimal tax,BigDecimal total,Instant expiresAt,Instant createdAt,Instant updatedAt,
+  UUID saleId,String paymentReference,String paymentMethod,String confirmedBy,Instant confirmedAt,List<OrderLineView> items){
   static OrderView from(WhatsAppOrder o){return new OrderView(o.getId(),o.getOrderNumber(),o.getStatus(),o.getCart().getId(),o.getQuote().getId(),o.getCustomerRef(),o.getWarehouse().getId(),o.getWarehouse().getCode(),
    o.getCurrency(),o.getSubtotal(),o.getTax(),o.getTotal(),o.getExpiresAt(),o.getCreatedAt(),o.getUpdatedAt(),
+   o.getSale()==null?null:o.getSale().getId(),o.getPaymentReference(),o.getPaymentMethod(),o.getConfirmedBy(),o.getConfirmedAt(),
    o.getItems().stream().map(i->new OrderLineView(i.getProduct().getId(),i.getSkuSnapshot(),i.getProductNameSnapshot(),i.getQuantity(),i.getUnitPrice(),i.getLineTotal())).toList());}
  }
 }

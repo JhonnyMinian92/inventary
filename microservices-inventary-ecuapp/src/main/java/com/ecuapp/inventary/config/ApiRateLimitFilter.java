@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -42,10 +43,20 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     private final ObjectMapper mapper;
     private final AuditService audit;
 
-    public ApiRateLimitFilter(ApiProblemFactory problems, ObjectMapper mapper, AuditService audit) {
+    private final int loginPerMinute;
+    private final int whatsappPerMinute;
+    private final int publicPerMinute;
+
+    public ApiRateLimitFilter(ApiProblemFactory problems, ObjectMapper mapper, AuditService audit,
+                              @Value("${app.rate-limit.login-per-minute:10}") int loginPerMinute,
+                              @Value("${app.rate-limit.whatsapp-per-minute:240}") int whatsappPerMinute,
+                              @Value("${app.rate-limit.public-per-minute:300}") int publicPerMinute) {
         this.problems = problems;
         this.mapper = mapper;
         this.audit = audit;
+        this.loginPerMinute = loginPerMinute;
+        this.whatsappPerMinute = whatsappPerMinute;
+        this.publicPerMinute = publicPerMinute;
     }
 
     @Override
@@ -105,8 +116,10 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     private Policy policy(String path) {
-        if ("/api/v1/auth/login".equals(path)) return new Policy("login", 10, 60_000);
-        if (path.startsWith("/api/v1/integrations/whatsapp/")) return new Policy("whatsapp", 240, 60_000);
+        if ("/api/v1/auth/login".equals(path)) return new Policy("login", loginPerMinute, 60_000);
+        if (path.startsWith("/api/v1/integrations/whatsapp/")) return new Policy("whatsapp", whatsappPerMinute, 60_000);
+        if (path.startsWith("/api/v1/public/")) return new Policy("public", publicPerMinute, 60_000);
+        if ("/graphql".equals(path)) return new Policy("graphql", publicPerMinute, 60_000);
         return null;
     }
 

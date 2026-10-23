@@ -1,274 +1,232 @@
 package com.ecuapp.inventary.inventory;
 
+import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.catalog.Product;
-import com.ecuapp.inventary.common.BusinessRuleException;
-import com.ecuapp.inventary.common.ResourceNotFoundException;
+import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.warehouse.WarehouseLocation;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Transactional inventory cost layer engine. Receipts create layers; issue movements consume layers;
- * each allocation is recorded append-only in inventory_valuation_entry.
+ * Inventory valuation engine (FIFO or moving average).
+ * <p>
+ * Every physical movement is valued inside the same transaction that changes the stock balance. Callers already hold
+ * the PESSIMISTIC_WRITE lock of the product/warehouse balance, which serializes valuation per product and location;
+ * the cost state row is locked as well to stay correct even if a future flow forgets that rule.
+ * <ul>
+ * <li>{@link #inbound} values an entry at an explicit unit cost and opens a FIFO layer.</li>
+ * <li>{@link #outbound} consumes layers in FIFO order and values the issue with the active method.</li>
+ * <li>{@link #passThrough} records a cost for paired entry/exit movements that do not change stock (scrapped returns).</li>
+ * </ul>
+ * Movements are immutable once inserted, so callers first obtain a {@link Valuation}, persist the movement with
+ * {@link Valuation#movementUnitCost()} and finally call {@link #post} to append the valuation ledger.
  */
 @Service
 public class InventoryCostingService {
-    private static final BigDecimal ZERO_QTY = new BigDecimal("0.000");
-    private static final BigDecimal ZERO_COST = new BigDecimal("0.0000");
+    private static final String CONFIG_KEY = "DEFAULT";
+
+    public record Portion(InventoryCostLayer layer, BigDecimal quantity, BigDecimal unitCost, BigDecimal totalCost) {}
+
+    public record Valuation(CostingMethod method, boolean opensLayer, Product product, WarehouseLocation location,
+                            BigDecimal quantity, BigDecimal unitCost, BigDecimal totalCost, String currency,
+                            List<Portion> portions) {
+        /** Unit cost stored on the stock movement (scale 2); the valuation ledger keeps scale 4. */
+        public BigDecimal movementUnitCost() { return unitCost.setScale(2, RoundingMode.HALF_UP); }
+    }
 
     private final InventoryCostingConfigRepository configs;
+    private final InventoryCostStateRepository states;
     private final InventoryCostLayerRepository layers;
     private final InventoryValuationEntryRepository entries;
-    private final StockMovementRepository movements;
+    private final AuditService audit;
 
-    public InventoryCostingService(InventoryCostingConfigRepository configs,
-                                   InventoryCostLayerRepository layers,
-                                   InventoryValuationEntryRepository entries,
-                                   StockMovementRepository movements) {
+    public InventoryCostingService(InventoryCostingConfigRepository configs, InventoryCostStateRepository states,
+                                   InventoryCostLayerRepository layers, InventoryValuationEntryRepository entries,
+                                   AuditService audit) {
         this.configs = configs;
+        this.states = states;
         this.layers = layers;
         this.entries = entries;
-        this.movements = movements;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
-    public CostingMethod currentMethod() {
-        return policy();
+    public InventoryCostingConfig policy() {
+        return configs.findBySingletonKey(CONFIG_KEY)
+            .orElseThrow(() -> new IllegalStateException("No existe la política de valoración de inventario."));
+    }
+
+    @Transactional
+    public InventoryCostingConfig changePolicy(CostingMethod method, String actor) {
+        InventoryCostingConfig config = configs.findBySingletonKey(CONFIG_KEY)
+            .orElseThrow(() -> new IllegalStateException("No existe la política de valoración de inventario."));
+        if (config.getMethod() == method) return config;
+        // Consistency principle: the valuation method cannot change after valued movements exist.
+        if (entries.count() > 0) {
+            throw new ConflictException("El método de valoración no puede cambiarse después de registrar movimientos valorizados.");
+        }
+        CostingMethod previous = config.getMethod();
+        config.changeMethod(method, actor);
+        audit.record(actor, "COSTING_POLICY_CHANGED", "INVENTORY_COSTING_CONFIG", config.getId(),
+            Map.of("previous", previous.name(), "method", method.name()));
+        return config;
+    }
+
+    /** Values an inbound movement at an explicit unit cost; a FIFO layer is opened when the movement is posted. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Valuation inbound(Product product, WarehouseLocation location, BigDecimal quantity, BigDecimal unitCost) {
+        requirePositive(quantity);
+        CostingMethod method = policy().getMethod();
+        BigDecimal cost = normalizeCost(unitCost);
+        BigDecimal total = total(quantity, cost);
+        InventoryCostState state = lockState(product, location);
+        state.add(quantity, total);
+        return new Valuation(method, true, product, location, quantity, cost, total, product.getCurrency(),
+            List.of(new Portion(null, quantity, cost, total)));
+    }
+
+    /** Values an outbound movement with the active method, consuming FIFO layers for quantity traceability. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Valuation outbound(Product product, WarehouseLocation location, BigDecimal quantity) {
+        return outbound(product, location, quantity, null, null);
     }
 
     /**
-     * Return the weighted unit cost which should be snapshotted on an outgoing movement.
-     * The caller holds the product/warehouse balance lock, and this query also locks available layers.
+     * Outbound valuation that consumes the layer opened by {@code preferredSourceMovementId} first (purchase returns).
+     * Under moving average the issue is valued at {@code preferredUnitCost} when provided.
      */
-    @Transactional
-    public BigDecimal currentIssueUnitCost(Product product, WarehouseLocation location,
-                                           BigDecimal quantity, BigDecimal fallbackUnitCost) {
-        if (location == null || quantity == null || quantity.signum() <= 0) {
-            throw new BusinessRuleException("No se puede valorar una salida sin ubicación y cantidad válidas.");
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Valuation outbound(Product product, WarehouseLocation location, BigDecimal quantity,
+                              UUID preferredSourceMovementId, BigDecimal preferredUnitCost) {
+        requirePositive(quantity);
+        CostingMethod method = policy().getMethod();
+        InventoryCostState state = lockState(product, location);
+        BigDecimal average = state.averageCost();
+        BigDecimal fallback = average != null ? average : normalizeCost(product.getCostPrice());
+
+        List<InventoryCostLayer> open = new ArrayList<>(layers.findOpenForUpdate(product.getId(), location.getId()));
+        if (preferredSourceMovementId != null) {
+            open.sort((a, b) -> Boolean.compare(!a.getSourceMovement().getId().equals(preferredSourceMovementId),
+                !b.getSourceMovement().getId().equals(preferredSourceMovementId)));
         }
-        CostingMethod method = policy();
-        List<InventoryCostLayer> open = layers.findByProductIdAndLocationIdAndRemainingQuantityGreaterThanOrderByReceivedAtAscIdAsc(
-                product.getId(), location.getId(), ZERO_QTY);
-        BigDecimal remaining = quantity.setScale(3, RoundingMode.UNNECESSARY);
-        BigDecimal allocatedValue = BigDecimal.ZERO;
-        BigDecimal available = open.stream().map(InventoryCostLayer::getRemainingQuantity)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (available.compareTo(remaining) < 0) {
-            throw new BusinessRuleException("No existen capas de costo suficientes para valorar la salida de "
-                    + product.getSku() + ". Revise la valoración inicial del inventario.");
-        }
-        if (method == CostingMethod.MOVING_AVERAGE) {
-            BigDecimal value = open.stream()
-                    .map(layer -> layer.getRemainingQuantity().multiply(layer.getUnitCost()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal average = value.divide(available, 4, RoundingMode.HALF_UP);
-            return average.setScale(2, RoundingMode.HALF_UP);
-        }
+        List<Portion> consumed = new ArrayList<>();
+        BigDecimal pending = quantity;
         for (InventoryCostLayer layer : open) {
-            if (remaining.signum() == 0) break;
-            BigDecimal used = remaining.min(layer.getRemainingQuantity());
-            allocatedValue = allocatedValue.add(used.multiply(layer.getUnitCost()));
-            remaining = remaining.subtract(used);
-        }
-        return allocatedValue.divide(quantity, 4, RoundingMode.HALF_UP).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /** Resolve the inbound cost before an immutable stock_movement row is inserted. */
-    @Transactional(readOnly = true)
-    public BigDecimal inboundUnitCost(Product product, MovementType type, String referenceType,
-                                     UUID referenceId, UUID sourceLineId, BigDecimal fallbackUnitCost) {
-        if (type == MovementType.SALE_CANCEL_IN
-                || (type == MovementType.RETURN_IN && "SALES_RETURN".equals(referenceType))) {
-            return findOriginalSaleUnitCost(sourceLineId).orElse(scaleCost(fallbackUnitCost));
-        }
-        if (type == MovementType.TRANSFER_IN && referenceType != null && referenceId != null) {
-            return movements.findFirstByMovementTypeAndReferenceTypeAndReferenceIdAndSourceLineIdOrderByOccurredAtAsc(
-                            MovementType.TRANSFER_OUT, referenceType, referenceId, sourceLineId)
-                    .flatMap(this::averageValuedUnitCost)
-                    .orElse(scaleCost(fallbackUnitCost));
-        }
-        return scaleCost(fallbackUnitCost);
-    }
-
-    @Transactional
-    public void recordInbound(StockMovement movement) {
-        WarehouseLocation location = movement.getToLocation();
-        if (location == null) return;
-        CostingMethod method = policy();
-        BigDecimal quantity = movement.getQuantity().setScale(3, RoundingMode.UNNECESSARY);
-        String currency = movement.getProduct().getCurrency();
-
-        if (movement.getMovementType() == MovementType.SALE_CANCEL_IN
-                && restoreCancelledSaleLayers(movement, method, currency, quantity)) {
-            if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
-            return;
-        }
-        if (movement.getMovementType() == MovementType.TRANSFER_IN
-                && receiveTransferLayers(movement, method, currency, quantity, location)) {
-            if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
-            return;
-        }
-
-        BigDecimal unitCost = scaleCost(movement.getUnitCost());
-        InventoryCostLayer layer = layers.saveAndFlush(new InventoryCostLayer(
-                movement.getProduct(), location, movement, quantity, quantity, unitCost, currency, movement.getOccurredAt()));
-        entries.saveAndFlush(new InventoryValuationEntry(movement, layer, method, quantity, unitCost, currency));
-
-        if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
-    }
-
-    @Transactional
-    public void recordOutbound(StockMovement movement) {
-        WarehouseLocation location = movement.getFromLocation();
-        if (location == null) return;
-        CostingMethod method = policy();
-        BigDecimal quantity = movement.getQuantity().setScale(3, RoundingMode.UNNECESSARY);
-        String currency = movement.getProduct().getCurrency();
-        List<InventoryCostLayer> open = layers.findByProductIdAndLocationIdAndRemainingQuantityGreaterThanOrderByReceivedAtAscIdAsc(
-                movement.getProduct().getId(), location.getId(), ZERO_QTY);
-        BigDecimal available = open.stream().map(InventoryCostLayer::getRemainingQuantity)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (available.compareTo(quantity) < 0) {
-            throw new BusinessRuleException("Las capas de costo no concilian con el saldo para "
-                    + movement.getProduct().getSku() + ". No se contabilizó la salida.");
-        }
-
-        BigDecimal average = BigDecimal.ZERO;
-        if (method == CostingMethod.MOVING_AVERAGE) {
-            BigDecimal inventoryValue = open.stream()
-                    .map(layer -> layer.getRemainingQuantity().multiply(layer.getUnitCost()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            average = inventoryValue.divide(available, 4, RoundingMode.HALF_UP);
-        }
-
-        BigDecimal remaining = quantity;
-        for (InventoryCostLayer layer : open) {
-            if (remaining.signum() == 0) break;
-            BigDecimal used = remaining.min(layer.getRemainingQuantity());
-            BigDecimal unitCost = method == CostingMethod.FIFO ? scaleCost(layer.getUnitCost()) : average;
-            layer.consume(used);
-            entries.save(new InventoryValuationEntry(movement, layer, method, used, unitCost, currency));
-            remaining = remaining.subtract(used);
-        }
-        entries.flush();
-        if (method == CostingMethod.MOVING_AVERAGE) revalueOpenLayers(movement.getProduct().getId(), location.getId());
-    }
-
-    /**
-     * Moves FIFO layer costs intact across warehouses. If a transfer is cancelled before receipt,
-     * the original source layers are replenished instead of manufacturing a new cost layer.
-     */
-    private boolean receiveTransferLayers(StockMovement inbound, CostingMethod method, String currency,
-                                          BigDecimal quantity, WarehouseLocation destinationLocation) {
-        if (inbound.getReferenceType() == null || inbound.getReferenceId() == null
-                || inbound.getSourceLineId() == null) return false;
-        StockMovement outbound = movements.findFirstByMovementTypeAndReferenceTypeAndReferenceIdAndSourceLineIdOrderByOccurredAtAsc(
-                MovementType.TRANSFER_OUT, inbound.getReferenceType(), inbound.getReferenceId(), inbound.getSourceLineId())
-                .orElse(null);
-        if (outbound == null) return false;
-        List<InventoryValuationEntry> allocations = entries.findByStockMovementIdOrderByCreatedAtAsc(outbound.getId());
-        if (allocations.isEmpty()) return false;
-
-        boolean restoringOrigin = outbound.getWarehouse().getId().equals(inbound.getWarehouse().getId());
-        BigDecimal remaining = quantity;
-        for (InventoryValuationEntry allocation : allocations) {
-            if (remaining.signum() == 0) break;
-            BigDecimal moved = remaining.min(allocation.getQuantity());
-            BigDecimal unitCost = scaleCost(allocation.getUnitCost());
-            InventoryCostLayer layer = allocation.getCostLayer();
-            if (restoringOrigin && layer != null) {
-                layer.restore(moved);
-            } else {
-                layer = layers.saveAndFlush(new InventoryCostLayer(inbound.getProduct(), destinationLocation,
-                        inbound, moved, moved, unitCost, currency, inbound.getOccurredAt()));
+            if (pending.signum() == 0) break;
+            BigDecimal taken = layer.consume(pending);
+            if (taken.signum() > 0) {
+                consumed.add(new Portion(layer, taken, layer.getUnitCost(), total(taken, layer.getUnitCost())));
+                pending = pending.subtract(taken);
             }
-            entries.save(new InventoryValuationEntry(inbound, layer, method, moved, unitCost, currency));
-            remaining = remaining.subtract(moved);
         }
-        if (remaining.signum() > 0) {
-            BigDecimal unitCost = scaleCost(inbound.getUnitCost());
-            InventoryCostLayer fallback = layers.saveAndFlush(new InventoryCostLayer(inbound.getProduct(),
-                    destinationLocation, inbound, remaining, remaining, unitCost, currency, inbound.getOccurredAt()));
-            entries.save(new InventoryValuationEntry(inbound, fallback, method, remaining, unitCost, currency));
+        if (pending.signum() > 0) {
+            // Stock that predates valuation (or legacy data) is valued at the current average or catalog cost.
+            consumed.add(new Portion(null, pending.setScale(3), fallback, total(pending, fallback)));
         }
-        entries.flush();
-        return true;
-    }
 
-    private boolean restoreCancelledSaleLayers(StockMovement cancellation, CostingMethod method,
-                                               String currency, BigDecimal quantity) {
-        if (cancellation.getSourceLineId() == null) return false;
-        StockMovement original = movements.findFirstByMovementTypeAndSourceLineIdOrderByOccurredAtAsc(
-                MovementType.SALE, cancellation.getSourceLineId()).orElse(null);
-        if (original == null) return false;
-        List<InventoryValuationEntry> originalEntries = entries.findByStockMovementIdOrderByCreatedAtAsc(original.getId());
-        BigDecimal remaining = quantity;
-        boolean restored = false;
-        for (InventoryValuationEntry originalEntry : originalEntries) {
-            if (remaining.signum() == 0) break;
-            if (originalEntry.getCostLayer() == null) continue;
-            BigDecimal restore = remaining.min(originalEntry.getQuantity());
-            InventoryCostLayer sourceLayer = originalEntry.getCostLayer();
-            sourceLayer.restore(restore);
-            entries.save(new InventoryValuationEntry(cancellation, sourceLayer, method, restore,
-                    sourceLayer.getUnitCost(), currency));
-            remaining = remaining.subtract(restore);
-            restored = true;
+        List<Portion> portions;
+        BigDecimal totalCost;
+        if (method == CostingMethod.FIFO) {
+            portions = consumed;
+            totalCost = consumed.stream().map(Portion::totalCost).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(4, RoundingMode.HALF_UP);
+        } else {
+            BigDecimal unit = preferredUnitCost != null ? normalizeCost(preferredUnitCost) : fallback;
+            boolean depletes = quantity.compareTo(state.getQuantity()) >= 0;
+            // Full depletion transfers the exact remaining value so rounding residues never stay in stock.
+            totalCost = depletes && preferredUnitCost == null ? state.getTotalValue() : total(quantity, unit);
+            portions = List.of(new Portion(null, quantity, unit, totalCost));
         }
-        if (remaining.signum() > 0) {
-            // Historical sales created before costing was activated have no allocation rows.
-            InventoryCostLayer legacyLayer = layers.saveAndFlush(new InventoryCostLayer(
-                    cancellation.getProduct(), cancellation.getToLocation(), cancellation, remaining, remaining,
-                    scaleCost(cancellation.getUnitCost()), currency, cancellation.getOccurredAt()));
-            entries.save(new InventoryValuationEntry(cancellation, legacyLayer, method, remaining,
-                    legacyLayer.getUnitCost(), currency));
-            restored = true;
+        state.remove(quantity, totalCost);
+        if (method == CostingMethod.FIFO && state.getQuantity().signum() > 0) {
+            // Under FIFO the remaining value is exactly the value of the open layers when every unit is layered.
+            List<InventoryCostLayer> remaining = layers.findOpen(product.getId(), location.getId());
+            BigDecimal layeredQuantity = remaining.stream().map(InventoryCostLayer::getRemainingQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (layeredQuantity.compareTo(state.getQuantity()) == 0) {
+                state.replaceValue(remaining.stream().map(l -> total(l.getRemainingQuantity(), l.getUnitCost()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+            }
         }
-        entries.flush();
-        return restored;
+        BigDecimal unitCost = totalCost.divide(quantity, 4, RoundingMode.HALF_UP);
+        return new Valuation(method, false, product, location, quantity, unitCost, totalCost, product.getCurrency(), portions);
     }
 
-    private java.util.Optional<BigDecimal> findOriginalSaleUnitCost(UUID sourceLineId) {
-        if (sourceLineId == null) return java.util.Optional.empty();
-        return movements.findFirstByMovementTypeAndSourceLineIdOrderByOccurredAtAsc(MovementType.SALE, sourceLineId)
-                .flatMap(this::averageValuedUnitCost);
+    /** Values a movement that is immediately compensated (no change to layers or running state). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Valuation passThrough(Product product, WarehouseLocation location, BigDecimal quantity, BigDecimal unitCost) {
+        requirePositive(quantity);
+        BigDecimal cost = normalizeCost(unitCost);
+        BigDecimal total = total(quantity, cost);
+        return new Valuation(policy().getMethod(), false, product, location, quantity, cost, total, product.getCurrency(),
+            List.of(new Portion(null, quantity, cost, total)));
     }
 
-    private java.util.Optional<BigDecimal> averageValuedUnitCost(StockMovement movement) {
-        List<InventoryValuationEntry> movementEntries = entries.findByStockMovementIdOrderByCreatedAtAsc(movement.getId());
-        BigDecimal quantity = movementEntries.stream().map(InventoryValuationEntry::getQuantity)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (quantity.signum() == 0) return java.util.Optional.empty();
-        BigDecimal total = movementEntries.stream().map(InventoryValuationEntry::getTotalCost)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return java.util.Optional.of(total.divide(quantity, 4, RoundingMode.HALF_UP));
+    /** Appends the valuation ledger for an already persisted movement and opens its FIFO layer when inbound. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void post(StockMovement movement, Valuation valuation) {
+        if (valuation.opensLayer()) {
+            InventoryCostLayer layer = layers.save(new InventoryCostLayer(valuation.product(), valuation.location(), movement,
+                valuation.quantity(), valuation.unitCost(), valuation.currency()));
+            entries.save(new InventoryValuationEntry(movement, layer, valuation.method(), valuation.quantity(),
+                valuation.unitCost(), valuation.totalCost(), valuation.currency()));
+            return;
+        }
+        if (valuation.method() == CostingMethod.MOVING_AVERAGE || valuation.portions().size() == 1) {
+            Portion portion = valuation.portions().get(0);
+            InventoryCostLayer layer = valuation.method() == CostingMethod.FIFO ? portion.layer() : null;
+            entries.save(new InventoryValuationEntry(movement, layer, valuation.method(), valuation.quantity(),
+                valuation.unitCost(), valuation.totalCost(), valuation.currency()));
+            return;
+        }
+        for (Portion portion : valuation.portions()) {
+            entries.save(new InventoryValuationEntry(movement, portion.layer(), valuation.method(), portion.quantity(),
+                portion.unitCost(), portion.totalCost(), valuation.currency()));
+        }
     }
 
-    private void revalueOpenLayers(UUID productId, UUID locationId) {
-        List<InventoryCostLayer> open = layers.findByProductIdAndLocationIdAndRemainingQuantityGreaterThanOrderByReceivedAtAscIdAsc(
-                productId, locationId, ZERO_QTY);
-        BigDecimal quantity = open.stream().map(InventoryCostLayer::getRemainingQuantity)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (quantity.signum() == 0) return;
-        BigDecimal value = open.stream().map(layer -> layer.getRemainingQuantity().multiply(layer.getUnitCost()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal average = value.divide(quantity, 4, RoundingMode.HALF_UP);
-        open.forEach(layer -> layer.revalue(average));
+    /** Weighted unit cost recorded for a movement, or null when the movement has no valuation entries. */
+    @Transactional(readOnly = true)
+    public BigDecimal valuedUnitCost(UUID movementId) {
+        List<Object[]> rows = entries.totals(movementId);
+        if (rows.isEmpty()) return null;
+        BigDecimal quantity = (BigDecimal) rows.get(0)[0];
+        BigDecimal total = (BigDecimal) rows.get(0)[1];
+        if (quantity == null || quantity.signum() == 0) return null;
+        return total.divide(quantity, 4, RoundingMode.HALF_UP);
     }
 
-    private CostingMethod policy() {
-        return configs.findBySingletonKey("DEFAULT")
-                .map(InventoryCostingConfig::getMethod)
-                .orElseThrow(() -> new ResourceNotFoundException("Política de valoración", "DEFAULT"));
+    /** Best estimate of the current replacement cost: running average, last layer cost or catalog cost. */
+    @Transactional(readOnly = true)
+    public BigDecimal currentUnitCost(Product product, WarehouseLocation location) {
+        BigDecimal average = states.find(product.getId(), location.getId()).map(InventoryCostState::averageCost).orElse(null);
+        if (average != null) return average;
+        return layers.findLatest(product.getId(), location.getId()).stream().findFirst()
+            .map(InventoryCostLayer::getUnitCost).orElse(normalizeCost(product.getCostPrice()));
     }
 
-    private BigDecimal scaleCost(BigDecimal value) {
-        if (value == null || value.signum() < 0) throw new BusinessRuleException("El costo unitario no puede ser negativo.");
+    private InventoryCostState lockState(Product product, WarehouseLocation location) {
+        states.insertIfAbsent(UUID.randomUUID(), product.getId(), location.getId(), product.getCurrency());
+        return states.findForUpdate(product.getId(), location.getId())
+            .orElseThrow(() -> new IllegalStateException("No se pudo asegurar el estado de valoración."));
+    }
+
+    private static BigDecimal total(BigDecimal quantity, BigDecimal unitCost) {
+        return quantity.multiply(unitCost).setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal normalizeCost(BigDecimal value) {
+        if (value == null || value.signum() < 0) return BigDecimal.ZERO.setScale(4);
         return value.setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private static void requirePositive(BigDecimal quantity) {
+        if (quantity == null || quantity.signum() <= 0) throw new IllegalArgumentException("La cantidad valorizada debe ser positiva.");
     }
 }

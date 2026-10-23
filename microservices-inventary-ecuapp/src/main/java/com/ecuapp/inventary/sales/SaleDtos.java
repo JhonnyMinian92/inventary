@@ -18,9 +18,11 @@ public final class SaleDtos {
  }
  public record ItemView(UUID id,UUID productId,String sku,String productName,BigDecimal quantity,BigDecimal unitPrice,BigDecimal lineTotal){}
  public record View(UUID id,String saleNumber,SaleStatus status,UUID customerId,String customerName,String customerPhone,SaleChannel channel,
-  UUID warehouseId,String warehouseCode,BigDecimal subtotal,BigDecimal tax,BigDecimal total,String currency,String createdBy,Instant soldAt,List<ItemView> items){
+  UUID warehouseId,String warehouseCode,BigDecimal subtotal,BigDecimal tax,BigDecimal total,String currency,String createdBy,Instant soldAt,
+  String cancellationReason,String cancellationRequestedBy,Instant cancellationRequestedAt,String cancellationApprovedBy,Instant cancellationApprovedAt,List<ItemView> items){
   static View from(Sale s){return new View(s.getId(),s.getSaleNumber(),s.getStatus(),s.getCustomer()==null?null:s.getCustomer().getId(),s.getCustomerName(),s.getCustomerPhone(),s.getChannel(),
    s.getWarehouse().getId(),s.getWarehouse().getCode(),s.getSubtotal(),s.getTax(),s.getTotal(),s.getCurrency(),s.getCreatedBy(),s.getSoldAt(),
+   s.getCancellationReason(),s.getCancellationRequestedBy(),s.getCancellationRequestedAt(),s.getCancellationApprovedBy(),s.getCancellationApprovedAt(),
    s.getItems().stream().map(i->new ItemView(i.getId(),i.getProduct().getId(),i.getSkuSnapshot(),i.getProductNameSnapshot(),i.getQuantity(),i.getUnitPrice(),i.getLineTotal())).toList());}
  }
 }

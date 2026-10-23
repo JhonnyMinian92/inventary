@@ -13,8 +13,18 @@ public interface WhatsAppOrderRepository extends JpaRepository<WhatsAppOrder,UUI
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select o from WhatsAppOrder o where o.id=:id")
  Optional<WhatsAppOrder> findForUpdate(@Param("id") UUID id);
- @EntityGraph(attributePaths={"items","items.product","cart","quote","warehouse"})
+ @EntityGraph(attributePaths={"items","items.product","cart","quote","warehouse","sale"})
  @Query("select distinct o from WhatsAppOrder o where o.id=:id")
  Optional<WhatsAppOrder> findDetailedById(@Param("id") UUID id);
  List<WhatsAppOrder> findByStatusAndExpiresAtBefore(WhatsAppOrderStatus status,Instant instant);
+ @EntityGraph(attributePaths={"cart","quote","warehouse","sale"})
+ @Query("""
+  select o from WhatsAppOrder o
+  where (:status is null or o.status=:status)
+  and (:customerRef is null or o.customerRef=:customerRef)
+  and o.createdAt>=:fromTime
+  and o.createdAt<:toTime
+  """)
+ org.springframework.data.domain.Page<WhatsAppOrder> search(@Param("status") WhatsAppOrderStatus status,@Param("customerRef") String customerRef,
+  @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,org.springframework.data.domain.Pageable pageable);
 }

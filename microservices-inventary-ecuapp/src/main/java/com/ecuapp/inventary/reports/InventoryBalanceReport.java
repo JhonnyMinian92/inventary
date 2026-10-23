@@ -8,6 +8,7 @@ import java.util.UUID;
 public record InventoryBalanceReport(
         LocalDate from,
         LocalDate to,
+        String zone,
         UUID warehouseId,
         Instant generatedAt,
         int page,
