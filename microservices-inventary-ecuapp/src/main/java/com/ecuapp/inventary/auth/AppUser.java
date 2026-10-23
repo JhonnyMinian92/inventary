@@ -23,4 +23,7 @@ public class AppUser {
     public String getPasswordHash(){return passwordHash;}
     public String getRole(){return role;}
     public boolean isActive(){return active;}
+ public void setActive(boolean active){this.active=active;}
+ public void updateRole(String role){this.role=role;}
+ public void updatePasswordHash(String passwordHash){this.passwordHash=passwordHash;}
 }
