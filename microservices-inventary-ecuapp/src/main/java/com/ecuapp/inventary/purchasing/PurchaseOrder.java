@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.purchasing;
 
 import com.ecuapp.inventary.partners.BusinessPartner;
+import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.warehouse.Warehouse;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -32,9 +33,9 @@ public class PurchaseOrder {
  }
  @PrePersist void onCreate(){if(createdAt==null)createdAt=Instant.now();if(orderedAt==null)orderedAt=Instant.now();}
  public void addLine(PurchaseOrderLine line){lines.add(line);line.setPurchaseOrder(this);}
- public void submit(){if(status!=PurchaseOrderStatus.DRAFT)throw new IllegalStateException("Solo se puede enviar una orden en borrador.");status=PurchaseOrderStatus.SUBMITTED;}
- public void approve(){if(status!=PurchaseOrderStatus.SUBMITTED)throw new IllegalStateException("Solo se puede aprobar una orden enviada.");status=PurchaseOrderStatus.APPROVED;}
- public void cancel(){if(status!=PurchaseOrderStatus.DRAFT&&status!=PurchaseOrderStatus.SUBMITTED)throw new IllegalStateException("Solo se puede cancelar una orden antes de aprobar/recibir.");status=PurchaseOrderStatus.CANCELLED;}
+ public void submit(){if(status!=PurchaseOrderStatus.DRAFT)throw new ConflictException("Solo se puede enviar una orden en borrador.");status=PurchaseOrderStatus.SUBMITTED;}
+ public void approve(){if(status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede aprobar una orden enviada.");status=PurchaseOrderStatus.APPROVED;}
+ public void cancel(){if(status!=PurchaseOrderStatus.DRAFT&&status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede cancelar una orden antes de aprobar/recibir.");status=PurchaseOrderStatus.CANCELLED;}
  public void recalculateReceiptStatus(){
   if(lines.stream().allMatch(l->l.remaining().signum()==0)){status=PurchaseOrderStatus.RECEIVED;return;}
   if(lines.stream().anyMatch(l->l.getReceivedQuantity().signum()>0))status=PurchaseOrderStatus.PARTIALLY_RECEIVED;
