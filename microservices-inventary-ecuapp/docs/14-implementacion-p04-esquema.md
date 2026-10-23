@@ -23,7 +23,8 @@ Completar el esquema relacional del MVP con una migración Flyway incremental, m
 - `Product` ahora mapea tipo, unidad y atributos JSONB versionados.
 - `StockBalance` y `StockMovement` incluyen referencias de ubicación y metadatos del movimiento.
 - Repositorios Spring Data para consultar las nuevas entidades.
-- El servicio de almacenes crea una ubicación principal al crear un almacén, y el servicio de inventario usa esa ubicación al crear el primer saldo.
+- El servicio de almacenes crea una ubicación principal al crear un almacén, y los flujos de inventario, recepción de compras, devolución de ventas y recepción de transferencias usan esa ubicación al crear el primer saldo.
+- Los flujos de compras y ventas rechazan productos que no estén clasificados como bienes con control de stock.
 - Los ajustes físicos rechazan productos de tipo servicio o sin control de stock.
 
 ## Compatibilidad y límites de la migración
