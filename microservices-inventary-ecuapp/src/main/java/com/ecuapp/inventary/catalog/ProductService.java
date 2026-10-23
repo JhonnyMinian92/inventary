@@ -1,5 +1,7 @@
 package com.ecuapp.inventary.catalog;
 
+import com.ecuapp.inventary.catalog.application.PageQuery;
+import com.ecuapp.inventary.catalog.application.PageResult;
 import com.ecuapp.inventary.catalog.application.ProductCommand;
 import com.ecuapp.inventary.catalog.application.ProductResult;
 import com.ecuapp.inventary.catalog.application.ProductResultMapper;
@@ -12,6 +14,7 @@ import java.util.Map;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import com.ecuapp.inventary.inventory.StockBalanceRepository;
 import org.springframework.data.domain.*;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -62,8 +65,15 @@ public class ProductService implements ProductUseCases {
  }
  @Transactional public void deactivate(UUID id,String actor){Product p=require(id);p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));}
  @Override @Transactional(readOnly=true)
- public Page<ProductResult> listProducts(String query,Pageable pageable){
-  return list(query,pageable).map(view->new ProductResult(view.id(),view.sku(),view.name(),view.description(),view.categoryId(),view.categoryName(),view.salePrice(),view.currency(),view.imageUrl(),view.active(),view.createdAt(),view.updatedAt()));
+ public PageResult<ProductResult> listProducts(String query,PageQuery page){
+  Sort sort = page.sort().isEmpty() ? Sort.by("name").ascending() : Sort.by(page.sort().stream()
+    .map(term -> new Sort.Order(term.direction() == PageQuery.Direction.DESC ? Sort.Direction.DESC : Sort.Direction.ASC, term.property()))
+    .toList());
+  Pageable pageable = PageRequest.of(page.page(), Math.min(page.size(), 100), sort);
+  Page<ProductDtos.View> result = list(query, pageable);
+  return new PageResult<>(result.getContent().stream()
+    .map(view -> new ProductResult(view.id(),view.sku(),view.name(),view.description(),view.categoryId(),view.categoryName(),view.salePrice(),view.currency(),view.imageUrl(),view.active(),view.createdAt(),view.updatedAt()))
+    .toList(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
  }
  @Override @Transactional(readOnly=true)
  public ProductResult getProduct(UUID id){return ProductResultMapper.from(require(id));}
