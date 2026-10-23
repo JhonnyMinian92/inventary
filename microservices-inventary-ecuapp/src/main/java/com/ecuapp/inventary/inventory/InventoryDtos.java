@@ -16,7 +16,8 @@ public final class InventoryDtos {
   static BalanceView from(StockBalance b){return new BalanceView(b.getId(),b.getProduct().getId(),b.getProduct().getSku(),b.getProduct().getName(),b.getWarehouse().getId(),b.getWarehouse().getCode(),b.getOnHand(),b.getReserved(),b.available(),b.getVersion());}
  }
  public record MovementView(UUID id,UUID productId,String sku,UUID warehouseId,String warehouseCode,MovementType type,
-   BigDecimal quantity,BigDecimal unitCost,String referenceType,UUID referenceId,String notes,String createdBy,Instant occurredAt){
-  static MovementView from(StockMovement m){return new MovementView(m.getId(),m.getProduct().getId(),m.getProduct().getSku(),m.getWarehouse().getId(),m.getWarehouse().getCode(),m.getMovementType(),m.getQuantity(),m.getUnitCost(),m.getReferenceType(),m.getReferenceId(),m.getNotes(),m.getCreatedBy(),m.getOccurredAt());}
+   BigDecimal quantity,BigDecimal unitCost,String referenceType,UUID referenceId,UUID fromLocationId,UUID toLocationId,
+   String unitOfMeasureCode,UUID sourceLineId,String correlationId,String notes,String createdBy,Instant occurredAt){
+  static MovementView from(StockMovement m){return new MovementView(m.getId(),m.getProduct().getId(),m.getProduct().getSku(),m.getWarehouse().getId(),m.getWarehouse().getCode(),m.getMovementType(),m.getQuantity(),m.getUnitCost(),m.getReferenceType(),m.getReferenceId(),m.getFromLocation()==null?null:m.getFromLocation().getId(),m.getToLocation()==null?null:m.getToLocation().getId(),m.getUnitOfMeasure()==null?null:m.getUnitOfMeasure().getCode(),m.getSourceLineId(),m.getCorrelationId(),m.getNotes(),m.getCreatedBy(),m.getOccurredAt());}
  }
 }
