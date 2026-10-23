@@ -2,6 +2,7 @@ package com.ecuapp.inventary.sales;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -17,7 +18,7 @@ public class SalesController {
  public Page<SaleDtos.View> list(@PageableDefault(size=20,sort="soldAt,desc") Pageable p){return service.list(p);}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAuthority('sales:manage')")
+ @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
  public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
  // A seller cannot approve cancellation of a completed sale.
  @PostMapping("/{id}/cancel") @PreAuthorize("hasAuthority('sales:cancel')")

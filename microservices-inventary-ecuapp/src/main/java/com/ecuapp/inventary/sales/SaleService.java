@@ -73,7 +73,7 @@ public class SaleService {
   Optional<Sale> legacy=sales.findByIdempotencyKey(key);
   if(legacy.isPresent()){
    Sale previous=legacy.get();
-   if(!hash.equals(previous.getRequestHash()))
+   if(!hash.equals(previous.getRequestHash())&&!legacyRequestHash(request).equals(previous.getRequestHash()))
     throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
    record.markCompleted("SALE",previous.getId(),(short)201);
    idempotencyRecords.saveAndFlush(record);
@@ -216,6 +216,10 @@ public class SaleService {
   }catch(JsonProcessingException ex){
    throw new BusinessRuleException("No se pudo validar el contenido de la solicitud.");
   }
+ }
+ private String legacyRequestHash(SaleDtos.CreateRequest request){
+  try{return sha256(mapper.writeValueAsString(request));}
+  catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar el contenido de la solicitud.");}
  }
  private String sha256(String value){
   try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
