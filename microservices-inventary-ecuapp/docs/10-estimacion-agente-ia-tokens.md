@@ -53,15 +53,15 @@ Horas = tiempo activo estimado del agente por trabajo (lectura, edición, llamad
 | AI-23 | Revisión estática de seguridad, límites, autorización por objeto y controles de inventario; corrección visible | 3–6 h | 80k–155k |
 | AI-24 | Reconciliar documentación con el código final y registrar pendientes del propietario | 1–2 h | 25k–45k |
 
-### Totales iniciales
+### Totales actualizados para el backend MVP ampliado
 
-- **Tiempo activo del agente:** aproximadamente 67–125 horas para implementar y autocorregir el MVP extendido con GraphQL, Kafka/Outbox, caché y estrategia de escalado.
-- **Tokens sumados por tarea (sin contingencia):** aproximadamente 1.65–2.95 millones de tokens incluyendo los componentes de escalabilidad añadidos.
-- **Reserva para retrabajo de código, cambios de contexto y decisiones posteriores (25 %):** aproximadamente 0.4–0.75 millones de tokens.
-- **Presupuesto recomendado del proyecto completo actualizado:** **2.1–3.7 millones de tokens agregados**.
-- **Tiempo de pared orientativo actualizado:** 9–18 días laborables de ejecución continua de un agente competente; para trabajo con aprobaciones, límites de proveedor e iteraciones: 3–5 semanas o más.
+- **Tiempo activo del agente:** aproximadamente 67–125 horas para implementar y autocorregir el MVP con GraphQL, Kafka/Outbox, caché y estrategia de escalado.
+- **Tokens agregados de todas las tareas (sin contingencia):** aproximadamente 1.65–2.95 millones.
+- **Reserva para retrabajo/contexto (aproximadamente 25 %):** 0.4–0.75 millones de tokens.
+- **Presupuesto recomendado del proyecto completo:** **2.1–3.7 millones de tokens agregados**.
+- **Tiempo de pared orientativo:** 9–18 días laborables de ejecución continua de un agente competente, o 3–5 semanas con aprobaciones, límites del proveedor e iteraciones.
 
-Las sumas tienen margen y no son mediciones observadas. AI-16 es condicional; si se pospone lote/serie/FEFO puede reducir consumo inicial, pero incorporarlo posteriormente puede causar migraciones que aumenten el costo. Las tareas parcialmente paralelizables no garantizan que el tiempo total sea la suma exacta de horas activas.
+Estos rangos son estimaciones de planificación, no una medición observada ni una garantía. AI-16 (lotes/series/FEFO) es condicional. La suma de tareas no corresponde exactamente al tiempo de pared si algunas pueden hacerse en paralelo, ni incluye pruebas ejecutadas por el agente.
 
 ## 4. Qué significa el consumo de tokens
 
