@@ -6,15 +6,9 @@ Esta carpeta es la especificación de referencia para diseñar e implementar el 
 
 ## Estado comprobado del repositorio
 
-La revisión estática del árbol de la rama base encontró:
+El backend ya contiene una aplicación Spring Boot con endpoints REST, servicios, entidades JPA, repositorios, migraciones Flyway y configuración de seguridad. La arquitectura se está migrando gradualmente hacia un monolito modular con límites hexagonales; no todos los módulos históricos están migrados todavía.
 
-- Aplicación Spring Boot de arranque en Java 21 (InventaryApplication).
-- pom.xml con spring-boot-starter y spring-boot-starter-test.
-- application.yaml solo declara spring.application.name: inventary.
-- No se encontraron controladores REST, casos de uso, entidades de dominio, repositorios, migraciones, configuración de seguridad ni persistencia.
-- Existe una prueba de contexto Spring, pero esta revisión documental no la ejecuta.
-
-Por tanto, el backend se considera **esqueleto inicial** y la API que sigue es una propuesta de contrato objetivo, no una descripción de rutas existentes.
+La entrega P03 establece una primera rebanada vertical en catálogo de productos: puerto de entrada de casos de uso, comandos/resultados de aplicación, puerto de persistencia, adaptador JPA, DTOs HTTP y errores RFC 9457. El alcance exacto y el límite pendiente del modelo JPA se describen en [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md). Las pruebas y la compilación no se ejecutaron y quedan para la fase final.
 
 ## Documentos
 
@@ -32,6 +26,7 @@ Por tanto, el backend se considera **esqueleto inicial** y la API que sigue es u
 | [10 — Estimación del agente IA y tokens](10-estimacion-agente-ia-tokens.md) | Tiempo por tarea, tokens orientativos, presupuesto total y factores que modifican la estimación. |
 | [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md) | Decisiones sobre transacciones, eventos, caché, DataSource/pools, réplicas, particionamiento y vector search. |
 | [12 — Decisiones P01](12-decisiones-p01.md) | Defaults de MVP, alcance, roles, permisos y reglas de negocio para desbloquear la implementación. |
+| [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md) | Estado real de capas, puertos, adaptadores, errores y límites de la migración. |
 
 ## Convenciones
 
