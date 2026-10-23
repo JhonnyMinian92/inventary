@@ -313,3 +313,8 @@ Regla: un evento de Kafka solo comunica un cambio ya confirmado. Si Kafka o n8n 
 4. Cancelar en borrador sin ledger; cancelar en tránsito repone el origen mediante `TRANSFER_IN` compensatorio antes de pasar a CANCELLED.
 5. Revertir solo una transferencia completada: bloquear saldos de origen/destino en orden estable, comprobar que el destino tenga stock disponible, descontar destino y reponer origen con dos movimientos compensatorios. Marcar REVERSED con actor y motivo.
 6. Las claves idempotentes evitan aplicar dos veces una transición; los movimientos históricos son inmutables y toda la compensación comparte una transacción con auditoría y Outbox.
+
+
+## P11 — Auditoría de errores y correlación
+
+Las respuestas HTTP de error de `/api/**` conservan el contrato RFC 9457 y se correlacionan mediante `X-Request-ID`/`requestId`. Los fallos se registran sin cuerpos ni credenciales. La consulta de eventos requiere `audit:read`, permite filtros acotados y pagina hasta 100 elementos. OpenAPI describe seguridad Bearer, clave de integración y respuestas comunes.

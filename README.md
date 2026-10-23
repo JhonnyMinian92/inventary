@@ -141,3 +141,7 @@ Este diseño garantiza que **Inventary** no sea un simple CRUD. Al combinar el p
 ## Documentación de implementación del backend
 
 La especificación del backend, el contrato REST propuesto, los requerimientos, los diagramas, los controles de seguridad y el plan de trabajo se encuentran en [la documentación del backend](microservices-inventary-ecuapp/docs/README.md).
+
+## Estado del backend
+
+El estado vigente se registra en [la documentación técnica del backend](microservices-inventary-ecuapp/docs/README.md). P11 incorpora trazabilidad de fallos HTTP, consulta acotada de auditoría, errores RFC 9457 y OpenAPI sincronizado con los controladores. La validación local permanece pendiente hasta completar la implementación fuente acordada.

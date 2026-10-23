@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -99,7 +100,8 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.GET,"/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:read")
     .requestMatchers("/api/v1/sales/**","/api/v1/sales-returns/**").hasAuthority("sales:manage")
     .requestMatchers("/graphql").hasAuthority("catalog:read").anyRequest().denyAll())
-   .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users,roles))));
+   .oauth2ResourceServer(oauth->oauth.jwt(jwt->jwt.jwtAuthenticationConverter(jwtAuthenticationConverter(users,roles))))
+   .addFilterAfter(new AuthenticatedActorCaptureFilter(), BearerTokenAuthenticationFilter.class);
   return http.build();
  }
  @Bean ApplicationRunner bootstrapAdmin(AppUserRepository users,PasswordEncoder encoder,PasswordPolicy policy,

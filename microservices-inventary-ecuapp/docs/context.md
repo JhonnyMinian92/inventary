@@ -7,10 +7,14 @@ Implementar un backend de inventario mantenible y seguro para administrar catál
 ## Estado base confirmado
 
 - Aplicación de arranque Spring Boot en Java 21.
-- POM con starter básico y dependencia de pruebas; sin dependencia visible de Spring Web, seguridad, JPA ni driver de base de datos.
-- application.yaml declara únicamente el nombre de la aplicación.
-- No hay controladores REST, modelo de dominio, repositorios, migraciones ni políticas de seguridad implementadas.
+- Backend implementado con Spring Boot 3.5, Java 21, Spring MVC, JPA, PostgreSQL, Flyway, JWT HS256/RBAC y controladores REST.
+- Hay migraciones incrementales, catálogo, inventario, compras, ventas, devoluciones, transferencias y auditoría.
+- Las guías P03–P11 documentan el estado de implementación y distinguen el código fuente de las validaciones aplazadas.
 - La documentación de las APIs describe el estado objetivo, no rutas existentes.
+
+## Estado P11 — auditoría, documentación y API
+
+P11 agrega correlación `X-Request-ID`, errores RFC 9457, registro de fallos HTTP sin cuerpos ni credenciales, filtros de auditoría paginados y OpenAPI con seguridad Bearer/clave de integración. Véase [21 — Implementación P11](21-implementacion-p11-auditoria-documentacion-api.md). La validación local queda aplazada hasta completar toda la implementación fuente acordada.
 
 ## Orden de lectura obligatorio
 

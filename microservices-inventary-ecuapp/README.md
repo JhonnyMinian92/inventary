@@ -255,3 +255,13 @@ Aún requieren validación/implementación adicional: integración de pagos y es
 ## Transferencias entre almacenes
 
 Los comandos de creación, despacho, recepción, cancelación y reversión requieren `Idempotency-Key`. Si una transferencia en tránsito se cancela, se restaura el stock del origen con un movimiento compensatorio; una transferencia completada se revierte mediante `POST /api/v1/inventory/transfers/{id}/reverse` y un motivo obligatorio. La reversión descuenta el destino y repone el origen en una transacción, sin editar movimientos históricos. Ver [P10 — Transferencias consistentes](docs/20-implementacion-p10-transferencias-consistentes.md).
+
+
+## Auditoría, errores y OpenAPI (P11)
+
+- La bitácora se consulta con `GET /api/v1/audit-events`, permiso `audit:read`, filtros por actor/acción/recurso/resultado/intervalo y paginación máxima de 100 eventos.
+- Cada respuesta REST incluye `X-Request-ID`. Se acepta un valor entrante solo si cumple el patrón seguro; de lo contrario se genera uno nuevo. El mismo valor aparece en el cuerpo del error como `requestId`.
+- Los errores siguen `application/problem+json`. Los errores inesperados no exponen stack traces, SQL ni secretos; los detalles técnicos se registran en logs del servidor junto al requestId.
+- Los errores HTTP de `/api/**` generan eventos de auditoría con actor disponible, ruta sin query string, método, estado y correlación. Nunca se guardan cuerpos ni credenciales.
+- OpenAPI descubre las rutas de los controladores. JWT Bearer se documenta para rutas privadas y `X-Integration-Key` para WhatsApp. Habilita Swagger solo en desarrollo con `SWAGGER_ENABLED=true`.
+- Véase [21 — Implementación P11](docs/21-implementacion-p11-auditoria-documentacion-api.md) y [05 — Catálogo de APIs](docs/05-catalogo-apis.md).
