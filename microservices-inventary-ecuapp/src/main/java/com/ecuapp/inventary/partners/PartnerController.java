@@ -14,9 +14,9 @@ public class PartnerController {
  private final PartnerService service;
  public PartnerController(PartnerService service){this.service=service;}
 
- @GetMapping("/api/v1/suppliers") public Page<PartnerDtos.View> suppliers(@PageableDefault(size=20,sort="name") Pageable p){return service.list(PartnerType.SUPPLIER,p);}
- @GetMapping("/api/v1/suppliers/{id}") public PartnerDtos.View supplier(@PathVariable UUID id){return service.get(PartnerType.SUPPLIER,id);}
- @PostMapping("/api/v1/suppliers") @PreAuthorize("hasAuthority('partners:manage')")
+ @GetMapping("/api/v1/suppliers") @PreAuthorize("hasAuthority('purchasing:read')") public Page<PartnerDtos.View> suppliers(@PageableDefault(size=20,sort="name") Pageable p){return service.list(PartnerType.SUPPLIER,p);}
+ @GetMapping("/api/v1/suppliers/{id}") @PreAuthorize("hasAuthority('purchasing:read')") public PartnerDtos.View supplier(@PathVariable UUID id){return service.get(PartnerType.SUPPLIER,id);}
+ @PostMapping("/api/v1/suppliers") @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('partners:manage')")
  public PartnerDtos.View createSupplier(@Valid @RequestBody PartnerDtos.WriteRequest r,Authentication a){return service.create(PartnerType.SUPPLIER,r,a.getName());}
  @PutMapping("/api/v1/suppliers/{id}") @PreAuthorize("hasAuthority('partners:manage')")
  public PartnerDtos.View updateSupplier(@PathVariable UUID id,@Valid @RequestBody PartnerDtos.WriteRequest r,Authentication a){return service.update(PartnerType.SUPPLIER,id,r,a.getName());}
