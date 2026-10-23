@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/inventory/transfers")
-@PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','AUDITOR')")
+@PreAuthorize("hasAnyAuthority('inventory:manage','audit:read')")
 public class StockTransferController {
  private final StockTransferService service;
  public StockTransferController(StockTransferService service){this.service=service;}

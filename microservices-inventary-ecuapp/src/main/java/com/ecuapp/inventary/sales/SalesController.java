@@ -17,10 +17,10 @@ public class SalesController {
  public Page<SaleDtos.View> list(@PageableDefault(size=20,sort="soldAt,desc") Pageable p){return service.list(p);}
  @GetMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES','AUDITOR')")
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','SALES')")
+ @PostMapping @PreAuthorize("hasAuthority('sales:manage')")
  public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
  // A seller cannot approve cancellation of a completed sale.
- @PostMapping("/{id}/cancel") @PreAuthorize("hasRole('ADMIN')")
+ @PostMapping("/{id}/cancel") @PreAuthorize("hasAuthority('sales:cancel')")
  public SaleDtos.View cancel(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody CancelRequest request,Authentication auth){return service.cancel(id,key,request.reason(),auth.getName());}
  public record CancelRequest(@NotBlank @Size(max=1000) String reason){}
 }

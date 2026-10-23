@@ -53,6 +53,7 @@ public class RoleManagementService {
  private Set<AppPermission> resolvePermissions(Set<String> codes){
   Set<AppPermission> result=new LinkedHashSet<>();
   for(String raw:codes){
+   if(raw==null)throw new BusinessRuleException("El conjunto de permisos contiene un valor nulo.");
    String code=raw.trim().toLowerCase(Locale.ROOT);
    AppPermission permission=permissions.findByCodeAndActiveTrue(code)
     .orElseThrow(()->new BusinessRuleException("Uno o más permisos no existen o están inactivos."));

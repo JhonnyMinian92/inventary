@@ -9,8 +9,8 @@ import java.util.UUID;
 public class SalesReturnController {
  private final SalesReturnService service;
  public SalesReturnController(SalesReturnService service){this.service=service;}
- @GetMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES','AUDITOR')")
+ @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
  public SalesReturnDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','SALES')")
+ @PostMapping @PreAuthorize("hasAuthority('sales:manage')")
  public SalesReturnDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SalesReturnDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
 }

@@ -9,8 +9,8 @@ import java.util.UUID;
 public class PurchaseReturnController {
  private final PurchaseReturnService service;
  public PurchaseReturnController(PurchaseReturnService service){this.service=service;}
- @GetMapping("/{id}") @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER','AUDITOR')")
+ @GetMapping("/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
  public PurchaseReturnDtos.View get(@PathVariable UUID id){return service.get(id);}
- @PostMapping @PreAuthorize("hasAnyRole('ADMIN','INVENTORY_MANAGER')")
+ @PostMapping @PreAuthorize("hasAuthority('purchasing:manage')")
  public PurchaseReturnDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody PurchaseReturnDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
 }
