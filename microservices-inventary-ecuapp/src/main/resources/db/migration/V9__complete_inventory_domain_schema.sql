@@ -11,7 +11,7 @@ CREATE TABLE unit_of_measure (
 );
 
 INSERT INTO unit_of_measure(id,code,name,dimension,decimal_scale)
-VALUES ('00000000-0000-0000-0000-000000000001','EA','Unidad','COUNT',0);
+VALUES ('00000000-0000-0000-0000-000000000001','EA','Unidad','COUNT',3);
 
 CREATE TABLE unit_conversion (
  id UUID PRIMARY KEY,
