@@ -191,3 +191,80 @@ flowchart TD
 - Clave idempotente igual y payload igual: devolver respuesta original; mismo key con payload diferente: 409.
 - Error inesperado: rollback y 500 genérico + correlation ID; detalle solo en logs protegidos.
 - Fallo de API externa: no mantener locks de inventario durante la llamada; marcar operación pendiente/reintentar con outbox o compensación definida.
+
+## 11. Catálogo público para sitio/canal de venta
+
+~~~mermaid
+flowchart TD
+    A[GET public catalog] --> B[Rate limit + validate filters/page]
+    B --> C[Filter active and publishable products]
+    C --> D[Project public DTO]
+    D --> E[Expose price, description, image URL and sale availability]
+    E --> F[Return paginated response]
+~~~
+
+- Consultar los filtros con parámetros validados y orden allowlisted.
+- Leer precio de venta vigente y disponibilidad vendible; nunca enviar precio de compra/margen.
+- URL de imagen estable HTTPS o medio subido al proveedor de mensajería; un path local no es accesible por Meta.
+- No usar el número devuelto de stock como reserva. Una orden ejecuta su propia validación transaccional.
+- Aplicar rate limiting, paginación pequeña, caché prudente y protección contra scraping.
+
+## 12. Compra por WhatsApp mediante n8n + OpenAI
+
+~~~mermaid
+sequenceDiagram
+    actor Customer as Cliente
+    participant Meta as WhatsApp Cloud API
+    participant N8N as n8n
+    participant AI as OpenAI API
+    participant API as Inventary API
+    participant DB as PostgreSQL
+    Customer->>Meta: "Quiero comprar dos artículos"
+    Meta->>N8N: Webhook con mensaje y wa_id
+    N8N->>N8N: Validar evento y deduplicar messageId
+    N8N->>AI: Mensaje y herramientas limitadas
+    AI-->>N8N: Llamada sugerida para buscar producto
+    N8N->>API: GET catálogo con credencial de servicio
+    API->>DB: Leer datos publicables
+    DB-->>API: Productos actuales
+    API-->>N8N: Precio, descripción, imagen y disponibilidad
+    N8N->>AI: Resultado del catálogo
+    AI-->>N8N: Propuesta de producto/cantidad
+    N8N->>API: Actualizar carrito y crear cotización
+    API->>DB: Validar líneas y recalcular precio
+    API-->>N8N: Quote ID, líneas, total y expiración
+    N8N->>Meta: Enviar resumen de compra
+    Meta->>Customer: Mostrar resumen y pedir confirmación
+    Customer->>Meta: Confirmación explícita
+    Meta->>N8N: Confirmación con messageId verificado
+    N8N->>API: POST order + quoteId + Idempotency-Key
+    API->>DB: TX: revalidar quote/stock, crear pedido + reserva + auditoría
+    DB-->>API: Commit o conflicto
+    API-->>N8N: Número y estado real del pedido
+    N8N->>Meta: Confirmación o mensaje para recotizar
+    Meta->>Customer: Resultado
+~~~
+
+### Flujo por endpoint
+
+1. GET catálogo: devolver solo DTO público y disponibilidad de venta; respuesta no crea reserva.
+2. Crear/recuperar carrito: asociar a un identificador del canal derivado del webhook validado y guardar la relación en servidor.
+3. Añadir/quitar líneas: validar producto/variante, estado y cantidad; no aceptar precio ni descuento impuestos del agente.
+4. Cotizar: volver a leer los precios; calcular subtotales y total en backend; aplicar caducidad a quote; no confirmar stock reservado todavía.
+5. Mostrar resumen: n8n envía al cliente los productos, cantidades, precios, total y método de entrega. Un mensaje tipo “sí” fuera de contexto o un tool call del modelo no es suficiente; la confirmación debe estar ligada al quote actual.
+6. Crear pedido: verificar expiración, versión/precios de quote, identidad del workflow, mensaje real de confirmación y clave idempotente; dentro de una transacción, revalidar disponibilidad y crear pedido/reservas.
+7. Resultado: informar AWAITING_PAYMENT o el estado que realmente esté almacenado. No llamar PAID a un pedido sin confirmación de pago verificada.
+8. Si se agotó stock o cambió el precio: no crear el pedido silenciosamente; devolver conflicto y pedir al cliente que acepte una nueva cotización.
+9. Si webhook/workflow reintenta: la combinación de messageId, quoteId y Idempotency-Key evita duplicidad de pedidos.
+
+### Condición de red para webhook
+
+Meta necesita un HTTPS accesible desde internet para los webhooks; localhost no basta. El backend puede permanecer privado y n8n self-hosted puede ejecutarse en local durante desarrollo si el callback se publica mediante túnel HTTPS temporal seguro. En producción se debe configurar un callback estable con TLS, protección y monitoreo.
+
+### Responsabilidades estrictas
+
+- OpenAI interpreta intención y propone funciones, pero no determina stock, precio, descuentos, pago ni identidad.
+- n8n valida las llamadas sugeridas, pasa credenciales de máquina protegidas y registra el resultado del backend.
+- Inventary es la única autoridad para cotizar, reservar stock y persistir el pedido.
+- La creación de pedido exige confirmación explícita de resumen al cliente.
+- No facilitar al LLM SQL, administración de catálogo, modificación de stock o acceso general a clientes.
