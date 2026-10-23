@@ -107,9 +107,9 @@ Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálog
 | Ventas | `/api/v1/sales` | Registrar ventas, consulta paginada y detalle |
 | Devoluciones de venta | `/api/v1/sales-returns` | Restock o merma, limitando el total devuelto a la cantidad original |
 | Clientes | `/api/v1/customers` | Crear y mantener contactos de cliente |
-| Proveedores | `/api/v1/suppliers` | Crear y mantener contactos de proveedor |
-| Compras | `/api/v1/purchase-orders` | Borrador, envío, aprobación, cancelación permitida y consulta |
-| Recepciones | `POST /api/v1/purchase-orders/{id}/receipts`, `GET /api/v1/goods-receipts/{id}` | Recepción parcial e idempotente, actualiza saldo y ledger en transacción |
+| Proveedores | `/api/v1/suppliers` | CRUD de contactos; lectura protegida por `purchasing:read` |
+| Compras | `/api/v1/purchase-orders` | Crear idempotentemente, enviar, aprobar, cancelar antes de aprobación y consultar |
+| Recepciones | `POST /api/v1/purchase-orders/{id}/receipts`, `GET /api/v1/goods-receipts/{id}` | Recepción parcial idempotente; actualiza saldo, ledger, auditoría y Outbox en transacción |
 | Devoluciones a proveedor | `/api/v1/purchase-returns` | Devolver cantidades de recepciones verificadas; impide exceder el recibido o el stock |
 | Auditoría | `GET /api/v1/audit-events` | Lectura restringida a ADMIN/AUDITOR |
 | Integración WhatsApp/n8n | `/api/v1/integrations/whatsapp/**` | Catálogo por SKU/UUID, carrito, cotización temporal y orden pendiente de pago |
@@ -155,6 +155,42 @@ Content-Type: application/json
 ```
 
 La creación captura el saldo esperado y la cantidad física contada. Consulta el conteo en `GET /api/v1/inventory/counts/{id}`; después, `POST /api/v1/inventory/counts/{id}/post` aplica únicamente la diferencia. Si el saldo cambió desde la captura, la contabilización se rechaza para evitar sobrescribir movimientos posteriores. `POST /api/v1/inventory/counts/{id}/cancel` cancela solo conteos abiertos. Las líneas capturadas no se editan; una corrección requiere un nuevo conteo.
+
+### Compras y recepciones parciales
+
+Crear una orden requiere `Idempotency-Key`:
+
+```http
+POST /api/v1/purchase-orders
+Authorization: Bearer <JWT>
+Idempotency-Key: oc-proveedor-001
+Content-Type: application/json
+
+{
+  "supplierId": "UUID_DEL_PROVEEDOR",
+  "warehouseId": "UUID_DEL_ALMACEN",
+  "items": [
+    {"productId": "UUID_DEL_PRODUCTO", "quantity": 20.000, "unitCost": 4.25}
+  ]
+}
+```
+
+Una orden sigue `DRAFT → SUBMITTED → APPROVED → PARTIALLY_RECEIVED → RECEIVED`; las órdenes en borrador o enviadas se pueden cancelar. Aprobar requiere `purchasing:approve`. Recibir requiere `purchasing:manage` y una clave idempotente:
+
+```http
+POST /api/v1/purchase-orders/{orderId}/receipts
+Authorization: Bearer <JWT>
+Idempotency-Key: recepcion-proveedor-001
+Content-Type: application/json
+
+{
+  "items": [
+    {"purchaseOrderLineId": "UUID_DE_LINEA", "quantity": 7.000}
+  ]
+}
+```
+
+El servicio valida que cada línea pertenezca a la orden, que la cantidad no supere el pendiente y que el proveedor, almacén y productos sean válidos. Cada recepción actualiza saldo, cantidad recibida, ledger, auditoría y Outbox dentro de una sola transacción. Los reintentos no duplican el ingreso de stock. Ver [P08 — Compras y recepciones parciales](docs/18-implementacion-p08-compras-y-recepciones.md).
 
 ### Venta
 
