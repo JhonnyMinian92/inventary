@@ -4,26 +4,43 @@
 >
 > **Repositorio:** `JhonnyMinian92/inventary`  
 > **Rama examinada:** `master`  
-> **Commit del árbol de código examinado:** `b310bd511f7663ff9d94c2602ce002e5ed36c8b8`  
-> **Alcance del commit:** snapshot P12 integrado en `master` antes de añadir este informe. La auditoría se publica en `master` en un commit posterior; las referencias de código y hallazgos corresponden al SHA anterior.  
+> **Commit del árbol de código examinado:** `983017215e6362e18eb9cdb4aa57845261a73593`  
+> **Alcance del commit:** `master` con reporte consolidado por periodo, motor de valoración conectado a los flujos físicos, migración incremental V14, endurecimientos de API/configuración y pruebas unitarias añadidas. Esta auditoría se actualizará en un commit posterior; las referencias de código corresponden al SHA anterior.  
 > **Alcance observado:** backend Java 21 / Spring Boot 3.5.6, PostgreSQL, Flyway, Security/JWT/RBAC, REST, GraphQL, integración WhatsApp/n8n, Outbox/Kafka opcional, Docker Compose y documentación.  
-> **Tipo de revisión:** inspección estática de archivos del repositorio. **No se ejecutaron** build, tests, CI, aplicación, migraciones ni comprobaciones de entorno durante esta auditoría.
+> **Tipo de revisión:** inspección estática de archivos del repositorio y cambios por commits remotos. **No se ejecutaron** build, tests, CI, aplicación, migraciones ni comprobaciones de entorno; por lo tanto, no se afirma que el código compile ni que V14 se haya aplicado correctamente.
 
 ## 1. Resumen ejecutivo
 
 La rama contiene una base de backend considerable: catálogo, usuarios y RBAC, almacenes, saldos y movimientos, ajustes/conteos, compras/recepciones/devoluciones, ventas y cancelación con aprobación, transferencias, auditoría, imágenes por URL, cotización/carritos/pedidos WhatsApp y un publicador Outbox/Kafka opcional. Hay buenas decisiones de integridad y seguridad, descritas abajo.
 
-**Estado recomendado: NO declarar listo para producción ni cerrar entrega hasta completar las tareas P1, ejecutar la matriz de pruebas y guardar evidencias.** Esto no significa que el backend entero esté roto: significa que no existe evidencia de ejecución y todavía hay funcionalidades documentadas como alcance futuro, cobertura de pruebas insuficiente y algunos desajustes de configuración/contrato visibles en código.
+**Estado recomendado: NO declarar listo para producción ni cerrar entrega hasta completar las tareas P1, ejecutar la matriz de pruebas y guardar evidencias.** Esto no significa que el backend entero esté roto: significa que no existe evidencia de ejecución y se corrigieron varios defectos concretos y se añadió el reporte de balance/costeo, pero siguen existiendo funcionalidades fuera de alcance, pruebas HTTP/concurrencia insuficientes y falta de evidencia de ejecución.
 
 ### Hechos conocidos
 
-- El árbol revisado contiene alrededor de **178 archivos Java de producción**, **9 archivos/clases de test** y **13 migraciones Flyway V1–V13**.
+- El árbol revisado contiene alrededor de **178 archivos Java de producción**, **11 archivos/clases de test** y **14 migraciones Flyway V1–V14** (V14 de costeo está añadida, pero no se ha ejecutado ni verificado).
 - Los tests de integración existentes cubren algunas rutas de servicios, pero no hay una suite de pruebas HTTP amplia que atraviese controladores, autenticación JWT, autorización RBAC, filtros, serialización y códigos HTTP.
 - El test de carga de contexto (`InventaryApplicationTests`) necesita la configuración y la base de datos de la aplicación. No se puede inferir que pasa porque exista el archivo.
 - El workflow `.github/workflows/backend-ci.yml` está limitado intencionalmente a `workflow_dispatch`; está preparado, pero no hay resultado de CI asociado a esta auditoría.
 - El workspace `app-inventary-ecuapp/` es un placeholder (README corto y `docs/context.md`); no se observó implementación de frontend Angular en el árbol de `master` examinado.
 - El inventario de ramas remoto se revisó para esta consolidación: las ramas P01–P11 y `fix/p02-require-jwt-secret` están detrás de `master` sin commits exclusivos; la única rama de integración con contenido exclusivo era P12, cuyo commit `b310bd511f7663ff9d94c2602ce002e5ed36c8b8` se incorporó a `master` como snapshot base de esta auditoría.
-- Algunas capacidades son explícitamente pendientes según `microservices-inventary-ecuapp/README.md`: pagos, facturación electrónica/SRI, reglas fiscales, carga binaria de imágenes, consumidor/proyecciones Kafka, reportes, política de valoración completa, multiempresa y mayor cobertura de concurrencia.
+- El nuevo endpoint `GET /api/v1/reports/inventory-balance` y el motor FIFO/promedio están implementados en código, con tests unitarios escritos pero no ejecutados. Siguen pendientes de validación efectiva, cobertura HTTP/security amplia, consumidor/proyecciones Kafka, multiempresa, atributos/variantes expuestos completamente, frontend, pagos/facturación SRI y mejoras operativas.
+
+## Estado de implementación estática en master
+
+Esta sección refleja cambios incorporados después de la auditoría inicial; no sustituye la validación ejecutable.
+
+| Hallazgo | Estado actual | Siguiente evidencia requerida |
+|---|---|---|
+| Reporte compras/ventas/saldo por fechas | Implementado: `GET /api/v1/reports/inventory-balance`; filtro de almacén obligatorio y producto opcional; rango inclusivo UTC de hasta 366 días. | Prueba real de query con producto agotado y luego repuesto; caso con saldo histórico, cancelación y devoluciones. |
+| FIFO/promedio en movimientos físicos | Servicio, capas, asientos y V14 implementados; integrado a entradas, salidas, cancelaciones, devoluciones y transferencias. | Build, Flyway V14, pruebas con PostgreSQL, conciliación y concurrencia. |
+| 401/403 ProblemDetail | Implementado estáticamente en SecurityConfig y handler común. | Confirmar comportamiento real OAuth2 Resource Server mediante HTTP. |
+| 429/rate limit | ProblemDetail, Retry-After, request ID y auditoría best-effort implementados. | Pruebas de límite y auditoría; sigue siendo un límite local por instancia. |
+| CORS por Docker Compose | Variable propagada. | Preflight permitido/denegado en cada perfil desplegado. |
+| Sort de productos | Allowlist implementada. | Extender a endpoints restantes. |
+| Último administrador activo | Bloqueo pesimista agregado. | Prueba concurrente PostgreSQL. |
+| Cancelaciones de venta | Matchers alineados a `request-cancellation` y `approve-cancellation`. | Pruebas de roles y autoaprobación. |
+
+Ninguno de estos elementos se marca como validado en ejecución en este commit debido a la instrucción de no ejecutar tests, build, migraciones, aplicación ni CI.
 
 ## 2. Cómo debe trabajar el agente local
 
@@ -55,29 +72,33 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 
 ### P1-01 — No hay evidencia de que el backend compile, migre o arranque
 
-- **Evidencia:** `microservices-inventary-ecuapp/pom.xml`, `src/main/resources/application.yaml`, migraciones `src/main/resources/db/migration/V1__...sql` a `V13__...sql`, `src/test/java/com/ecuapp/inventary/InventaryApplicationTests.java` y `.github/workflows/backend-ci.yml`.
-- **Estado:** validación pendiente; no afirmar que build o migraciones pasan.
-- **Acción:** ejecutar contra PostgreSQL 16 limpio; confirmar Flyway aplica V1–V13, `ddl-auto=validate` termina sin mismatch y `mvn -B verify` pasa con Java 21. Repetir sobre instancia con migraciones previas/datos representativos.
-- **Aceptación:** evidencia de CI para SHA final; migraciones reproducibles; sin errores de mapping JPA; tests pasan sin ignorar casos ni relajar restricciones.
+- **Estado:** ABIERTO por restricción operativa: no se han ejecutado build, pruebas, app, CI ni migraciones.
+- **Evidencia:** `pom.xml`, `application.yaml`, migraciones Flyway V1–V14 y `InventaryApplicationTests.java`.
+- **Acción pendiente:** el agente local debe aplicar V1–V14 contra PostgreSQL 16 limpio y una base representativa, verificar `ddl-auto=validate` y ejecutar `mvn -B verify` con Java 21.
+- **Aceptación:** evidencia reproducible ligada al SHA final, sin desactivar seguridad, saltar migraciones ni eliminar aserciones. No inferir éxito por tener el archivo de migración.
 
-### P1-02 — La lógica de valoración FIFO/promedio no está integrada en los flujos de stock revisados
+### P1-02 — Motor de valoración integrado estáticamente; falta validación real
 
-- **Evidencia:** el esquema V9 define `inventory_costing_config`, `inventory_cost_layer` e `inventory_valuation_entry`; existen `InventoryCostLayer`, `InventoryCostingConfig`, `InventoryValuationEntry` y repositorios. Sin embargo, en `PurchaseOrderService.receive()` se actualiza el saldo y se registra `StockMovement` con `unitCost`, pero no se crea capa de costo/entrada de valoración; `SaleService.create()` registra salida con el `product.getCostPrice()` actual. No se observó servicio/controlador de costing dedicado en el árbol revisado.
-- **Impacto:** el coste y el margen históricos pueden no representar FIFO o costo promedio ponderado cuando cambie el costo de catálogo o existan múltiples recepciones con costos distintos.
-- **Acción:** confirmar la política aprobada y hacer explícito el alcance real. Si FIFO/promedio forma parte del MVP, implementar motor transaccional para entradas/salidas/devoluciones/transferencias/ajustes, bloquear capas en orden estable, crear entradas append-only y evitar usar el costo de catálogo actual como sustituto de costo histórico. Alinear moneda, redondeo, devoluciones, cancelaciones y reversas.
-- **Aceptación:** pruebas de cálculo con dos o más recepciones a costos diferentes, venta parcial, devolución, cancelación/reversa, cantidades decimales, redondeo y concurrencia; conciliación de cantidad/costo de capas contra stock/ledger. Si se excluye de MVP, documentar expresamente y retirar las promesas de costeo en la documentación operativa.
+- **Estado:** IMPLEMENTADO EN CÓDIGO / NO VALIDADO EN EJECUCIÓN.
+- **Evidencia actual:** `inventory/InventoryCostingService.java`; integración en `InventoryService`, `SaleService`, `PurchaseOrderService`, `PurchaseReturnService`, `SalesReturnService` y `StockTransferService`; capa y asientos de valoración; migración `V14__inventory_costing_opening_layers.sql`.
+- **Cambio aplicado:** las entradas crean capas, las salidas consumen capas ordenadas, cancelaciones restauran sus asignaciones y transferencias preservan el costo de las capas entre almacenes. Las recepciones y las ventas ya no usan de forma aislada el costo vigente del producto para valorar salidas.
+- **Limitación histórica explícita:** para stock que existía antes del motor, V14 crea capas iniciales usando `product.cost_price` como estimación de apertura; no se puede reconstruir COGS histórico que nunca se almacenó. Esas capas carecen intencionalmente de movimiento fuente para evitar falsificar el ledger.
+- **Acción pendiente:** ejecutar pruebas FIFO/promedio con múltiples recepciones, ventas parciales, devoluciones, cancelaciones, transferencias, ajustes, decimales, concurrencia y conciliación contra el ledger; revisar el redondeo y resultado real antes de usar el importe como contabilidad.
+- **Aceptación:** capas abiertas concilian con saldo físico y cada movimiento nuevo tiene sus asientos; diferencias de capa/saldo bloquean una salida. No declarar valoración contable validada hasta que pasen estas pruebas.
 
 ### P1-03 — Cobertura HTTP/API y controles de autorización insuficientes
 
-- **Evidencia:** existen 20 controladores y 9 archivos de test; los tests de integración revisados invocan la capa de servicio directamente (`InventoryIntegrationTest`, `ProcurementIntegrationTest`, `SalesReturnIntegrationTest`, `SaleCancellationIntegrationTest`, `StockTransferIntegrationTest`, `WhatsAppCommerceIntegrationTest`). No se observó una suite de `MockMvc`/`WebTestClient` que ejercite todas las APIs con JWT real.
-- **Acción:** añadir pruebas de contrato HTTP para cada ruta del inventario de endpoints de la sección 6. Probar JSON y status codes, `ProblemDetail`, request ID, Bearer inválido/ausente, rol/permiso correcto e incorrecto, headers obligatorios, filtros, paginación, errores de validación y que las operaciones denegadas no escriban datos ni auditoría de éxito.
-- **Aceptación:** matriz de cobertura con una fila por operación; no queda API de escritura sin un test HTTP autorizado y uno denegado; pruebas ejecutadas y reproducibles en PostgreSQL.
+- **Estado:** PARCIAL. Se añadieron `InventoryBalanceReportServiceTest` y `InventoryCostingServiceTest`, pero no se ejecutaron. No se creó aún una matriz completa HTTP/JWT.
+- **Evidencia:** los tests existentes aún invocan en gran parte servicios directamente; el reporte cubre validación de fechas, paginación/filtros y el motor cubre cálculos FIFO/promedio por unidad.
+- **Acción pendiente:** construir pruebas con MockMvc y PostgreSQL real que cubran las rutas de lectura/escritura, JWT ausente/expirado, permisos correctos e incorrectos, content-type, request ID, idempotencia, filtros, paginación, efectos persistidos y rechazo sin side effects.
+- **Aceptación:** matriz por ruta y rol, con evidencia por SHA, incluidos casos negativos y concurrencia.
 
-### P1-04 — Las respuestas 401/403 de Spring Security no tienen handlers explícitos RFC 9457
+### P1-04 — Handlers 401/403 añadidos; contrato aún no validado
 
-- **Evidencia:** `config/SecurityConfig.java` no configura `AuthenticationEntryPoint` ni `AccessDeniedHandler`; `common/GlobalExceptionHandler.java` y `common/ApiProblemFactory.java` solo operan en el pipeline MVC, mientras que errores de autenticación/autorización pueden ser convertidos directamente por el filtro de seguridad.
-- **Acción:** configurar handlers de seguridad para JSON `application/problem+json`, con status/título/código y `requestId` coherentes; no filtrar mensajes internos; cubrir token faltante, inválido, expirado, usuario desactivado, tokenVersion inválida y permiso insuficiente.
-- **Aceptación:** todas las respuestas de error dentro de `/api/**`, incluidos 401/403 y 429, cumplen una forma única y tests comprueban content type, status y correlación.
+- **Estado:** IMPLEMENTADO EN CÓDIGO / VALIDACIÓN PENDIENTE.
+- **Evidencia:** `config/ApiSecurityProblemHandler.java`, `SecurityConfig.java` y el manejador MVC común. 401/403 se convierten a `application/problem+json`, con código seguro y sin detalles internos.
+- **Acción pendiente:** validar por HTTP token ausente, inválido, expirado, usuario desactivado, tokenVersion obsoleta y permiso insuficiente; confirmar que OAuth2 Resource Server no sobrescriba el handler y que request ID aparezca en cada respuesta.
+- **Aceptación:** forma RFC 9457, status correcto, `Cache-Control: no-store`, request ID y ausencia de datos sensibles.
 
 ### P1-05 — Las capacidades de producto dinámico y variantes están parcialmente modeladas, pero no completas como API
 
@@ -92,18 +113,17 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 - **Acción:** si la entrega prometida incluye aplicación web, implementar el frontend por su plan/contrato: login, renovación/expiración de sesión, guardas y visibilidad de permisos, catálogo, inventario, compras, ventas, devoluciones, transferencias, auditoría, errores y loading states. Si esta entrega es solo backend, declararlo como exclusión formal y no presentar el proyecto como completo de extremo a extremo.
 - **Aceptación:** build/test del frontend si está dentro del alcance, integración con APIs reales y pruebas de permisos; o alcance backend-only firmado/documentado.
 
-### P2-01 — Docker Compose no pasa `CORS_ALLOWED_ORIGINS` al contenedor API
+### P2-01 — CORS_ALLOWED_ORIGINS se propaga por Compose
 
-- **Evidencia:** `microservices-inventary-ecuapp/.env.example` declara `CORS_ALLOWED_ORIGINS`; `application.yaml` la lee, `application-dev.yaml` tiene fallback local, pero `docker-compose.yml` no incluye esta variable en `api.environment`.
-- **Impacto:** cambiar la variable en `.env` puede no surtir efecto en la API contenedorizada y en perfil dev podría aplicarse el origen fallback; deployments con otro dominio pueden fallar o no respetar su configuración esperada.
-- **Acción:** pasar `CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}` explícitamente al contenedor y decidir fallback seguro por perfil. Documentar que origen no equivale a autenticación.
-- **Aceptación:** prueba manual/automatizada de preflight desde origen permitido y origen no permitido, tanto Compose dev como prod.
+- **Estado:** CORREGIDO EN CÓDIGO / PENDIENTE DE VALIDAR.
+- **Evidencia:** `docker-compose.yml` pasa `CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}` al servicio API.
+- **Pendiente:** comprobar preflight desde origen permitido y denegado en perfiles reales. El valor vacío no es autorización y la política efectiva se define en configuración de Spring.
 
-### P2-02 — Rate limit no consistente con el formato de error ni la auditoría
+### P2-02 — Rate limit usa ProblemDetail común, Retry-After y auditoría
 
-- **Evidencia:** `config/ApiRateLimitFilter.java` retorna 429 directamente, con body hecho a mano, sin `code`/`requestId`. El filtro está ordenado antes de `ApiRequestAuditFilter`, por lo que las peticiones limitadas que terminan en el propio filtro no pasan por el siguiente filtro de auditoría.
-- **Acción:** construir el 429 a través de un formato común; preservar/exponer el request ID generado por `RequestCorrelationFilter`; emitir evento seguro de límite/rate-denied sin incluir secretos; verificar que la auditoría no genere recursión ni bloquee la petición.
-- **Aceptación:** tests para límite N/N+1, `Retry-After`, request ID, forma RFC 9457 y auditoría registrada.
+- **Estado:** CORREGIDO EN CÓDIGO / PENDIENTE DE VALIDAR.
+- **Evidencia:** `config/ApiRateLimitFilter.java` usa `ApiProblemFactory`, añade `code=RATE_LIMIT_EXCEEDED`, `Retry-After`, request ID y registra `HTTP_RATE_LIMITED` cuando la auditoría está disponible.
+- **Pendiente:** probar límites N/N+1, ventana expirada, request ID y evento persistido; el registro de auditoría es best-effort para que el subsistema de auditoría no bloquee el 429.
 
 ### P2-03 — El rate limit es por instancia y usa `getRemoteAddr()` sin estrategia de proxy explícita
 
@@ -111,12 +131,11 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 - **Acción:** documentar topología de proxy confiable; no confiar indiscriminadamente en `X-Forwarded-For`. Añadir rate limit distribuido/gateway para despliegues con múltiples réplicas y límites por integración/credencial cuando sea apropiado.
 - **Aceptación:** prueba detrás del proxy real; los clientes no pueden falsificar su IP desde cabeceras, y el rate limit mantiene el límite total entre réplicas.
 
-### P2-04 — Paginación: propiedad de sort no validada
+### P2-04 — Allowlist de sort aplicada al controlador de productos
 
-- **Evidencia:** `catalog/application/PageQuery.java` comprueba que `property` no esté vacío, pero `JpaProductPersistenceAdapter.pageable()` convierte la propiedad recibida en `Sort.Order` sin allowlist. Los endpoints aceptan `Pageable`.
-- **Impacto:** un `?sort=propiedadInexistente` puede provocar excepción del repositorio y HTTP 500, según ruta/repositorio.
-- **Acción:** normalizar y allowlistear las columnas por endpoint; devolver 400 problem detail para propiedad inválida; conservar límite de tamaño y evitar paginación negativa. Aplicar de modo consistente a productos/categorías/almacenes/ventas/compras/conteos/auditoría.
-- **Aceptación:** test de sort permitido, múltiple, descendente, nombre inválido, tamaño máximo, número negativo y página fuera de rango.
+- **Estado:** PARCIAL.
+- **Evidencia:** `catalog/ProductController.java` solo admite `name`, `sku`, `createdAt`, `updatedAt`, `active` y `salePrice`; sort no admitido se convierte a HTTP 400.
+- **Pendiente:** revisar/allowlistear sort de compras, ventas, almacenes, conteos, transferencias y auditoría. Añadir tests de múltiples órdenes, propiedades inválidas, page/size fuera de rango y páginas vacías.
 
 ### P2-05 — El modelo de ubicaciones no habilita todavía múltiples ubicaciones de stock por producto y almacén
 
@@ -124,17 +143,17 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 - **Acción:** si multi-bin forma parte del alcance, rediseñar las consultas y comandos para direccionar ubicación; ajustar restricción/ledger, reserva, transferencia interna, conteo, picking y consolidación. Si no, documentar que existe una única ubicación operativa por producto/almacén.
 - **Aceptación:** tests con dos ubicaciones del mismo almacén y transferencia/picking entre ellas o exclusión aprobada del alcance.
 
-### P2-06 — Regla de “último SUPER_ADMIN” vulnerable a concurrencia
+### P2-06 — Bloqueo pesimista para proteger al último SUPER_ADMIN
 
-- **Evidencia:** `auth/UserManagementService.update()` valida `countByRoleAndActiveTrue(SUPER_ADMIN) <= 1` antes de mutar usuario, pero no se aprecia lock de conjunto/tabla o restricción de base de datos que serialice dos cambios simultáneos sobre distintos administradores.
-- **Acción:** serializar cambios de rol/estado de administradores (por ejemplo bloqueo de una fila de configuración común) o introducir un diseño de restricción seguro compatible con el modelo; mantener transacción y auditoría. No agregar una restricción parcial sin revisar la portabilidad/esquema PostgreSQL.
-- **Aceptación:** test concurrente de dos solicitudes que intentan quitar privilegios a los dos últimos administradores: como mínimo uno debe fallar y siempre debe quedar uno activo.
+- **Estado:** CORREGIDO EN CÓDIGO / VALIDACIÓN DE CONCURRENCIA PENDIENTE.
+- **Evidencia:** `AppUserRepository.findByRoleAndActiveTrueOrderByIdAsc` usa bloqueo pesimista; `UserManagementService.update()` bloquea administradores activos en orden estable antes del conteo.
+- **Pendiente:** test de dos transacciones que intentan retirar rol/estado a los últimos administradores y confirmación de que siempre queda uno activo.
 
-### P2-07 — Matcher de cancelación de venta desactualizado
+### P2-07 — Matchers de cancelación alineados a rutas reales
 
-- **Evidencia:** `SecurityConfig` especifica matcher POST `/api/v1/sales/*/cancel`, pero `SalesController` expone `/api/v1/sales/{id}/request-cancellation` y `/api/v1/sales/{id}/approve-cancellation`. El método de aprobación sí tiene `@PreAuthorize('sales:cancel')`, pero el matcher antiguo es código muerto/confuso.
-- **Acción:** alinear los matchers con rutas reales y dejar una política única y legible. Probar separadamente solicitante con `sales:manage` y aprobador con `sales:cancel`, incluyendo prohibición de autoaprobación.
-- **Aceptación:** tests explícitos y retirada del matcher obsoleto.
+- **Estado:** CORREGIDO EN CÓDIGO / PRUEBAS DE PERMISO PENDIENTES.
+- **Evidencia:** `SecurityConfig` protege `POST /api/v1/sales/*/request-cancellation` con `sales:manage` y `POST /api/v1/sales/*/approve-cancellation` con `sales:cancel`.
+- **Pendiente:** comprobar solicitante/aprobador, autoaprobación prohibida y 401/403 JSON por petición HTTP.
 
 ### P2-08 — Outbox mantiene transacción/locks durante llamada de red y no se observa estrategia de redrive operativa
 
@@ -143,11 +162,11 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 - **Acción:** considerar reclamar en transacción corta (`FOR UPDATE SKIP LOCKED` o estado de claim con lease), enviar fuera de la transacción y guardar resultado después; mantener entrega al menos una vez y documentar idempotencia de consumidores por `eventId`; monitorizar pending/failed/age y crear procedimiento seguro de replay.
 - **Aceptación:** tests con fallo/timeout/reintento/restart/duplicado, dos publicadores concurrentes y alerta/redrive documentado. No afirmar exactly-once.
 
-### P2-09 — Algunos caminos de autorización/documentación de permisos pueden ser incoherentes
+### P2-09 — Permiso de lectura de proveedores alineado entre matcher y controlador
 
-- **Evidencia:** los endpoints de proveedores en `partners/PartnerController.java` usan método `@PreAuthorize('purchasing:read')`, mientras el matcher de rutas en `SecurityConfig` asocia GET de proveedores/clientes/partners con `partners:read`. El efecto real es la intersección de ambos controles. `MANAGER_ALMACEN` tiene ambos permisos en V10; `VENDEDOR` tiene `partners:read` pero no `purchasing:read`, por lo que no podrá consultar proveedores pese al permiso de ruta. Puede ser política intencional, debe resolverse explícitamente.
-- **Acción:** decidir la matriz de acceso por rol y hacerla coincidir en SecurityConfig, `@PreAuthorize`, semilla SQL, OpenAPI y pruebas.
-- **Aceptación:** matriz con al menos los cinco roles, por cada operación crítica, que demuestre acceso permitido/denegado.
+- **Estado:** PARCIALMENTE CORREGIDO.
+- **Evidencia:** el matcher GET de `/api/v1/suppliers/**` ya exige `purchasing:read`, en línea con `PartnerController`.
+- **Pendiente:** resolver la matriz por rol de todas las operaciones, contrastar con V10/OpenAPI y cubrir los cinco roles mediante pruebas.
 
 ### P2-10 — Los permisos de aprobación de compra merecen revisión explícita
 
@@ -173,11 +192,11 @@ Severidades: **P1** bloquea cierre funcional/seguridad o pone en duda reglas ese
 - **Acción:** construir una tabla por comando POST/PUT/DELETE con columna “clave obligatoria, scope, hash canónico, replay esperado, conflicto por body distinto”. Añadir idempotencia donde el comando sea susceptible de reintentos de cliente/red; no imponer una clave indiscriminadamente a acciones puramente idempotentes sin definir contrato.
 - **Aceptación:** mismo key+payload no duplica eventos/saldos; mismo key+payload distinto retorna 409; la recuperación después de timeout se documenta; claves en ámbitos diferentes no colisionan accidentalmente.
 
-### P2-14 — Auditoría y ledger necesitan pruebas de integridad adicionales
+### P2-14 — Añadidos handlers y auditoría de 429; integridad sigue sin evidencia
 
-- **Evidencia:** hay auditoría de operaciones y filtro HTTP para errores; los movimientos son append-only por triggers SQL. Aún no hay tests para acceso a bitácora, filtros/paginación, fallos de auditoría, intento de modificar/borrar ledger con SQL, ni auditoría de 401/403/429.
-- **Acción:** probar permisos `audit:read`, exclusión de actor no autorizado, límites de página, filtros/intervalos, correlación, redacción de secretos y persistencia de auditoría. Probar directamente que las migraciones/triggers niegan UPDATE/DELETE de `stock_movement`/`inventory_valuation_entry` y de las líneas inmutables de conteo.
-- **Aceptación:** el sistema no expone cuerpos, tokens, claves de integración ni contraseñas en metadatos; intento de hard delete de ledger falla en PostgreSQL; acciones exitosas/fallidas producen eventos apropiados.
+- **Estado:** PARCIAL.
+- **Evidencia:** handlers 401/403 usan ProblemDetail; 429 registra un evento seguro; se añadieron tests unitarios de reporte y costeo, no ejecutados.
+- **Pendiente:** probar permisos y filtros de auditoría, correlación/redacción, fallos de escritura y que PostgreSQL rechace UPDATE/DELETE sobre ledger y entradas de valoración append-only. No afirmar integridad probada sin ejecución.
 
 ### P3-01 — Arquitectura hexagonal aplicada solo parcialmente
 
