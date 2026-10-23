@@ -27,7 +27,8 @@ public class InventoryService {
   return InventoryDtos.BalanceView.from(b);
  }
  @Transactional public InventoryDtos.MovementView adjust(String key,InventoryDtos.AdjustmentRequest r,String actor){
-  if(key==null||key.isBlank()||key.length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
+  if(key==null||key.isBlank()||key.trim().length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
+  key=key.trim();
   BigDecimal quantity=r.quantity().setScale(3,java.math.RoundingMode.UNNECESSARY);
   String hash=hash(r.productId()+"|"+r.warehouseId()+"|"+r.direction()+"|"+quantity.toPlainString()+"|"+r.reason().trim());
   var previous=movements.findByIdempotencyKey(key);
