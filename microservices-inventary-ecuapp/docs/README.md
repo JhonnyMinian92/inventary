@@ -29,7 +29,7 @@ La entrega P03 establece una primera rebanada vertical en catálogo de productos
 | [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md) | Estado real de capas, puertos, adaptadores, errores y límites de la migración. |
 | [14 — Implementación P04: esquema PostgreSQL y entidades](14-implementacion-p04-esquema.md) | Migración incremental V9, unidades, variantes, ubicaciones, reservas, costeo e idempotencia. |
 | [15 — Implementación P05: seguridad e identidad](15-implementacion-p05-seguridad.md) | JWT, roles/permisos RBAC, invalidación de tokens, bootstrap inicial seguro y CORS. |
-| [16 — Implementación P06: ventas atómicas e idempotencia](16-implementacion-p06-ventas-atomicas.md) | Precios del servidor, descuento de stock transaccional, movimientos por línea y deduplicación concurrente de solicitudes. |
+| [16 — Implementación P06: ventas atómicas e idempotencia](16-implementacion-p06-ventas-atomicas.md) | Precios del servidor, descuento de stock transaccional, movimientos por línea y deduplicación concurrente de solicitudes. |\n| [17 — Implementación P07: inventario operativo](17-implementacion-p07-inventario-operativo.md) | Conteos físicos, diferencias, ajustes transaccionales, idempotencia, trazabilidad y ledger append-only. |
 
 ## Convenciones
 
