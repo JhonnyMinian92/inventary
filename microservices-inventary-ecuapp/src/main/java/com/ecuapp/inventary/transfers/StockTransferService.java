@@ -21,11 +21,11 @@ import java.util.*;
 
 @Service
 public class StockTransferService {
- private final StockTransferRepository transfers;private final ProductRepository products;private final WarehouseRepository warehouses;
+ private final StockTransferRepository transfers;private final IdempotencyRecordRepository idempotencyRecords;private final ProductRepository products;private final WarehouseRepository warehouses;
  private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final StockMovementRepository movements;private final ObjectMapper mapper;private final AuditService audit;
- public StockTransferService(StockTransferRepository transfers,ProductRepository products,WarehouseRepository warehouses,
+ public StockTransferService(StockTransferRepository transfers,IdempotencyRecordRepository idempotencyRecords,ProductRepository products,WarehouseRepository warehouses,
   StockBalanceRepository balances,WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,ObjectMapper mapper,AuditService audit){
-  this.transfers=transfers;this.products=products;this.warehouses=warehouses;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.mapper=mapper;this.audit=audit;
+  this.transfers=transfers;this.idempotencyRecords=idempotencyRecords;this.products=products;this.warehouses=warehouses;this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.mapper=mapper;this.audit=audit;
  }
  @Transactional(readOnly=true) public Page<TransferDtos.View> list(Pageable p){return transfers.findAll(PageRequest.of(p.getPageNumber(),Math.min(p.getPageSize(),100),p.getSort())).map(TransferDtos.View::from);}
  @Transactional(readOnly=true) public TransferDtos.View get(UUID id){return TransferDtos.View.from(transfers.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Transferencia",id)));}
@@ -36,6 +36,14 @@ public class StockTransferService {
    if(!hash.equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
    return TransferDtos.View.from(transfers.findDetailedById(previous.get().getId()).orElseThrow());
   }
+  idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"STOCK_TRANSFER_CREATE",key,hash);
+  IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("STOCK_TRANSFER_CREATE",key)
+   .orElseThrow(()->new ConflictException("No se pudo reservar la clave de idempotencia."));
+  if(!hash.equals(idempotency.getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
+  if(idempotency.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED && idempotency.getResourceId()!=null)
+   return TransferDtos.View.from(transfers.findDetailedById(idempotency.getResourceId()).orElseThrow());
+  if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)
+   throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   if(request.sourceWarehouseId().equals(request.destinationWarehouseId()))throw new BusinessRuleException("El almacén de origen y destino deben ser diferentes.");
   Warehouse source=warehouses.findById(request.sourceWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén origen",request.sourceWarehouseId()));
   Warehouse dest=warehouses.findById(request.destinationWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén destino",request.destinationWarehouseId()));
@@ -51,6 +59,8 @@ public class StockTransferService {
   String number="TRF-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   StockTransfer transfer=transfers.saveAndFlush(new StockTransfer(number,source,dest,key,hash,actor));
   lines.forEach(transfer::addLine);transfers.save(transfer);
+  idempotency.markCompleted("STOCK_TRANSFER",transfer.getId(),(short) 201);
+  idempotencyRecords.save(idempotency);
   audit.record(actor,"STOCK_TRANSFER_CREATED","STOCK_TRANSFER",transfer.getId(),Map.of("transferNumber",number,"lineCount",lines.size()));
   return TransferDtos.View.from(transfers.findDetailedById(transfer.getId()).orElseThrow());
  }
