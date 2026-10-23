@@ -2,7 +2,6 @@ package com.ecuapp.inventary.inventory;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
-import org.springframework.data.repository.query.Param;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
