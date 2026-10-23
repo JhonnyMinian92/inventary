@@ -51,6 +51,5 @@ jobs:
           JWT_SECRET: ci-only-secret-key-32-bytes-or-longer-please
           BOOTSTRAP_ADMIN_USERNAME: ci-admin
           BOOTSTRAP_ADMIN_PASSWORD: ci-only-admin-password-123!
-          SPRING_PROFILES_ACTIVE: test
           SWAGGER_ENABLED: "false"
         run: mvn -B verify
