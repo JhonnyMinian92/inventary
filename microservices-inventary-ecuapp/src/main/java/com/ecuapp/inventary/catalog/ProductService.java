@@ -28,16 +28,16 @@ public class ProductService implements ProductUseCases {
  private final ProductPersistencePort products; private final CategoryRepository categories; private final StockBalanceRepository balances; private final AuditService audit;
  public ProductService(ProductPersistencePort products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit){this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;}
  @Transactional(readOnly=true) public Page<ProductDtos.View> list(String q,Pageable pageable){
-  Pageable p=PageRequest.of(pageable.getPageNumber(),Math.min(pageable.getPageSize(),100),pageable.getSort());
-  Page<Product> result=(q==null||q.isBlank())?products.findAll(p):products.searchByNameOrSku(q.trim(),p);
-  return result.map(ProductDtos.View::from);
+  PageQuery query=pageQuery(pageable);
+  PageResult<Product> result=(q==null||q.isBlank())?products.findAll(query):products.searchByNameOrSku(q.trim(),query);
+  return new PageImpl<>(result.content().stream().map(ProductDtos.View::from).toList(),PageRequest.of(result.page(),result.size(),pageable.getSort()),result.totalElements());
  }
  @org.springframework.cache.annotation.Cacheable(cacheNames="publicProductList",key="#pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
  @Transactional(readOnly=true) public Page<ProductDtos.PublicView> publicList(Pageable pageable){
-  Pageable p=PageRequest.of(pageable.getPageNumber(),Math.min(pageable.getPageSize(),100),pageable.getSort());
-  Page<Product> page=products.findActivePublic(p);
-  Set<UUID> available=page.isEmpty()?Set.of():balances.findProductIdsWithAvailableStock(page.getContent().stream().map(Product::getId).toList());
-  return page.map(product->ProductDtos.PublicView.from(product,available.contains(product.getId())));
+  PageQuery query=pageQuery(pageable);
+  PageResult<Product> page=products.findActivePublic(query);
+  Set<UUID> available=page.content().isEmpty()?Set.of():balances.findProductIdsWithAvailableStock(page.content().stream().map(Product::getId).toList());
+  return new PageImpl<>(page.content().stream().map(product->ProductDtos.PublicView.from(product,available.contains(product.getId()))).toList(),PageRequest.of(page.page(),page.size(),pageable.getSort()),page.totalElements());
  }
  @Transactional(readOnly=true) public ProductDtos.View get(UUID id){return ProductDtos.View.from(require(id));}
  @Transactional(readOnly=true) public ProductDtos.PublicView getPublic(String identifier){
@@ -66,14 +66,8 @@ public class ProductService implements ProductUseCases {
  @Transactional public void deactivate(UUID id,String actor){Product p=require(id);p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));}
  @Override @Transactional(readOnly=true)
  public PageResult<ProductResult> listProducts(String query,PageQuery page){
-  Sort sort = page.sort().isEmpty() ? Sort.by("name").ascending() : Sort.by(page.sort().stream()
-    .map(term -> new Sort.Order(term.direction() == PageQuery.Direction.DESC ? Sort.Direction.DESC : Sort.Direction.ASC, term.property()))
-    .toList());
-  Pageable pageable = PageRequest.of(page.page(), Math.min(page.size(), 100), sort);
-  Page<ProductDtos.View> result = list(query, pageable);
-  return new PageResult<>(result.getContent().stream()
-    .map(view -> new ProductResult(view.id(),view.sku(),view.name(),view.description(),view.categoryId(),view.categoryName(),view.salePrice(),view.currency(),view.imageUrl(),view.active(),view.createdAt(),view.updatedAt()))
-    .toList(), result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+  PageResult<Product> result = (query == null || query.isBlank()) ? products.findAll(page) : products.searchByNameOrSku(query.trim(), page);
+  return new PageResult<>(result.content().stream().map(ProductResultMapper::from).toList(), result.page(), result.size(), result.totalElements(), result.totalPages());
  }
  @Override @Transactional(readOnly=true)
  public ProductResult getProduct(UUID id){return ProductResultMapper.from(require(id));}
@@ -91,6 +85,7 @@ public class ProductService implements ProductUseCases {
  }
  @Override
  public void deactivateProduct(UUID id,String actor){deactivate(id,actor);}
+ private PageQuery pageQuery(Pageable pageable){return new PageQuery(pageable.getPageNumber(),pageable.getPageSize(),pageable.getSort().stream().map(order -> new PageQuery.SortTerm(order.getProperty(),order.isDescending()?PageQuery.Direction.DESC:PageQuery.Direction.ASC)).toList());}
  private Product require(UUID id){return products.findById(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));}
  private Category requireCategory(UUID id){Category c=categories.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
  private String normalizeSku(String sku){return sku.trim().toUpperCase(Locale.ROOT);}
