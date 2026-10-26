@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
@@ -10,6 +10,9 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [lines, setLines] = useState([emptyLine()]);
+  const [availabilityByProduct, setAvailabilityByProduct] = useState({});
+  const [availabilityWarning, setAvailabilityWarning] = useState('');
+  const selectedProductIds = useMemo(() => [...new Set(lines.map(line => line.productId).filter(Boolean))].sort().join(','), [lines]);
   const totals = useMemo(() => lines.reduce((result, line) => {
     const product = products.find(item => String(idOf(item)) === String(line.productId));
     const qty = Math.max(0, Number(line.quantity || 0));
@@ -18,11 +21,36 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     return result;
   }, { quantity: 0, amount: 0 }), [lines, products]);
 
+  useEffect(() => {
+    if (!warehouseId || !selectedProductIds) {
+      setAvailabilityByProduct({});
+      setAvailabilityWarning('');
+      return undefined;
+    }
+    let active = true;
+    const ids = selectedProductIds.split(',').filter(Boolean);
+    Promise.all(ids.map(async productId => {
+      try {
+        const result = await api.availableStock({ productId, warehouseId });
+        return [productId, Number(result?.available ?? 0)];
+      } catch {
+        return [productId, null];
+      }
+    })).then(entries => {
+      if (!active) return;
+      const next = Object.fromEntries(entries.filter(([,value]) => value !== null));
+      setAvailabilityByProduct(next);
+      setAvailabilityWarning(entries.some(([,value]) => value === null) ? 'No fue posible consultar la disponibilidad en tiempo real de algunos artículos; las existencias mostradas son aproximadas.' : '');
+    });
+    return () => { active = false; };
+  }, [warehouseId, selectedProductIds]);
+
   function updateLine(index, field, value) {
     setLines(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
   }
 
   function available(productId) {
+    if (Object.prototype.hasOwnProperty.call(availabilityByProduct, productId)) return availabilityByProduct[productId];
     return balances.filter(balance => String(balance.productId || balance.product?.id) === String(productId) &&
       String(balance.warehouseId || balance.warehouse?.id) === String(warehouseId))
       .reduce((sum, balance) => sum + Number(balance.available ?? balance.onHand ?? 0), 0);
@@ -66,14 +94,15 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
       return <section className="line-editor wide" key={index}>
         <div className="line-editor-heading"><strong>Artículo {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" onClick={() => setLines(current => current.filter((_, lineIndex) => lineIndex !== index))}>Quitar</button>}</div>
         <div className="form-grid compact-grid">
-          <label className="field wide"><span>Producto<b> *</b></span><select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}><option value="">Seleccionar producto</option>{products.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}</select></label>
+          <label className="field wide"><span>Producto<b> *</b></span><select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}><option value="">Seleccionar producto</option>{products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD' && !lines.some((otherLine, otherIndex) => otherIndex !== index && String(otherLine.productId) === String(idOf(item)))).map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}</select></label>
           <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
           <div className="stock-hint"><small>Stock disponible</small><strong>{stock == null ? '—' : stock.toLocaleString('es-EC')}</strong><small>Precio actual: {product ? money(product.salePrice) : '—'}</small></div>
         </div>
         {stock != null && qty > stock && <p className="inline-warning">La cantidad supera el stock mostrado. El backend rechazará la venta si no hay disponibilidad suficiente.</p>}
       </section>;
     })}
-    <div className="wide line-add-row"><button type="button" className="button secondary" onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir artículo</button><div className="order-total"><span>Total estimado</span><strong>{money(totals.amount)}</strong><small>Estimación con precios de catálogo · {totals.quantity} unidades</small></div></div>
+    {availabilityWarning && <p className="form-hint wide">{availabilityWarning}</p>}
+    <div className="wide line-add-row"><button type="button" className="button secondary" disabled={lines.length >= 100} onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir artículo</button><div className="order-total"><span>Total estimado</span><strong>{money(totals.amount)}</strong><small>Estimación con precios de catálogo · {totals.quantity} unidades</small></div></div>
     <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Registrando…' : 'Registrar venta'}</button></div>
   </form>;
 }
