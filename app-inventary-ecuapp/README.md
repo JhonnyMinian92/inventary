@@ -1,14 +1,16 @@
 # Inventary Web — React
 
-Frontend SPA for the Inventary inventory backend. Built with React, Vite and Lucide icons; UI components call REST through the shared client in `src/api.js`.
+Aplicación web SPA de inventario construida con **React + Vite**. El frontend usa un cliente REST compartido en **src/api.js** y consume directamente el backend bajo **/api/v1**; no mantiene un inventario simulado ni modifica el saldo directamente desde el navegador.
 
-## Requirements
+## Requisitos
 
-- Node.js 20+
-- Backend reachable from the browser
-- A user authorized by the backend
+- Node.js 20 o superior.
+- Backend levantado y accesible desde el navegador.
+- Usuario activo con los permisos correspondientes en el backend.
 
-## Local development
+## Ejecución local
+
+Desde la raíz del repositorio:
 
 ```bash
 cd app-inventary-ecuapp
@@ -17,26 +19,40 @@ npm install
 npm run dev
 ```
 
-Set `VITE_API_BASE_URL` to the backend base URL including `/api/v1`. Default: `http://localhost:8080/api/v1`. Configure backend CORS to allow the Vite origin (normally `http://localhost:5173`).
+Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1**. El valor predeterminado es **http://localhost:8080/api/v1**. El backend debe permitir el origen de Vite en su configuración CORS, normalmente **http://localhost:5173**.
 
-## Build
+## Estructura relevante
+
+- **src/App.jsx**: marco de navegación, carga de datos y coordinación de flujos.
+- **src/api.js**: llamadas REST, autenticación Bearer, manejo centralizado de errores e idempotencia para operaciones transaccionales.
+- **src/features/catalog/ProductForm.jsx**: crear/editar productos y renderizar campos a partir del esquema de atributos de la categoría.
+- **src/features/catalog/CategoryForm.jsx**: crear/editar categorías y configurar campos tipados, obligatorios, enumerados y restricciones básicas.
+- **src/styles.css**: sistema visual responsive.
+- **docs/frontend-roadmap.md**: alcance y criterios de cierre por fase.
+
+## Funciones incorporadas
+
+- Inicio de sesión con token emitido por el backend.
+- Catálogo de productos y categorías.
+- Propiedades de producto derivadas del esquema de la categoría (STRING, NUMBER, BOOLEAN, DATE, ENUM).
+- Activación y desactivación de productos y categorías.
+- Compras con envío a aprobación y recepción contabilizada por el backend.
+- Ventas, consulta de saldos y movimientos.
+- Balance de inventario por almacén y rango de fechas.
+
+Una orden de compra por sí sola no aumenta las existencias: el stock cambia al registrar la recepción aprobada, mediante la API. De forma equivalente, las ventas se registran como operaciones transaccionales del backend.
+
+## Fases y pruebas
+
+El trabajo está separado en fases descritas en [docs/frontend-roadmap.md](docs/frontend-roadmap.md). La Fase 1 se enfoca en la base del frontend y el catálogo de productos/categorías. De acuerdo con el plan solicitado, la compilación, las pruebas de componentes y la verificación end-to-end se ejecutarán después de completar el 100 % del código fuente.
+
+## Build de producción (para la fase de pruebas)
+
+Cuando se abra la fase de pruebas, los comandos serán:
 
 ```bash
 npm run build
 npm run preview
 ```
 
-## Modules
-
-- Overview dashboard with live API data.
-- Product catalogue: create/edit products, categories, units and dynamic JSON properties.
-- Purchase orders and transactional sales.
-- Stock balances and movement history.
-- Inventory balance report by warehouse, product and date range.
-- Bearer token authentication, centralized error handling and idempotency keys for stock-changing commands.
-
-## API integration
-
-Uses backend routes under `/api/v1`, including `/catalog/products`, `/catalog/categories`, `/inventory/balances`, `/inventory/movements`, `/purchase-orders`, `/sales` and `/reports/inventory-balance`. Stock is never edited directly in the browser. A purchase order alone does not add stock: the backend goods-receipt posting workflow must be completed to record physical receipt.
-
-The UI surfaces API validation/authentication errors rather than simulating successful data. Collection adapters accept common envelopes (`items`, `content`, `data`, `results`, `records`). The backend's OpenAPI schema remains authoritative for request DTOs.
+El contrato del backend y su OpenAPI siguen siendo la fuente de verdad para los DTOs y permisos. Los errores de validación y autorización deben solucionarse en coordinación con ese contrato; no se deben reemplazar por respuestas simuladas.
