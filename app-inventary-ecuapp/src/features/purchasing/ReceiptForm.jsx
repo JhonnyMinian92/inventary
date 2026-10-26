@@ -11,7 +11,7 @@ function remaining(line) {
 
 export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
   const orderLines = Array.isArray(order?.items) ? order.items : Array.isArray(order?.lines) ? order.lines : [];
-  const [quantities, setQuantities] = useState(() => orderLines.map(line => String(remaining(line))));
+  const [quantities, setQuantities] = useState(() => orderLines.map(() => '0'));
   const pending = useMemo(() => orderLines.filter((line, index) => Number(quantities[index] || 0) > 0 && idOf(line)), [orderLines, quantities]);
 
   function submit(event) {
