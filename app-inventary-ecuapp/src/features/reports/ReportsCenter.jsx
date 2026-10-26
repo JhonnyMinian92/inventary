@@ -78,7 +78,7 @@ function asCsvValue(value) {
   return '"' + text.replaceAll('"', '""') + '"';
 }
 function downloadCsv(fileName, columns, rows) {
-  const csv = [columns.map(column => asCsvValue(column.label)).join(','), ...(rows || []).map(row => columns.map(column => asCsvValue(row[column.key])).join(','))].join('\r\n');
+  const csv = [columns.map(column => asCsvValue(column.label)).join(','), ...(rows || []).map(row => columns.map(column => asCsvValue(typeof column.csvValue === 'function' ? column.csvValue(row) : row[column.key])).join(','))].join('\r\n');
   const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -141,7 +141,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       { key: 'closingValue', label: 'Valor al cierre', format: 'money' },
       { key: 'costOfSales', label: 'Costo de ventas', format: 'money' },
       { key: 'grossProfit', label: 'Utilidad bruta', format: 'money' },
-      { key: 'margin', label: 'Margen bruto', render: row => Number(row.salesAmount) > 0 ? (Number(row.grossProfit || 0) / Number(row.salesAmount) * 100).toLocaleString('es-EC', { maximumFractionDigits: 2 }) + '%' : '—' }
+      { key: 'margin', label: 'Margen bruto', render: row => Number(row.salesAmount) > 0 ? (Number(row.grossProfit || 0) / Number(row.salesAmount) * 100).toLocaleString('es-EC', { maximumFractionDigits: 2 }) + '%' : '—', csvValue: row => Number(row.salesAmount) > 0 ? (Number(row.grossProfit || 0) / Number(row.salesAmount) * 100).toFixed(2) + '%' : '' }
     ];
     if (activeTab === 'sales') return [
       { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' },
@@ -185,7 +185,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     setFilters(current => ({ ...current, [key]: value }));
   }
 
-  async function runReport(event) {
+  async function runReport(event, requestedPage = 0) {
     event?.preventDefault?.();
     if (loading) return;
     if (reportHasRange) {
@@ -222,7 +222,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       let response;
       const range = { from: filters.from, to: filters.to, zone: filters.zone };
       if (activeTab === 'balance') {
-        const params = { ...range, warehouseId: filters.warehouseId, page: 0, size: 100 };
+        const params = { ...range, warehouseId: filters.warehouseId, page: requestedPage, size: 100 };
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryBalanceReport(params);
       } else if (activeTab === 'sales') {
@@ -237,7 +237,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       } else if (activeTab === 'kardex') {
         response = await api.kardexReport({ ...range, warehouseId: filters.warehouseId, productId: filters.productId });
       } else if (activeTab === 'valuation') {
-        const params = { page: 0, size: 100, includeEmpty: false };
+        const params = { page: requestedPage, size: 100, includeEmpty: false };
         if (filters.warehouseId) params.warehouseId = filters.warehouseId;
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryValuationReport(params);
@@ -250,6 +250,8 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     } catch (err) {
       const nextError = formatError(err);
       setError(nextError);
+      setResults(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: undefined }));
+      setQueried(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: false }));
       if (err?.status === 401) onUnauthorized?.();
     } finally {
       setLoading(false);
@@ -370,6 +372,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     </form>
     <div id="report-results" role="tabpanel" aria-labelledby={'report-tab-' + activeTab} aria-busy={loading} className="report-results">
       {loading ? <div className="empty-state" role="status"><Activity size={22}/><span>Consultando el backend y calculando el informe…</span></div> : renderResult()}
+      {resultReady && !loading && ['balance','valuation'].includes(activeTab) && Number(data?.totalPages || 0) > 1 && <nav className="report-pagination" aria-label="Páginas del informe"><button type="button" className="button secondary" disabled={loading || Number(data.page || 0) <= 0} onClick={() => void runReport(null, Number(data.page || 0) - 1)}>Página anterior</button><span>Página {Number(data.page || 0) + 1} de {data.totalPages} · {data.totalElements} filas</span><button type="button" className="button secondary" disabled={loading || Number(data.page || 0) + 1 >= Number(data.totalPages)} onClick={() => void runReport(null, Number(data.page || 0) + 1)}>Página siguiente</button></nav>}
       {lastRun[activeTab] && resultReady && <p className="report-footnote">Última consulta: {dateTime(lastRun[activeTab])}. Los datos reflejan el resultado entregado por la API en ese momento.</p>}
     </div>
     <div className="report-permission-note"><ShieldAlert size={15}/><span>Los informes financieros requieren el permiso <code>reports:financial</code>. Las respuestas 403 se muestran como falta de autorización; no se reemplazan por datos simulados.</span></div>
