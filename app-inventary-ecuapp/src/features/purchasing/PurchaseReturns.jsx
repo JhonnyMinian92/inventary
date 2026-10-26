@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, listFrom } from '../../api';
+import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 
 function idOf(item) { return item?.id ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
@@ -16,6 +17,7 @@ export default function PurchaseReturns({ onChanged }) {
   const [receipt, setReceipt] = useState(null);
   const [lines, setLines] = useState([]);
   const [reason, setReason] = useState('');
+  const dialogRef = useAccessibleDialog(modal, () => setModal(false));
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -137,8 +139,8 @@ export default function PurchaseReturns({ onChanged }) {
     </tbody></table>{!returns.length && <div className="empty-state">{loading ? 'Cargando devoluciones…' : 'Todavía no hay devoluciones a proveedores.'}</div>}</div>
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
-      <section className="modal-card">
-        <div className="modal-heading"><h2>Registrar devolución a proveedor</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal(false)}>×</button></div>
+      <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="purchase-return-modal-title" tabIndex={-1}>
+        <div className="modal-heading"><h2 id="purchase-return-modal-title">Registrar devolución a proveedor</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setModal(false)}>×</button></div>
         <form className="form-grid" onSubmit={submit}>
           <label className="field wide"><span>Recepción contabilizada<b> *</b></span><select required value={receiptId} onChange={event => setReceiptId(event.target.value)}><option value="">Seleccionar recepción</option>{receipts.map(item => <option key={idOf(item)} value={idOf(item)}>{item.receiptNumber || idOf(item)} · {item.purchaseOrderNumber || ''} · {item.warehouseCode || ''}</option>)}</select></label>
           {receipt && <p className="form-hint wide">Recepción: <strong>{receipt.receiptNumber || idOf(receipt)}</strong>. Solo se puede devolver la cantidad aceptada que aún no tenga devoluciones registradas.</p>}
