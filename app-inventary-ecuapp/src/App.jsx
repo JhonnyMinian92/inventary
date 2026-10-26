@@ -124,6 +124,18 @@ function App() {
     const id = pickId(category);
     await runAction(() => inactive ? api.activateCategory(id) : api.deactivateCategory(id), inactive ? 'Categoría activada.' : 'Categoría desactivada.');
   }
+
+  async function logout() {
+    try {
+      await api.logout();
+    } catch (logoutError) {
+      setError('La sesión se cerró localmente, pero el backend no confirmó el cierre: ' + (logoutError?.message || 'error desconocido'));
+    } finally {
+      setToken('');
+      setTokenState('');
+      setUser(null);
+    }
+  }
   async function submitPurchase(e) {
     e.preventDefault();
     const data = { warehouseId: purchaseForm.warehouseId, supplierId: purchaseForm.supplierId || null, items: [{ productId: purchaseForm.productId, quantity: Number(purchaseForm.quantity), unitCost: Number(purchaseForm.unitCost) }] };
@@ -175,7 +187,7 @@ function App() {
       <div className="brand"><div className="brand-mark"><Boxes size={22}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div>
       <div className="workspace-label">ESPACIO DE TRABAJO</div>
       <nav>{nav.map(item => <button key={item.id} className={section === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setSection(item.id)}><item.icon size={18}/><span>{item.label}</span>{section === item.id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="api-status"><span className="status-dot"/><span>Conectado a la API</span></div><button className="nav-item logout" onClick={() => { setToken(''); setTokenState(''); setUser(null); }}><LogOut size={18}/> Cerrar sesión</button></div>
+      <div className="sidebar-bottom"><div className="api-status"><span className="status-dot"/><span>Conectado a la API</span></div><button className="nav-item logout" onClick={logout}><LogOut size={18}/> Cerrar sesión</button></div>
     </aside>
     <main className="main-content">
       <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button className="icon-button" onClick={loadData} title="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
