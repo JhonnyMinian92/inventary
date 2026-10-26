@@ -12,7 +12,8 @@ function normalizeDefinition(definition) {
     valueType: definition?.valueType || 'STRING',
     required: Boolean(definition?.required),
     optionsText: Array.isArray(definition?.options) ? definition.options.join('\n') : '',
-    maxLength: definition?.constraints?.maxLength == null ? '' : String(definition.constraints.maxLength)
+    maxLength: definition?.constraints?.maxLength == null ? '' : String(definition.constraints.maxLength),
+    constraints: definition?.constraints && typeof definition.constraints === 'object' ? { ...definition.constraints } : {}
   };
 }
 
@@ -27,9 +28,10 @@ function buildDefinitions(rows) {
     if (row.valueType === 'ENUM') {
       definition.options = row.optionsText.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
     }
-    if (row.valueType === 'STRING' && row.maxLength !== '') {
-      definition.constraints = { maxLength: Number(row.maxLength) };
-    }
+    const constraints = { ...(row.constraints || {}) };
+    delete constraints.maxLength;
+    if (row.valueType === 'STRING' && row.maxLength !== '') constraints.maxLength = Number(row.maxLength);
+    if (Object.keys(constraints).length) definition.constraints = constraints;
     return definition;
   });
 }
