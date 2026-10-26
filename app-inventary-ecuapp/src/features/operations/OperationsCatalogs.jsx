@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, listFrom } from '../../api';
+import UnitConversions from './UnitConversions.jsx';
 
 const configs = {
   warehouses: {
@@ -197,6 +198,7 @@ export default function OperationsCatalogs({ onChanged }) {
         <td><div className="row-actions"><button className="small-action" disabled={loading} onClick={() => open(item)}>Editar</button>{config.activate && config.deactivate && <button className="small-action" disabled={loading} onClick={() => toggle(item)}>{inactive(item) ? 'Activar' : 'Desactivar'}</button>}</div></td>
       </tr>)}
     </tbody></table>{!visible.length && <div className="empty-state">{loading ? 'Cargando registros…' : 'No hay registros que coincidan con la búsqueda.'}</div>}</div>
+    {kind === 'units' && <UnitConversions units={records.units} />}
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
       <section className="modal-card">
