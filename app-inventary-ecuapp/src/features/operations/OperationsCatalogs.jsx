@@ -210,7 +210,7 @@ export default function OperationsCatalogs({ onChanged }) {
             <span>{field.label}{field.required && <b> *</b>}</span>
             {field.options
               ? <select required={Boolean(field.required)} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}><option value="">Seleccionar</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
-              : <input required={Boolean(field.required)} type={field.type || 'text'} min={field.min} max={field.max} maxLength={field.maxLength} pattern={field.pattern} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />}
+              : <input required={Boolean(field.required)} disabled={Boolean(editing && field.key === 'code')} type={field.type || 'text'} min={field.min} max={field.max} maxLength={field.maxLength} pattern={field.pattern} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />}
           </label>)}
           {kind === 'units' && editing && <label className="field"><span>Estado</span><select value={form.active || 'true'} onChange={event => setForm(current => ({ ...current, active: event.target.value }))}><option value="true">Activa</option><option value="false">Inactiva</option></select></label>}
           {error && <div className="alert error wide">{error}</div>}
