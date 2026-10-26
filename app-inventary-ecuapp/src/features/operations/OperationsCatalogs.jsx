@@ -1,0 +1,187 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { api, listFrom } from '../../api';
+
+const configs = {
+  warehouses: {
+    label: 'Almacenes',
+    singular: 'almacén',
+    fields: [
+      { key: 'code', label: 'Código', required: true, maxLength: 60 },
+      { key: 'name', label: 'Nombre', required: true, maxLength: 160 },
+      { key: 'address', label: 'Dirección', maxLength: 500 }
+    ],
+    list: api.warehouses,
+    create: api.createWarehouse,
+    update: api.updateWarehouse,
+    activate: api.activateWarehouse,
+    deactivate: api.deactivateWarehouse
+  },
+  suppliers: {
+    label: 'Proveedores',
+    singular: 'proveedor',
+    fields: [
+      { key: 'code', label: 'Código', required: true, maxLength: 60 },
+      { key: 'name', label: 'Nombre comercial', required: true, maxLength: 160 },
+      { key: 'taxId', label: 'RUC / identificación tributaria', maxLength: 32 },
+      { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 160 },
+      { key: 'phone', label: 'Teléfono', maxLength: 40 }
+    ],
+    list: api.suppliers,
+    create: api.createSupplier,
+    update: api.updateSupplier,
+    activate: api.activateSupplier,
+    deactivate: api.deactivateSupplier
+  },
+  customers: {
+    label: 'Clientes',
+    singular: 'cliente',
+    fields: [
+      { key: 'code', label: 'Código', required: true, maxLength: 60 },
+      { key: 'name', label: 'Nombre', required: true, maxLength: 160 },
+      { key: 'taxId', label: 'RUC / identificación tributaria', maxLength: 32 },
+      { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 160 },
+      { key: 'phone', label: 'Teléfono', maxLength: 40 }
+    ],
+    list: api.customers,
+    create: api.createCustomer,
+    update: api.updateCustomer,
+    activate: api.activateCustomer,
+    deactivate: api.deactivateCustomer
+  }
+};
+
+function idOf(item) { return item?.id ?? item?.warehouseId ?? item?.supplierId ?? item?.customerId ?? ''; }
+function inactive(item) { return item?.active === false || String(item?.status || '').toUpperCase() === 'INACTIVE'; }
+function freshData(kind, item = null) {
+  return Object.fromEntries(configs[kind].fields.map(field => [field.key, item?.[field.key] == null ? '' : String(item[field.key])]));
+}
+
+export default function OperationsCatalogs({ onChanged }) {
+  const [kind, setKind] = useState('warehouses');
+  const [records, setRecords] = useState({ warehouses: [], suppliers: [], customers: [] });
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({});
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    const [warehouses, suppliers, customers] = await Promise.allSettled([
+      api.warehouses(), api.suppliers(), api.customers()
+    ]);
+    const result = { warehouses: [], suppliers: [], customers: [] };
+    const failures = [];
+    for (const [key, response] of [['warehouses', warehouses], ['suppliers', suppliers], ['customers', customers]]) {
+      if (response.status === 'fulfilled') result[key] = listFrom(response.value);
+      else failures.push(configs[key].label.toLowerCase() + ': ' + (response.reason?.message || 'error'));
+    }
+    setRecords(result);
+    if (failures.length === 3) setError('No se pudieron cargar los catálogos. ' + failures.join(' · '));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const visible = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return records[kind];
+    return records[kind].filter(item => configs[kind].fields.some(field => String(item?.[field.key] || '').toLocaleLowerCase().includes(query)));
+  }, [records, kind, search]);
+
+  function open(item = null) {
+    setEditing(item);
+    setForm(freshData(kind, item));
+    setError('');
+    setNotice('');
+    setModal(true);
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    const config = configs[kind];
+    for (const field of config.fields.filter(field => field.required)) {
+      if (!String(form[field.key] || '').trim()) {
+        setError('El campo "' + field.label + '" es obligatorio.');
+        return;
+      }
+    }
+    const payload = Object.fromEntries(config.fields.map(field => [field.key, String(form[field.key] || '').trim()]).filter(([key, value]) => value !== '' || config.fields.some(field => field.key === key && field.required)));
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      if (editing) await config.update(idOf(editing), payload);
+      else await config.create(payload);
+      setModal(false);
+      setEditing(null);
+      setNotice('Se guardó el registro de ' + config.singular + '.');
+      await refresh();
+      await onChanged?.();
+    } catch (err) {
+      setError(err?.message || 'No se pudo guardar el registro.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggle(item) {
+    const config = configs[kind];
+    const action = inactive(item) ? config.activate : config.deactivate;
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      await action(idOf(item));
+      setNotice(inactive(item) ? 'Registro activado.' : 'Registro desactivado.');
+      await refresh();
+      await onChanged?.();
+    } catch (err) {
+      setError(err?.message || 'No se pudo cambiar el estado.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const config = configs[kind];
+
+  return <section className="panel">
+    <div className="panel-heading">
+      <div className="panel-title-icon"><span> <strong>◎</strong> </span><div><h2>Almacenes y contactos</h2><p>Administra los datos requeridos para registrar compras, entradas y ventas.</p></div></div>
+      <button className="button primary" onClick={() => open()}>+ Nuevo {config.singular}</button>
+    </div>
+    <div className="catalog-tabs" role="tablist" aria-label="Catálogos auxiliares">
+      {Object.entries(configs).map(([key, entry]) => <button key={key} role="tab" aria-selected={kind === key} className={kind === key ? 'catalog-tab active' : 'catalog-tab'} onClick={() => { setKind(key); setSearch(''); setError(''); setNotice(''); }}>{entry.label}<span>{records[key].length}</span></button>)}
+    </div>
+    {error && <div className="alert error"><span>{error}</span><button onClick={() => setError('')}>×</button></div>}
+    {notice && <div className="alert success"><span>{notice}</span><button onClick={() => setNotice('')}>×</button></div>}
+    <div className="toolbar">
+      <div className="search-box"><input value={search} onChange={event => setSearch(event.target.value)} placeholder={'Buscar ' + config.label.toLowerCase() + '…'} /></div>
+      <span className="muted">{loading ? 'Actualizando…' : visible.length + ' registros'}</span>
+    </div>
+    <div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field.key}>{field.label}</th>)}<th>Estado</th><th>Acciones</th></tr></thead><tbody>
+      {visible.map((item, index) => <tr key={idOf(item) || index}>
+        {config.fields.map(field => <td key={field.key}>{item?.[field.key] || '—'}</td>)}
+        <td><span className={'pill ' + (inactive(item) ? 'inactive' : 'active')}>{inactive(item) ? 'Inactivo' : 'Activo'}</span></td>
+        <td><div className="row-actions"><button className="small-action" disabled={loading} onClick={() => open(item)}>Editar</button><button className="small-action" disabled={loading} onClick={() => toggle(item)}>{inactive(item) ? 'Activar' : 'Desactivar'}</button></div></td>
+      </tr>)}
+    </tbody></table>{!visible.length && <div className="empty-state">{loading ? 'Cargando registros…' : 'No hay registros que coincidan con la búsqueda.'}</div>}</div>
+
+    {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
+      <section className="modal-card">
+        <div className="modal-heading"><h2>{editing ? 'Editar ' : 'Crear '}{config.singular}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal(false)}>×</button></div>
+        <form className="form-grid" onSubmit={save}>
+          {config.fields.map(field => <label className="field" key={field.key}>
+            <span>{field.label}{field.required && <b> *</b>}</span>
+            <input required={Boolean(field.required)} type={field.type || 'text'} maxLength={field.maxLength} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />
+          </label>)}
+          {error && <div className="alert error wide">{error}</div>}
+          <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => setModal(false)}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Guardar registro'}</button></div>
+        </form>
+      </section>
+    </div>}
+  </section>;
+}
