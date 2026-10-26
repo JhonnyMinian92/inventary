@@ -121,6 +121,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastRun, setLastRun] = useState({});
+  const [balanceSummaryCache, setBalanceSummaryCache] = useState({ signature: '', rows: [] });
   const data = results[activeTab];
   const resultReady = Boolean(queried[activeTab] && data !== undefined);
   const today = localDate();
@@ -225,6 +226,19 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         const params = { ...range, warehouseId: filters.warehouseId, page: requestedPage, size: 100 };
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryBalanceReport(params);
+        const signature = [filters.from, filters.to, filters.zone, filters.warehouseId, filters.productId].join('|');
+        let summaryRows = balanceSummaryCache.signature === signature ? balanceSummaryCache.rows : null;
+        if (!summaryRows) {
+          summaryRows = [...listFrom(response.items)];
+          const totalPages = Number(response.totalPages || 0);
+          for (let firstPage = 1; firstPage < totalPages; firstPage += 5) {
+            const batchPages = Array.from({ length: Math.min(5, totalPages - firstPage) }, (_, offset) => firstPage + offset);
+            const pageResults = await Promise.all(batchPages.map(page => api.inventoryBalanceReport({ ...params, page })));
+            pageResults.forEach(pageResult => summaryRows.push(...listFrom(pageResult.items)));
+          }
+          setBalanceSummaryCache({ signature, rows: summaryRows });
+        }
+        response = { ...response, summaryItems: summaryRows };
       } else if (activeTab === 'sales') {
         const params = { ...range };
         if (filters.warehouseId) params.warehouseId = filters.warehouseId;
@@ -252,6 +266,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       setError(nextError);
       setResults(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: undefined }));
       setQueried(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: false }));
+      if (activeTab === 'balance' || nextError.kind === 'permission') setBalanceSummaryCache({ signature: '', rows: [] });
       if (err?.status === 401) onUnauthorized?.();
     } finally {
       setLoading(false);
@@ -284,20 +299,21 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     if (!resultReady) return <div className="empty-state report-empty"><CalendarRange size={26}/><strong>Consulta el informe para ver resultados</strong><span>Los datos se solicitan directamente al backend cuando envías los filtros.</span></div>;
     if (activeTab === 'balance') {
       const rows = listFrom(data?.items);
+      const summaryRows = listFrom(data?.summaryItems).length ? listFrom(data.summaryItems) : rows;
       if (!rows.length) return <div className="empty-state report-empty"><FileSpreadsheet size={26}/><strong>Sin movimientos o saldos en el periodo</strong><span>Prueba otro rango o selecciona otro producto. El backend no inventa filas sin actividad histórica.</span></div>;
       return <>
         <Metrics items={[
-          { label: 'Valor al inicio', value: currencyText(rows, 'openingValue') },
-          { label: 'Compras netas', value: currencyText(rows, 'purchaseAmount') },
-          { label: 'Ventas netas', value: currencyText(rows, 'salesAmount') },
-          { label: 'Costo de ventas', value: currencyText(rows, 'costOfSales') },
-          { label: 'Valor al cierre', value: currencyText(rows, 'closingValue') },
-          { label: 'Utilidad bruta', value: currencyText(rows, 'grossProfit') },
-          { label: 'Margen bruto', value: marginText(rows) }
+          { label: 'Valor al inicio', value: currencyText(summaryRows, 'openingValue') },
+          { label: 'Compras netas', value: currencyText(summaryRows, 'purchaseAmount') },
+          { label: 'Ventas netas', value: currencyText(summaryRows, 'salesAmount') },
+          { label: 'Costo de ventas', value: currencyText(summaryRows, 'costOfSales') },
+          { label: 'Valor al cierre', value: currencyText(summaryRows, 'closingValue') },
+          { label: 'Utilidad bruta', value: currencyText(summaryRows, 'grossProfit') },
+          { label: 'Margen bruto', value: marginText(summaryRows) }
         ]}/>
         <div className="report-subheading"><div><h3>Balance por producto</h3><p>Saldo al inicio del periodo, compras y ventas netas, y saldo al cierre. El stock actual puede diferir porque incluye movimientos posteriores al periodo.</p></div><span className="muted">{data.totalElements ?? rows.length} productos</span></div>
         <ReportTable rows={rows} columns={columns} caption="Balance de inventario por producto" empty="Sin filas para los filtros seleccionados."/>
-        <p className="report-footnote">Zona horaria: {data.zone || filters.zone}. Generado: {dateTime(data.generatedAt)}. Página {Number(data.page || 0) + 1} de {data.totalPages || 1}.</p>
+        <p className="report-footnote">Las métricas resumen todos los productos del periodo; la tabla muestra la página actual. Zona horaria: {data.zone || filters.zone}. Generado: {dateTime(data.generatedAt)}. Página {Number(data.page || 0) + 1} de {data.totalPages || 1}.</p>
       </>;
     }
     if (activeTab === 'sales') {
