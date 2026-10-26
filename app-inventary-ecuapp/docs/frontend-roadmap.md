@@ -5,7 +5,7 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 ## Fase 1 — Fundación y catálogo
 
 - Mantener React + Vite como única aplicación web.
-- Centralizar las llamadas REST, autorización Bearer, errores e idempotencia en \`src/api.js\`.
+- Centralizar las llamadas REST, autorización Bearer, errores e idempotencia en **src/api.js**.
 - Completar el inicio de sesión y el marco común de navegación.
 - Separar los formularios de productos y categorías en componentes independientes.
 - Crear y editar productos y categorías mediante el backend.
@@ -29,7 +29,7 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 - Completar el balance por fecha y almacén, mostrando compras, ventas, saldo inicial/final, valoración y margen con los nombres reales del DTO.
 - Completar vistas de detalle y estados vacíos, de carga, error y permisos.
 - Revisar responsive, teclado, etiquetas, confirmaciones y mensajes de error.
-- Reducir el acoplamiento restante de \`App.jsx\` extrayendo páginas, tablas y operaciones a módulos por funcionalidad.
+- Reducir el acoplamiento restante de **App.jsx** extrayendo páginas, tablas y operaciones a módulos por funcionalidad.
 
 ## Fase 4 — Cierre del código fuente y documentación
 
