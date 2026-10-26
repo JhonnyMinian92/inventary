@@ -55,7 +55,7 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
             <span>Producto<b> *</b></span>
             <select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}>
               <option value="">Seleccionar producto</option>
-              {products.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}
+              {products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD' && !lines.some((otherLine, otherIndex) => otherIndex !== index && String(otherLine.productId) === String(idOf(item)))).map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}
             </select>
           </label>
           <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
@@ -64,7 +64,7 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
         <div className="line-editor-foot"><span>{product ? 'SKU: ' + (product.sku || product.code || '—') : 'Selecciona el producto'}</span><strong>{money(lineTotal)}</strong></div>
       </section>;
     })}
-    <div className="wide line-add-row"><button type="button" className="button secondary" onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir producto</button><div className="order-total"><span>Total estimado</span><strong>{money(total)}</strong></div></div>
+    <div className="wide line-add-row"><button type="button" className="button secondary" disabled={lines.length >= 100} onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir producto</button><div className="order-total"><span>Total estimado</span><strong>{money(total)}</strong></div></div>
     <p className="form-hint wide">La orden será creada y enviada para aprobación. Debe aprobarla un usuario autorizado diferente; las existencias solo aumentan cuando se contabiliza la recepción.</p>
     <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Guardando…' : 'Crear y enviar orden'}</button></div>
   </form>;
