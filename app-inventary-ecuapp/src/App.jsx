@@ -8,6 +8,7 @@ import ReceiptForm from './features/purchasing/ReceiptForm.jsx';
 import SaleForm from './features/sales/SaleForm.jsx';
 import OperationsCatalogs from './features/operations/OperationsCatalogs.jsx';
 import InventoryOperations from './features/inventory/InventoryOperations.jsx';
+import ReportsCenter from './features/reports/ReportsCenter.jsx';
 import PurchaseReturns from './features/purchasing/PurchaseReturns.jsx';
 import SalesReturns from './features/sales/SalesReturns.jsx';
 
@@ -43,7 +44,6 @@ function App() {
   const [movements, setMovements] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [sales, setSales] = useState([]);
-  const [report, setReport] = useState([]);
   const [valuation, setValuation] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [saleToCancel, setSaleToCancel] = useState(null);
@@ -56,7 +56,6 @@ function App() {
   const [modal, setModal] = useState('');
   const [editing, setEditing] = useState(null);
   const [inventoryFilter, setInventoryFilter] = useState({ warehouseId: '', productId: '' });
-  const [reportForm, setReportForm] = useState({ warehouseId: '', from: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), productId: '' });
 
   const loadData = useCallback(async () => {
     setLoading(true); setError('');
@@ -254,15 +253,7 @@ function App() {
     setLoading(false);
   }
 
-  async function runReport(e) {
-    e.preventDefault();
-    await runAction(async () => {
-      const params = { warehouseId: reportForm.warehouseId, from: reportForm.from, to: reportForm.to };
-      if (reportForm.productId) params.productId = reportForm.productId;
-      const result = await api.inventoryBalanceReport(params);
-      setReport(listFrom(result));
-    }, 'Reporte actualizado.');
-  }
+
   function openProduct(product = null) {
     setEditing(product);
     setModal('product');
@@ -296,7 +287,7 @@ function App() {
       {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={order => runAction(() => api.cancelPurchaseOrder(pickId(order)), 'Orden cancelada.')} onReceive={openReceive}/><PurchaseReturns onChanged={loadData}/></section>}
       {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><SalesTable rows={sales} loading={loading} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation}/><SalesReturns onChanged={loadData}/></section>}
       {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseCode','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['type','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['occurredAt','Fecha'],['referenceType','Tipo de documento'],['referenceId','Referencia']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
-      {section === 'reports' && <section className="panel"><PanelHeading title="Balance de inventario" subtitle="Compara compras, ventas y saldo por rango de fechas." icon={ClipboardList}/><form className="report-filters" onSubmit={runReport}><Field label="Almacén" required><select required value={reportForm.warehouseId} onChange={e => setReportForm({...reportForm, warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w => <option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Desde" required><input type="date" required value={reportForm.from} onChange={e => setReportForm({...reportForm, from:e.target.value})}/></Field><Field label="Hasta" required><input type="date" min={reportForm.from} required value={reportForm.to} onChange={e => setReportForm({...reportForm, to:e.target.value})}/></Field><Field label="Producto (opcional)"><select value={reportForm.productId} onChange={e => setReportForm({...reportForm, productId:e.target.value})}><option value="">Todos los productos</option>{products.map(p => <option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Consultar balance</button></form><DataTable rows={report} columns={[['productName','Producto'],['sku','SKU'],['openingStock','Saldo inicial'],['purchasedQuantity','Comprado'],['purchaseAmount','Importe compras'],['soldQuantity','Vendido'],['salesAmount','Importe ventas'],['closingStock','Saldo final'],['currentStock','Stock actual'],['grossProfit','Ganancia bruta']]} empty="Selecciona un almacén y consulta un periodo para ver el balance."/></section>}
+      {section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => { setToken(''); setTokenState(''); setUser(null); }}/ >}
     </main>
     {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); }}><>
       {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
