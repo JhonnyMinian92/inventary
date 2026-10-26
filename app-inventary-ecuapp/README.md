@@ -28,10 +28,14 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 - **src/features/catalog/ProductForm.jsx**: crear/editar productos y renderizar campos a partir del esquema de atributos de la categoría.
 - **src/features/catalog/CategoryForm.jsx**: crear/editar categorías y configurar campos tipados, obligatorios, enumerados y restricciones básicas.
 - **src/features/operations/OperationsCatalogs.jsx** y **UnitConversions.jsx**: almacenes, proveedores, clientes, unidades y conversiones.
-- **src/features/purchasing/PurchaseForm.jsx**, **ReceiptForm.jsx** y **PurchaseReturns.jsx**: órdenes multítem, recepción parcial y devoluciones a proveedores.
-- **src/features/sales/SaleForm.jsx** y **SalesReturns.jsx**: venta transaccional multítem y devoluciones de clientes.
+- **src/features/purchasing/PurchaseForm.jsx**, **ReceiptForm.jsx**, **PurchaseTable.jsx** y **PurchaseReturns.jsx**: órdenes multítem, recepción parcial, detalle y devoluciones a proveedores.
+- **src/features/sales/SaleForm.jsx**, **SalesTable.jsx** y **SalesReturns.jsx**: venta transaccional multítem, detalle y devoluciones de clientes.
 - **src/features/inventory/InventoryOperations.jsx**: traslados, ajustes, conteos físicos y reposición.
-- **src/styles.css**: sistema visual responsive.
+- **src/features/reports/ReportsCenter.jsx**: informes con filtros, detalle de DTO, paginación, estados de error/permisos y exportación CSV.
+- **src/features/dashboard/Overview.jsx**, **src/features/catalog/CatalogTables.jsx** y **src/components/DataTable.jsx**: dashboard y tablas reutilizables.
+- **src/components/TransactionDetails.jsx**: vistas de detalle de órdenes y ventas.
+- **src/hooks/useAccessibleDialog.js**: diálogo accesible mediante teclado y gestión de foco.
+- **src/styles.css**: sistema visual responsive y estados de foco.
 - **docs/frontend-roadmap.md**: alcance y criterios de cierre por fase.
 
 ## Funciones incorporadas
@@ -43,13 +47,17 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 - Ventas multítem con clientes registrados u ocasionales, solicitud/aprobación de anulaciones y devoluciones de clientes (reincorporación o descarte).
 - Consulta de disponibilidad en tiempo real antes de vender y consulta de saldos/movimientos por almacén y producto.
 - Traslados con despacho/recepción, ajustes con motivo, conteos físicos y reglas/sugerencias de reposición.
-- Balance de inventario por almacén y rango de fechas.
+- Centro de informes: balance histórico, ventas netas y margen, compras y devoluciones, kardex, valoración y stock bajo.
+- Exportación CSV y paginación en informes que exponen múltiples páginas.
+- Detalle de órdenes y ventas obtenido directamente desde el backend.
+- Manejo explícito de permisos financieros, carga, errores, resultados vacíos y sesiones vencidas.
+- Diálogos accesibles por teclado, foco administrado, confirmaciones y estilos responsive.
 
-Una orden de compra por sí sola no aumenta las existencias: el stock cambia al registrar la recepción aprobada, mediante la API. De forma equivalente, las ventas se registran como operaciones transaccionales del backend.
+Una orden de compra por sí sola no aumenta las existencias: el stock cambia al registrar la recepción aprobada mediante la API. De forma equivalente, las ventas y devoluciones se procesan transaccionalmente en el backend.
 
 ## Fases y pruebas
 
-El trabajo está separado en fases descritas en [docs/frontend-roadmap.md](docs/frontend-roadmap.md). Las Fases 1 y 2 cubren la fundación, el catálogo, las operaciones auxiliares y los flujos principales de inventario. De acuerdo con el plan solicitado, la compilación, las pruebas de componentes y la verificación end-to-end se ejecutarán después de completar el 100 % del código fuente.
+Las Fases 1, 2 y 3 ya tienen su código fuente incorporado en `master`. Queda pendiente la **Fase 4: revisión final del código fuente y documentación**. Después se ejecutará la fase separada de pruebas: compilación de producción, revisión estática, pruebas de componentes y escenarios end-to-end contra el backend y PostgreSQL. Conforme a la secuencia solicitada, no se han ejecutado aún compilación ni pruebas.
 
 ## Build de producción (para la fase de pruebas)
 
