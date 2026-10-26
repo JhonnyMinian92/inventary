@@ -43,7 +43,9 @@ export function getToken() {
 }
 
 export function setToken(token) {
-  if (token) localStorage.setItem('inventary.accessToken', token);
+  const nextToken = token || '';
+  if (getToken() !== nextToken) pendingIdempotencyKeys.clear();
+  if (nextToken) localStorage.setItem('inventary.accessToken', nextToken);
   else localStorage.removeItem('inventary.accessToken');
 }
 
@@ -73,10 +75,14 @@ export async function request(path, options = {}) {
     headers.set('Idempotency-Key', idempotencyKey);
   }
 
+  const fetchOptions = { ...options };
+  delete fetchOptions.idempotent;
+  delete fetchOptions.idempotencyKey;
+
   let response;
   try {
     response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       method,
       headers,
       body: requestBody
