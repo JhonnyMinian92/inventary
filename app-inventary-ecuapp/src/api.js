@@ -107,8 +107,6 @@ export const api = {
   sale: id => request(`/sales/${encodeURIComponent(id)}`),
   requestSaleCancellation: (id, data) => request(`/sales/${encodeURIComponent(id)}/request-cancellation`, { method: 'POST', body: data, idempotent: true }),
   approveSaleCancellation: (id) => request(`/sales/${encodeURIComponent(id)}/approve-cancellation`, { method: 'POST', idempotent: true }),
-  salesReturns: (params = {}) => request(`/sales-returns${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
-  createSaleReturn: data => request('/sales-returns', { method: 'POST', body: data, idempotent: true }),
   inventoryTransfers: (params = {}) => request(`/inventory/transfers${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   inventoryTransfer: id => request(`/inventory/transfers/${encodeURIComponent(id)}`),
   createInventoryTransfer: data => request('/inventory/transfers', { method: 'POST', body: data, idempotent: true }),
