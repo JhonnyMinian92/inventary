@@ -18,6 +18,7 @@ function normalizeProduct(product) {
   return {
     sku: product?.sku || product?.code || '',
     name: product?.name || '',
+    kind: product?.kind || 'STOCKED_GOOD',
     categoryId: product?.categoryId || product?.category?.id || '',
     unitOfMeasureId: product?.unitOfMeasureId || product?.unitOfMeasure?.id || '',
     description: product?.description || '',
@@ -179,13 +180,21 @@ export default function ProductForm({ initialValue, categories, units = [], load
     </label>
     <label className="field">
       <span>SKU / código<b> *</b></span>
-      <input required maxLength="64" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" title="Usa hasta 64 caracteres: letras, números, punto, guion o guion bajo." value={form.sku} onChange={event => changeField('sku', event.target.value)} placeholder="Ej. TEC-001" autoComplete="off" />
+      <input required disabled={Boolean(initialValue)} maxLength="64" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" title="Usa hasta 64 caracteres: letras, números, punto, guion o guion bajo." value={form.sku} onChange={event => changeField('sku', event.target.value)} placeholder="Ej. TEC-001" autoComplete="off" />
     </label>
     <label className="field">
       <span>Categoría<b> *</b></span>
       <select required value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
         <option value="">Seleccionar categoría</option>
-        {categories.map(category => <option key={category.id || category.categoryId} value={category.id || category.categoryId}>{category.name}</option>)}
+        {categories.filter(category => category.active !== false && category.status !== 'INACTIVE').map(category => <option key={category.id || category.categoryId} value={category.id || category.categoryId}>{category.name}</option>)}
+      </select>
+    </label>
+    <label className="field">
+      <span>Tipo de producto<b> *</b></span>
+      <select required value={form.kind} onChange={event => changeField('kind', event.target.value)}>
+        <option value="STOCKED_GOOD">Producto con inventario</option>
+        <option value="NON_STOCKED_GOOD">Producto sin control de stock</option>
+        <option value="SERVICE">Servicio</option>
       </select>
     </label>
     <label className="field">
