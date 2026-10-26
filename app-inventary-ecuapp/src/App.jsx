@@ -3,18 +3,22 @@ import { Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, ChartNoAxesCombined,
 import { api, getToken, listFrom, setToken } from './api';
 import ProductForm from './features/catalog/ProductForm.jsx';
 import CategoryForm from './features/catalog/CategoryForm.jsx';
+import PurchaseForm from './features/purchasing/PurchaseForm.jsx';
+import ReceiptForm from './features/purchasing/ReceiptForm.jsx';
+import SaleForm from './features/sales/SaleForm.jsx';
+import OperationsCatalogs from './features/operations/OperationsCatalogs.jsx';
+import InventoryOperations from './features/inventory/InventoryOperations.jsx';
 
 const nav = [
   { id: 'overview', label: 'Resumen', icon: ChartNoAxesCombined },
   { id: 'products', label: 'Productos', icon: Boxes },
   { id: 'categories', label: 'Categorías', icon: Tags },
+  { id: 'partners', label: 'Almacenes y contactos', icon: Warehouse },
   { id: 'purchases', label: 'Compras', icon: ArrowDownToLine },
   { id: 'sales', label: 'Ventas', icon: ArrowUpFromLine },
   { id: 'inventory', label: 'Inventario', icon: Warehouse },
   { id: 'reports', label: 'Reportes', icon: ClipboardList }
 ];
-const emptyPurchase = { supplierId: '', warehouseId: '', productId: '', quantity: '1', unitCost: '0', notes: '' };
-const emptySale = { warehouseId: '', productId: '', quantity: '1', unitPrice: '0', notes: '' };
 
 function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
@@ -32,13 +36,13 @@ function App() {
   const [units, setUnits] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [balances, setBalances] = useState([]);
   const [movements, setMovements] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [sales, setSales] = useState([]);
   const [report, setReport] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [receiptQty, setReceiptQty] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [apiStatus, setApiStatus] = useState('checking');
@@ -46,15 +50,14 @@ function App() {
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState('');
   const [editing, setEditing] = useState(null);
-  const [purchaseForm, setPurchaseForm] = useState(emptyPurchase);
-  const [saleForm, setSaleForm] = useState(emptySale);
+  const [inventoryFilter, setInventoryFilter] = useState({ warehouseId: '', productId: '' });
   const [reportForm, setReportForm] = useState({ warehouseId: '', from: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), productId: '' });
 
   const loadData = useCallback(async () => {
     setLoading(true); setError('');
     const tasks = [
       ['products', api.products()], ['categories', api.categories()], ['units', api.units()],
-      ['warehouses', api.warehouses()], ['suppliers', api.suppliers()], ['balances', api.balances()], ['movements', api.movements()],
+      ['warehouses', api.warehouses()], ['suppliers', api.suppliers()], ['customers', api.customers()], ['balances', api.balances()], ['movements', api.movements()],
       ['purchases', api.purchaseOrders()], ['sales', api.sales()]
     ];
     const results = await Promise.allSettled(tasks.map(t => t[1]));
@@ -74,7 +77,7 @@ function App() {
       const [key] = tasks[i];
       if (result.status === 'fulfilled') {
         const value = listFrom(result.value);
-        ({ products: setProducts, categories: setCategories, units: setUnits, warehouses: setWarehouses, suppliers: setSuppliers, balances: setBalances, movements: setMovements, purchases: setPurchases, sales: setSales })[key](value);
+        ({ products: setProducts, categories: setCategories, units: setUnits, warehouses: setWarehouses, suppliers: setSuppliers, customers: setCustomers, balances: setBalances, movements: setMovements, purchases: setPurchases, sales: setSales })[key](value);
       } else if (['products', 'categories', 'warehouses', 'balances'].includes(key)) failed.push(`${key}: ${result.reason?.message || 'error'}`);
     });
     if (failed.length) setError(`No se pudieron cargar algunos datos. ${failed.join(' · ')}`);
@@ -157,28 +160,57 @@ function App() {
       setUser(null);
     }
   }
-  async function submitPurchase(e) {
-    e.preventDefault();
-    const data = { warehouseId: purchaseForm.warehouseId, supplierId: purchaseForm.supplierId || null, items: [{ productId: purchaseForm.productId, quantity: Number(purchaseForm.quantity), unitCost: Number(purchaseForm.unitCost) }] };
+  async function submitPurchase(data) {
     await runAction(async () => {
       const order = await api.createPurchaseOrder(data);
       const orderId = order?.id ?? order?.purchaseOrderId ?? order?.orderId;
       if (!orderId) throw new Error('La API creó la orden pero no devolvió su identificador.');
       await api.submitPurchaseOrder(orderId);
-    }, 'Orden enviada para aprobación. Un usuario autorizado distinto debe aprobarla antes de recibir mercancía.');
+    }, 'Orden creada y enviada para aprobación. La recepción requiere aprobación del backend.');
   }
-  async function submitReceipt(e) {
-    e.preventDefault();
-    const line = selectedOrder?.items?.[0];
-    if (!line?.id) { setError('La orden no incluye la línea de compra necesaria para registrar la recepción.'); return; }
-    await runAction(() => api.createReceipt(pickId(selectedOrder), { items: [{ purchaseOrderLineId: line.id, quantity: Number(receiptQty) }] }), 'Recepción contabilizada. El inventario se actualizó desde el backend.');
+
+  async function openReceive(order) {
+    setLoading(true);
+    setError('');
+    try {
+      const detail = await api.purchaseOrder(pickId(order));
+      setSelectedOrder(detail);
+      setModal('receive');
+    } catch (err) {
+      setError('No se pudo cargar el detalle de la orden para recibirla: ' + (err?.message || 'error'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitReceipt(data) {
+    if (!selectedOrder) return;
+    await runAction(() => api.createReceipt(pickId(selectedOrder), data), 'Recepción contabilizada. El inventario se actualizó desde el backend.');
     setSelectedOrder(null);
   }
-  async function submitSale(e) {
-    e.preventDefault();
-    const data = { warehouseId: saleForm.warehouseId, channel: 'POS', items: [{ productId: saleForm.productId, quantity: Number(saleForm.quantity) }] };
-    await runAction(() => api.createSale(data), 'Venta registrada.');
+
+  async function submitSale(data) {
+    await runAction(() => api.createSale(data), 'Venta registrada por el backend.');
   }
+
+  async function loadInventoryFilter(event) {
+    event?.preventDefault?.();
+    setLoading(true);
+    setError('');
+    const params = {};
+    if (inventoryFilter.warehouseId) params.warehouseId = inventoryFilter.warehouseId;
+    if (inventoryFilter.productId) params.productId = inventoryFilter.productId;
+    params.size = '100';
+    const [balanceResult, movementResult] = await Promise.allSettled([api.balances(params), api.movements(params)]);
+    const failures = [];
+    if (balanceResult.status === 'fulfilled') setBalances(listFrom(balanceResult.value));
+    else failures.push('saldos: ' + (balanceResult.reason?.message || 'error'));
+    if (movementResult.status === 'fulfilled') setMovements(listFrom(movementResult.value));
+    else failures.push('movimientos: ' + (movementResult.reason?.message || 'error'));
+    if (failures.length) setError('No se pudieron aplicar todos los filtros. ' + failures.join(' · '));
+    setLoading(false);
+  }
+
   async function runReport(e) {
     e.preventDefault();
     await runAction(async () => {
@@ -217,16 +249,19 @@ function App() {
       {section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValue} purchases={purchases} sales={sales} movements={movements} setSection={setSection} loading={loading}/>}
       {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus}/></section>}
       {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus}/></section>}
-      {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Crea órdenes, gestiona su aprobación y contabiliza las recepciones." action="Nueva compra" onAction={() => { setPurchaseForm({...emptyPurchase, warehouseId: pickId(warehouses[0])}); setModal('purchase'); }} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onReceive={order => { setSelectedOrder(order); setReceiptQty(String(order.items?.[0]?.quantity || '1')); setModal('receive'); }}/></section>}
-      {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas mediante el comando transaccional del backend." action="Nueva venta" onAction={() => { setSaleForm({...emptySale, warehouseId: pickId(warehouses[0])}); setModal('sale'); }} icon={ArrowUpFromLine}/><DataTable rows={sales} columns={[['number','Documento'],['status','Estado'],['customerName','Cliente'],['createdAt','Fecha'],['total','Total']]} moneyKey="total" empty="Todavía no hay ventas."/></section>}
-      {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta saldos físicos y trazabilidad de los movimientos." action="Actualizar" onAction={loadData} icon={Warehouse}/><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 10)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/></section>}
+      {section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
+      {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={order => runAction(() => api.cancelPurchaseOrder(pickId(order)), 'Orden cancelada.')} onReceive={openReceive}/></section>}
+      {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><DataTable rows={sales} columns={[['number','Documento'],['status','Estado'],['customerName','Cliente'],['createdAt','Fecha'],['total','Total']]} moneyKey="total" empty="Todavía no hay ventas."/></section>}
+      {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { setInventoryFilter({warehouseId:'',productId:''}); void loadInventoryFilter({preventDefault:()=>{}}); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
       {section === 'reports' && <section className="panel"><PanelHeading title="Balance de inventario" subtitle="Compara compras, ventas y saldo por rango de fechas." icon={ClipboardList}/><form className="report-filters" onSubmit={runReport}><Field label="Almacén" required><select required value={reportForm.warehouseId} onChange={e => setReportForm({...reportForm, warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w => <option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Desde" required><input type="date" required value={reportForm.from} onChange={e => setReportForm({...reportForm, from:e.target.value})}/></Field><Field label="Hasta" required><input type="date" min={reportForm.from} required value={reportForm.to} onChange={e => setReportForm({...reportForm, to:e.target.value})}/></Field><Field label="Producto (opcional)"><select value={reportForm.productId} onChange={e => setReportForm({...reportForm, productId:e.target.value})}><option value="">Todos los productos</option>{products.map(p => <option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Consultar balance</button></form><DataTable rows={report} columns={[['productName','Producto'],['sku','SKU'],['openingStock','Saldo inicial'],['purchasedQuantity','Comprado'],['purchaseAmount','Importe compras'],['soldQuantity','Vendido'],['salesAmount','Importe ventas'],['closingStock','Saldo final'],['currentStock','Stock actual'],['grossProfit','Ganancia bruta']]} empty="Selecciona un almacén y consulta un periodo para ver el balance."/></section>}
     </main>
-    {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta'}[modal]} onClose={() => { setModal(''); setEditing(null); }}><>
+    {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); }}><>
       {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
       {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitCategory} onError={setError}/>}
-      {modal === 'purchase' && <form className="form-grid" onSubmit={submitPurchase}><Field label="Almacén" required><select required value={purchaseForm.warehouseId} onChange={e => setPurchaseForm({...purchaseForm,warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w=><option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Producto" required><select required value={purchaseForm.productId} onChange={e => setPurchaseForm({...purchaseForm,productId:e.target.value})}><option value="">Seleccionar producto</option>{products.map(p=><option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><Field label="Cantidad" required><input type="number" min="0.001" step="0.001" required value={purchaseForm.quantity} onChange={e => setPurchaseForm({...purchaseForm,quantity:e.target.value})}/></Field><Field label="Costo unitario" required><input type="number" min="0" step="0.0001" required value={purchaseForm.unitCost} onChange={e => setPurchaseForm({...purchaseForm,unitCost:e.target.value})}/></Field><Field label="Proveedor" required><select required value={purchaseForm.supplierId} onChange={e => setPurchaseForm({...purchaseForm,supplierId:e.target.value})}><option value="">Seleccionar proveedor</option>{suppliers.map(s=><option key={pickId(s)} value={pickId(s)}>{pickName(s)}</option>)}</select></Field><Field label="Notas"><input value={purchaseForm.notes} onChange={e => setPurchaseForm({...purchaseForm,notes:e.target.value})}/></Field><p className="form-hint wide">La orden se envía para aprobación. Después de aprobarla con el permiso correspondiente, registra la recepción para que el backend incremente el stock.</p><FormActions loading={loading} onCancel={() => setModal('')}/></form>}
-      {modal === 'receive' && <form className="form-grid" onSubmit={submitReceipt}><div className="form-hint wide">Orden: {selectedOrder?.number || pickId(selectedOrder)}. La recepción contabilizada incrementará el stock según las reglas del backend.</div><Field label="Cantidad recibida" required><input type="number" min="0.001" step="0.001" required value={receiptQty} onChange={e=>setReceiptQty(e.target.value)}/></Field><FormActions loading={loading} onCancel={()=>{setModal('');setSelectedOrder(null);}}/></form>}{modal === 'sale' && <form className="form-grid" onSubmit={submitSale}><Field label="Almacén" required><select required value={saleForm.warehouseId} onChange={e => setSaleForm({...saleForm,warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w=><option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Producto" required><select required value={saleForm.productId} onChange={e => setSaleForm({...saleForm,productId:e.target.value})}><option value="">Seleccionar producto</option>{products.map(p=><option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><Field label="Cantidad" required><input type="number" min="0.001" step="0.001" required value={saleForm.quantity} onChange={e => setSaleForm({...saleForm,quantity:e.target.value})}/></Field><Field label="Notas" wide><input value={saleForm.notes} onChange={e => setSaleForm({...saleForm,notes:e.target.value})}/></Field><p className="form-hint wide">La API debe validar el precio y el stock disponible en una única transacción; nunca se modifica el saldo directamente desde el navegador.</p><FormActions loading={loading} onCancel={() => setModal('')}/></form>}
+      {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={() => setModal('')} onSubmit={submitPurchase}/>}
+      {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={() => { setModal(''); setSelectedOrder(null); }} onSubmit={submitReceipt}/>}
+      {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={() => setModal('')} onSubmit={submitSale}/>}
+
     </></Modal>}
   </div>;
 }
