@@ -65,7 +65,7 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
       </section>;
     })}
     <div className="wide line-add-row"><button type="button" className="button secondary" disabled={lines.length >= 100} onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir producto</button><div className="order-total"><span>Total estimado</span><strong>{money(total)}</strong></div></div>
-    <p className="form-hint wide">La orden será creada y enviada para aprobación. Debe aprobarla un usuario autorizado diferente; las existencias solo aumentan cuando se contabiliza la recepción.</p>
-    <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Guardando…' : 'Crear y enviar orden'}</button></div>
+    <p className="form-hint wide">La orden se crea como borrador. Después usa <strong>Enviar</strong> en la lista de compras; un usuario autorizado distinto debe aprobarla y luego puedes contabilizar la recepción. Solo esa recepción aumenta las existencias.</p>
+    <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Guardando…' : 'Crear orden'}</button></div>
   </form>;
 }
