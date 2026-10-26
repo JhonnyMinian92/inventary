@@ -43,6 +43,8 @@ function App() {
   const [sales, setSales] = useState([]);
   const [report, setReport] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [saleToCancel, setSaleToCancel] = useState(null);
+  const [saleCancelReason, setSaleCancelReason] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [apiStatus, setApiStatus] = useState('checking');
@@ -195,10 +197,24 @@ function App() {
     await runAction(() => api.createSale(data), 'Venta registrada por el backend.');
   }
 
-  async function requestSaleCancellation(sale) {
-    const reason = window.prompt('Indica el motivo para solicitar la anulación de esta venta:');
-    if (!reason?.trim()) return;
-    await runAction(() => api.requestSaleCancellation(pickId(sale), { reason: reason.trim() }), 'Solicitud de anulación enviada. Requiere aprobación autorizada.');
+  function requestSaleCancellation(sale) {
+    setSaleToCancel(sale);
+    setSaleCancelReason('');
+    setError('');
+    setModal('cancelSale');
+  }
+
+  async function submitSaleCancellation(event) {
+    event.preventDefault();
+    if (!saleToCancel || !saleCancelReason.trim()) {
+      setError('Debes indicar el motivo de anulación.');
+      return;
+    }
+    const completed = await runAction(() => api.requestSaleCancellation(pickId(saleToCancel), { reason: saleCancelReason.trim() }), 'Solicitud de anulación enviada. Requiere aprobación de un usuario autorizado distinto.');
+    if (completed) {
+      setSaleToCancel(null);
+      setSaleCancelReason('');
+    }
   }
 
   async function approveSaleCancellation(sale) {
@@ -267,12 +283,13 @@ function App() {
       {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
       {section === 'reports' && <section className="panel"><PanelHeading title="Balance de inventario" subtitle="Compara compras, ventas y saldo por rango de fechas." icon={ClipboardList}/><form className="report-filters" onSubmit={runReport}><Field label="Almacén" required><select required value={reportForm.warehouseId} onChange={e => setReportForm({...reportForm, warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w => <option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Desde" required><input type="date" required value={reportForm.from} onChange={e => setReportForm({...reportForm, from:e.target.value})}/></Field><Field label="Hasta" required><input type="date" min={reportForm.from} required value={reportForm.to} onChange={e => setReportForm({...reportForm, to:e.target.value})}/></Field><Field label="Producto (opcional)"><select value={reportForm.productId} onChange={e => setReportForm({...reportForm, productId:e.target.value})}><option value="">Todos los productos</option>{products.map(p => <option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Consultar balance</button></form><DataTable rows={report} columns={[['productName','Producto'],['sku','SKU'],['openingStock','Saldo inicial'],['purchasedQuantity','Comprado'],['purchaseAmount','Importe compras'],['soldQuantity','Vendido'],['salesAmount','Importe ventas'],['closingStock','Saldo final'],['currentStock','Stock actual'],['grossProfit','Ganancia bruta']]} empty="Selecciona un almacén y consulta un periodo para ver el balance."/></section>}
     </main>
-    {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); }}><>
+    {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); }}><>
       {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
       {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitCategory} onError={setError}/>}
       {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={() => setModal('')} onSubmit={submitPurchase}/>}
       {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={() => { setModal(''); setSelectedOrder(null); }} onSubmit={submitReceipt}/>}
       {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={() => setModal('')} onSubmit={submitSale}/>}
+      {modal === 'cancelSale' && saleToCancel && <form className="form-grid" onSubmit={submitSaleCancellation}><p className="form-hint wide">Venta: <strong>{saleToCancel.number || saleToCancel.code || pickId(saleToCancel)}</strong>. La anulación no devuelve las existencias hasta que el backend la apruebe.</p><Field label="Motivo de anulación" required wide><textarea rows="3" required maxLength="500" value={saleCancelReason} onChange={event => setSaleCancelReason(event.target.value)} placeholder="Describe el motivo de la solicitud"/></Field><FormActions loading={loading} onCancel={() => { setModal(''); setSaleToCancel(null); }}/></form>}
 
     </></Modal>}
   </div>;
