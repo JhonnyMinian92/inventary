@@ -4,7 +4,8 @@ Aplicación web SPA de inventario construida con **React + Vite**. El frontend u
 
 ## Requisitos
 
-- Node.js 20 o superior.
+- Node.js 22.12.0 o superior dentro de la línea 22 (versión declarada en .nvmrc).
+- npm 10 u 11.
 - Backend levantado y accesible desde el navegador.
 - Usuario activo con los permisos correspondientes en el backend.
 
@@ -37,6 +38,8 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 - **src/hooks/useAccessibleDialog.js**: diálogo accesible mediante teclado y gestión de foco.
 - **src/styles.css**: sistema visual responsive y estados de foco.
 - **docs/frontend-roadmap.md**: alcance y criterios de cierre por fase.
+- **docs/api-coverage.md**: matriz de módulos del frontend y rutas REST del backend consumidas.
+- **docs/troubleshooting.md**: configuración de entorno, errores comunes, sesión, permisos e idempotencia.
 
 ## Funciones incorporadas
 
@@ -57,15 +60,18 @@ Una orden de compra por sí sola no aumenta las existencias: el stock cambia al 
 
 ## Fases y pruebas
 
-Las Fases 1, 2 y 3 ya tienen su código fuente incorporado en `master`. Queda pendiente la **Fase 4: revisión final del código fuente y documentación**. Después se ejecutará la fase separada de pruebas: compilación de producción, revisión estática, pruebas de componentes y escenarios end-to-end contra el backend y PostgreSQL. Conforme a la secuencia solicitada, no se han ejecutado aún compilación ni pruebas.
+Las Fases 1, 2, 3 y 4 tienen el código fuente y su documentación incorporados en `master`. La Fase 4 cubre el mapa de rutas, configuración por entorno, instrucciones para resolver errores, permisos y manejo de idempotencia. Queda pendiente la **fase de validación**: generar el archivo de bloqueo de dependencias con acceso al registro de npm, compilar el frontend, revisar errores estáticos y ejecutar pruebas de componentes y escenarios end-to-end contra el backend y PostgreSQL. Conforme a la secuencia acordada, todavía no he ejecutado compilación ni pruebas.
 
 ## Build de producción (para la fase de pruebas)
 
-Cuando se abra la fase de pruebas, los comandos serán:
+Al abrir la fase de validación, desde app-inventary-ecuapp ejecutar:
 
 ```bash
+npm install
 npm run build
 npm run preview
 ```
+
+El proyecto fija las versiones directas en package.json. El primer npm install debe generar package-lock.json; guarda ese archivo en el repositorio y usa npm ci en las ejecuciones siguientes.
 
 El contrato del backend y su OpenAPI siguen siendo la fuente de verdad para los DTOs y permisos. Los errores de validación y autorización deben solucionarse en coordinación con ese contrato; no se deben reemplazar por respuestas simuladas.
