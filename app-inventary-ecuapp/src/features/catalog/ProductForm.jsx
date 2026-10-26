@@ -199,7 +199,7 @@ export default function ProductForm({ initialValue, categories, loading, onCance
     {!schemaLoading && !schemaError && definitions.length === 0 &&
       <label className="field wide">
         <span>Propiedades adicionales (objeto JSON)</span>
-        <textarea rows="4" spellCheck="false" value={attributesText} onChange={event => setAttributesText(event.target.value)} />
+        <textarea rows="4" spellCheck="false" value={attributesText} onChange={event => { setAttributesText(event.target.value); setSchemaError(''); }} />
         <small className="field-help">Usa un objeto JSON, por ejemplo: {"{\"color\":\"Negro\",\"garantiaMeses\":12}"}.</small>
       </label>
     }
