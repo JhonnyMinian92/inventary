@@ -19,7 +19,7 @@ function startDate() {
   date.setDate(date.getDate() - 30);
   return localDate(date);
 }
-function idOf(item) { return item?.id ?? item?.productId ?? item?.warehouseId ?? ''; }
+function rowKey(item, index) { return item?.id ?? [item?.productId, item?.warehouseId, item?.referenceId, item?.date, index].filter(value => value !== null && value !== undefined && value !== '').join('-'); }
 function money(value, currency = 'USD') {
   if (value === null || value === undefined || value === '') return '—';
   try {
@@ -103,7 +103,7 @@ function ReportTable({ rows, columns, caption, empty }) {
     <table aria-label={caption}>
       <caption className="visually-hidden">{caption}</caption>
       <thead><tr>{columns.map(column => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={idOf(row) || row.movementId || row.saleItemId || row.receiptLineId || index}>
+      <tbody>{rows.map((row, index) => <tr key={rowKey(row, index) || index}>
         {columns.map(column => {
           const value = column.render ? column.render(row) : column.format === 'money' ? money(row[column.key], row.currency) : column.format === 'quantity' ? number(row[column.key]) : column.format === 'date' ? dateTime(row[column.key]) : column.format === 'status' ? titleCase(row[column.key]) : row[column.key] ?? '—';
           return <td key={column.key}>{value}</td>;
