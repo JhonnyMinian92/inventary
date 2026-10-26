@@ -1,0 +1,33 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "app-inventary-ecuapp/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "app-inventary-ecuapp/**"
+      - ".github/workflows/frontend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app-inventary-ecuapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app-inventary-ecuapp/package-lock.json
+      - run: npm install
+      - run: npm run build
