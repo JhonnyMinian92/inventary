@@ -19,6 +19,7 @@ function startDate() {
   date.setDate(date.getDate() - 30);
   return localDate(date);
 }
+function idOf(item) { return item?.id ?? item?.productId ?? item?.warehouseId ?? ''; }
 function rowKey(item, index) { return item?.id ?? [item?.productId, item?.warehouseId, item?.referenceId, item?.date, index].filter(value => value !== null && value !== undefined && value !== '').join('-'); }
 function money(value, currency = 'USD') {
   if (value === null || value === undefined || value === '') return '—';
