@@ -120,3 +120,16 @@ button:disabled{cursor:not-allowed}
 .report-pagination span{font-size:11px;color:var(--muted)}
 .report-pagination .button{min-height:38px}
 @media(max-width:520px){.report-pagination{align-items:stretch;flex-direction:column}.report-pagination .button{width:100%;justify-content:center}.report-pagination span{text-align:center}}
+
+/* Transaction detail views */
+.transaction-detail{display:flex;flex-direction:column;gap:13px;min-width:0}
+.detail-status-line{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.detail-status-line .muted{font-size:11px}
+.detail-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px;margin:0;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.detail-definition{display:flex;flex-direction:column;gap:6px;min-width:0;padding:12px;border-bottom:1px solid var(--line)}
+.detail-definition dt{font-size:10px;color:var(--muted);line-height:1.35}
+.detail-definition dd{margin:0;color:var(--ink);font-size:12px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}
+.transaction-detail .report-subheading{margin-top:10px}
+.transaction-detail .report-table-wrap table{min-width:700px}
+@media(max-width:760px){.detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.detail-grid{grid-template-columns:minmax(0,1fr)}.detail-definition{padding:10px}.detail-status-line{align-items:flex-start;flex-direction:column}}
