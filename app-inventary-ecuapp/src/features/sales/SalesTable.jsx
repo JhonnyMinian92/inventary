@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2 } from 'lucide-react';
+import { Ban, CheckCircle2, Eye } from 'lucide-react';
 
 function idOf(item) { return item?.id ?? item?.saleId ?? ''; }
 function titleCase(value = '') { return String(value || '—').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
@@ -13,7 +13,7 @@ function money(value, currency = 'USD') {
   catch { return Number(value).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency; }
 }
 
-export default function SalesTable({ rows = [], loading = false, onRequestCancel, onApproveCancellation }) {
+export default function SalesTable({ rows = [], loading = false, onView, onRequestCancel, onApproveCancellation }) {
   return <div className="table-wrap">
     <table aria-label="Ventas registradas">
       <caption className="visually-hidden">Ventas y solicitudes de anulación</caption>
@@ -32,6 +32,7 @@ export default function SalesTable({ rows = [], loading = false, onRequestCancel
           <td>{date(sale.soldAt || sale.createdAt)}</td>
           <td>{money(sale.total, sale.currency)}</td>
           <td><div className="row-actions">
+            <button type="button" className="small-action" disabled={loading} aria-label={'Ver detalle de la venta ' + number} onClick={() => onView(sale)}><Eye size={13}/> Detalle</button>
             {canRequest && <button type="button" className="small-action" disabled={loading} aria-label={'Solicitar anulación de venta ' + number} onClick={() => onRequestCancel(sale)}><Ban size={13}/> Solicitar anulación</button>}
             {canApprove && <button type="button" className="small-action" disabled={loading} aria-label={'Aprobar anulación de venta ' + number} onClick={() => onApproveCancellation(sale)}><CheckCircle2 size={13}/> Aprobar anulación</button>}
           </div></td>
