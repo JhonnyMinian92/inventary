@@ -233,7 +233,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryBalanceReport(params);
         const signature = [filters.from, filters.to, filters.zone, filters.warehouseId, filters.productId].join('|');
-        let summaryRows = balanceSummaryCache.signature === signature ? balanceSummaryCache.rows : null;
+        let summaryRows = requestedPage > 0 && balanceSummaryCache.signature === signature ? balanceSummaryCache.rows : null;
         if (!summaryRows) {
           summaryRows = [...listFrom(response.items)];
           const totalPages = Number(response.totalPages || 0);
@@ -262,7 +262,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryValuationReport(params);
         const signature = [filters.warehouseId, filters.productId, 'includeEmpty=false'].join('|');
-        let exportRows = valuationExportCache.signature === signature ? valuationExportCache.rows : null;
+        let exportRows = requestedPage > 0 && valuationExportCache.signature === signature ? valuationExportCache.rows : null;
         if (!exportRows) {
           exportRows = [...listFrom(response.items)];
           const totalPages = Number(response.totalPages || 0);
