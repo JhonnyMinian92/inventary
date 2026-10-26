@@ -194,6 +194,16 @@ function App() {
     await runAction(() => api.createSale(data), 'Venta registrada por el backend.');
   }
 
+  async function requestSaleCancellation(sale) {
+    const reason = window.prompt('Indica el motivo para solicitar la anulación de esta venta:');
+    if (!reason?.trim()) return;
+    await runAction(() => api.requestSaleCancellation(pickId(sale), { reason: reason.trim() }), 'Solicitud de anulación enviada. Requiere aprobación autorizada.');
+  }
+
+  async function approveSaleCancellation(sale) {
+    await runAction(() => api.approveSaleCancellation(pickId(sale)), 'Anulación aprobada por el backend.');
+  }
+
   async function loadInventoryFilter(event, filterValues = inventoryFilter) {
     event?.preventDefault?.();
     setLoading(true);
@@ -252,7 +262,7 @@ function App() {
       {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus}/></section>}
       {section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
       {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={order => runAction(() => api.cancelPurchaseOrder(pickId(order)), 'Orden cancelada.')} onReceive={openReceive}/></section>}
-      {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><DataTable rows={sales} columns={[['number','Documento'],['status','Estado'],['customerName','Cliente'],['createdAt','Fecha'],['total','Total']]} moneyKey="total" empty="Todavía no hay ventas."/></section>}
+      {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><SalesTable rows={sales} loading={loading} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation}/></section>}
       {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
       {section === 'reports' && <section className="panel"><PanelHeading title="Balance de inventario" subtitle="Compara compras, ventas y saldo por rango de fechas." icon={ClipboardList}/><form className="report-filters" onSubmit={runReport}><Field label="Almacén" required><select required value={reportForm.warehouseId} onChange={e => setReportForm({...reportForm, warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w => <option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Desde" required><input type="date" required value={reportForm.from} onChange={e => setReportForm({...reportForm, from:e.target.value})}/></Field><Field label="Hasta" required><input type="date" min={reportForm.from} required value={reportForm.to} onChange={e => setReportForm({...reportForm, to:e.target.value})}/></Field><Field label="Producto (opcional)"><select value={reportForm.productId} onChange={e => setReportForm({...reportForm, productId:e.target.value})}><option value="">Todos los productos</option>{products.map(p => <option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Consultar balance</button></form><DataTable rows={report} columns={[['productName','Producto'],['sku','SKU'],['openingStock','Saldo inicial'],['purchasedQuantity','Comprado'],['purchaseAmount','Importe compras'],['soldQuantity','Vendido'],['salesAmount','Importe ventas'],['closingStock','Saldo final'],['currentStock','Stock actual'],['grossProfit','Ganancia bruta']]} empty="Selecciona un almacén y consulta un periodo para ver el balance."/></section>}
     </main>
@@ -315,7 +325,28 @@ function PurchaseTable({rows,onSubmit,onApprove,onCancel,onReceive,loading}) {
     </tr>;
   })}</tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay órdenes de compra.</div>}</div>;
 }
-function DataTable({rows,columns,moneyKey,empty}) { return <div className="table-wrap"><table><thead><tr>{columns.map(([key,label])=><th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={pickId(row)||row.id||i}>{columns.map(([key])=><td key={key}>{key===moneyKey?money(row[key]):key.toLowerCase().includes('date')||key==='createdAt'?date(row[key]):key==='status'||key==='movementType'?titleCase(row[key]||'—'):row[key]??row.product?.name??row.warehouse?.name??'—'}</td>)}</tr>)}</tbody></table>{!rows.length&&<div className="empty-state">{empty}</div>}</div>; }
+function SalesTable({rows,loading,onRequestCancel,onApproveCancellation}) {
+  return <div className="table-wrap"><table><thead><tr><th>Documento</th><th>Estado</th><th>Cliente</th><th>Almacén</th><th>Fecha</th><th>Total</th><th>Acciones</th></tr></thead><tbody>
+    {rows.map((sale,index)=>{
+      const status=String(sale.status||'COMPLETED').toUpperCase();
+      const canRequest=['COMPLETED','POSTED'].includes(status);
+      const canApprove=status.includes('CANCEL') && !['CANCELLED','CANCELED'].includes(status);
+      return <tr key={pickId(sale)||index}>
+        <td><strong>{sale.number||sale.code||String(pickId(sale)).slice(0,12)||'Venta'}</strong></td>
+        <td><span className={'pill '+(['COMPLETED','POSTED'].includes(status)?'active':['CANCELLED','CANCELED'].includes(status)?'inactive':'pending')}>{titleCase(status)}</span></td>
+        <td>{sale.customerName||sale.customer?.name||'Venta de mostrador'}</td>
+        <td>{sale.warehouseName||sale.warehouse?.name||'—'}</td>
+        <td>{date(sale.createdAt)}</td>
+        <td>{money(sale.total)}</td>
+        <td><div className="row-actions">
+          {canRequest&&<button className="small-action" disabled={loading} onClick={()=>onRequestCancel(sale)}>Solicitar anulación</button>}
+          {canApprove&&<button className="small-action" disabled={loading} onClick={()=>onApproveCancellation(sale)}>Aprobar anulación</button>}
+        </div></td>
+      </tr>;
+    })}
+  </tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay ventas registradas.</div>}</div>;
+}
+function DataTable({rows,columns,moneyKey,empty}) { return <div className="table-wrap"><table><thead><tr>{columns.map(([key,label])=><th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={pickId(row)||row.id||i}>{columns.map(([key])=><td key={key}>{key===moneyKey?money(row[key]):key.toLowerCase().includes('date')||key==='createdAt'?date(row[key]):key==='status'||key==='movementType'?titleCase(row[key]||'—'):row[key]??row.productName??row.warehouseName??row.supplierName??row.customer?.name??row.customerName??row.product?.name??row.warehouse?.name??'—'}</td>)}</tr>)}</tbody></table>{!rows.length&&<div className="empty-state">{empty}</div>}</div>; }
 function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
 function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
 function Modal({title,onClose,children}) { return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section className="modal-card"><div className="modal-heading"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Cerrar">×</button></div>{children}</section></div>; }
