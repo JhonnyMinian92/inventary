@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Activity, CalendarRange, Download, FileSpreadsheet, RefreshCw, Search, ShieldAlert } from 'lucide-react';
-import { api, listFrom } from '../api';
+import { api, listFrom } from '../../api';
 
 const REPORT_TABS = [
   { id: 'balance', label: 'Balance de inventario' },
