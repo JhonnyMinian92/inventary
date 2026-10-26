@@ -20,3 +20,35 @@
 @media(max-width:560px){.compact-grid{grid-template-columns:1fr}.attribute-definition{padding:11px}}
 
 .status-dot.error{background:#ef7979;box-shadow:0 0 0 3px #ef797920}.status-dot.checking{background:#e3b341;box-shadow:0 0 0 3px #e3b34120}
+
+
+/* Phase 2 — operational forms and inventory workflows */
+.catalog-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:0 0 10px;margin:6px 0 17px}
+.catalog-tab{display:inline-flex;align-items:center;gap:9px;border:1px solid transparent;border-radius:9px;padding:9px 12px;background:transparent;color:var(--muted);font:600 12px 'DM Sans',sans-serif;cursor:pointer}
+.catalog-tab span{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:6px;padding:0 5px;background:#eef0f7;color:#656f82;font-size:10px}
+.catalog-tab.active{background:#f0eeff;border-color:#e4e0ff;color:#5548bd}
+.catalog-tab.active span{background:#dfdbff;color:#4f43b6}
+.line-editor{border:1px solid var(--line);border-radius:12px;background:#fcfcff;padding:13px}
+.line-editor-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;color:var(--ink);font-size:12px}
+.line-editor-foot{display:flex;justify-content:space-between;gap:12px;align-items:center;padding-top:10px;margin-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.line-editor-foot strong,.order-total strong{color:var(--ink);font:800 15px Manrope,sans-serif}
+.line-add-row{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.order-total{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.order-total span,.order-total small{color:var(--muted);font-size:10px}
+.order-total strong{font-size:20px}
+.receipt-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:15px;padding:12px;border:1px solid var(--line);border-radius:10px}
+.receipt-line>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.receipt-line>div strong{font-size:12px;color:var(--ink)}
+.receipt-line>div small{font-size:10px;line-height:1.5;color:var(--muted)}
+.receipt-line .field{margin:0}
+.stock-hint{display:flex;flex-direction:column;gap:4px;align-self:center;border-radius:9px;background:#f4f5fa;padding:10px 12px}
+.stock-hint small{font-size:10px;color:var(--muted)}
+.stock-hint strong{font:800 14px Manrope,sans-serif;color:var(--ink)}
+.inline-warning{font-size:11px;line-height:1.5;color:#95651c;background:#fff7e5;padding:9px 11px;border-radius:8px;margin:10px 0 0}
+.pill.pending{background:#fff3d9;color:#946516}
+.inventory-filters{grid-template-columns:repeat(4,minmax(0,1fr));align-items:end;margin-bottom:18px}
+.inventory-filters>.button{justify-self:stretch;white-space:nowrap}
+.inventory-operations{margin-top:22px;border-top:3px solid #efeff6}
+.inventory-operations>.panel-heading{margin-bottom:14px}
+@media(max-width:1000px){.inventory-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.receipt-line{grid-template-columns:1fr}.inventory-filters{grid-template-columns:1fr}.inventory-filters>.button{width:100%}.line-add-row{align-items:stretch;flex-direction:column}.order-total{align-items:flex-start}.catalog-tabs{gap:3px}.catalog-tab{padding:8px}}
