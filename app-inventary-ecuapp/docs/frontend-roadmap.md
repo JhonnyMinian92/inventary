@@ -22,15 +22,16 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 **Estado del código fuente: completada en `master`.** Las pruebas de compilación y de negocio siguen aplazadas hasta el cierre de todo el frontend.
 
-- Administrar almacenes, proveedores, clientes y unidades de medida; asignar una unidad a cada producto.
-- Crear órdenes de compra con múltiples productos; enviar a aprobación, cancelar borradores/órdenes pendientes y registrar recepción parcial o completa por cada línea.
-- Registrar ventas con múltiples artículos, cliente registrado u ocasional, y solicitar/aprobar anulaciones siguiendo la autorización del backend.
-- Consultar saldos y movimientos filtrando por almacén y producto.
-- Gestionar traslados de inventario, con líneas múltiples y flujo de despacho, recepción, cancelación y reversión.
+- Administrar almacenes, proveedores, clientes y unidades de medida; asignar unidades a productos y configurar conversiones.
+- Crear órdenes de compra con múltiples productos; enviar a aprobación, cancelar borradores/órdenes pendientes y registrar recepción parcial o completa por línea.
+- Registrar devoluciones a proveedores desde recepciones contabilizadas, limitando cantidades a las que aún no se han devuelto.
+- Registrar ventas multítem con clientes registrados u ocasionales, consultar disponibilidad y solicitar/aprobar anulaciones.
+- Registrar devoluciones de clientes por línea de venta, eligiendo entre reincorporar el artículo al inventario o descartarlo.
+- Consultar saldos y movimientos filtrando por almacén y producto, mostrando los campos reales de los DTOs.
+- Gestionar traslados multítem con despacho, recepción, cancelación y reversión con motivo.
 - Registrar ajustes de stock con dirección, cantidad, motivo obligatorio y costo unitario para entradas.
-- Registrar conteos físicos de varias líneas y contabilizar o cancelar los documentos.
-- Crear y desactivar reglas de reposición y consultar sugerencias de abastecimiento.
-- Centralizar las nuevas rutas bajo el cliente REST, usando claves de idempotencia para operaciones que modifican inventario.
+- Registrar conteos físicos multítem y contabilizar o cancelar los documentos; crear/editar/desactivar reglas de reposición y consultar sugerencias.
+- Centralizar las nuevas rutas bajo el cliente REST, usando claves de idempotencia para operaciones transaccionales que modifican inventario.
 
 ## Fase 3 — Reportes, accesibilidad y consistencia de producto
 
