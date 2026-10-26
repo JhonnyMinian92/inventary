@@ -87,6 +87,7 @@ export default function ProductForm({ initialValue, categories, loading, onCance
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState('');
+  const [attributesError, setAttributesError] = useState('');
   const [attributesText, setAttributesText] = useState(() => JSON.stringify(objectValue(initialValue?.attributes), null, 2));
 
   useEffect(() => {
@@ -144,13 +145,14 @@ export default function ProductForm({ initialValue, categories, loading, onCance
       try {
         attributes = JSON.parse(attributesText || '{}');
       } catch {
-        setSchemaError('Las propiedades deben contener un objeto JSON válido.');
+        setAttributesError('Las propiedades deben contener un objeto JSON válido.');
         return;
       }
       if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) {
-        setSchemaError('Las propiedades del producto deben ser un objeto JSON.');
+        setAttributesError('Las propiedades del producto deben ser un objeto JSON.');
         return;
       }
+      setAttributesError('');
     }
     if (schemaError && form.categoryId) {
       onError?.('No se puede guardar hasta cargar el esquema de la categoría correctamente.');
@@ -199,10 +201,11 @@ export default function ProductForm({ initialValue, categories, loading, onCance
     {!schemaLoading && !schemaError && definitions.length === 0 &&
       <label className="field wide">
         <span>Propiedades adicionales (objeto JSON)</span>
-        <textarea rows="4" spellCheck="false" value={attributesText} onChange={event => { setAttributesText(event.target.value); setSchemaError(''); }} />
+        <textarea rows="4" spellCheck="false" value={attributesText} onChange={event => { setAttributesText(event.target.value); setAttributesError(''); }} />
         <small className="field-help">Usa un objeto JSON, por ejemplo: {"{\"color\":\"Negro\",\"garantiaMeses\":12}"}.</small>
       </label>
     }
+    {attributesError && <div className="alert error wide">{attributesError}</div>}
     {schemaError && <div className="alert error wide">{schemaError}</div>}
     {schemaError && form.categoryId && <button type="button" className="button secondary wide" onClick={() => changeCategory('')}>Quitar categoría y editar propiedades manualmente</button>}
     <div className="form-actions wide">
