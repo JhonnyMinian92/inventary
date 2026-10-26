@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-function idOf(row) { return row?.id ?? row?.productId ?? row?.categoryId ?? row?.warehouseId ?? ''; }
+function rowKey(row, index) { return row?.id ?? row?.categoryId ?? [row?.productId, row?.warehouseId, row?.referenceId, index].filter(value => value !== null && value !== undefined && value !== '').join('-'); }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 function date(value) {
   if (!value) return '—';
@@ -20,7 +20,7 @@ export default function DataTable({ rows = [], columns = [], moneyKey, empty = '
       <caption className="visually-hidden">{caption}</caption>
       <thead><tr>{normalizedColumns.map(column => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
       <tbody>
-        {(rows || []).map((row, index) => <tr key={idOf(row) || index}>
+        {(rows || []).map((row, index) => <tr key={rowKey(row, index) || index}>
           {normalizedColumns.map(column => {
             const value = column.render ? column.render(row) :
               (column.key === moneyKey || column.format === 'money') ? money(row[column.key]) :
