@@ -1,4 +1,4 @@
-import { CheckCircle2, Send, XCircle, PackageCheck } from 'lucide-react';
+import { CheckCircle2, Eye, Send, XCircle, PackageCheck } from 'lucide-react';
 
 function idOf(item) { return item?.id ?? item?.purchaseOrderId ?? ''; }
 function titleCase(value = '') { return String(value || '—').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
@@ -8,7 +8,7 @@ function date(value) {
   return Number.isNaN(parsed.valueOf()) ? String(value) : parsed.toLocaleDateString('es-EC');
 }
 
-export default function PurchaseTable({ rows = [], onSubmit, onApprove, onCancel, onReceive, loading = false }) {
+export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, onCancel, onReceive, loading = false }) {
   return <div className="table-wrap">
     <table aria-label="Órdenes de compra">
       <caption className="visually-hidden">Órdenes de compra y sus estados de aprobación y recepción</caption>
@@ -30,6 +30,7 @@ export default function PurchaseTable({ rows = [], onSubmit, onApprove, onCancel
           <td>{items.length || order.itemCount || '—'}</td>
           <td>{date(order.orderedAt || order.createdAt)}</td>
           <td><div className="row-actions">
+            <button type="button" className="small-action" disabled={loading} aria-label={'Ver detalle de la orden ' + orderNumber} onClick={() => onView(order)}><Eye size={13}/> Detalle</button>
             {canSubmit && <button type="button" className="small-action" disabled={loading} aria-label={'Enviar orden ' + orderNumber} onClick={() => onSubmit(order)}><Send size={13}/> Enviar</button>}
             {canApprove && <button type="button" className="small-action" disabled={loading} aria-label={'Aprobar orden ' + orderNumber} onClick={() => onApprove(order)}><CheckCircle2 size={13}/> Aprobar</button>}
             {canReceive && <button type="button" className="small-action" disabled={loading} aria-label={'Recibir mercancía de la orden ' + orderNumber} onClick={() => onReceive(order)}><PackageCheck size={13}/> Recibir</button>}
