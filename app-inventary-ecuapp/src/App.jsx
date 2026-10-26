@@ -121,7 +121,7 @@ function App() {
     await runAction(() => api.createReceipt(pickId(selectedOrder), { items: [{ purchaseOrderLineId: line.id, quantity: Number(receiptQty) }] }), 'Recepción contabilizada. El inventario se actualizó desde el backend.');
     setSelectedOrder(null);
   }
-  async function submitReceipt(e) {\n    e.preventDefault();\n    const line = selectedOrder?.items?.[0];\n    if (!line?.id) { setError('La orden no incluye la línea de compra necesaria para registrar la recepción.'); return; }\n    await runAction(() => api.createReceipt(pickId(selectedOrder), { items: [{ purchaseOrderLineId: line.id, quantity: Number(receiptQty) }] }), 'Recepción contabilizada. El inventario se actualizó desde el backend.');\n    setSelectedOrder(null);\n  }\n  async function submitSale(e) {
+  async function submitSale(e) {
     e.preventDefault();
     const data = { warehouseId: saleForm.warehouseId, channel: 'POS', items: [{ productId: saleForm.productId, quantity: Number(saleForm.quantity) }] };
     await runAction(() => api.createSale(data), 'Venta registrada.');
