@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, ShoppingBag, Tags, Warehouse } from 'lucide-react';
 import { api, getToken, listFrom, setToken } from './api';
+import ProductForm from './features/catalog/ProductForm.jsx';
+import CategoryForm from './features/catalog/CategoryForm.jsx';
 
 const nav = [
   { id: 'overview', label: 'Resumen', icon: ChartNoAxesCombined },
@@ -11,8 +13,6 @@ const nav = [
   { id: 'inventory', label: 'Inventario', icon: Warehouse },
   { id: 'reports', label: 'Reportes', icon: ClipboardList }
 ];
-const emptyProduct = { sku: '', name: '', kind: 'PRODUCT', categoryId: '', unitOfMeasureId: '', description: '', costPrice: '0', salePrice: '0', attributes: '{}' };
-const emptyCategory = { name: '', description: '', attributesJson: '[]' };
 const emptyPurchase = { supplierId: '', warehouseId: '', productId: '', quantity: '1', unitCost: '0', notes: '' };
 const emptySale = { warehouseId: '', productId: '', quantity: '1', unitPrice: '0', notes: '' };
 
@@ -45,8 +45,6 @@ function App() {
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState('');
   const [editing, setEditing] = useState(null);
-  const [productForm, setProductForm] = useState(emptyProduct);
-  const [categoryForm, setCategoryForm] = useState(emptyCategory);
   const [purchaseForm, setPurchaseForm] = useState(emptyPurchase);
   const [saleForm, setSaleForm] = useState(emptySale);
   const [reportForm, setReportForm] = useState({ warehouseId: '', from: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), productId: '' });
@@ -88,24 +86,43 @@ function App() {
     finally { setLoading(false); }
   }
 
-  async function submitProduct(e) {
-    e.preventDefault();
-    let attributes;
-    try { attributes = JSON.parse(productForm.attributes || '{}'); } catch { setError('Las propiedades deben ser un JSON válido.'); return; }
-    const data = { sku: productForm.sku.trim(), name: productForm.name.trim(), categoryId: productForm.categoryId || null, costPrice: Number(productForm.costPrice), salePrice: Number(productForm.salePrice), description: productForm.description.trim(), attributes };
+  async function submitProduct(form) {
+    const data = {
+      sku: form.sku.trim(),
+      name: form.name.trim(),
+      categoryId: form.categoryId || null,
+      costPrice: Number(form.costPrice),
+      salePrice: Number(form.salePrice),
+      description: form.description.trim(),
+      attributes: form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes) ? form.attributes : {}
+    };
+    if (!Number.isFinite(data.costPrice) || data.costPrice < 0 || !Number.isFinite(data.salePrice) || data.salePrice < 0) {
+      setError('El costo y el precio de venta deben ser números válidos no negativos.');
+      return;
+    }
     await runAction(() => editing ? api.updateProduct(pickId(editing), data) : api.createProduct(data), editing ? 'Producto actualizado.' : 'Producto creado.');
   }
-  async function submitCategory(e) {
-    e.preventDefault();
-    let definitions;
-    try { definitions = JSON.parse(categoryForm.attributesJson || '[]'); } catch { setError('Las propiedades de categoría deben ser un JSON válido.'); return; }
-    if (!Array.isArray(definitions)) { setError('Las propiedades deben ser un arreglo JSON.'); return; }
-    const data = { name: categoryForm.name.trim(), description: categoryForm.description.trim() };
+
+  async function submitCategory(form) {
+    const data = { name: form.name.trim(), description: form.description.trim() };
     await runAction(async () => {
       const result = editing ? await api.updateCategory(pickId(editing), data) : await api.createCategory(data);
       const categoryId = result?.id ?? result?.categoryId ?? (editing ? pickId(editing) : null);
-      if (categoryId && definitions.length) await api.saveCategoryAttributes(categoryId, { definitions });
-    }, editing ? 'Categoría actualizada.' : 'Categoría creada.');
+      if (!categoryId) throw new Error('La API guardó la categoría pero no devolvió su identificador; no se pudo guardar el esquema de propiedades.');
+      await api.saveCategoryAttributes(categoryId, { definitions: Array.isArray(form.definitions) ? form.definitions : [] });
+    }, editing ? 'Categoría y propiedades actualizadas.' : 'Categoría creada con sus propiedades.');
+  }
+
+  async function toggleProductStatus(product) {
+    const inactive = product.active === false || String(product.status || '').toUpperCase() === 'INACTIVE';
+    const id = pickId(product);
+    await runAction(() => inactive ? api.activateProduct(id) : api.deactivateProduct(id), inactive ? 'Producto activado.' : 'Producto desactivado.');
+  }
+
+  async function toggleCategoryStatus(category) {
+    const inactive = category.active === false || String(category.status || '').toUpperCase() === 'INACTIVE';
+    const id = pickId(category);
+    await runAction(() => inactive ? api.activateCategory(id) : api.deactivateCategory(id), inactive ? 'Categoría activada.' : 'Categoría desactivada.');
   }
   async function submitPurchase(e) {
     e.preventDefault();
@@ -139,11 +156,12 @@ function App() {
     }, 'Reporte actualizado.');
   }
   function openProduct(product = null) {
-    setEditing(product); setProductForm(product ? { sku: product.sku || '', name: product.name || '', kind: product.kind || 'PRODUCT', categoryId: product.categoryId || product.category?.id || '', unitOfMeasureId: product.unitOfMeasureId || product.unitOfMeasure?.id || '', description: product.description || '', costPrice: String(product.costPrice ?? 0), salePrice: String(product.salePrice ?? 0), attributes: JSON.stringify(product.attributes || {}, null, 2) } : emptyProduct);
+    setEditing(product);
     setModal('product');
   }
   function openCategory(category = null) {
-    setEditing(category); setCategoryForm(category ? { name: category.name || '', description: category.description || '', attributesJson: '[]' } : emptyCategory); setModal('category');
+    setEditing(category);
+    setModal('category');
   }
 
   if (!token) return <Login onLogin={async (username, password) => {
@@ -164,16 +182,16 @@ function App() {
       {error && <div className="alert error"><CircleAlert size={18}/><span>{error}</span><button onClick={() => setError('')}>×</button></div>}
       {notice && <div className="alert success"><Activity size={18}/><span>{notice}</span><button onClick={() => setNotice('')}>×</button></div>}
       {section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValue} purchases={purchases} sales={sales} movements={movements} setSection={setSection} loading={loading}/>}
-      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct}/></section>}
-      {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory}/></section>}
+      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus}/></section>}
+      {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus}/></section>}
       {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Crea órdenes, gestiona su aprobación y contabiliza las recepciones." action="Nueva compra" onAction={() => { setPurchaseForm({...emptyPurchase, warehouseId: pickId(warehouses[0])}); setModal('purchase'); }} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onReceive={order => { setSelectedOrder(order); setReceiptQty(String(order.items?.[0]?.quantity || '1')); setModal('receive'); }}/></section>}
       {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas mediante el comando transaccional del backend." action="Nueva venta" onAction={() => { setSaleForm({...emptySale, warehouseId: pickId(warehouses[0])}); setModal('sale'); }} icon={ArrowUpFromLine}/><DataTable rows={sales} columns={[['number','Documento'],['status','Estado'],['customerName','Cliente'],['createdAt','Fecha'],['total','Total']]} moneyKey="total" empty="Todavía no hay ventas."/></section>}
       {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta saldos físicos y trazabilidad de los movimientos." action="Actualizar" onAction={loadData} icon={Warehouse}/><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 10)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/></section>}
       {section === 'reports' && <section className="panel"><PanelHeading title="Balance de inventario" subtitle="Compara compras, ventas y saldo por rango de fechas." icon={ClipboardList}/><form className="report-filters" onSubmit={runReport}><Field label="Almacén" required><select required value={reportForm.warehouseId} onChange={e => setReportForm({...reportForm, warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w => <option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Desde" required><input type="date" required value={reportForm.from} onChange={e => setReportForm({...reportForm, from:e.target.value})}/></Field><Field label="Hasta" required><input type="date" min={reportForm.from} required value={reportForm.to} onChange={e => setReportForm({...reportForm, to:e.target.value})}/></Field><Field label="Producto (opcional)"><select value={reportForm.productId} onChange={e => setReportForm({...reportForm, productId:e.target.value})}><option value="">Todos los productos</option>{products.map(p => <option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Consultar balance</button></form><DataTable rows={report} columns={[['productName','Producto'],['sku','SKU'],['openingStock','Saldo inicial'],['purchasedQuantity','Comprado'],['purchaseAmount','Importe compras'],['soldQuantity','Vendido'],['salesAmount','Importe ventas'],['closingStock','Saldo final'],['currentStock','Stock actual'],['grossProfit','Ganancia bruta']]} empty="Selecciona un almacén y consulta un periodo para ver el balance."/></section>}
     </main>
     {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta'}[modal]} onClose={() => { setModal(''); setEditing(null); }}><>
-      {modal === 'product' && <form className="form-grid" onSubmit={submitProduct}><Field label="Nombre del producto" required><input required maxLength="160" value={productForm.name} onChange={e => setProductForm({...productForm,name:e.target.value})} placeholder="Ej. Teclado mecánico"/></Field><Field label="SKU / código" required><input required maxLength="80" value={productForm.sku} onChange={e => setProductForm({...productForm,sku:e.target.value})} placeholder="Ej. TEC-001"/></Field><Field label="Categoría"><select value={productForm.categoryId} onChange={e => setProductForm({...productForm,categoryId:e.target.value})}><option value="">Sin categoría</option>{categories.map(c => <option key={pickId(c)} value={pickId(c)}>{pickName(c)}</option>)}</select></Field><Field label="Costo de compra" required><input type="number" min="0" step="0.0001" required value={productForm.costPrice} onChange={e => setProductForm({...productForm,costPrice:e.target.value})}/></Field><Field label="Precio de venta" required><input type="number" min="0" step="0.0001" required value={productForm.salePrice} onChange={e => setProductForm({...productForm,salePrice:e.target.value})}/></Field><Field label="Descripción"><input value={productForm.description} onChange={e => setProductForm({...productForm,description:e.target.value})} maxLength="1000"/></Field><Field label="Propiedades dinámicas (JSON)" wide><textarea rows="5" spellCheck="false" value={productForm.attributes} onChange={e => setProductForm({...productForm,attributes:e.target.value})} placeholder={'{\n  "color": "Negro",\n  "garantiaMeses": 12\n}'}/></Field><FormActions loading={loading} onCancel={() => setModal('')}/></form>}
-      {modal === 'category' && <form className="form-grid" onSubmit={submitCategory}><Field label="Nombre" required><input required maxLength="120" value={categoryForm.name} onChange={e => setCategoryForm({...categoryForm,name:e.target.value})}/></Field><Field label="Descripción" wide><textarea rows="3" value={categoryForm.description} onChange={e => setCategoryForm({...categoryForm,description:e.target.value})}/></Field><Field label="Propiedades de esta categoría (JSON array)" wide><textarea rows="5" spellCheck="false" value={categoryForm.attributesJson} onChange={e=>setCategoryForm({...categoryForm,attributesJson:e.target.value})} placeholder={'[{"key":"talla","displayName":"Talla","valueType":"ENUM","required":true,"options":["S","M","L"]}]'}/></Field><p className="form-hint wide">Tipos comunes: STRING, NUMBER, BOOLEAN, DATE y ENUM. Cada definición debe incluir key, displayName, valueType y required; ENUM puede incluir options.</p><FormActions loading={loading} onCancel={() => setModal('')}/></form>}
+      {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
+      {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitCategory} onError={setError}/>}
       {modal === 'purchase' && <form className="form-grid" onSubmit={submitPurchase}><Field label="Almacén" required><select required value={purchaseForm.warehouseId} onChange={e => setPurchaseForm({...purchaseForm,warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w=><option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Producto" required><select required value={purchaseForm.productId} onChange={e => setPurchaseForm({...purchaseForm,productId:e.target.value})}><option value="">Seleccionar producto</option>{products.map(p=><option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><Field label="Cantidad" required><input type="number" min="0.001" step="0.001" required value={purchaseForm.quantity} onChange={e => setPurchaseForm({...purchaseForm,quantity:e.target.value})}/></Field><Field label="Costo unitario" required><input type="number" min="0" step="0.0001" required value={purchaseForm.unitCost} onChange={e => setPurchaseForm({...purchaseForm,unitCost:e.target.value})}/></Field><Field label="Proveedor" required><select required value={purchaseForm.supplierId} onChange={e => setPurchaseForm({...purchaseForm,supplierId:e.target.value})}><option value="">Seleccionar proveedor</option>{suppliers.map(s=><option key={pickId(s)} value={pickId(s)}>{pickName(s)}</option>)}</select></Field><Field label="Notas"><input value={purchaseForm.notes} onChange={e => setPurchaseForm({...purchaseForm,notes:e.target.value})}/></Field><p className="form-hint wide">La orden se envía para aprobación. Después de aprobarla con el permiso correspondiente, registra la recepción para que el backend incremente el stock.</p><FormActions loading={loading} onCancel={() => setModal('')}/></form>}
       {modal === 'receive' && <form className="form-grid" onSubmit={submitReceipt}><div className="form-hint wide">Orden: {selectedOrder?.number || pickId(selectedOrder)}. La recepción contabilizada incrementará el stock según las reglas del backend.</div><Field label="Cantidad recibida" required><input type="number" min="0.001" step="0.001" required value={receiptQty} onChange={e=>setReceiptQty(e.target.value)}/></Field><FormActions loading={loading} onCancel={()=>{setModal('');setSelectedOrder(null);}}/></form>}{modal === 'sale' && <form className="form-grid" onSubmit={submitSale}><Field label="Almacén" required><select required value={saleForm.warehouseId} onChange={e => setSaleForm({...saleForm,warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w=><option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Producto" required><select required value={saleForm.productId} onChange={e => setSaleForm({...saleForm,productId:e.target.value})}><option value="">Seleccionar producto</option>{products.map(p=><option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><Field label="Cantidad" required><input type="number" min="0.001" step="0.001" required value={saleForm.quantity} onChange={e => setSaleForm({...saleForm,quantity:e.target.value})}/></Field><Field label="Notas" wide><input value={saleForm.notes} onChange={e => setSaleForm({...saleForm,notes:e.target.value})}/></Field><p className="form-hint wide">La API debe validar el precio y el stock disponible en una única transacción; nunca se modifica el saldo directamente desde el navegador.</p><FormActions loading={loading} onCancel={() => setModal('')}/></form>}
     </></Modal>}
@@ -190,8 +208,19 @@ function Overview({products,categories,stockTotal,inventoryValue,purchases,sales
 }
 function QuickAction({icon:Icon,title,text,onClick}) { return <button className="quick-action" onClick={onClick}><span className="quick-icon"><Icon size={20}/></span><span><strong>{title}</strong><small>{text}</small></span><ChevronRight size={16}/></button>; }
 function PanelHeading({title,subtitle,action,onAction,icon:Icon=Layers3}) { return <div className="panel-heading"><div className="panel-title-icon"><span><Icon size={20}/></span><div><h2>{title}</h2><p>{subtitle}</p></div></div>{action&&<button className="button primary" onClick={onAction}><Plus size={16}/>{action}</button>}</div>; }
-function ProductsTable({products,categories,onEdit}) { const categoryName = id => categories.find(c=>String(pickId(c))===String(id))?.name || '—'; return <div className="table-wrap"><table><thead><tr><th>Producto</th><th>SKU</th><th>Categoría</th><th>Tipo</th><th>Estado</th><th></th></tr></thead><tbody>{products.map((p,i)=><tr key={pickId(p)||i}><td><div className="product-cell"><span className="product-avatar"><ShoppingBag size={17}/></span><div><strong>{p.name||'Sin nombre'}</strong><small>{p.description||'Sin descripción'}</small></div></div></td><td><code>{p.sku||p.code||'—'}</code></td><td>{p.category?.name||categoryName(p.categoryId)}</td><td>{titleCase(p.kind||'PRODUCT')}</td><td><span className={'pill '+(p.active===false||p.status==='INACTIVE'?'inactive':'active')}>{p.active===false||p.status==='INACTIVE'?'Inactivo':'Activo'}</span></td><td><button className="small-action" onClick={()=>onEdit(p)}>Editar</button></td></tr>)}</tbody></table>{!products.length&&<div className="empty-state">No hay productos que coincidan con la búsqueda.</div>}</div>; }
-function CategoriesTable({categories,onEdit}) { return <div className="table-wrap"><table><thead><tr><th>Categoría</th><th>Código</th><th>Descripción</th><th>Productos</th><th></th></tr></thead><tbody>{categories.map((c,i)=><tr key={pickId(c)||i}><td><strong>{c.name||'Sin nombre'}</strong></td><td><code>{c.code||'—'}</code></td><td>{c.description||'—'}</td><td>{c.productCount??'—'}</td><td><button className="small-action" onClick={()=>onEdit(c)}>Editar</button></td></tr>)}</tbody></table>{!categories.length&&<div className="empty-state">Todavía no has creado categorías.</div>}</div>; }
+function ProductsTable({products,categories,onEdit,onToggleActive}) {
+  const categoryName = id => categories.find(c => String(pickId(c)) === String(id))?.name || '—';
+  return <div className="table-wrap"><table><thead><tr><th>Producto</th><th>SKU</th><th>Categoría</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{products.map((product,index)=>{
+    const inactive = product.active === false || String(product.status || '').toUpperCase() === 'INACTIVE';
+    return <tr key={pickId(product)||index}><td><div className="product-cell"><span className="product-avatar"><ShoppingBag size={17}/></span><div><strong>{product.name||'Sin nombre'}</strong><small>{product.description||'Sin descripción'}</small></div></div></td><td><code>{product.sku||product.code||'—'}</code></td><td>{product.category?.name||categoryName(product.categoryId)}</td><td>{titleCase(product.kind||'PRODUCT')}</td><td><span className={'pill '+(inactive?'inactive':'active')}>{inactive?'Inactivo':'Activo'}</span></td><td><div className="row-actions"><button className="small-action" onClick={()=>onEdit(product)}>Editar</button><button className="small-action" onClick={()=>onToggleActive(product)}>{inactive?'Activar':'Desactivar'}</button></div></td></tr>;
+  })}</tbody></table>{!products.length&&<div className="empty-state">No hay productos que coincidan con la búsqueda.</div>}</div>;
+}
+function CategoriesTable({categories,onEdit,onToggleActive}) {
+  return <div className="table-wrap"><table><thead><tr><th>Categoría</th><th>Código</th><th>Descripción</th><th>Productos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{categories.map((category,index)=>{
+    const inactive = category.active === false || String(category.status || '').toUpperCase() === 'INACTIVE';
+    return <tr key={pickId(category)||index}><td><strong>{category.name||'Sin nombre'}</strong></td><td><code>{category.code||'—'}</code></td><td>{category.description||'—'}</td><td>{category.productCount??'—'}</td><td><span className={'pill '+(inactive?'inactive':'active')}>{inactive?'Inactiva':'Activa'}</span></td><td><div className="row-actions"><button className="small-action" onClick={()=>onEdit(category)}>Editar</button><button className="small-action" onClick={()=>onToggleActive(category)}>{inactive?'Activar':'Desactivar'}</button></div></td></tr>;
+  })}</tbody></table>{!categories.length&&<div className="empty-state">Todavía no has creado categorías.</div>}</div>;
+}
 function PurchaseTable({rows,onSubmit,onApprove,onReceive}) {
   return <div className="table-wrap"><table><thead><tr><th>Documento</th><th>Estado</th><th>Proveedor</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>{rows.map((order,i)=>{const status=String(order.status||'DRAFT').toUpperCase();return <tr key={pickId(order)||i}><td><strong>{order.number||order.code||String(pickId(order)).slice(0,12)||'Orden'}</strong></td><td><span className={'pill '+(['RECEIVED','APPROVED','COMPLETED'].includes(status)?'active':'inactive')}>{titleCase(status)}</span></td><td>{order.supplierName||order.supplier?.name||'—'}</td><td>{date(order.createdAt)}</td><td><div className="row-actions">{['DRAFT','PENDING'].includes(status)&&<button className="small-action" onClick={()=>onSubmit(order)}>Enviar</button>}{['SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status)&&<button className="small-action" onClick={()=>onApprove(order)}>Aprobar</button>}{['APPROVED','PARTIALLY_RECEIVED'].includes(status)&&<button className="small-action" onClick={()=>onReceive(order)}>Recibir</button>}</div></td></tr>;})}</tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay órdenes de compra.</div>}</div>;
 }
