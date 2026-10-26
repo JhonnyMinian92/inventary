@@ -19,6 +19,7 @@ function normalizeProduct(product) {
     sku: product?.sku || product?.code || '',
     name: product?.name || '',
     categoryId: product?.categoryId || product?.category?.id || '',
+    unitOfMeasureId: product?.unitOfMeasureId || product?.unitOfMeasure?.id || '',
     description: product?.description || '',
     costPrice: String(product?.costPrice ?? 0),
     salePrice: String(product?.salePrice ?? 0),
@@ -82,7 +83,7 @@ function AttributeInput({ definition, value, onChange }) {
   </label>;
 }
 
-export default function ProductForm({ initialValue, categories, loading, onCancel, onSubmit, onError }) {
+export default function ProductForm({ initialValue, categories, units = [], loading, onCancel, onSubmit, onError }) {
   const [form, setForm] = useState(() => normalizeProduct(initialValue));
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
@@ -185,6 +186,13 @@ export default function ProductForm({ initialValue, categories, loading, onCance
       <select value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
         <option value="">Sin categoría</option>
         {categories.map(category => <option key={category.id || category.categoryId} value={category.id || category.categoryId}>{category.name}</option>)}
+      </select>
+    </label>
+    <label className="field">
+      <span>Unidad de medida</span>
+      <select value={form.unitOfMeasureId} onChange={event => changeField('unitOfMeasureId', event.target.value)}>
+        <option value="">Unidad predeterminada del backend</option>
+        {units.filter(unit => unit.active !== false && unit.status !== 'INACTIVE').map(unit => <option key={unit.id} value={unit.id}>{unit.name} · {unit.code}</option>)}
       </select>
     </label>
     <label className="field">
