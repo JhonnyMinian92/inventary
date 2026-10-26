@@ -179,12 +179,12 @@ export default function ProductForm({ initialValue, categories, units = [], load
     </label>
     <label className="field">
       <span>SKU / código<b> *</b></span>
-      <input required maxLength="80" value={form.sku} onChange={event => changeField('sku', event.target.value)} placeholder="Ej. TEC-001" autoComplete="off" />
+      <input required maxLength="64" pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,63}" title="Usa hasta 64 caracteres: letras, números, punto, guion o guion bajo." value={form.sku} onChange={event => changeField('sku', event.target.value)} placeholder="Ej. TEC-001" autoComplete="off" />
     </label>
     <label className="field">
-      <span>Categoría</span>
-      <select value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
-        <option value="">Sin categoría</option>
+      <span>Categoría<b> *</b></span>
+      <select required value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
+        <option value="">Seleccionar categoría</option>
         {categories.map(category => <option key={category.id || category.categoryId} value={category.id || category.categoryId}>{category.name}</option>)}
       </select>
     </label>
@@ -205,7 +205,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
     </label>
     <label className="field wide">
       <span>Descripción</span>
-      <textarea rows="2" maxLength="1000" value={form.description} onChange={event => changeField('description', event.target.value)} />
+      <textarea rows="2" maxLength="2000" value={form.description} onChange={event => changeField('description', event.target.value)} />
     </label>
 
     <div className="form-subheading wide">
