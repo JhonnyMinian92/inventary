@@ -60,9 +60,9 @@ function App() {
   const loadData = useCallback(async () => {
     setLoading(true); setError('');
     const tasks = [
-      ['products', api.products()], ['categories', api.categories()], ['units', api.units()],
-      ['warehouses', api.warehouses()], ['suppliers', api.suppliers()], ['customers', api.customers()], ['balances', api.balances()], ['movements', api.movements()],
-      ['purchases', api.purchaseOrders()], ['sales', api.sales()]
+      ['products', api.products({ size: 100 })], ['categories', api.categories({ size: 100 })], ['units', api.units()],
+      ['warehouses', api.warehouses({ size: 100 })], ['suppliers', api.suppliers({ size: 100 })], ['customers', api.customers({ size: 100 })], ['balances', api.balances({ size: 100 })], ['movements', api.movements({ size: 100 })],
+      ['purchases', api.purchaseOrders({ size: 100 })], ['sales', api.sales({ size: 100 })]
     ];
     const results = await Promise.allSettled(tasks.map(t => t[1]));
     const unauthorized = results.some(result => result.status === 'rejected' && result.reason?.status === 401);
