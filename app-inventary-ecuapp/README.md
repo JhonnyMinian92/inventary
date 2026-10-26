@@ -27,24 +27,29 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 - **src/api.js**: llamadas REST, autenticación Bearer, manejo centralizado de errores e idempotencia para operaciones transaccionales.
 - **src/features/catalog/ProductForm.jsx**: crear/editar productos y renderizar campos a partir del esquema de atributos de la categoría.
 - **src/features/catalog/CategoryForm.jsx**: crear/editar categorías y configurar campos tipados, obligatorios, enumerados y restricciones básicas.
+- **src/features/operations/OperationsCatalogs.jsx**: administración de almacenes, proveedores y clientes.
+- **src/features/purchasing/PurchaseForm.jsx** y **ReceiptForm.jsx**: órdenes y recepciones de múltiples líneas.
+- **src/features/sales/SaleForm.jsx**: venta transaccional con múltiples artículos.
+- **src/features/inventory/InventoryOperations.jsx**: traslados, ajustes, conteos físicos y reposición.
 - **src/styles.css**: sistema visual responsive.
 - **docs/frontend-roadmap.md**: alcance y criterios de cierre por fase.
 
 ## Funciones incorporadas
 
-- Inicio de sesión con token emitido por el backend.
-- Catálogo de productos y categorías.
-- Propiedades de producto derivadas del esquema de la categoría (STRING, NUMBER, BOOLEAN, DATE, ENUM).
-- Activación y desactivación de productos y categorías.
-- Compras con envío a aprobación y recepción contabilizada por el backend.
-- Ventas, consulta de saldos y movimientos.
+- Inicio de sesión con token emitido por el backend, cierre de sesión en la API y manejo de sesión vencida.
+- Catálogo de productos y categorías con propiedades derivadas del esquema de atributos (STRING, NUMBER, BOOLEAN, DATE, ENUM).
+- Administración de almacenes, proveedores y clientes.
+- Órdenes de compra con múltiples líneas, flujo de aprobación y recepción por artículo.
+- Ventas con múltiples artículos, clientes registrados y solicitud/aprobación de anulaciones.
+- Consulta de saldos y movimientos por almacén y producto.
+- Traslados con despacho y recepción, ajustes de stock con motivo, conteos físicos y reglas/sugerencias de reposición.
 - Balance de inventario por almacén y rango de fechas.
 
 Una orden de compra por sí sola no aumenta las existencias: el stock cambia al registrar la recepción aprobada, mediante la API. De forma equivalente, las ventas se registran como operaciones transaccionales del backend.
 
 ## Fases y pruebas
 
-El trabajo está separado en fases descritas en [docs/frontend-roadmap.md](docs/frontend-roadmap.md). La Fase 1 se enfoca en la base del frontend y el catálogo de productos/categorías. De acuerdo con el plan solicitado, la compilación, las pruebas de componentes y la verificación end-to-end se ejecutarán después de completar el 100 % del código fuente.
+El trabajo está separado en fases descritas en [docs/frontend-roadmap.md](docs/frontend-roadmap.md). Las Fases 1 y 2 cubren la fundación, el catálogo, las operaciones auxiliares y los flujos principales de inventario. De acuerdo con el plan solicitado, la compilación, las pruebas de componentes y la verificación end-to-end se ejecutarán después de completar el 100 % del código fuente.
 
 ## Build de producción (para la fase de pruebas)
 
