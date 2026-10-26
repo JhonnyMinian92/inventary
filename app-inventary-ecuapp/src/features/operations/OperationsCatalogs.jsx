@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, listFrom } from '../../api';
+import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import UnitConversions from './UnitConversions.jsx';
 
 const configs = {
@@ -84,6 +85,7 @@ export default function OperationsCatalogs({ onChanged }) {
   const [form, setForm] = useState({});
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const dialogRef = useAccessibleDialog(modal, () => setModal(false));
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -203,8 +205,8 @@ export default function OperationsCatalogs({ onChanged }) {
     {kind === 'units' && <UnitConversions units={records.units} />}
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
-      <section className="modal-card">
-        <div className="modal-heading"><h2>{editing ? 'Editar ' : 'Crear '}{config.singular}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal(false)}>×</button></div>
+      <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="operations-catalog-modal-title" tabIndex={-1}>
+        <div className="modal-heading"><h2 id="operations-catalog-modal-title">{editing ? 'Editar ' : 'Crear '}{config.singular}</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setModal(false)}>×</button></div>
         <form className="form-grid" onSubmit={save}>
           {config.fields.map(field => <label className="field" key={field.key}>
             <span>{field.label}{field.required && <b> *</b>}</span>
