@@ -38,7 +38,7 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 
 - Inicio de sesión con token emitido por el backend, cierre de sesión en la API y manejo de sesión vencida.
 - Catálogo de productos y categorías con propiedades derivadas del esquema de atributos (STRING, NUMBER, BOOLEAN, DATE, ENUM).
-- Administración de almacenes, proveedores y clientes.
+- Administración de almacenes, proveedores, clientes y unidades de medida, con asignación de unidad al producto.
 - Órdenes de compra con múltiples líneas, flujo de aprobación y recepción por artículo.
 - Ventas con múltiples artículos, clientes registrados y solicitud/aprobación de anulaciones.
 - Consulta de saldos y movimientos por almacén y producto.
