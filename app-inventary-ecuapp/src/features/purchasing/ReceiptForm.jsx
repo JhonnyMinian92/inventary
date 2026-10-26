@@ -12,7 +12,6 @@ function remaining(line) {
 export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
   const orderLines = Array.isArray(order?.items) ? order.items : Array.isArray(order?.lines) ? order.lines : [];
   const [quantities, setQuantities] = useState(() => orderLines.map(line => String(remaining(line))));
-  const [reason, setReason] = useState('');
   const pending = useMemo(() => orderLines.filter((line, index) => Number(quantities[index] || 0) > 0 && idOf(line)), [orderLines, quantities]);
 
   function submit(event) {
@@ -32,10 +31,9 @@ export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
       const max = remaining(line);
       return <div className="receipt-line wide" key={idOf(line) || index}>
         <div><strong>{lineName(line)}</strong><small>Solicitado: {ordered(line)} · Recibido: {received(line)} · Pendiente: {max}</small></div>
-        <label className="field"><span>Cantidad a recibir</span><input type="number" min="0" max={max || undefined} step="0.001" value={quantities[index] ?? '0'} onChange={event => setQuantities(current => current.map((value, qtyIndex) => qtyIndex === index ? event.target.value : value))} /></label>
+        <label className="field"><span>Cantidad a recibir</span><input type="number" min="0" max={max} step="0.001" value={quantities[index] ?? '0'} onChange={event => setQuantities(current => current.map((value, qtyIndex) => qtyIndex === index ? event.target.value : value))} /></label>
       </div>;
     })}
-    <label className="field wide"><span>Nota informativa (no enviada por no formar parte del contrato de recepción)</span><input value={reason} onChange={event => setReason(event.target.value)} placeholder="Referencia interna opcional" /></label>
     <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !pending.length || !orderLines.length}>{loading ? 'Contabilizando…' : 'Contabilizar recepción'}</button></div>
   </form>;
 }
