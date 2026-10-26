@@ -7,6 +7,7 @@ function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency
 export default function PurchaseForm({ products, warehouses, suppliers, loading, initialValue, onCancel, onSubmit }) {
   const [warehouseId, setWarehouseId] = useState(initialValue?.warehouseId || warehouses[0]?.id || '');
   const [supplierId, setSupplierId] = useState(initialValue?.supplierId || initialValue?.supplier?.id || '');
+  const [notes, setNotes] = useState(initialValue?.notes || '');
   const [lines, setLines] = useState(() => {
     if (Array.isArray(initialValue?.items) && initialValue.items.length) {
       return initialValue.items.map(line => ({ productId: line.productId || line.product?.id || '', quantity: String(line.quantity ?? 1), unitCost: String(line.unitCost ?? line.costPrice ?? 0) }));
@@ -23,7 +24,7 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
     event.preventDefault();
     const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity), unitCost: Number(line.unitCost) }));
     if (!warehouseId || !supplierId || !items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitCost) || item.unitCost < 0)) return;
-    onSubmit({ warehouseId, supplierId, items });
+    onSubmit({ warehouseId, supplierId, notes: notes.trim(), items });
   }
 
   return <form className="form-grid" onSubmit={submit}>
@@ -42,6 +43,7 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
       </select>
     </label>
 
+    <label className="field wide"><span>Notas de la orden</span><textarea rows="2" maxLength="1000" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Referencia, entrega o condición de compra" /></label>
     <div className="form-subheading wide"><strong>Productos de la orden</strong><small>Añade todas las líneas necesarias; cada cantidad y costo se validan antes de enviarse al backend.</small></div>
     {lines.map((line, index) => {
       const product = products.find(item => String(idOf(item)) === String(line.productId));
