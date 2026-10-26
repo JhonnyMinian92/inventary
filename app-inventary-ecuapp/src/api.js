@@ -60,7 +60,11 @@ export const api = {
   inventoryBalanceReport: params => request(`/reports/inventory-balance?${new URLSearchParams(params)}`),
   purchaseOrders: () => request('/purchase-orders'),
   createPurchaseOrder: data => request('/purchase-orders', { method: 'POST', body: data, idempotent: true }),
+  submitPurchaseOrder: id => request(`/purchase-orders/${encodeURIComponent(id)}/submit`, { method: 'POST' }),
+  approvePurchaseOrder: id => request(`/purchase-orders/${encodeURIComponent(id)}/approve`, { method: 'POST' }),
   createReceipt: (purchaseOrderId, data) => request(`/purchase-orders/${encodeURIComponent(purchaseOrderId)}/receipts`, { method: 'POST', body: data, idempotent: true }),
+  categoryAttributes: id => request(`/catalog/categories/${encodeURIComponent(id)}/attributes`),
+  saveCategoryAttributes: (id, data) => request(`/catalog/categories/${encodeURIComponent(id)}/attributes`, { method: 'PUT', body: data }),
   sales: () => request('/sales'),
   createSale: data => request('/sales', { method: 'POST', body: data, idempotent: true })
 };
