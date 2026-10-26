@@ -1,4 +1,33 @@
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '');
+const IDEMPOTENCY_RETRY_WINDOW_MS = 120_000;
+const pendingIdempotencyKeys = new Map();
+
+function createIdempotencyKey() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  if (globalThis.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+  }
+  // Idempotency keys identify a request; they are not authentication secrets.
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + '-' + Math.random().toString(36).slice(2);
+}
+
+function idempotencySignature(url, method, body) {
+  return [method.toUpperCase(), url, typeof body === 'string' ? body : ''].join('|');
+}
+
+function getIdempotencyKey(signature) {
+  const now = Date.now();
+  for (const [key, value] of pendingIdempotencyKeys) {
+    if (value.expiresAt <= now) pendingIdempotencyKeys.delete(key);
+  }
+  const existing = pendingIdempotencyKeys.get(signature);
+  if (existing) return existing.key;
+  const key = createIdempotencyKey();
+  pendingIdempotencyKeys.set(signature, { key, expiresAt: now + IDEMPOTENCY_RETRY_WINDOW_MS });
+  return key;
+}
 
 export class ApiError extends Error {
   constructor(message, status = 0, details = null) {
@@ -22,22 +51,58 @@ export async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
+
   const token = getToken();
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (options.idempotent) headers.set('Idempotency-Key', crypto.randomUUID());
+  if (token) headers.set('Authorization', 'Bearer ' + token);
+
+  const url = API_BASE + (path.startsWith('/') ? path : '/' + path);
+  const method = String(options.method || 'GET').toUpperCase();
+  const requestBody = options.body && typeof options.body !== 'string' && !(options.body instanceof FormData)
+    ? JSON.stringify(options.body)
+    : options.body;
+  const signature = options.idempotent
+    ? idempotencySignature(url, method, requestBody)
+    : null;
+  let idempotencyKey = null;
+
+  if (options.idempotencyKey) {
+    idempotencyKey = options.idempotencyKey;
+    headers.set('Idempotency-Key', idempotencyKey);
+  } else if (options.idempotent) {
+    idempotencyKey = getIdempotencyKey(signature);
+    headers.set('Idempotency-Key', idempotencyKey);
+  }
+
   let response;
   try {
-    response = await fetch(`${API_BASE}${path.startsWith('/') ? path : `/${path}`}`, {
-      ...options, headers, body: options.body && typeof options.body !== 'string' && !(options.body instanceof FormData) ? JSON.stringify(options.body) : options.body
+    response = await fetch(url, {
+      ...options,
+      method,
+      headers,
+      body: requestBody
     });
   } catch {
+    // Keep the key briefly so an identical retry after an ambiguous network failure
+    // reuses the backend's idempotency record instead of posting a second transaction.
     throw new ApiError('No se pudo conectar con el backend. Verifica que la API esté activa y que CORS permita este origen.');
   }
+
   const type = response.headers.get('content-type') || '';
-  const payload = response.status === 204 ? null : type.includes('json') ? await response.json().catch(() => null) : await response.text().catch(() => '');
+  const payload = response.status === 204 ? null : type.includes('json')
+    ? await response.json().catch(() => null)
+    : await response.text().catch(() => '');
+
+  if (signature && idempotencyKey) {
+    if (response.ok || (response.status < 500 && response.status !== 429)) {
+      const cached = pendingIdempotencyKeys.get(signature);
+      if (cached?.key === idempotencyKey) pendingIdempotencyKeys.delete(signature);
+    }
+  }
+
   if (!response.ok) {
     if (response.status === 401) setToken('');
-    const message = payload?.detail || payload?.message || payload?.title || (typeof payload === 'string' ? payload : '') || `Error HTTP ${response.status}`;
+    const message = payload?.detail || payload?.message || payload?.title ||
+      (typeof payload === 'string' ? payload : '') || 'Error HTTP ' + response.status;
     throw new ApiError(message, response.status, payload);
   }
   return payload;
