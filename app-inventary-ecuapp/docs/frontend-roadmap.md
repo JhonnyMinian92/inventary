@@ -48,6 +48,8 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 4 — Cierre del código fuente y documentación
 
+**Estado: pendiente.** Es la única fase de código fuente que queda antes de abrir la fase posterior de pruebas.
+
 - Revisar la cobertura funcional de todas las pantallas y cada ruta consumida.
 - Completar configuración por entorno, instrucciones de ejecución y resolución de problemas.
 - Revisar el manejo de sesión, permisos, duplicidad de acciones e idempotencia.
