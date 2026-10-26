@@ -1,0 +1,69 @@
+import { useMemo, useState } from 'react';
+
+const emptyLine = () => ({ productId: '', quantity: '1', unitCost: '0' });
+function idOf(item) { return item?.id ?? item?.productId ?? ''; }
+function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
+
+export default function PurchaseForm({ products, warehouses, suppliers, loading, initialValue, onCancel, onSubmit }) {
+  const [warehouseId, setWarehouseId] = useState(initialValue?.warehouseId || warehouses[0]?.id || '');
+  const [supplierId, setSupplierId] = useState(initialValue?.supplierId || initialValue?.supplier?.id || '');
+  const [lines, setLines] = useState(() => {
+    if (Array.isArray(initialValue?.items) && initialValue.items.length) {
+      return initialValue.items.map(line => ({ productId: line.productId || line.product?.id || '', quantity: String(line.quantity ?? 1), unitCost: String(line.unitCost ?? line.costPrice ?? 0) }));
+    }
+    return [emptyLine()];
+  });
+  const total = useMemo(() => lines.reduce((sum, line) => sum + Math.max(0, Number(line.quantity || 0)) * Math.max(0, Number(line.unitCost || 0)), 0), [lines]);
+
+  function updateLine(index, field, value) {
+    setLines(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity), unitCost: Number(line.unitCost) }));
+    if (!warehouseId || !supplierId || !items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitCost) || item.unitCost < 0)) return;
+    onSubmit({ warehouseId, supplierId, items });
+  }
+
+  return <form className="form-grid" onSubmit={submit}>
+    <label className="field">
+      <span>Almacén de destino<b> *</b></span>
+      <select required value={warehouseId} onChange={event => setWarehouseId(event.target.value)}>
+        <option value="">Seleccionar almacén</option>
+        {warehouses.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.code || idOf(item)}</option>)}
+      </select>
+    </label>
+    <label className="field">
+      <span>Proveedor<b> *</b></span>
+      <select required value={supplierId} onChange={event => setSupplierId(event.target.value)}>
+        <option value="">Seleccionar proveedor</option>
+        {suppliers.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.code || idOf(item)}</option>)}
+      </select>
+    </label>
+
+    <div className="form-subheading wide"><strong>Productos de la orden</strong><small>Añade todas las líneas necesarias; cada cantidad y costo se validan antes de enviarse al backend.</small></div>
+    {lines.map((line, index) => {
+      const product = products.find(item => String(idOf(item)) === String(line.productId));
+      const lineTotal = Math.max(0, Number(line.quantity || 0)) * Math.max(0, Number(line.unitCost || 0));
+      return <section className="line-editor wide" key={index}>
+        <div className="line-editor-heading"><strong>Línea {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" onClick={() => setLines(current => current.filter((_, lineIndex) => lineIndex !== index))}>Quitar</button>}</div>
+        <div className="form-grid compact-grid">
+          <label className="field wide">
+            <span>Producto<b> *</b></span>
+            <select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}>
+              <option value="">Seleccionar producto</option>
+              {products.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}
+            </select>
+          </label>
+          <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
+          <label className="field"><span>Costo unitario<b> *</b></span><input type="number" min="0" step="0.0001" required value={line.unitCost} onChange={event => updateLine(index, 'unitCost', event.target.value)} /></label>
+        </div>
+        <div className="line-editor-foot"><span>{product ? 'SKU: ' + (product.sku || product.code || '—') : 'Selecciona el producto'}</span><strong>{money(lineTotal)}</strong></div>
+      </section>;
+    })}
+    <div className="wide line-add-row"><button type="button" className="button secondary" onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir producto</button><div className="order-total"><span>Total estimado</span><strong>{money(total)}</strong></div></div>
+    <p className="form-hint wide">La orden será creada y enviada para aprobación. Debe aprobarla un usuario autorizado diferente; las existencias solo aumentan cuando se contabiliza la recepción.</p>
+    <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Guardando…' : 'Crear y enviar orden'}</button></div>
+  </form>;
+}
