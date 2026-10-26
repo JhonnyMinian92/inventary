@@ -18,3 +18,5 @@
 .danger-text{color:#b44545}
 .field-help{display:block;margin-top:5px}
 @media(max-width:560px){.compact-grid{grid-template-columns:1fr}.attribute-definition{padding:11px}}
+
+.status-dot.error{background:#ef7979;box-shadow:0 0 0 3px #ef797920}.status-dot.checking{background:#e3b341;box-shadow:0 0 0 3px #e3b34120}
