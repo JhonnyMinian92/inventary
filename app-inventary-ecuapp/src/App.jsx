@@ -41,6 +41,7 @@ function App() {
   const [receiptQty, setReceiptQty] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState('checking');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState('');
@@ -57,6 +58,17 @@ function App() {
       ['purchases', api.purchaseOrders()], ['sales', api.sales()]
     ];
     const results = await Promise.allSettled(tasks.map(t => t[1]));
+    const unauthorized = results.some(result => result.status === 'rejected' && result.reason?.status === 401);
+    if (unauthorized) {
+      setApiStatus('error');
+      setToken('');
+      setTokenState('');
+      setUser(null);
+      setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+      setLoading(false);
+      return;
+    }
+    setApiStatus(results.some(result => result.status === 'fulfilled') ? 'connected' : 'error');
     const failed = [];
     results.forEach((result, i) => {
       const [key] = tasks[i];
@@ -71,7 +83,7 @@ function App() {
 
   useEffect(() => {
     if (!token) return;
-    api.me().then(setUser).catch(e => { if (e.status === 401) { setToken(''); setTokenState(''); } else setError(e.message); });
+    api.me().then(setUser).catch(e => { if (e.status === 401) { setToken(''); setTokenState(''); setUser(null); setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.'); } else setError(e.message); });
     loadData();
   }, [token, loadData]);
 
@@ -187,7 +199,7 @@ function App() {
       <div className="brand"><div className="brand-mark"><Boxes size={22}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div>
       <div className="workspace-label">ESPACIO DE TRABAJO</div>
       <nav>{nav.map(item => <button key={item.id} className={section === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setSection(item.id)}><item.icon size={18}/><span>{item.label}</span>{section === item.id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="api-status"><span className="status-dot"/><span>Conectado a la API</span></div><button className="nav-item logout" onClick={logout}><LogOut size={18}/> Cerrar sesión</button></div>
+      <div className="sidebar-bottom"><div className="api-status"><span className={'status-dot ' + apiStatus}/><span>{apiStatus === 'connected' ? 'API disponible' : apiStatus === 'checking' ? 'Conectando a la API…' : 'API sin conexión'}</span></div><button className="nav-item logout" onClick={logout}><LogOut size={18}/> Cerrar sesión</button></div>
     </aside>
     <main className="main-content">
       <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button className="icon-button" onClick={loadData} title="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
