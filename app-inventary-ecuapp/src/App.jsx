@@ -35,7 +35,9 @@ function App() {
   const [movements, setMovements] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [sales, setSales] = useState([]);
-  const [report, setReport] = useState([]);\n  const [selectedOrder, setSelectedOrder] = useState(null);\n  const [receiptQty, setReceiptQty] = useState('');
+  const [report, setReport] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [receiptQty, setReceiptQty] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
