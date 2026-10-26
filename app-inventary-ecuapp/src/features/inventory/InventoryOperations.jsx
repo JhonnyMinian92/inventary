@@ -24,9 +24,9 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   const refresh = useCallback(async () => {
     const results = await Promise.allSettled([
-      api.inventoryTransfers({ size: 100 }),
-      api.inventoryCounts({ size: 100 }),
-      api.reorderRules({ size: 100 }),
+      api.inventoryTransfers(),
+      api.inventoryCounts(),
+      api.reorderRules(),
       api.replenishmentSuggestions()
     ]);
     const setters = [setTransfers, setCounts, setRules, setSuggestions];
