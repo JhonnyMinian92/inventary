@@ -27,8 +27,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   const refresh = useCallback(async () => {
     const results = await Promise.allSettled([
-      api.inventoryTransfers(),
-      api.inventoryCounts(),
+      api.inventoryTransfers({ size: 100 }),
+      api.inventoryCounts({ size: 100 }),
       api.reorderRules(),
       api.replenishmentSuggestions()
     ]);
@@ -82,9 +82,10 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   function submitTransfer(event) {
     event.preventDefault();
     const items = transferForm.items.map(line => ({ productId: line.productId, quantity: Number(line.quantity) }));
+    const hasDuplicateProducts = new Set(items.map(item => item.productId)).size !== items.length;
     if (!transferForm.sourceWarehouseId || !transferForm.destinationWarehouseId || transferForm.sourceWarehouseId === transferForm.destinationWarehouseId ||
-        !items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
-      setError('Selecciona almacenes diferentes y completa todas las líneas con cantidades positivas.');
+        !items.length || hasDuplicateProducts || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+      setError(hasDuplicateProducts ? 'Cada producto debe aparecer una sola vez en el traslado.' : 'Selecciona almacenes diferentes y completa todas las líneas con cantidades positivas.');
       return;
     }
     void operate(() => api.createInventoryTransfer({
@@ -97,8 +98,9 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   function submitCount(event) {
     event.preventDefault();
     const items = countForm.items.map(line => ({ productId: line.productId, countedQuantity: Number(line.quantity) }));
-    if (!countForm.warehouseId || !items.length || items.some(item => !item.productId || !Number.isFinite(item.countedQuantity) || item.countedQuantity < 0)) {
-      setError('Selecciona el almacén y productos, con cantidades contadas iguales o mayores que cero.');
+    const hasDuplicateProducts = new Set(items.map(item => item.productId)).size !== items.length;
+    if (!countForm.warehouseId || !items.length || hasDuplicateProducts || items.some(item => !item.productId || !Number.isFinite(item.countedQuantity) || item.countedQuantity < 0)) {
+      setError(hasDuplicateProducts ? 'Cada producto debe aparecer una sola vez en el conteo físico.' : 'Selecciona el almacén y productos, con cantidades contadas iguales o mayores que cero.');
       return;
     }
     void operate(() => api.createInventoryCount({ warehouseId: countForm.warehouseId, items }), 'Conteo creado. Revisa las cantidades antes de contabilizar los ajustes.');
