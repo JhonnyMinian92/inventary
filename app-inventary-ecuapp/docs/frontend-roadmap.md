@@ -48,12 +48,20 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 4 — Cierre del código fuente y documentación
 
-**Estado: pendiente.** Es la única fase de código fuente que queda antes de abrir la fase posterior de pruebas.
+**Estado del código fuente: completada en `master`.** La aplicación y sus instrucciones quedan preparadas para iniciar la fase separada de validación.
 
-- Revisar la cobertura funcional de todas las pantallas y cada ruta consumida.
-- Completar configuración por entorno, instrucciones de ejecución y resolución de problemas.
-- Revisar el manejo de sesión, permisos, duplicidad de acciones e idempotencia.
-- Congelar el código fuente para iniciar la fase posterior de pruebas.
+- Revisada la cobertura de rutas REST consumidas y documentadas en [api-coverage.md](api-coverage.md), incluidos permisos backend relevantes y funcionalidades que no se exponen como pantallas en este frontend.
+- Configuración por entorno documentada en `.env.example`; Node 22 está indicado en `.nvmrc` y los requisitos de Node/npm en `package.json`.
+- Versiones directas de React, React DOM, Vite, el plugin React y lucide-react fijadas a versiones exactas.
+- Guía de ejecución y solución de problemas disponible en [troubleshooting.md](troubleshooting.md), con configuración CORS, variables públicas, errores 401/403/404/409 y manejo de sesión.
+- Revisado el cliente REST para distinguir error de red, errores HTTP y pérdida de autorización. La sesión limpia la caché temporal de idempotencia al cambiar el usuario.
+- Las operaciones transaccionales marcadas como idempotentes reutilizan temporalmente la misma clave ante un reintento idéntico tras un fallo ambiguo de red o error temporal. La clave no sustituye las validaciones del backend ni persiste tras recargar el navegador.
+- Mejorados filtros y métricas paginadas de los informes; cuando cambian los filtros, se descarta el resultado anterior para no mostrar datos que no corresponden a la consulta actual.
+- El workflow de compilación de GitHub Actions es manual y requiere confirmar que el código fuente está completo; no ejecuta pruebas automáticamente antes del cierre de esta fase.
+- El archivo `package-lock.json` se generará y añadirá en la fase de validación al disponer de acceso al registro de npm. No se afirma que la compilación o la integración estén verificadas porque no se han ejecutado.
+
+**Alcance no representado por pantallas:** administración avanzada de usuarios/roles, auditoría completa, política de costeo, catálogo público/GraphQL, imágenes de productos, variantes, outbox e integraciones de WhatsApp. El mapa de cobertura identifica estas áreas para que no se confundan con módulos ya implementados.
+
 
 ## Fase de pruebas posterior
 
