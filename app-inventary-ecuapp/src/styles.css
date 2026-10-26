@@ -52,3 +52,15 @@
 .inventory-operations>.panel-heading{margin-bottom:14px}
 @media(max-width:1000px){.inventory-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.receipt-line{grid-template-columns:1fr}.inventory-filters{grid-template-columns:1fr}.inventory-filters>.button{width:100%}.line-add-row{align-items:stretch;flex-direction:column}.order-total{align-items:flex-start}.catalog-tabs{gap:3px}.catalog-tab{padding:8px}}
+
+
+/* Returns and unit conversion panels */
+.returns-panel,.unit-conversions{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+.returns-panel .panel-heading,.unit-conversions .panel-heading{margin-bottom:13px}
+.returns-panel .panel-heading h3,.unit-conversions .panel-heading h3{font:700 14px/1.4 Manrope,sans-serif;margin:0 0 4px;color:var(--ink)}
+.returns-panel .panel-heading p,.unit-conversions .panel-heading p{font-size:11px;line-height:1.5;color:var(--muted);margin:0}
+.returns-panel .modal-card,.unit-conversions .modal-card{max-height:min(90vh,900px);overflow:auto}
+.returns-panel .line-editor-heading{flex-wrap:wrap}
+.returns-panel .line-editor-heading small{font-size:10px;color:var(--muted);font-weight:400}
+.unit-conversions{background:#fbfcff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:20px}
+@media(max-width:560px){.returns-panel .panel-heading,.unit-conversions .panel-heading{align-items:flex-start;flex-direction:column}.returns-panel .panel-heading .button,.unit-conversions .panel-heading .button{width:100%}.unit-conversions{padding:11px}}
