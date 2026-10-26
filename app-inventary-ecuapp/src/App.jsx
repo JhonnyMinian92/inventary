@@ -230,6 +230,13 @@ function App() {
     if (filterValues.productId) params.productId = filterValues.productId;
     params.size = '100';
     const [balanceResult, movementResult] = await Promise.allSettled([api.balances(params), api.movements(params)]);
+    const unauthorized = [balanceResult, movementResult].some(result => result.status === 'rejected' && result.reason?.status === 401);
+    if (unauthorized) {
+      setToken(''); setTokenState(''); setUser(null); setApiStatus('error');
+      setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+      setLoading(false);
+      return;
+    }
     const failures = [];
     if (balanceResult.status === 'fulfilled') setBalances(listFrom(balanceResult.value));
     else failures.push('saldos: ' + (balanceResult.reason?.message || 'error'));
