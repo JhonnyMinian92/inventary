@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, listFrom } from '../../api';
+import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
@@ -20,6 +21,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [ruleEditing, setRuleEditing] = useState(null);
   const [reasonDialog, setReasonDialog] = useState(null);
   const [reasonText, setReasonText] = useState('');
+  const dialogRef = useAccessibleDialog(Boolean(modal), () => setModal(''));
+  const reasonDialogRef = useAccessibleDialog(Boolean(reasonDialog), () => setReasonDialog(null));
   const [transferForm, setTransferForm] = useState({ sourceWarehouseId: '', destinationWarehouseId: '', items: [emptyLine()] });
   const [countForm, setCountForm] = useState({ warehouseId: '', items: [emptyLine()] });
   const [ruleForm, setRuleForm] = useState({ productId: '', warehouseId: '', minimumQuantity: '0', targetQuantity: '1', leadTimeDays: '1', preferredSupplierId: '' });
@@ -206,7 +209,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     </>}
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(''); }}>
-      <section className="modal-card"><div className="modal-heading"><h2>{modal === 'transfer' ? 'Crear traslado entre almacenes' : modal === 'count' ? 'Registrar conteo físico' : modal === 'rule' ? (ruleEditing ? 'Editar regla de reposición' : 'Configurar regla de reposición') : 'Registrar ajuste de stock'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal('')}>×</button></div>
+      <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="inventory-operation-modal-title" tabIndex={-1}><div className="modal-heading"><h2 id="inventory-operation-modal-title">{modal === 'transfer' ? 'Crear traslado entre almacenes' : modal === 'count' ? 'Registrar conteo físico' : modal === 'rule' ? (ruleEditing ? 'Editar regla de reposición' : 'Configurar regla de reposición') : 'Registrar ajuste de stock'}</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setModal('')}>×</button></div>
         {modal === 'transfer' && <form className="form-grid" onSubmit={submitTransfer}>
           <label className="field"><span>Almacén de origen<b> *</b></span><select required value={transferForm.sourceWarehouseId} onChange={event => setTransferForm(current => ({ ...current, sourceWarehouseId: event.target.value }))}><option value="">Seleccionar origen</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
           <label className="field"><span>Almacén de destino<b> *</b></span><select required value={transferForm.destinationWarehouseId} onChange={event => setTransferForm(current => ({ ...current, destinationWarehouseId: event.target.value }))}><option value="">Seleccionar destino</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
@@ -251,8 +254,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       </section>
     </div>}
     {reasonDialog && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setReasonDialog(null); }}>
-      <section className="modal-card reason-modal">
-        <div className="modal-heading"><h2>{reasonDialog.kind === 'cancel' ? 'Cancelar traslado' : 'Revertir traslado'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setReasonDialog(null)}>×</button></div>
+      <section ref={reasonDialogRef} className="modal-card reason-modal" role="dialog" aria-modal="true" aria-labelledby="transfer-reason-modal-title" tabIndex={-1}>
+        <div className="modal-heading"><h2 id="transfer-reason-modal-title">{reasonDialog.kind === 'cancel' ? 'Cancelar traslado' : 'Revertir traslado'}</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setReasonDialog(null)}>×</button></div>
         <form className="form-grid" onSubmit={async event => {
           event.preventDefault();
           const reason = reasonText.trim();
