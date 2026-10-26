@@ -122,13 +122,14 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
   const [error, setError] = useState(null);
   const [lastRun, setLastRun] = useState({});
   const [balanceSummaryCache, setBalanceSummaryCache] = useState({ signature: '', rows: [] });
+  const [valuationExportCache, setValuationExportCache] = useState({ signature: '', rows: null });
   const data = results[activeTab];
   const resultReady = Boolean(queried[activeTab] && data !== undefined);
   const today = localDate();
   const reportHasRange = ['balance', 'sales', 'purchases', 'kardex'].includes(activeTab);
   const columns = useMemo(() => {
     if (activeTab === 'balance') return [
-      { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' },
+      { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' }, { key: 'currency', label: 'Moneda' },
       { key: 'openingStock', label: 'Saldo inicial', format: 'quantity' },
       { key: 'purchasedQuantity', label: 'Compra neta', format: 'quantity' },
       { key: 'purchaseAmount', label: 'Importe compras netas', format: 'money' },
@@ -145,14 +146,14 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       { key: 'margin', label: 'Margen bruto', render: row => Number(row.salesAmount) > 0 ? (Number(row.grossProfit || 0) / Number(row.salesAmount) * 100).toLocaleString('es-EC', { maximumFractionDigits: 2 }) + '%' : '—', csvValue: row => Number(row.salesAmount) > 0 ? (Number(row.grossProfit || 0) / Number(row.salesAmount) * 100).toFixed(2) + '%' : '' }
     ];
     if (activeTab === 'sales') return [
-      { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' },
+      { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' }, { key: 'currency', label: 'Moneda' },
       { key: 'netQuantity', label: 'Cantidad neta', format: 'quantity' },
       { key: 'netSales', label: 'Ventas netas', format: 'money' },
       { key: 'costOfSales', label: 'Costo de ventas', format: 'money' },
       { key: 'grossProfit', label: 'Utilidad bruta', format: 'money' }
     ];
     if (activeTab === 'purchases') return [
-      { key: 'supplierName', label: 'Proveedor' }, { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' },
+      { key: 'supplierName', label: 'Proveedor' }, { key: 'sku', label: 'SKU' }, { key: 'productName', label: 'Producto' }, { key: 'currency', label: 'Moneda' },
       { key: 'receivedQuantity', label: 'Recibido', format: 'quantity' },
       { key: 'receivedAmount', label: 'Importe recibido', format: 'money' },
       { key: 'returnedQuantity', label: 'Devuelto', format: 'quantity' },
@@ -260,6 +261,19 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         if (filters.warehouseId) params.warehouseId = filters.warehouseId;
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryValuationReport(params);
+        const signature = [filters.warehouseId, filters.productId, 'includeEmpty=false'].join('|');
+        let exportRows = valuationExportCache.signature === signature ? valuationExportCache.rows : null;
+        if (!exportRows) {
+          exportRows = [...listFrom(response.items)];
+          const totalPages = Number(response.totalPages || 0);
+          for (let firstPage = 1; firstPage < totalPages; firstPage += 5) {
+            const batchPages = Array.from({ length: Math.min(5, totalPages - firstPage) }, (_, offset) => firstPage + offset);
+            const pageResults = await Promise.all(batchPages.map(page => api.inventoryValuationReport({ ...params, page })));
+            pageResults.forEach(pageResult => exportRows.push(...listFrom(pageResult.items)));
+          }
+          setValuationExportCache({ signature, rows: exportRows });
+        }
+        response = { ...response, exportItems: exportRows };
       } else {
         response = await api.lowStockReport(filters.warehouseId ? { warehouseId: filters.warehouseId } : {});
       }
@@ -272,6 +286,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       setResults(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: undefined }));
       setQueried(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: false }));
       if (activeTab === 'balance' || nextError.kind === 'permission') setBalanceSummaryCache({ signature: '', rows: [] });
+      if (activeTab === 'valuation' || nextError.kind === 'permission') setValuationExportCache({ signature: '', rows: null });
       if (err?.status === 401) onUnauthorized?.();
     } finally {
       setLoading(false);
@@ -286,8 +301,10 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     : Array.isArray(data) ? data : listFrom(data);
   const exportData = () => {
     const prefix = 'inventary-' + activeTab + '-' + localDate();
-    downloadCsv(prefix + '.csv', columns, tableRows);
+    const exportRows = activeTab === 'balance' ? listFrom(data?.summaryItems) : activeTab === 'valuation' ? listFrom(data?.exportItems) : tableRows;
+    downloadCsv(prefix + '.csv', columns, exportRows);
   };
+  const exportDailySales = () => downloadCsv('inventary-ventas-diarias-' + localDate() + '.csv', [{ key: 'date', label: 'Fecha' }, { key: 'salesCount', label: 'Ventas' }, { key: 'grossSales', label: 'Ventas brutas' }], listFrom(data?.daily));
 
   function renderFilters() {
     return <>
@@ -335,7 +352,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
           { label: 'Costo de ventas', value: money(summary.costOfSales) },
           { label: 'Utilidad bruta', value: money(summary.grossProfit) }
         ]}/>
-        <div className="report-subheading"><div><h3>Ventas diarias</h3><p>Totales brutos por día dentro del periodo.</p></div></div>
+        <div className="report-subheading"><div><h3>Ventas diarias</h3><p>Totales brutos por día dentro del periodo.</p></div>{listFrom(data?.daily).length > 0 && <button type="button" className="button secondary" onClick={exportDailySales}><Download size={15}/> Exportar CSV diario</button>}</div>
         <ReportTable rows={listFrom(data?.daily)} columns={[{key:'date',label:'Fecha'},{key:'salesCount',label:'Ventas'},{key:'grossSales',label:'Ventas brutas',format:'money'}]} caption="Resumen diario de ventas" empty="No hubo ventas en el periodo."/>
         <div className="report-subheading"><div><h3>Resultados por producto</h3><p>Las cantidades e importes son netos de anulaciones y devoluciones según la API.</p></div></div>
         <ReportTable rows={rows} columns={columns} caption="Ventas netas por producto" empty="No hay ventas por producto para este periodo."/>
