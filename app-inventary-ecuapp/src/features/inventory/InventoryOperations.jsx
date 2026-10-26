@@ -20,6 +20,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [transferForm, setTransferForm] = useState({ sourceWarehouseId: '', destinationWarehouseId: '', items: [emptyLine()] });
   const [countForm, setCountForm] = useState({ warehouseId: '', items: [emptyLine()] });
   const [ruleForm, setRuleForm] = useState({ productId: '', warehouseId: '', minimumQuantity: '0', targetQuantity: '1', leadTimeDays: '1', preferredSupplierId: '' });
+  const [adjustmentForm, setAdjustmentForm] = useState({ productId: '', warehouseId: warehouses[0]?.id || '', direction: 'INCREASE', quantity: '1', unitCost: '0', reason: '' });
 
   const refresh = useCallback(async () => {
     const results = await Promise.allSettled([
@@ -110,6 +111,26 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     void operate(() => api.createReorderRule(data), 'Regla de reposición creada.');
   }
 
+  function submitAdjustment(event) {
+    event.preventDefault();
+    const quantity = Number(adjustmentForm.quantity);
+    const unitCost = Number(adjustmentForm.unitCost);
+    if (!adjustmentForm.productId || !adjustmentForm.warehouseId || !adjustmentForm.reason.trim() || !Number.isFinite(quantity) || quantity <= 0 ||
+        (adjustmentForm.direction === 'INCREASE' && (!Number.isFinite(unitCost) || unitCost < 0))) {
+      setError('Selecciona producto y almacén, indica un motivo y usa una cantidad positiva. Para entradas, el costo unitario debe ser válido.');
+      return;
+    }
+    const payload = {
+      productId: adjustmentForm.productId,
+      warehouseId: adjustmentForm.warehouseId,
+      direction: adjustmentForm.direction,
+      quantity,
+      reason: adjustmentForm.reason.trim()
+    };
+    if (adjustmentForm.direction === 'INCREASE') payload.unitCost = unitCost;
+    void operate(() => api.createInventoryAdjustment(payload), 'Ajuste registrado por el backend y reflejado en los movimientos.');
+  }
+
   const transferStatus = statusOf;
   return <section className="panel inventory-operations">
     <div className="panel-heading"><div className="panel-title-icon"><span>⇄</span><div><h2>Operaciones de inventario</h2><p>Traslados entre almacenes, conteos físicos y reposición de existencias.</p></div></div><button className="button secondary" onClick={() => void refresh()} disabled={loading}>Actualizar</button></div>
@@ -119,6 +140,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       <button className={tab === 'transfers' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'transfers'} onClick={() => setTab('transfers')}>Traslados <span>{transfers.length}</span></button>
       <button className={tab === 'counts' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'counts'} onClick={() => setTab('counts')}>Conteos físicos <span>{counts.length}</span></button>
       <button className={tab === 'reorder' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'reorder'} onClick={() => setTab('reorder')}>Reposición <span>{suggestions.length}</span></button>
+      <button className={tab === 'adjustments' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'adjustments'} onClick={() => setTab('adjustments')}>Ajustes</button>
     </div>
 
     {tab === 'transfers' && <>
@@ -155,6 +177,11 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       </tbody></table>{!counts.length && <div className="empty-state">{loading ? 'Cargando conteos…' : 'No hay conteos físicos registrados.'}</div>}</div>
     </>}
 
+    {tab === 'adjustments' && <>
+      <div className="toolbar"><p className="muted">Registra entradas o salidas justificadas. Todos los cambios quedan auditados por el backend.</p><button className="button primary" onClick={() => { setAdjustmentForm({ productId: '', warehouseId: warehouses[0]?.id || '', direction: 'INCREASE', quantity: '1', unitCost: '0', reason: '' }); setModal('adjustment'); }}>+ Nuevo ajuste</button></div>
+      <div className="form-hint wide">Usa este flujo para diferencias justificadas de inventario. Para movimientos entre ubicaciones utiliza la pestaña Traslados.</div>
+    </>}
+
     {tab === 'reorder' && <>
       <div className="toolbar"><p className="muted">Define mínimos y objetivos para recibir sugerencias cuando el stock sea bajo.</p><button className="button primary" onClick={() => { setRuleForm({ productId: '', warehouseId: warehouses[0]?.id || '', minimumQuantity: '0', targetQuantity: '1', leadTimeDays: '1', preferredSupplierId: '' }); setModal('rule'); }}>+ Nueva regla</button></div>
       <h3 className="subheading">Sugerencias de reposición</h3>
@@ -168,7 +195,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     </>}
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(''); }}>
-      <section className="modal-card"><div className="modal-heading"><h2>{modal === 'transfer' ? 'Crear traslado entre almacenes' : modal === 'count' ? 'Registrar conteo físico' : 'Configurar regla de reposición'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal('')}>×</button></div>
+      <section className="modal-card"><div className="modal-heading"><h2>{modal === 'transfer' ? 'Crear traslado entre almacenes' : modal === 'count' ? 'Registrar conteo físico' : modal === 'rule' ? 'Configurar regla de reposición' : 'Registrar ajuste de stock'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal('')}>×</button></div>
         {modal === 'transfer' && <form className="form-grid" onSubmit={submitTransfer}>
           <label className="field"><span>Almacén de origen<b> *</b></span><select required value={transferForm.sourceWarehouseId} onChange={event => setTransferForm(current => ({ ...current, sourceWarehouseId: event.target.value }))}><option value="">Seleccionar origen</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
           <label className="field"><span>Almacén de destino<b> *</b></span><select required value={transferForm.destinationWarehouseId} onChange={event => setTransferForm(current => ({ ...current, destinationWarehouseId: event.target.value }))}><option value="">Seleccionar destino</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
@@ -199,6 +226,16 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
           <label className="field"><span>Cantidad objetivo<b> *</b></span><input type="number" required min="0.001" step="0.001" value={ruleForm.targetQuantity} onChange={event => setRuleForm(current => ({ ...current, targetQuantity: event.target.value }))} /></label>
           <label className="field"><span>Plazo de suministro (días)<b> *</b></span><input type="number" required min="0" step="1" value={ruleForm.leadTimeDays} onChange={event => setRuleForm(current => ({ ...current, leadTimeDays: event.target.value }))} /></label>
           <div className="form-actions wide"><button type="button" className="button secondary" onClick={() => setModal('')}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Guardar regla'}</button></div>
+        </form>}
+        {modal === 'adjustment' && <form className="form-grid" onSubmit={submitAdjustment}>
+          <label className="field"><span>Almacén<b> *</b></span><select required value={adjustmentForm.warehouseId} onChange={event => setAdjustmentForm(current => ({ ...current, warehouseId: event.target.value }))}><option value="">Seleccionar almacén</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
+          <label className="field"><span>Producto<b> *</b></span><select required value={adjustmentForm.productId} onChange={event => setAdjustmentForm(current => ({ ...current, productId: event.target.value }))}><option value="">Seleccionar producto</option>{products.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}</select></label>
+          <label className="field"><span>Dirección<b> *</b></span><select required value={adjustmentForm.direction} onChange={event => setAdjustmentForm(current => ({ ...current, direction: event.target.value }))}><option value="INCREASE">Entrada / aumentar</option><option value="DECREASE">Salida / disminuir</option></select></label>
+          <label className="field"><span>Cantidad<b> *</b></span><input type="number" required min="0.001" step="0.001" value={adjustmentForm.quantity} onChange={event => setAdjustmentForm(current => ({ ...current, quantity: event.target.value }))} /></label>
+          {adjustmentForm.direction === 'INCREASE' && <label className="field"><span>Costo unitario<b> *</b></span><input type="number" required min="0" step="0.0001" value={adjustmentForm.unitCost} onChange={event => setAdjustmentForm(current => ({ ...current, unitCost: event.target.value }))} /></label>}
+          <label className="field wide"><span>Motivo del ajuste<b> *</b></span><textarea rows="3" required maxLength="500" value={adjustmentForm.reason} onChange={event => setAdjustmentForm(current => ({ ...current, reason: event.target.value }))} placeholder="Describe la razón de la entrada o salida" /></label>
+          <p className="form-hint wide">La API confirma el ajuste de manera transaccional e idempotente; no se editan saldos manualmente en el navegador.</p>
+          <div className="form-actions wide"><button type="button" className="button secondary" onClick={() => setModal('')}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Registrar ajuste'}</button></div>
         </form>}
       </section>
     </div>}
