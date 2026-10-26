@@ -189,31 +189,36 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
   async function runReport(event, requestedPage = 0) {
     event?.preventDefault?.();
     if (loading) return;
+    const rejectFilters = message => {
+      setError({ kind: 'error', message });
+      setResults(current => ({ ...current, [activeTab]: undefined }));
+      setQueried(current => ({ ...current, [activeTab]: false }));
+    };
     if (reportHasRange) {
       if (!filters.from || !filters.to) {
-        setError({ kind: 'error', message: 'Debes indicar las dos fechas del periodo.' });
+        rejectFilters('Debes indicar las dos fechas del periodo.');
         return;
       }
       if (filters.from > filters.to) {
-        setError({ kind: 'error', message: 'La fecha inicial no puede ser posterior a la fecha final.' });
+        rejectFilters('La fecha inicial no puede ser posterior a la fecha final.');
         return;
       }
       if (filters.to > today) {
-        setError({ kind: 'error', message: 'La fecha final no puede ser futura.' });
+        rejectFilters('La fecha final no puede ser futura.');
         return;
       }
       const days = Math.round((new Date(filters.to + 'T00:00:00Z') - new Date(filters.from + 'T00:00:00Z')) / 86400000);
       if (days >= 366) {
-        setError({ kind: 'error', message: 'El backend admite periodos de hasta 366 días incluyendo las fechas inicial y final.' });
+        rejectFilters('El backend admite periodos de hasta 366 días incluyendo las fechas inicial y final.');
         return;
       }
     }
     if (activeTab === 'balance' && !filters.warehouseId) {
-      setError({ kind: 'error', message: 'Selecciona un almacén para calcular el balance.' });
+      rejectFilters('Selecciona un almacén para calcular el balance.');
       return;
     }
     if (activeTab === 'kardex' && (!filters.warehouseId || !filters.productId)) {
-      setError({ kind: 'error', message: 'Selecciona un almacén y un producto para consultar el kardex.' });
+      rejectFilters('Selecciona un almacén y un producto para consultar el kardex.');
       return;
     }
 
