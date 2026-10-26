@@ -80,9 +80,9 @@ Para evitar el "código espagueti" y asegurar la escalabilidad, se aplicará **C
 
 ## 6. Jerarquía de Directorios (Workspaces)
 
-### Frontend: `app-inventary-ecuapp` (Angular 21)
+### Frontend: `app-inventary-ecuapp` (React + Vite)
 
-Estructura basada en dominios de negocio, orientada a Standalone Components y lazy loading automático mediante las nuevas rutas funcionales.
+Frontend SPA implementado con React y Vite, con cliente REST centralizado, componentes por dominio, formularios controlados y estilos responsive. La implementación vigente está en `app-inventary-ecuapp/src/` y se documenta en `app-inventary-ecuapp/README.md`.
 
 ```text
 app-inventary-ecuapp/
@@ -135,7 +135,7 @@ microservices-inventary-ecuapp/
 
 ## 7. Conclusión del Diseño
 
-Este diseño garantiza que **Inventary** no sea un simple CRUD. Al combinar el poder de **PostgreSQL JSONB** para la adaptabilidad de productos, **Spring Boot Hexagonal** para la mantenibilidad empresarial y testabilidad, y **Angular 21 (Signals)** para un rendimiento hiper-reactivo en el cliente, el sistema está preparado para escalar, auditar cada milímetro de la operación y blindar los datos comerciales contra errores humanos o manipulaciones malintencionadas.
+Este diseño garantiza que **Inventary** no sea un simple CRUD. Al combinar el poder de **PostgreSQL JSONB** para la adaptabilidad de productos, **Spring Boot Hexagonal** para la mantenibilidad empresarial y testabilidad, y **React + Vite** para un rendimiento hiper-reactivo en el cliente, el sistema está preparado para escalar, auditar cada milímetro de la operación y blindar los datos comerciales contra errores humanos o manipulaciones malintencionadas.
 
 
 ## Documentación de implementación del backend
