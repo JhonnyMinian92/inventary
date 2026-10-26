@@ -129,7 +129,7 @@ function App() {
   async function runReport(e) {
     e.preventDefault();
     await runAction(async () => {
-      const params = { warehouseId: reportForm.warehouseId, from: new Date(reportForm.from + 'T00:00:00Z').toISOString(), to: new Date(reportForm.to + 'T23:59:59.999Z').toISOString() };
+      const params = { warehouseId: reportForm.warehouseId, from: reportForm.from, to: reportForm.to };
       if (reportForm.productId) params.productId = reportForm.productId;
       const result = await api.inventoryBalanceReport(params);
       setReport(listFrom(result));
