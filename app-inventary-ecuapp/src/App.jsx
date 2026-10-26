@@ -123,6 +123,7 @@ function App() {
     const data = {
       sku: form.sku.trim(),
       name: form.name.trim(),
+      kind: form.kind || 'STOCKED_GOOD',
       categoryId: form.categoryId,
       costPrice: Number(form.costPrice),
       salePrice: Number(form.salePrice),
