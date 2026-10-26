@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, ShoppingBag, Tags, Warehouse } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, Tags, Warehouse } from 'lucide-react';
 import { api, getToken, listFrom, setToken } from './api';
 import ProductForm from './features/catalog/ProductForm.jsx';
 import CategoryForm from './features/catalog/CategoryForm.jsx';
@@ -13,6 +13,7 @@ import Overview from './features/dashboard/Overview.jsx';
 import DataTable from './components/DataTable.jsx';
 import PurchaseTable from './features/purchasing/PurchaseTable.jsx';
 import SalesTable from './features/sales/SalesTable.jsx';
+import { ProductsTable, CategoriesTable } from './features/catalog/CatalogTables.jsx';
 import useAccessibleDialog from './hooks/useAccessibleDialog.js';
 import PurchaseReturns from './features/purchasing/PurchaseReturns.jsx';
 import SalesReturns from './features/sales/SalesReturns.jsx';
@@ -311,19 +312,6 @@ function Login({ onLogin, error }) {
   return <div className="login-screen"><div className="login-card"><div className="brand login-brand"><div className="brand-mark"><Boxes size={23}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div><span className="eyebrow">BIENVENIDO DE NUEVO</span><h1>Controla tu inventario con claridad.</h1><p>Ingresa con tus credenciales para administrar productos, compras y ventas.</p>{error && <div className="alert error">{error}</div>}<form onSubmit={async e=>{e.preventDefault();setBusy(true);await onLogin(username,password);setBusy(false);}}><Field label="Usuario o correo"><input autoComplete="username" required value={username} onChange={e=>setUsername(e.target.value)} placeholder="Tu usuario"/></Field><Field label="Contraseña"><input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Tu contraseña"/></Field><button className="button primary full" disabled={busy}>{busy?'Conectando…':'Iniciar sesión'}<ChevronRight size={17}/></button></form><small className="login-foot">Conexión segura al backend Inventary</small></div></div>;
 }
 function PanelHeading({title,subtitle,action,onAction,icon:Icon=Layers3}) { return <div className="panel-heading"><div className="panel-title-icon"><span><Icon size={20}/></span><div><h2>{title}</h2><p>{subtitle}</p></div></div>{action&&<button className="button primary" onClick={onAction}><Plus size={16}/>{action}</button>}</div>; }
-function ProductsTable({products,categories,onEdit,onToggleActive}) {
-  const categoryName = id => categories.find(c => String(pickId(c)) === String(id))?.name || '—';
-  return <div className="table-wrap"><table><thead><tr><th>Producto</th><th>SKU</th><th>Categoría</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{products.map((product,index)=>{
-    const inactive = product.active === false || String(product.status || '').toUpperCase() === 'INACTIVE';
-    return <tr key={pickId(product)||index}><td><div className="product-cell"><span className="product-avatar"><ShoppingBag size={17}/></span><div><strong>{product.name||'Sin nombre'}</strong><small>{product.description||'Sin descripción'}</small></div></div></td><td><code>{product.sku||product.code||'—'}</code></td><td>{product.category?.name||categoryName(product.categoryId)}</td><td>{titleCase(product.kind||'PRODUCT')}</td><td><span className={'pill '+(inactive?'inactive':'active')}>{inactive?'Inactivo':'Activo'}</span></td><td><div className="row-actions"><button className="small-action" onClick={()=>onEdit(product)}>Editar</button><button className="small-action" onClick={()=>onToggleActive(product)}>{inactive?'Activar':'Desactivar'}</button></div></td></tr>;
-  })}</tbody></table>{!products.length&&<div className="empty-state">No hay productos que coincidan con la búsqueda.</div>}</div>;
-}
-function CategoriesTable({categories,onEdit,onToggleActive}) {
-  return <div className="table-wrap"><table><thead><tr><th>Categoría</th><th>Código</th><th>Descripción</th><th>Productos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{categories.map((category,index)=>{
-    const inactive = category.active === false || String(category.status || '').toUpperCase() === 'INACTIVE';
-    return <tr key={pickId(category)||index}><td><strong>{category.name||'Sin nombre'}</strong></td><td><code>{category.code||'—'}</code></td><td>{category.description||'—'}</td><td>{category.productCount??'—'}</td><td><span className={'pill '+(inactive?'inactive':'active')}>{inactive?'Inactiva':'Activa'}</span></td><td><div className="row-actions"><button className="small-action" onClick={()=>onEdit(category)}>Editar</button><button className="small-action" onClick={()=>onToggleActive(category)}>{inactive?'Activar':'Desactivar'}</button></div></td></tr>;
-  })}</tbody></table>{!categories.length&&<div className="empty-state">Todavía no has creado categorías.</div>}</div>;
-}
 function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
 function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
 function Modal({title,onClose,children}) {
