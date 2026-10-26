@@ -17,6 +17,9 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState('');
+  const [ruleEditing, setRuleEditing] = useState(null);
+  const [reasonDialog, setReasonDialog] = useState(null);
+  const [reasonText, setReasonText] = useState('');
   const [transferForm, setTransferForm] = useState({ sourceWarehouseId: '', destinationWarehouseId: '', items: [emptyLine()] });
   const [countForm, setCountForm] = useState({ warehouseId: '', items: [emptyLine()] });
   const [ruleForm, setRuleForm] = useState({ productId: '', warehouseId: '', minimumQuantity: '0', targetQuantity: '1', leadTimeDays: '1', preferredSupplierId: '' });
@@ -62,10 +65,13 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       await action();
       setNotice(success);
       setModal('');
+      setRuleEditing(null);
       await refresh();
       await onChanged?.();
+      return true;
     } catch (err) {
       setError(err?.message || 'No se pudo completar la operación.');
+      return false;
     } finally {
       setLoading(false);
     }
@@ -108,7 +114,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     }
     const data = { productId: ruleForm.productId, warehouseId: ruleForm.warehouseId, minimumQuantity, targetQuantity, leadTimeDays };
     if (ruleForm.preferredSupplierId) data.preferredSupplierId = ruleForm.preferredSupplierId;
-    void operate(() => api.createReorderRule(data), 'Regla de reposición creada.');
+    else data.preferredSupplierId = null;
+    void operate(() => ruleEditing ? api.updateReorderRule(idOf(ruleEditing), data) : api.createReorderRule(data), ruleEditing ? 'Regla de reposición actualizada.' : 'Regla de reposición creada.');
   }
 
   function submitAdjustment(event) {
@@ -156,8 +163,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
             <td><div className="row-actions">
               {['DRAFT','PENDING'].includes(status) && <button className="small-action" disabled={loading} onClick={() => void operate(() => api.dispatchInventoryTransfer(idOf(transfer)), 'Traslado despachado.')}>Despachar</button>}
               {['DISPATCHED','IN_TRANSIT'].includes(status) && <button className="small-action" disabled={loading} onClick={() => void operate(() => api.receiveInventoryTransfer(idOf(transfer)), 'Traslado recibido en el almacén destino.')}>Recibir</button>}
-              {['DRAFT','PENDING','DISPATCHED','IN_TRANSIT'].includes(status) && <button className="small-action" disabled={loading} onClick={() => { const reason = window.prompt('Motivo de cancelación del traslado:'); if (reason?.trim()) void operate(() => api.cancelInventoryTransfer(idOf(transfer), reason.trim()), 'Traslado cancelado.'); }}>Cancelar</button>}
-              {['RECEIVED','COMPLETED'].includes(status) && <button className="small-action" disabled={loading} onClick={() => { const reason = window.prompt('Motivo de reversión del traslado:'); if (reason?.trim()) void operate(() => api.reverseInventoryTransfer(idOf(transfer), reason.trim()), 'Reversión solicitada y procesada por el backend.'); }}>Revertir</button>}
+              {['DRAFT','PENDING','DISPATCHED','IN_TRANSIT'].includes(status) && <button className="small-action" disabled={loading} onClick={() => { setReasonText(''); setReasonDialog({ kind: 'cancel', id: idOf(transfer), label: transfer.number || transfer.code || idOf(transfer) }); }}>Cancelar</button>}
+              {['RECEIVED','COMPLETED'].includes(status) && <button className="small-action" disabled={loading} onClick={() => { setReasonText(''); setReasonDialog({ kind: 'reverse', id: idOf(transfer), label: transfer.number || transfer.code || idOf(transfer) }); }}>Revertir</button>}
             </div></td>
           </tr>;
         })}
@@ -183,19 +190,19 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     </>}
 
     {tab === 'reorder' && <>
-      <div className="toolbar"><p className="muted">Define mínimos y objetivos para recibir sugerencias cuando el stock sea bajo.</p><button className="button primary" onClick={() => { setRuleForm({ productId: '', warehouseId: warehouses[0]?.id || '', minimumQuantity: '0', targetQuantity: '1', leadTimeDays: '1', preferredSupplierId: '' }); setModal('rule'); }}>+ Nueva regla</button></div>
+      <div className="toolbar"><p className="muted">Define mínimos y objetivos para recibir sugerencias cuando el stock sea bajo.</p><button className="button primary" onClick={() => { setRuleEditing(null); setRuleForm({ productId: '', warehouseId: warehouses[0]?.id || '', minimumQuantity: '0', targetQuantity: '1', leadTimeDays: '1', preferredSupplierId: '' }); setModal('rule'); }}>+ Nueva regla</button></div>
       <h3 className="subheading">Sugerencias de reposición</h3>
       <div className="table-wrap"><table><thead><tr><th>Producto</th><th>Almacén</th><th>Stock</th><th>Mínimo</th><th>Objetivo</th><th>Sugerido</th></tr></thead><tbody>
         {suggestions.map((item, index) => <tr key={idOf(item) || index}><td>{item.productName || item.product?.name || item.sku || item.productId || '—'}</td><td>{item.warehouseName || item.warehouse?.name || '—'}</td><td>{item.currentQuantity ?? item.onHand ?? item.available ?? '—'}</td><td>{item.minimumQuantity ?? '—'}</td><td>{item.targetQuantity ?? '—'}</td><td><strong>{item.suggestedQuantity ?? item.recommendedQuantity ?? '—'}</strong></td></tr>)}
       </tbody></table>{!suggestions.length && <div className="empty-state">No hay sugerencias disponibles.</div>}</div>
       <h3 className="subheading">Reglas configuradas</h3>
       <div className="table-wrap"><table><thead><tr><th>Producto</th><th>Almacén</th><th>Mínimo</th><th>Objetivo</th><th>Plazo (días)</th><th>Proveedor sugerido</th><th></th></tr></thead><tbody>
-        {rules.map((rule, index) => <tr key={idOf(rule) || index}><td>{rule.productName || rule.product?.name || rule.productId || '—'}</td><td>{rule.warehouseName || rule.warehouse?.name || '—'}</td><td>{rule.minimumQuantity}</td><td>{rule.targetQuantity}</td><td>{rule.leadTimeDays}</td><td>{rule.preferredSupplierName || rule.preferredSupplier?.name || '—'}</td><td><button className="small-action" disabled={loading || rule.active === false} onClick={() => void operate(() => api.deactivateReorderRule(idOf(rule)), 'Regla de reposición desactivada.')}>Desactivar</button></td></tr>)}
+        {rules.map((rule, index) => <tr key={idOf(rule) || index}><td>{rule.productName || rule.product?.name || rule.productId || '—'}</td><td>{rule.warehouseName || rule.warehouse?.name || '—'}</td><td>{rule.minimumQuantity}</td><td>{rule.targetQuantity}</td><td>{rule.leadTimeDays}</td><td>{rule.preferredSupplierName || rule.preferredSupplier?.name || '—'}</td><td><div className="row-actions"><button className="small-action" disabled={loading || rule.active === false} onClick={() => { setRuleEditing(rule); setRuleForm({ productId: rule.productId || rule.product?.id || '', warehouseId: rule.warehouseId || rule.warehouse?.id || '', minimumQuantity: String(rule.minimumQuantity ?? 0), targetQuantity: String(rule.targetQuantity ?? 1), leadTimeDays: String(rule.leadTimeDays ?? 1), preferredSupplierId: rule.preferredSupplierId || rule.preferredSupplier?.id || '' }); setModal('rule'); }}>Editar</button><button className="small-action" disabled={loading || rule.active === false} onClick={() => void operate(() => api.deactivateReorderRule(idOf(rule)), 'Regla de reposición desactivada.')}>Desactivar</button></div></td></tr>)}
       </tbody></table>{!rules.length && <div className="empty-state">No hay reglas de reposición configuradas.</div>}</div>
     </>}
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(''); }}>
-      <section className="modal-card"><div className="modal-heading"><h2>{modal === 'transfer' ? 'Crear traslado entre almacenes' : modal === 'count' ? 'Registrar conteo físico' : modal === 'rule' ? 'Configurar regla de reposición' : 'Registrar ajuste de stock'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal('')}>×</button></div>
+      <section className="modal-card"><div className="modal-heading"><h2>{modal === 'transfer' ? 'Crear traslado entre almacenes' : modal === 'count' ? 'Registrar conteo físico' : modal === 'rule' ? (ruleEditing ? 'Editar regla de reposición' : 'Configurar regla de reposición') : 'Registrar ajuste de stock'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal('')}>×</button></div>
         {modal === 'transfer' && <form className="form-grid" onSubmit={submitTransfer}>
           <label className="field"><span>Almacén de origen<b> *</b></span><select required value={transferForm.sourceWarehouseId} onChange={event => setTransferForm(current => ({ ...current, sourceWarehouseId: event.target.value }))}><option value="">Seleccionar origen</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
           <label className="field"><span>Almacén de destino<b> *</b></span><select required value={transferForm.destinationWarehouseId} onChange={event => setTransferForm(current => ({ ...current, destinationWarehouseId: event.target.value }))}><option value="">Seleccionar destino</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
@@ -225,7 +232,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
           <label className="field"><span>Cantidad mínima<b> *</b></span><input type="number" required min="0" step="0.001" value={ruleForm.minimumQuantity} onChange={event => setRuleForm(current => ({ ...current, minimumQuantity: event.target.value }))} /></label>
           <label className="field"><span>Cantidad objetivo<b> *</b></span><input type="number" required min="0.001" step="0.001" value={ruleForm.targetQuantity} onChange={event => setRuleForm(current => ({ ...current, targetQuantity: event.target.value }))} /></label>
           <label className="field"><span>Plazo de suministro (días)<b> *</b></span><input type="number" required min="0" step="1" value={ruleForm.leadTimeDays} onChange={event => setRuleForm(current => ({ ...current, leadTimeDays: event.target.value }))} /></label>
-          <div className="form-actions wide"><button type="button" className="button secondary" onClick={() => setModal('')}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Guardar regla'}</button></div>
+          <div className="form-actions wide"><button type="button" className="button secondary" onClick={() => setModal('')}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : ruleEditing ? 'Actualizar regla' : 'Guardar regla'}</button></div>
         </form>}
         {modal === 'adjustment' && <form className="form-grid" onSubmit={submitAdjustment}>
           <label className="field"><span>Almacén<b> *</b></span><select required value={adjustmentForm.warehouseId} onChange={event => setAdjustmentForm(current => ({ ...current, warehouseId: event.target.value }))}><option value="">Seleccionar almacén</option>{warehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label>
@@ -237,6 +244,25 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
           <p className="form-hint wide">La API confirma el ajuste de manera transaccional e idempotente; no se editan saldos manualmente en el navegador.</p>
           <div className="form-actions wide"><button type="button" className="button secondary" onClick={() => setModal('')}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Registrar ajuste'}</button></div>
         </form>}
+      </section>
+    </div>}
+    {reasonDialog && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setReasonDialog(null); }}>
+      <section className="modal-card reason-modal">
+        <div className="modal-heading"><h2>{reasonDialog.kind === 'cancel' ? 'Cancelar traslado' : 'Revertir traslado'}</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setReasonDialog(null)}>×</button></div>
+        <form className="form-grid" onSubmit={async event => {
+          event.preventDefault();
+          const reason = reasonText.trim();
+          if (!reason) { setError('Debes indicar el motivo.'); return; }
+          const action = reasonDialog.kind === 'cancel'
+            ? () => api.cancelInventoryTransfer(reasonDialog.id, reason)
+            : () => api.reverseInventoryTransfer(reasonDialog.id, reason);
+          const completed = await operate(action, reasonDialog.kind === 'cancel' ? 'Traslado cancelado.' : 'Reversión del traslado procesada.');
+          if (completed) { setReasonDialog(null); setReasonText(''); }
+        }}>
+          <p className="form-hint wide">Documento: <strong>{reasonDialog.label}</strong>. El motivo queda registrado en la operación del backend.</p>
+          <label className="field wide"><span>Motivo<b> *</b></span><textarea rows="3" required maxLength="500" value={reasonText} onChange={event => setReasonText(event.target.value)} placeholder="Describe el motivo de esta operación" /></label>
+          <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => setReasonDialog(null)}>Cancelar</button><button className="button primary" disabled={loading || !reasonText.trim()}>{loading ? 'Procesando…' : 'Confirmar'}</button></div>
+        </form>
       </section>
     </div>}
   </section>;
