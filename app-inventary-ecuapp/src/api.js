@@ -53,7 +53,7 @@ export const api = {
   updateProduct: (id, data) => request(`/catalog/products/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
   activateProduct: id => request(`/catalog/products/${encodeURIComponent(id)}/activate`, { method: 'POST' }),
   deactivateProduct: id => request(`/catalog/products/${encodeURIComponent(id)}/deactivate`, { method: 'POST' }),
-  categories: () => request('/catalog/categories'),
+  categories: (params = {}) => request(`/catalog/categories${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   createCategory: data => request('/catalog/categories', { method: 'POST', body: data }),
   updateCategory: (id, data) => request(`/catalog/categories/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
   activateCategory: id => request(`/catalog/categories/${encodeURIComponent(id)}/activate`, { method: 'POST' }),
