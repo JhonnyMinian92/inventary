@@ -148,8 +148,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const transferStatus = statusOf;
   return <section className="panel inventory-operations">
     <div className="panel-heading"><div className="panel-title-icon"><span>⇄</span><div><h2>Operaciones de inventario</h2><p>Traslados entre almacenes, conteos físicos y reposición de existencias.</p></div></div><button className="button secondary" onClick={() => void refresh()} disabled={loading}>Actualizar</button></div>
-    {error && <div className="alert error"><span>{error}</span><button onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success"><span>{notice}</span><button onClick={() => setNotice('')}>×</button></div>}
+    {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
+    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     <div className="catalog-tabs" role="tablist" aria-label="Operaciones de inventario">
       <button className={tab === 'transfers' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'transfers'} onClick={() => setTab('transfers')}>Traslados <span>{transfers.length}</span></button>
       <button className={tab === 'counts' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'counts'} onClick={() => setTab('counts')}>Conteos físicos <span>{counts.length}</span></button>
