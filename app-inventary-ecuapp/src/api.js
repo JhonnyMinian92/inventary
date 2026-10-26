@@ -55,6 +55,7 @@ export const api = {
   updateCategory: (id, data) => request(`/catalog/categories/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
   units: () => request('/catalog/units'),
   warehouses: () => request('/warehouses'),
+  suppliers: () => request('/suppliers'),
   balances: (params = {}) => request(`/inventory/balances${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   movements: (params = {}) => request(`/inventory/movements${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   inventoryBalanceReport: params => request(`/reports/inventory-balance?${new URLSearchParams(params)}`),
