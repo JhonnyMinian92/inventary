@@ -45,6 +45,7 @@ export async function request(path, options = {}) {
 
 export const api = {
   login: (username, password) => request('/auth/login', { method: 'POST', body: { username, password } }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
   products: (params = {}) => request(`/catalog/products${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   product: id => request(`/catalog/products/${encodeURIComponent(id)}`),
