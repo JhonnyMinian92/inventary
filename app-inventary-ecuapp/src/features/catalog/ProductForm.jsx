@@ -197,11 +197,11 @@ export default function ProductForm({ initialValue, categories, units = [], load
     </label>
     <label className="field">
       <span>Costo de compra<b> *</b></span>
-      <input type="number" min="0" step="0.0001" required value={form.costPrice} onChange={event => changeField('costPrice', event.target.value)} />
+      <input type="number" min="0" step="0.01" required value={form.costPrice} onChange={event => changeField('costPrice', event.target.value)} />
     </label>
     <label className="field">
       <span>Precio de venta<b> *</b></span>
-      <input type="number" min="0" step="0.0001" required value={form.salePrice} onChange={event => changeField('salePrice', event.target.value)} />
+      <input type="number" min="0" step="0.01" required value={form.salePrice} onChange={event => changeField('salePrice', event.target.value)} />
     </label>
     <label className="field wide">
       <span>Descripción</span>
