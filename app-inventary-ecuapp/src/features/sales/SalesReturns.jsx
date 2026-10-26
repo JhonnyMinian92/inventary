@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, listFrom } from '../../api';
+import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 
 function idOf(value) { return value?.id ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
@@ -16,6 +17,7 @@ export default function SalesReturns({ onChanged }) {
   const [sourceSale, setSourceSale] = useState(null);
   const [lines, setLines] = useState([]);
   const [reason, setReason] = useState('');
+  const dialogRef = useAccessibleDialog(modal, () => setModal(false));
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -146,8 +148,8 @@ export default function SalesReturns({ onChanged }) {
     </tbody></table>{!rows.length && <div className="empty-state">{loading ? 'Cargando devoluciones…' : 'Todavía no hay devoluciones de clientes.'}</div>}</div>
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
-      <section className="modal-card">
-        <div className="modal-heading"><h2>Registrar devolución de cliente</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal(false)}>×</button></div>
+      <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="sales-return-modal-title" tabIndex={-1}>
+        <div className="modal-heading"><h2 id="sales-return-modal-title">Registrar devolución de cliente</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setModal(false)}>×</button></div>
         <form className="form-grid" onSubmit={submit}>
           <label className="field wide"><span>Venta original<b> *</b></span><select required value={sourceSaleId} onChange={event => setSourceSaleId(event.target.value)}><option value="">Seleccionar una venta completada</option>{sales.map(sale => <option key={idOf(sale)} value={idOf(sale)}>{sale.saleNumber || idOf(sale)} · {sale.customerName || 'Mostrador'} · {money(sale.total)}</option>)}</select></label>
           {sourceSale && <p className="form-hint wide">Venta {sourceSale.saleNumber || idOf(sourceSale)} · {sourceSale.warehouseCode || 'Almacén'} · cada cantidad queda limitada a lo que aún no se ha devuelto.</p>}
