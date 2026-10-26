@@ -13,6 +13,7 @@ import Overview from './features/dashboard/Overview.jsx';
 import DataTable from './components/DataTable.jsx';
 import PurchaseTable from './features/purchasing/PurchaseTable.jsx';
 import SalesTable from './features/sales/SalesTable.jsx';
+import useAccessibleDialog from './hooks/useAccessibleDialog.js';
 import PurchaseReturns from './features/purchasing/PurchaseReturns.jsx';
 import SalesReturns from './features/sales/SalesReturns.jsx';
 
@@ -282,8 +283,8 @@ function App() {
     </aside>
     <main className="main-content">
       <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button className="icon-button" onClick={loadData} title="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
-      {error && <div className="alert error"><CircleAlert size={18}/><span>{error}</span><button onClick={() => setError('')}>×</button></div>}
-      {notice && <div className="alert success"><Activity size={18}/><span>{notice}</span><button onClick={() => setNotice('')}>×</button></div>}
+      {error && <div className="alert error" role="alert" aria-live="assertive"><CircleAlert size={18}/><span>{error}</span><button type="button" aria-label="Cerrar mensaje de error" onClick={() => setError('')}>×</button></div>}
+      {notice && <div className="alert success" role="status" aria-live="polite"><Activity size={18}/><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
       {section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValueLabel} purchases={purchases} sales={sales} movements={movements} setSection={setSection} loading={loading} onNewProduct={() => openProduct()} onNewCategory={() => openCategory()} onNewPurchase={() => setModal('purchase')} onNewSale={() => setModal('sale')}/>}
       {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus}/></section>}
       {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus}/></section>}
@@ -325,6 +326,14 @@ function CategoriesTable({categories,onEdit,onToggleActive}) {
 }
 function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
 function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
-function Modal({title,onClose,children}) { return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section className="modal-card"><div className="modal-heading"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Cerrar">×</button></div>{children}</section></div>; }
+function Modal({title,onClose,children}) {
+  const dialogRef = useAccessibleDialog(true, onClose);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="global-modal-title" tabIndex={-1}>
+      <div className="modal-heading"><h2 id="global-modal-title">{title}</h2><button type="button" className="icon-button" onClick={onClose} aria-label="Cerrar ventana">×</button></div>
+      {children}
+    </section>
+  </div>;
+}
 
 export default App;
