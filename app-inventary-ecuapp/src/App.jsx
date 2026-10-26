@@ -96,7 +96,7 @@ function App() {
 
   async function runAction(action, success) {
     setLoading(true); setError(''); setNotice('');
-    try { await action(); setNotice(success); setModal(''); setEditing(null); await loadData(); }
+    try { await action(); setNotice(success); setModal(''); setEditing(null); await loadData(); return true; }
     catch (e) {
       if (e.status === 401) {
         setToken('');
@@ -106,6 +106,7 @@ function App() {
       } else {
         setError(e.message || 'No se pudo completar la operación.');
       }
+      return false;
     }
     finally { setLoading(false); }
   }
@@ -185,21 +186,21 @@ function App() {
 
   async function submitReceipt(data) {
     if (!selectedOrder) return;
-    await runAction(() => api.createReceipt(pickId(selectedOrder), data), 'Recepción contabilizada. El inventario se actualizó desde el backend.');
-    setSelectedOrder(null);
+    const completed = await runAction(() => api.createReceipt(pickId(selectedOrder), data), 'Recepción contabilizada. El inventario se actualizó desde el backend.');
+    if (completed) setSelectedOrder(null);
   }
 
   async function submitSale(data) {
     await runAction(() => api.createSale(data), 'Venta registrada por el backend.');
   }
 
-  async function loadInventoryFilter(event) {
+  async function loadInventoryFilter(event, filterValues = inventoryFilter) {
     event?.preventDefault?.();
     setLoading(true);
     setError('');
     const params = {};
-    if (inventoryFilter.warehouseId) params.warehouseId = inventoryFilter.warehouseId;
-    if (inventoryFilter.productId) params.productId = inventoryFilter.productId;
+    if (filterValues.warehouseId) params.warehouseId = filterValues.warehouseId;
+    if (filterValues.productId) params.productId = filterValues.productId;
     params.size = '100';
     const [balanceResult, movementResult] = await Promise.allSettled([api.balances(params), api.movements(params)]);
     const failures = [];
@@ -252,7 +253,7 @@ function App() {
       {section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
       {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={order => runAction(() => api.cancelPurchaseOrder(pickId(order)), 'Orden cancelada.')} onReceive={openReceive}/></section>}
       {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><DataTable rows={sales} columns={[['number','Documento'],['status','Estado'],['customerName','Cliente'],['createdAt','Fecha'],['total','Total']]} moneyKey="total" empty="Todavía no hay ventas."/></section>}
-      {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { setInventoryFilter({warehouseId:'',productId:''}); void loadInventoryFilter({preventDefault:()=>{}}); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
+      {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{money(inventoryValue)}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseName','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['movementType','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['createdAt','Fecha'],['reference','Documento']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
       {section === 'reports' && <section className="panel"><PanelHeading title="Balance de inventario" subtitle="Compara compras, ventas y saldo por rango de fechas." icon={ClipboardList}/><form className="report-filters" onSubmit={runReport}><Field label="Almacén" required><select required value={reportForm.warehouseId} onChange={e => setReportForm({...reportForm, warehouseId:e.target.value})}><option value="">Seleccionar almacén</option>{warehouses.map(w => <option key={pickId(w)} value={pickId(w)}>{pickName(w)}</option>)}</select></Field><Field label="Desde" required><input type="date" required value={reportForm.from} onChange={e => setReportForm({...reportForm, from:e.target.value})}/></Field><Field label="Hasta" required><input type="date" min={reportForm.from} required value={reportForm.to} onChange={e => setReportForm({...reportForm, to:e.target.value})}/></Field><Field label="Producto (opcional)"><select value={reportForm.productId} onChange={e => setReportForm({...reportForm, productId:e.target.value})}><option value="">Todos los productos</option>{products.map(p => <option key={pickId(p)} value={pickId(p)}>{p.name} · {p.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Consultar balance</button></form><DataTable rows={report} columns={[['productName','Producto'],['sku','SKU'],['openingStock','Saldo inicial'],['purchasedQuantity','Comprado'],['purchaseAmount','Importe compras'],['soldQuantity','Vendido'],['salesAmount','Importe ventas'],['closingStock','Saldo final'],['currentStock','Stock actual'],['grossProfit','Ganancia bruta']]} empty="Selecciona un almacén y consulta un periodo para ver el balance."/></section>}
     </main>
     {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); }}><>
@@ -289,8 +290,30 @@ function CategoriesTable({categories,onEdit,onToggleActive}) {
     return <tr key={pickId(category)||index}><td><strong>{category.name||'Sin nombre'}</strong></td><td><code>{category.code||'—'}</code></td><td>{category.description||'—'}</td><td>{category.productCount??'—'}</td><td><span className={'pill '+(inactive?'inactive':'active')}>{inactive?'Inactiva':'Activa'}</span></td><td><div className="row-actions"><button className="small-action" onClick={()=>onEdit(category)}>Editar</button><button className="small-action" onClick={()=>onToggleActive(category)}>{inactive?'Activar':'Desactivar'}</button></div></td></tr>;
   })}</tbody></table>{!categories.length&&<div className="empty-state">Todavía no has creado categorías.</div>}</div>;
 }
-function PurchaseTable({rows,onSubmit,onApprove,onReceive}) {
-  return <div className="table-wrap"><table><thead><tr><th>Documento</th><th>Estado</th><th>Proveedor</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>{rows.map((order,i)=>{const status=String(order.status||'DRAFT').toUpperCase();return <tr key={pickId(order)||i}><td><strong>{order.number||order.code||String(pickId(order)).slice(0,12)||'Orden'}</strong></td><td><span className={'pill '+(['RECEIVED','APPROVED','COMPLETED'].includes(status)?'active':'inactive')}>{titleCase(status)}</span></td><td>{order.supplierName||order.supplier?.name||'—'}</td><td>{date(order.createdAt)}</td><td><div className="row-actions">{['DRAFT','PENDING'].includes(status)&&<button className="small-action" onClick={()=>onSubmit(order)}>Enviar</button>}{['SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status)&&<button className="small-action" onClick={()=>onApprove(order)}>Aprobar</button>}{['APPROVED','PARTIALLY_RECEIVED'].includes(status)&&<button className="small-action" onClick={()=>onReceive(order)}>Recibir</button>}</div></td></tr>;})}</tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay órdenes de compra.</div>}</div>;
+function PurchaseTable({rows,onSubmit,onApprove,onCancel,onReceive,loading}) {
+  return <div className="table-wrap"><table><thead><tr><th>Documento</th><th>Estado</th><th>Proveedor</th><th>Almacén</th><th>Líneas</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>{rows.map((order,index)=>{
+    const status=String(order.status||'DRAFT').toUpperCase();
+    const items=Array.isArray(order.items)?order.items:Array.isArray(order.lines)?order.lines:[];
+    const canSubmit=['DRAFT'].includes(status);
+    const canApprove=['SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status);
+    const canReceive=['APPROVED','PARTIALLY_RECEIVED'].includes(status);
+    const canCancel=['DRAFT','SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status);
+    const tone=['RECEIVED','COMPLETED'].includes(status)?'active':['CANCELLED','REJECTED'].includes(status)?'inactive':'pending';
+    return <tr key={pickId(order)||index}>
+      <td><strong>{order.number||order.code||String(pickId(order)).slice(0,12)||'Orden'}</strong></td>
+      <td><span className={'pill '+tone}>{titleCase(status)}</span></td>
+      <td>{order.supplierName||order.supplier?.name||'—'}</td>
+      <td>{order.warehouseName||order.warehouse?.name||'—'}</td>
+      <td>{items.length || order.itemCount || '—'}</td>
+      <td>{date(order.createdAt)}</td>
+      <td><div className="row-actions">
+        {canSubmit&&<button className="small-action" disabled={loading} onClick={()=>onSubmit(order)}>Enviar</button>}
+        {canApprove&&<button className="small-action" disabled={loading} onClick={()=>onApprove(order)}>Aprobar</button>}
+        {canReceive&&<button className="small-action" disabled={loading} onClick={()=>onReceive(order)}>Recibir</button>}
+        {canCancel&&<button className="small-action" disabled={loading} onClick={()=>onCancel(order)}>Cancelar</button>}
+      </div></td>
+    </tr>;
+  })}</tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay órdenes de compra.</div>}</div>;
 }
 function DataTable({rows,columns,moneyKey,empty}) { return <div className="table-wrap"><table><thead><tr>{columns.map(([key,label])=><th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={pickId(row)||row.id||i}>{columns.map(([key])=><td key={key}>{key===moneyKey?money(row[key]):key.toLowerCase().includes('date')||key==='createdAt'?date(row[key]):key==='status'||key==='movementType'?titleCase(row[key]||'—'):row[key]??row.product?.name??row.warehouse?.name??'—'}</td>)}</tr>)}</tbody></table>{!rows.length&&<div className="empty-state">{empty}</div>}</div>; }
 function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
