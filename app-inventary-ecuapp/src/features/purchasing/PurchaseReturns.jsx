@@ -128,8 +128,8 @@ export default function PurchaseReturns({ onChanged }) {
       <div><h3>Devoluciones a proveedores</h3><p>Devuelve mercancía de recepciones contabilizadas, con control de cantidades ya devueltas.</p></div>
       <button className="button primary" onClick={openForm}>+ Nueva devolución</button>
     </div>
-    {error && <div className="alert error"><span>{error}</span><button onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success"><span>{notice}</span><button onClick={() => setNotice('')}>×</button></div>}
+    {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
+    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     <div className="table-wrap"><table><thead><tr><th>Devolución</th><th>Orden</th><th>Recepción</th><th>Estado</th><th>Fecha</th><th>Motivo</th><th>Total</th></tr></thead><tbody>
       {returns.map((row,index) => <tr key={idOf(row)||index}>
         <td><strong>{row.returnNumber || idOf(row)}</strong></td><td>{row.purchaseOrderNumber || row.purchaseOrderId || '—'}</td>
