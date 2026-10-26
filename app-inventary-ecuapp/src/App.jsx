@@ -94,7 +94,16 @@ function App() {
   async function runAction(action, success) {
     setLoading(true); setError(''); setNotice('');
     try { await action(); setNotice(success); setModal(''); setEditing(null); await loadData(); }
-    catch (e) { setError(e.message || 'No se pudo completar la operación.'); }
+    catch (e) {
+      if (e.status === 401) {
+        setToken('');
+        setTokenState('');
+        setUser(null);
+        setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+      } else {
+        setError(e.message || 'No se pudo completar la operación.');
+      }
+    }
     finally { setLoading(false); }
   }
 
