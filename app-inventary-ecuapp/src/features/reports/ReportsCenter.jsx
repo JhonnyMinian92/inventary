@@ -186,6 +186,11 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
 
   function updateFilter(key, value) {
     setFilters(current => ({ ...current, [key]: value }));
+    setResults(current => ({ ...current, [activeTab]: undefined }));
+    setQueried(current => ({ ...current, [activeTab]: false }));
+    if (activeTab === 'balance') setBalanceSummaryCache({ signature: '', rows: [] });
+    if (activeTab === 'valuation') setValuationExportCache({ signature: '', rows: null });
+    setError(null);
   }
 
   async function runReport(event, requestedPage = 0) {
@@ -236,8 +241,9 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         const signature = [filters.from, filters.to, filters.zone, filters.warehouseId, filters.productId].join('|');
         let summaryRows = requestedPage > 0 && balanceSummaryCache.signature === signature ? balanceSummaryCache.rows : null;
         if (!summaryRows) {
-          summaryRows = [...listFrom(response.items)];
-          const totalPages = Number(response.totalPages || 0);
+          const firstPageResponse = requestedPage === 0 ? response : await api.inventoryBalanceReport({ ...params, page: 0 });
+          summaryRows = [...listFrom(firstPageResponse.items)];
+          const totalPages = Number(firstPageResponse.totalPages || 0);
           for (let firstPage = 1; firstPage < totalPages; firstPage += 5) {
             const batchPages = Array.from({ length: Math.min(5, totalPages - firstPage) }, (_, offset) => firstPage + offset);
             const pageResults = await Promise.all(batchPages.map(page => api.inventoryBalanceReport({ ...params, page })));
@@ -265,8 +271,9 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         const signature = [filters.warehouseId, filters.productId, 'includeEmpty=false'].join('|');
         let exportRows = requestedPage > 0 && valuationExportCache.signature === signature ? valuationExportCache.rows : null;
         if (!exportRows) {
-          exportRows = [...listFrom(response.items)];
-          const totalPages = Number(response.totalPages || 0);
+          const firstPageResponse = requestedPage === 0 ? response : await api.inventoryValuationReport({ ...params, page: 0 });
+          exportRows = [...listFrom(firstPageResponse.items)];
+          const totalPages = Number(firstPageResponse.totalPages || 0);
           for (let firstPage = 1; firstPage < totalPages; firstPage += 5) {
             const batchPages = Array.from({ length: Math.min(5, totalPages - firstPage) }, (_, offset) => firstPage + offset);
             const pageResults = await Promise.all(batchPages.map(page => api.inventoryValuationReport({ ...params, page })));
@@ -402,7 +409,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       {resultReady && tableRows.length > 0 && <button className="button secondary" type="button" onClick={exportData}><Download size={16}/> Exportar CSV</button>}
     </div>
     <div className="report-tabs" role="tablist" aria-label="Informes de inventario">
-      {REPORT_TABS.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="report-results" id={'report-tab-' + tab.id} className={activeTab === tab.id ? 'report-tab active' : 'report-tab'} onClick={() => { setActiveTab(tab.id); setError(null); }}>{tab.label}</button>)}
+      {REPORT_TABS.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="report-results" id={'report-tab-' + tab.id} className={activeTab === tab.id ? 'report-tab active' : 'report-tab'} onClick={() => { if (!loading) { setActiveTab(tab.id); setError(null); } }} disabled={loading}>{tab.label}</button>)}
     </div>
     {error && <div className={'alert ' + (error.kind === 'permission' ? 'warning' : 'error')} role="alert" aria-live="assertive"><ShieldAlert size={18}/><span>{error.message}</span><button type="button" aria-label="Cerrar mensaje" onClick={() => setError(null)}>×</button></div>}
     <form className="report-filters report-center-filters" onSubmit={runReport} aria-label="Filtros del informe">
