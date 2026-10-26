@@ -53,6 +53,7 @@ function App() {
   const [valuation, setValuation] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [purchaseToCancel, setPurchaseToCancel] = useState(null);
+  const [statusChangeTarget, setStatusChangeTarget] = useState(null);
   const [saleToCancel, setSaleToCancel] = useState(null);
   const [saleCancelReason, setSaleCancelReason] = useState('');
   const [search, setSearch] = useState('');
@@ -160,16 +161,29 @@ function App() {
     }, editing ? 'Categoría y propiedades actualizadas.' : 'Categoría creada con sus propiedades.');
   }
 
-  async function toggleProductStatus(product) {
+  function toggleProductStatus(product) {
     const inactive = product.active === false || String(product.status || '').toUpperCase() === 'INACTIVE';
-    const id = pickId(product);
-    await runAction(() => inactive ? api.activateProduct(id) : api.deactivateProduct(id), inactive ? 'Producto activado.' : 'Producto desactivado.');
+    setStatusChangeTarget({ kind: 'product', item: product, activate: inactive });
+    setModal('confirmStatusChange');
   }
 
-  async function toggleCategoryStatus(category) {
+  function toggleCategoryStatus(category) {
     const inactive = category.active === false || String(category.status || '').toUpperCase() === 'INACTIVE';
-    const id = pickId(category);
-    await runAction(() => inactive ? api.activateCategory(id) : api.deactivateCategory(id), inactive ? 'Categoría activada.' : 'Categoría desactivada.');
+    setStatusChangeTarget({ kind: 'category', item: category, activate: inactive });
+    setModal('confirmStatusChange');
+  }
+
+  async function confirmStatusChange(event) {
+    event.preventDefault();
+    if (!statusChangeTarget) return;
+    const { kind, item, activate } = statusChangeTarget;
+    const id = pickId(item);
+    const action = kind === 'product'
+      ? (activate ? () => api.activateProduct(id) : () => api.deactivateProduct(id))
+      : (activate ? () => api.activateCategory(id) : () => api.deactivateCategory(id));
+    const label = kind === 'product' ? 'producto' : 'categoría';
+    const completed = await runAction(action, (activate ? 'Se activó el ' : 'Se desactivó el ') + label + '.');
+    if (completed) setStatusChangeTarget(null);
   }
 
   async function logout() {
@@ -297,11 +311,11 @@ function App() {
       <div className="sidebar-bottom"><div className="api-status"><span className={'status-dot ' + apiStatus}/><span>{apiStatus === 'connected' ? 'API disponible' : apiStatus === 'checking' ? 'Conectando a la API…' : 'API sin conexión'}</span></div><button className="nav-item logout" onClick={logout}><LogOut size={18}/> Cerrar sesión</button></div>
     </aside>
     <main className="main-content">
-      <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button className="icon-button" onClick={loadData} title="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
+      <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button type="button" className="icon-button" onClick={loadData} title="Actualizar datos" aria-label="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
       {error && <div className="alert error" role="alert" aria-live="assertive"><CircleAlert size={18}/><span>{error}</span><button type="button" aria-label="Cerrar mensaje de error" onClick={() => setError('')}>×</button></div>}
       {notice && <div className="alert success" role="status" aria-live="polite"><Activity size={18}/><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
       {section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValueLabel} purchases={purchases} sales={sales} movements={movements} setSection={setSection} loading={loading} onNewProduct={() => openProduct()} onNewCategory={() => openCategory()} onNewPurchase={() => setModal('purchase')} onNewSale={() => setModal('sale')}/>}
-      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus}/></section>}
+      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input aria-label="Buscar productos por nombre o SKU" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus}/></section>}
       {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus}/></section>}
       {section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
       {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={requestPurchaseCancellation} onReceive={openReceive}/><PurchaseReturns onChanged={loadData}/></section>}
@@ -309,12 +323,17 @@ function App() {
       {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseCode','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['type','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['occurredAt','Fecha'],['referenceType','Tipo de documento'],['referenceId','Referencia']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
       {section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => { setToken(''); setTokenState(''); setUser(null); }} />}
     </main>
-    {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta',confirmPurchaseCancel:'Confirmar cancelación de compra'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); if (modal === 'confirmPurchaseCancel') setPurchaseToCancel(null); }}><>
+    {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta',confirmPurchaseCancel:'Confirmar cancelación de compra',confirmStatusChange:statusChangeTarget ? (statusChangeTarget.activate ? 'Confirmar activación' : 'Confirmar desactivación') : 'Confirmar cambio de estado'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); if (modal === 'confirmPurchaseCancel') setPurchaseToCancel(null); if (modal === 'confirmStatusChange') setStatusChangeTarget(null); }}><>
       {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
       {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitCategory} onError={setError}/>}
       {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={() => setModal('')} onSubmit={submitPurchase}/>}
       {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={() => { setModal(''); setSelectedOrder(null); }} onSubmit={submitReceipt}/>}
       {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={() => setModal('')} onSubmit={submitSale}/>}
+      {modal === 'confirmStatusChange' && statusChangeTarget && <form className="form-grid" onSubmit={confirmStatusChange}>
+        <div className="alert warning wide" role="alert"><CircleAlert size={18}/><span>¿Confirmas que deseas {statusChangeTarget.activate ? 'activar' : 'desactivar'} el {statusChangeTarget.kind === 'product' ? 'producto' : 'categoría'} <strong>{statusChangeTarget.item.name || statusChangeTarget.item.sku || pickId(statusChangeTarget.item)}</strong>?</span></div>
+        <p className="form-hint wide">{statusChangeTarget.activate ? 'El registro volverá a estar disponible según las reglas del backend.' : 'No se borran movimientos ni documentos históricos. Las operaciones futuras que requieran este registro podrán ser rechazadas.'}</p>
+        <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => { setModal(''); setStatusChangeTarget(null); }}>Volver</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : statusChangeTarget.activate ? 'Confirmar activación' : 'Confirmar desactivación'}</button></div>
+      </form>}
       {modal === 'confirmPurchaseCancel' && purchaseToCancel && <form className="form-grid" onSubmit={confirmPurchaseCancellation}><div className="alert warning wide" role="alert"><CircleAlert size={18}/><span>Vas a cancelar la orden <strong>{purchaseToCancel.orderNumber || purchaseToCancel.number || pickId(purchaseToCancel)}</strong>. Esta acción no se puede deshacer desde el formulario y no aumenta ni reduce existencias.</span></div><p className="form-hint wide">Proveedor: {purchaseToCancel.supplierName || purchaseToCancel.supplier?.name || '—'} · Almacén: {purchaseToCancel.warehouseCode || '—'}.</p><div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => { setModal(''); setPurchaseToCancel(null); }}>Volver</button><button className="button danger" disabled={loading}>{loading ? 'Cancelando…' : 'Confirmar cancelación'}</button></div></form>}
       {modal === 'cancelSale' && saleToCancel && <form className="form-grid" onSubmit={submitSaleCancellation}><p className="form-hint wide">Venta: <strong>{saleToCancel.number || saleToCancel.code || pickId(saleToCancel)}</strong>. La anulación no devuelve las existencias hasta que el backend la apruebe.</p><Field label="Motivo de anulación" required wide><textarea rows="3" required maxLength="500" value={saleCancelReason} onChange={event => setSaleCancelReason(event.target.value)} placeholder="Describe el motivo de la solicitud"/></Field><FormActions loading={loading} onCancel={() => { setModal(''); setSaleToCancel(null); }}/></form>}
 
