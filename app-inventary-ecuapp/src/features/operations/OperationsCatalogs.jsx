@@ -189,10 +189,10 @@ export default function OperationsCatalogs({ onChanged }) {
     <div className="catalog-tabs" role="tablist" aria-label="Catálogos auxiliares">
       {Object.entries(configs).map(([key, entry]) => <button key={key} role="tab" aria-selected={kind === key} className={kind === key ? 'catalog-tab active' : 'catalog-tab'} onClick={() => { setKind(key); setSearch(''); setError(''); setNotice(''); }}>{entry.label}<span>{records[key].length}</span></button>)}
     </div>
-    {error && <div className="alert error"><span>{error}</span><button onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success"><span>{notice}</span><button onClick={() => setNotice('')}>×</button></div>}
+    {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
+    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     <div className="toolbar">
-      <div className="search-box"><input value={search} onChange={event => setSearch(event.target.value)} placeholder={'Buscar ' + config.label.toLowerCase() + '…'} /></div>
+      <div className="search-box"><input aria-label={'Buscar en ' + config.label.toLowerCase()} value={search} onChange={event => setSearch(event.target.value)} placeholder={'Buscar ' + config.label.toLowerCase() + '…'} /></div>
       <span className="muted">{loading ? 'Actualizando…' : visible.length + ' registros'}</span>
     </div>
     <div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field.key}>{field.label}</th>)}<th>Estado</th><th>Acciones</th></tr></thead><tbody>
