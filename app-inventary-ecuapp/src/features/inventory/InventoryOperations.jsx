@@ -33,11 +33,13 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       api.replenishmentSuggestions()
     ]);
     const setters = [setTransfers, setCounts, setRules, setSuggestions];
+    const labels = ['traslados', 'conteos físicos', 'reglas de reposición', 'sugerencias'];
+    const failures = [];
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') setters[index](listFrom(result.value));
+      else failures.push(labels[index] + ': ' + (result.reason?.message || 'error'));
     });
-    const failures = results.filter(result => result.status === 'rejected');
-    if (failures.length === results.length) setError('No se pudieron cargar las operaciones avanzadas del inventario.');
+    if (failures.length) setError('Algunas operaciones no se pudieron cargar. ' + failures.join(' · '));
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
