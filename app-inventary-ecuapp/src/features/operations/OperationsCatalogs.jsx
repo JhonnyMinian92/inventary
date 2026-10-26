@@ -89,7 +89,7 @@ export default function OperationsCatalogs({ onChanged }) {
     setLoading(true);
     setError('');
     const [warehouses, suppliers, customers, units] = await Promise.allSettled([
-      api.warehouses(), api.suppliers(), api.customers(), api.units()
+      api.warehouses({ size: 100 }), api.suppliers({ size: 100 }), api.customers({ size: 100 }), api.units()
     ]);
     const result = { warehouses: [], suppliers: [], customers: [], units: [] };
     const failures = [];
