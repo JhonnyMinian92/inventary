@@ -8,6 +8,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [lines, setLines] = useState([emptyLine()]);
   const totals = useMemo(() => lines.reduce((result, line) => {
     const product = products.find(item => String(idOf(item)) === String(line.productId));
@@ -33,7 +34,10 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     if (!warehouseId || !items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) return;
     const data = { warehouseId, channel: 'POS', items };
     if (customerId) data.customerId = customerId;
-    else if (customerName.trim()) data.customerName = customerName.trim();
+    else {
+      if (customerName.trim()) data.customerName = customerName.trim();
+      if (customerPhone.trim()) data.customerPhone = customerPhone.trim();
+    }
     onSubmit(data);
   }
 
@@ -47,12 +51,12 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     </label>
     <label className="field">
       <span>Cliente registrado</span>
-      <select value={customerId} onChange={event => { setCustomerId(event.target.value); if (event.target.value) setCustomerName(''); }}>
+      <select value={customerId} onChange={event => { setCustomerId(event.target.value); if (event.target.value) { setCustomerName(''); setCustomerPhone(''); } }}>
         <option value="">Venta rápida / otro cliente</option>
         {customers.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.code || idOf(item)}</option>)}
       </select>
     </label>
-    {!customerId && <label className="field wide"><span>Nombre del cliente (opcional)</span><input maxLength="160" value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Cliente de mostrador" /></label>}
+    {!customerId && <><label className="field"><span>Nombre del cliente (opcional)</span><input maxLength="160" value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Cliente de mostrador" /></label><label className="field"><span>Teléfono del cliente (opcional)</span><input maxLength="40" value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="099…" /></label></>}
 
     <div className="form-subheading wide"><strong>Artículos de la venta</strong><small>El precio final y la disponibilidad se calculan y validan en la transacción del backend.</small></div>
     {lines.map((line, index) => {
