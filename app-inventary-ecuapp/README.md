@@ -27,9 +27,9 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 - **src/api.js**: llamadas REST, autenticación Bearer, manejo centralizado de errores e idempotencia para operaciones transaccionales.
 - **src/features/catalog/ProductForm.jsx**: crear/editar productos y renderizar campos a partir del esquema de atributos de la categoría.
 - **src/features/catalog/CategoryForm.jsx**: crear/editar categorías y configurar campos tipados, obligatorios, enumerados y restricciones básicas.
-- **src/features/operations/OperationsCatalogs.jsx**: administración de almacenes, proveedores y clientes.
-- **src/features/purchasing/PurchaseForm.jsx** y **ReceiptForm.jsx**: órdenes y recepciones de múltiples líneas.
-- **src/features/sales/SaleForm.jsx**: venta transaccional con múltiples artículos.
+- **src/features/operations/OperationsCatalogs.jsx** y **UnitConversions.jsx**: almacenes, proveedores, clientes, unidades y conversiones.
+- **src/features/purchasing/PurchaseForm.jsx**, **ReceiptForm.jsx** y **PurchaseReturns.jsx**: órdenes multítem, recepción parcial y devoluciones a proveedores.
+- **src/features/sales/SaleForm.jsx** y **SalesReturns.jsx**: venta transaccional multítem y devoluciones de clientes.
 - **src/features/inventory/InventoryOperations.jsx**: traslados, ajustes, conteos físicos y reposición.
 - **src/styles.css**: sistema visual responsive.
 - **docs/frontend-roadmap.md**: alcance y criterios de cierre por fase.
@@ -38,11 +38,11 @@ Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1*
 
 - Inicio de sesión con token emitido por el backend, cierre de sesión en la API y manejo de sesión vencida.
 - Catálogo de productos y categorías con propiedades derivadas del esquema de atributos (STRING, NUMBER, BOOLEAN, DATE, ENUM).
-- Administración de almacenes, proveedores, clientes y unidades de medida, con asignación de unidad al producto.
-- Órdenes de compra con múltiples líneas, flujo de aprobación y recepción por artículo.
-- Ventas con múltiples artículos, clientes registrados y solicitud/aprobación de anulaciones.
-- Consulta de saldos y movimientos por almacén y producto.
-- Traslados con despacho y recepción, ajustes de stock con motivo, conteos físicos y reglas/sugerencias de reposición.
+- Administración de almacenes, proveedores, clientes y unidades de medida; asignación de unidad y conversiones entre unidades.
+- Órdenes de compra con múltiples líneas, envío a aprobación, recepción parcial y devoluciones a proveedores.
+- Ventas multítem con clientes registrados u ocasionales, solicitud/aprobación de anulaciones y devoluciones de clientes (reincorporación o descarte).
+- Consulta de disponibilidad en tiempo real antes de vender y consulta de saldos/movimientos por almacén y producto.
+- Traslados con despacho/recepción, ajustes con motivo, conteos físicos y reglas/sugerencias de reposición.
 - Balance de inventario por almacén y rango de fechas.
 
 Una orden de compra por sí sola no aumenta las existencias: el stock cambia al registrar la recepción aprobada, mediante la API. De forma equivalente, las ventas se registran como operaciones transaccionales del backend.
