@@ -9,6 +9,10 @@ import SaleForm from './features/sales/SaleForm.jsx';
 import OperationsCatalogs from './features/operations/OperationsCatalogs.jsx';
 import InventoryOperations from './features/inventory/InventoryOperations.jsx';
 import ReportsCenter from './features/reports/ReportsCenter.jsx';
+import Overview from './features/dashboard/Overview.jsx';
+import DataTable from './components/DataTable.jsx';
+import PurchaseTable from './features/purchasing/PurchaseTable.jsx';
+import SalesTable from './features/sales/SalesTable.jsx';
 import PurchaseReturns from './features/purchasing/PurchaseReturns.jsx';
 import SalesReturns from './features/sales/SalesReturns.jsx';
 
@@ -305,11 +309,6 @@ function Login({ onLogin, error }) {
   const [username,setUsername] = useState(''); const [password,setPassword] = useState(''); const [busy,setBusy] = useState(false);
   return <div className="login-screen"><div className="login-card"><div className="brand login-brand"><div className="brand-mark"><Boxes size={23}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div><span className="eyebrow">BIENVENIDO DE NUEVO</span><h1>Controla tu inventario con claridad.</h1><p>Ingresa con tus credenciales para administrar productos, compras y ventas.</p>{error && <div className="alert error">{error}</div>}<form onSubmit={async e=>{e.preventDefault();setBusy(true);await onLogin(username,password);setBusy(false);}}><Field label="Usuario o correo"><input autoComplete="username" required value={username} onChange={e=>setUsername(e.target.value)} placeholder="Tu usuario"/></Field><Field label="Contraseña"><input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Tu contraseña"/></Field><button className="button primary full" disabled={busy}>{busy?'Conectando…':'Iniciar sesión'}<ChevronRight size={17}/></button></form><small className="login-foot">Conexión segura al backend Inventary</small></div></div>;
 }
-function Overview({products,categories,stockTotal,inventoryValue,purchases,sales,movements,setSection,loading,onNewProduct,onNewCategory,onNewPurchase,onNewSale}) {
-  const cards = [{label:'Productos',value:products.length,detail:'Referencias registradas',icon:Boxes,color:'violet'},{label:'Categorías',value:categories.length,detail:'Grupos de catálogo',icon:Tags,color:'blue'},{label:'Unidades en stock',value:stockTotal.toLocaleString('es-EC'),detail:'Suma de saldos disponibles',icon:Warehouse,color:'green'},{label:'Valor estimado',value:inventoryValue,detail:'Según valoración financiera del backend',icon:ChartNoAxesCombined,color:'orange'}];
-  return <><div className="welcome-row"><div><h2>Todo tu inventario, en un solo lugar.</h2><p>Consulta el estado del negocio y accede rápidamente a las operaciones principales.</p></div><button className="button secondary" onClick={()=>setSection('reports')}><ChartNoAxesCombined size={16}/> Ver balance</button></div><div className="stats-grid">{cards.map(c=><div className="stat-card" key={c.label}><div className="stat-top"><span>{c.label}</span><span className={'stat-icon '+c.color}><c.icon size={19}/></span></div><strong>{c.value}</strong><small>{c.detail}</small></div>)}</div><div className="content-grid"><section className="panel quick-panel"><div className="section-heading"><div><h3>Acciones rápidas</h3><p>Continúa con una tarea frecuente.</p></div></div><div className="quick-actions"><QuickAction icon={PackagePlus} title="Crear producto" text="Añade una referencia al catálogo" onClick={onNewProduct}/><QuickAction icon={Tags} title="Nueva categoría" text="Organiza tus productos" onClick={onNewCategory}/><QuickAction icon={ArrowDownToLine} title="Registrar compra" text="Abastece tu inventario" onClick={onNewPurchase}/><QuickAction icon={ArrowUpFromLine} title="Registrar venta" text="Registra una salida comercial" onClick={onNewSale}/></div></section><section className="panel activity-panel"><div className="section-heading"><div><h3>Actividad reciente</h3><p>Últimos movimientos registrados</p></div><button className="text-button" onClick={()=>setSection('inventory')}>Ver todo <ChevronRight size={14}/></button></div>{loading?<div className="empty-state">Actualizando datos…</div>:movements.length===0?<div className="empty-state"><Activity size={24}/><span>Aún no hay actividad para mostrar.</span></div>:movements.slice(0,5).map((m,i)=><div className="activity-row" key={m.id||i}><div className="activity-icon"><Activity size={16}/></div><div className="activity-copy"><strong>{titleCase(m.movementType||m.type||'Movimiento de inventario')}</strong><small>{m.productName||m.product?.name||m.reference||'Movimiento registrado'}</small></div><div className="activity-meta"><strong>{m.quantity??m.delta??'—'}</strong><small>{date(m.createdAt||m.occurredAt)}</small></div></div>)}</section></div><div className="bottom-note"><span className="status-dot"/><span>Los saldos y documentos provienen directamente de la API.</span><span className="note-separator">·</span><span>{purchases.length} compras</span><span className="note-separator">·</span><span>{sales.length} ventas</span></div></>;
-}
-function QuickAction({icon:Icon,title,text,onClick}) { return <button className="quick-action" onClick={onClick}><span className="quick-icon"><Icon size={20}/></span><span><strong>{title}</strong><small>{text}</small></span><ChevronRight size={16}/></button>; }
 function PanelHeading({title,subtitle,action,onAction,icon:Icon=Layers3}) { return <div className="panel-heading"><div className="panel-title-icon"><span><Icon size={20}/></span><div><h2>{title}</h2><p>{subtitle}</p></div></div>{action&&<button className="button primary" onClick={onAction}><Plus size={16}/>{action}</button>}</div>; }
 function ProductsTable({products,categories,onEdit,onToggleActive}) {
   const categoryName = id => categories.find(c => String(pickId(c)) === String(id))?.name || '—';
@@ -324,53 +323,6 @@ function CategoriesTable({categories,onEdit,onToggleActive}) {
     return <tr key={pickId(category)||index}><td><strong>{category.name||'Sin nombre'}</strong></td><td><code>{category.code||'—'}</code></td><td>{category.description||'—'}</td><td>{category.productCount??'—'}</td><td><span className={'pill '+(inactive?'inactive':'active')}>{inactive?'Inactiva':'Activa'}</span></td><td><div className="row-actions"><button className="small-action" onClick={()=>onEdit(category)}>Editar</button><button className="small-action" onClick={()=>onToggleActive(category)}>{inactive?'Activar':'Desactivar'}</button></div></td></tr>;
   })}</tbody></table>{!categories.length&&<div className="empty-state">Todavía no has creado categorías.</div>}</div>;
 }
-function PurchaseTable({rows,onSubmit,onApprove,onCancel,onReceive,loading}) {
-  return <div className="table-wrap"><table><thead><tr><th>Documento</th><th>Estado</th><th>Proveedor</th><th>Almacén</th><th>Líneas</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>{rows.map((order,index)=>{
-    const status=String(order.status||'DRAFT').toUpperCase();
-    const items=Array.isArray(order.items)?order.items:Array.isArray(order.lines)?order.lines:[];
-    const canSubmit=['DRAFT'].includes(status);
-    const canApprove=['SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status);
-    const canReceive=['APPROVED','PARTIALLY_RECEIVED'].includes(status);
-    const canCancel=['DRAFT','SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status);
-    const tone=['RECEIVED','COMPLETED'].includes(status)?'active':['CANCELLED','REJECTED'].includes(status)?'inactive':'pending';
-    return <tr key={pickId(order)||index}>
-      <td><strong>{order.orderNumber||order.number||order.code||String(pickId(order)).slice(0,12)||'Orden'}</strong></td>
-      <td><span className={'pill '+tone}>{titleCase(status)}</span></td>
-      <td>{order.supplierName||order.supplier?.name||'—'}</td>
-      <td>{order.warehouseCode||order.warehouseName||order.warehouse?.name||'—'}</td>
-      <td>{items.length || order.itemCount || '—'}</td>
-      <td>{date(order.orderedAt||order.createdAt)}</td>
-      <td><div className="row-actions">
-        {canSubmit&&<button className="small-action" disabled={loading} onClick={()=>onSubmit(order)}>Enviar</button>}
-        {canApprove&&<button className="small-action" disabled={loading} onClick={()=>onApprove(order)}>Aprobar</button>}
-        {canReceive&&<button className="small-action" disabled={loading} onClick={()=>onReceive(order)}>Recibir</button>}
-        {canCancel&&<button className="small-action" disabled={loading} onClick={()=>onCancel(order)}>Cancelar</button>}
-      </div></td>
-    </tr>;
-  })}</tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay órdenes de compra.</div>}</div>;
-}
-function SalesTable({rows,loading,onRequestCancel,onApproveCancellation}) {
-  return <div className="table-wrap"><table><thead><tr><th>Documento</th><th>Estado</th><th>Cliente</th><th>Almacén</th><th>Fecha</th><th>Total</th><th>Acciones</th></tr></thead><tbody>
-    {rows.map((sale,index)=>{
-      const status=String(sale.status||'COMPLETED').toUpperCase();
-      const canRequest=['COMPLETED','POSTED'].includes(status);
-      const canApprove=status.includes('CANCEL') && !['CANCELLED','CANCELED'].includes(status);
-      return <tr key={pickId(sale)||index}>
-        <td><strong>{sale.saleNumber||sale.number||sale.code||String(pickId(sale)).slice(0,12)||'Venta'}</strong></td>
-        <td><span className={'pill '+(['COMPLETED','POSTED'].includes(status)?'active':['CANCELLED','CANCELED'].includes(status)?'inactive':'pending')}>{titleCase(status)}</span></td>
-        <td>{sale.customerName||sale.customer?.name||'Venta de mostrador'}</td>
-        <td>{sale.warehouseCode||sale.warehouseName||sale.warehouse?.name||'—'}</td>
-        <td>{date(sale.soldAt||sale.createdAt)}</td>
-        <td>{money(sale.total)}</td>
-        <td><div className="row-actions">
-          {canRequest&&<button className="small-action" disabled={loading} onClick={()=>onRequestCancel(sale)}>Solicitar anulación</button>}
-          {canApprove&&<button className="small-action" disabled={loading} onClick={()=>onApproveCancellation(sale)}>Aprobar anulación</button>}
-        </div></td>
-      </tr>;
-    })}
-  </tbody></table>{!rows.length&&<div className="empty-state">Todavía no hay ventas registradas.</div>}</div>;
-}
-function DataTable({rows,columns,moneyKey,empty}) { return <div className="table-wrap"><table><thead><tr>{columns.map(([key,label])=><th key={key}>{label}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={pickId(row)||row.id||i}>{columns.map(([key])=><td key={key}>{key===moneyKey?money(row[key]):key.toLowerCase().includes('date')||['createdAt','occurredAt','soldAt','orderedAt'].includes(key)?date(row[key]):['status','movementType','type','referenceType'].includes(key)?titleCase(row[key]||'—'):row[key]??row.productName??row.warehouseName??row.supplierName??row.customer?.name??row.customerName??row.product?.name??row.warehouse?.name??'—'}</td>)}</tr>)}</tbody></table>{!rows.length&&<div className="empty-state">{empty}</div>}</div>; }
 function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
 function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
 function Modal({title,onClose,children}) { return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section className="modal-card"><div className="modal-heading"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Cerrar">×</button></div>{children}</section></div>; }
