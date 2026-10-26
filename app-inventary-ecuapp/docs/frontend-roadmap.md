@@ -22,7 +22,7 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 **Estado del código fuente: completada en `master`.** Las pruebas de compilación y de negocio siguen aplazadas hasta el cierre de todo el frontend.
 
-- Administrar almacenes, proveedores y clientes mediante las APIs de altas, edición y activación/desactivación.
+- Administrar almacenes, proveedores, clientes y unidades de medida; asignar una unidad a cada producto.
 - Crear órdenes de compra con múltiples productos; enviar a aprobación, cancelar borradores/órdenes pendientes y registrar recepción parcial o completa por cada línea.
 - Registrar ventas con múltiples artículos, cliente registrado u ocasional, y solicitar/aprobar anulaciones siguiendo la autorización del backend.
 - Consultar saldos y movimientos filtrando por almacén y producto.
