@@ -35,10 +35,16 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 3 — Reportes, accesibilidad y consistencia de producto
 
-- Completar el balance por fecha y almacén, mostrando compras, ventas, saldo inicial/final, valoración y margen con los nombres reales del DTO.
-- Completar vistas de detalle y estados vacíos, de carga, error y permisos.
-- Revisar responsive, teclado, etiquetas, confirmaciones y mensajes de error.
-- Reducir el acoplamiento restante de **App.jsx** extrayendo páginas, tablas y operaciones a módulos por funcionalidad.
+**Estado del código fuente: completada en `master`.** No se han ejecutado compilación ni pruebas, conforme a la secuencia solicitada.
+
+- Centro de informes conectado a los endpoints reales: balance de inventario, ventas/margen, compras y devoluciones, kardex, valoración y stock bajo.
+- Balance por fechas y almacén con saldo inicial/final, compras y ventas netas, valoración inicial/final, costo de ventas, utilidad y margen bruto, usando los nombres reales de `InventoryBalanceReportRow`.
+- Paginación donde el DTO expone páginas y exportación CSV de los resultados.
+- Estados de carga, vacío, error y falta de permiso `reports:financial`; los fallos no se sustituyen por datos ficticios ni mantienen visibles resultados financieros obsoletos.
+- Vistas de detalle de órdenes y ventas que consultan el documento completo en el backend.
+- Diálogos con navegación por teclado, Escape, foco atrapado/restaurado, etiquetas accesibles, anuncios de error/notificación y confirmaciones para operaciones sensibles.
+- Ajustes responsive y foco visible, incluido el centro de informes, tablas extensas y diálogos en pantallas pequeñas.
+- Refactor de `App.jsx`: dashboard, catálogo de tablas, tablas de compras/ventas, tabla compartida, centro de informes, detalles transaccionales y accesibilidad movidos a módulos por funcionalidad.
 
 ## Fase 4 — Cierre del código fuente y documentación
 
