@@ -114,10 +114,14 @@ function App() {
   }
 
   async function submitProduct(form) {
+    if (!form.categoryId) {
+      setError('Selecciona una categoría. El backend requiere una categoría para registrar el producto.');
+      return;
+    }
     const data = {
       sku: form.sku.trim(),
       name: form.name.trim(),
-      categoryId: form.categoryId || null,
+      categoryId: form.categoryId,
       costPrice: Number(form.costPrice),
       salePrice: Number(form.salePrice),
       description: form.description.trim(),
@@ -335,12 +339,12 @@ function PurchaseTable({rows,onSubmit,onApprove,onCancel,onReceive,loading}) {
     const canCancel=['DRAFT','SUBMITTED','PENDING_APPROVAL','PENDING'].includes(status);
     const tone=['RECEIVED','COMPLETED'].includes(status)?'active':['CANCELLED','REJECTED'].includes(status)?'inactive':'pending';
     return <tr key={pickId(order)||index}>
-      <td><strong>{order.number||order.code||String(pickId(order)).slice(0,12)||'Orden'}</strong></td>
+      <td><strong>{order.orderNumber||order.number||order.code||String(pickId(order)).slice(0,12)||'Orden'}</strong></td>
       <td><span className={'pill '+tone}>{titleCase(status)}</span></td>
       <td>{order.supplierName||order.supplier?.name||'—'}</td>
-      <td>{order.warehouseName||order.warehouse?.name||'—'}</td>
+      <td>{order.warehouseCode||order.warehouseName||order.warehouse?.name||'—'}</td>
       <td>{items.length || order.itemCount || '—'}</td>
-      <td>{date(order.createdAt)}</td>
+      <td>{date(order.orderedAt||order.createdAt)}</td>
       <td><div className="row-actions">
         {canSubmit&&<button className="small-action" disabled={loading} onClick={()=>onSubmit(order)}>Enviar</button>}
         {canApprove&&<button className="small-action" disabled={loading} onClick={()=>onApprove(order)}>Aprobar</button>}
@@ -357,11 +361,11 @@ function SalesTable({rows,loading,onRequestCancel,onApproveCancellation}) {
       const canRequest=['COMPLETED','POSTED'].includes(status);
       const canApprove=status.includes('CANCEL') && !['CANCELLED','CANCELED'].includes(status);
       return <tr key={pickId(sale)||index}>
-        <td><strong>{sale.number||sale.code||String(pickId(sale)).slice(0,12)||'Venta'}</strong></td>
+        <td><strong>{sale.saleNumber||sale.number||sale.code||String(pickId(sale)).slice(0,12)||'Venta'}</strong></td>
         <td><span className={'pill '+(['COMPLETED','POSTED'].includes(status)?'active':['CANCELLED','CANCELED'].includes(status)?'inactive':'pending')}>{titleCase(status)}</span></td>
         <td>{sale.customerName||sale.customer?.name||'Venta de mostrador'}</td>
-        <td>{sale.warehouseName||sale.warehouse?.name||'—'}</td>
-        <td>{date(sale.createdAt)}</td>
+        <td>{sale.warehouseCode||sale.warehouseName||sale.warehouse?.name||'—'}</td>
+        <td>{date(sale.soldAt||sale.createdAt)}</td>
         <td>{money(sale.total)}</td>
         <td><div className="row-actions">
           {canRequest&&<button className="small-action" disabled={loading} onClick={()=>onRequestCancel(sale)}>Solicitar anulación</button>}
