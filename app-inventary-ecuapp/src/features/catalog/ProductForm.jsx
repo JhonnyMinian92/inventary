@@ -130,7 +130,10 @@ export default function ProductForm({ initialValue, categories, loading, onCance
       categoryId,
       attributes: categoryId === current.categoryId ? current.attributes : {}
     }));
-    if (categoryId !== form.categoryId) setAttributesText('{}');
+    if (categoryId !== form.categoryId) {
+      setAttributesText('{}');
+      setAttributesError('');
+    }
   }
 
   function changeAttribute(key, value) {
@@ -141,6 +144,13 @@ export default function ProductForm({ initialValue, categories, loading, onCance
     event.preventDefault();
     if (schemaLoading) return;
     let attributes = form.attributes;
+    if (definitions.length > 0) {
+      attributes = {};
+      for (const definition of definitions) {
+        const value = form.attributes[definition.key];
+        if (value !== undefined && value !== null && value !== '') attributes[definition.key] = value;
+      }
+    }
     if (!form.categoryId || definitions.length === 0) {
       try {
         attributes = JSON.parse(attributesText || '{}');
