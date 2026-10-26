@@ -20,11 +20,17 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 2 — Operación de inventario
 
-- Completar almacenes, proveedores y demás catálogos auxiliares que requiera el flujo.
-- Crear órdenes de compra y cubrir envío, aprobación y recepción de mercancía.
-- Crear ventas transaccionales desde el frontend sin alterar saldos directamente.
-- Consultar saldos y movimientos por almacén, producto y filtros admitidos por la API.
-- Mejorar los formularios operativos para líneas múltiples, estados y errores de negocio.
+**Estado del código fuente: completada en `master`.** Las pruebas de compilación y de negocio siguen aplazadas hasta el cierre de todo el frontend.
+
+- Administrar almacenes, proveedores y clientes mediante las APIs de altas, edición y activación/desactivación.
+- Crear órdenes de compra con múltiples productos; enviar a aprobación, cancelar borradores/órdenes pendientes y registrar recepción parcial o completa por cada línea.
+- Registrar ventas con múltiples artículos, cliente registrado u ocasional, y solicitar/aprobar anulaciones siguiendo la autorización del backend.
+- Consultar saldos y movimientos filtrando por almacén y producto.
+- Gestionar traslados de inventario, con líneas múltiples y flujo de despacho, recepción, cancelación y reversión.
+- Registrar ajustes de stock con dirección, cantidad, motivo obligatorio y costo unitario para entradas.
+- Registrar conteos físicos de varias líneas y contabilizar o cancelar los documentos.
+- Crear y desactivar reglas de reposición y consultar sugerencias de abastecimiento.
+- Centralizar las nuevas rutas bajo el cliente REST, usando claves de idempotencia para operaciones que modifican inventario.
 
 ## Fase 3 — Reportes, accesibilidad y consistencia de producto
 
