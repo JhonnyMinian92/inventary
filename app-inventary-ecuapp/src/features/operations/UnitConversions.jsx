@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, listFrom } from '../../api';
+import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 
 function idOf(item) { return item?.id ?? ''; }
 
@@ -10,6 +11,7 @@ export default function UnitConversions({ units }) {
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ fromUnitId: '', toUnitId: '', factor: '1' });
+  const dialogRef = useAccessibleDialog(modal, () => setModal(false));
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -72,8 +74,8 @@ export default function UnitConversions({ units }) {
     </tbody></table>{!rows.length && <div className="empty-state">{loading ? 'Cargando conversiones…' : 'No hay conversiones configuradas.'}</div>}</div>
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
-      <section className="modal-card">
-        <div className="modal-heading"><h2>Nueva conversión de unidades</h2><button className="icon-button" aria-label="Cerrar" onClick={() => setModal(false)}>×</button></div>
+      <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="unit-conversion-modal-title" tabIndex={-1}>
+        <div className="modal-heading"><h2 id="unit-conversion-modal-title">Nueva conversión de unidades</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setModal(false)}>×</button></div>
         <form className="form-grid" onSubmit={submit}>
           <label className="field"><span>Unidad de origen<b> *</b></span><select required value={form.fromUnitId} onChange={event => setForm(current => ({ ...current, fromUnitId: event.target.value }))}><option value="">Seleccionar unidad</option>{activeUnits.map(unit => <option key={idOf(unit)} value={idOf(unit)}>{unit.name} · {unit.code}</option>)}</select></label>
           <label className="field"><span>Unidad de destino<b> *</b></span><select required value={form.toUnitId} onChange={event => setForm(current => ({ ...current, toUnitId: event.target.value }))}><option value="">Seleccionar unidad</option>{activeUnits.map(unit => <option key={idOf(unit)} value={idOf(unit)}>{unit.name} · {unit.code}</option>)}</select></label>
