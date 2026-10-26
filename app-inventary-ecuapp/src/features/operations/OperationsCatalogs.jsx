@@ -7,7 +7,7 @@ const configs = {
     label: 'Almacenes',
     singular: 'almacén',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 40 },
+      { key: 'code', label: 'Código', required: true, maxLength: 40, pattern: '[A-Za-z0-9][A-Za-z0-9._-]{0,39}' },
       { key: 'name', label: 'Nombre', required: true, maxLength: 140 },
       { key: 'address', label: 'Dirección', maxLength: 500 }
     ],
@@ -24,8 +24,9 @@ const configs = {
       { key: 'code', label: 'Código', required: true, maxLength: 40 },
       { key: 'name', label: 'Nombre comercial', required: true, maxLength: 180 },
       { key: 'taxId', label: 'RUC / identificación tributaria', maxLength: 32 },
-      { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 160 },
-      { key: 'phone', label: 'Teléfono', maxLength: 40 }
+      { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 254 },
+      { key: 'phone', label: 'Teléfono', maxLength: 40 },
+      { key: 'address', label: 'Dirección', maxLength: 500 }
     ],
     list: api.suppliers,
     create: api.createSupplier,
@@ -40,8 +41,9 @@ const configs = {
       { key: 'code', label: 'Código', required: true, maxLength: 40 },
       { key: 'name', label: 'Nombre', required: true, maxLength: 180 },
       { key: 'taxId', label: 'RUC / identificación tributaria', maxLength: 32 },
-      { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 160 },
-      { key: 'phone', label: 'Teléfono', maxLength: 40 }
+      { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 254 },
+      { key: 'phone', label: 'Teléfono', maxLength: 40 },
+      { key: 'address', label: 'Dirección', maxLength: 500 }
     ],
     list: api.customers,
     create: api.createCustomer,
@@ -53,8 +55,8 @@ const configs = {
     label: 'Unidades',
     singular: 'unidad de medida',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 20 },
-      { key: 'name', label: 'Nombre', required: true, maxLength: 80 },
+      { key: 'code', label: 'Código', required: true, maxLength: 24, pattern: '[A-Za-z][A-Za-z0-9_]{0,23}' },
+      { key: 'name', label: 'Nombre', required: true, maxLength: 100 },
       { key: 'dimension', label: 'Dimensión', required: true, options: ['COUNT', 'MASS', 'LENGTH', 'VOLUME', 'AREA', 'TIME', 'OTHER'] },
       { key: 'decimalScale', label: 'Decimales permitidos', required: true, type: 'number', min: 0, max: 3 }
     ],
@@ -208,7 +210,7 @@ export default function OperationsCatalogs({ onChanged }) {
             <span>{field.label}{field.required && <b> *</b>}</span>
             {field.options
               ? <select required={Boolean(field.required)} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}><option value="">Seleccionar</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
-              : <input required={Boolean(field.required)} type={field.type || 'text'} min={field.min} max={field.max} maxLength={field.maxLength} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />}
+              : <input required={Boolean(field.required)} type={field.type || 'text'} min={field.min} max={field.max} maxLength={field.maxLength} pattern={field.pattern} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />}
           </label>)}
           {kind === 'units' && editing && <label className="field"><span>Estado</span><select value={form.active || 'true'} onChange={event => setForm(current => ({ ...current, active: event.target.value }))}><option value="true">Activa</option><option value="false">Inactiva</option></select></label>}
           {error && <div className="alert error wide">{error}</div>}
