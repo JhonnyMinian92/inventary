@@ -86,6 +86,7 @@ export const api = {
   balance: (productId, warehouseId) => request(`/inventory/balances/${encodeURIComponent(productId)}/${encodeURIComponent(warehouseId)}`),
   movements: (params = {}) => request(`/inventory/movements${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   inventoryBalanceReport: params => request(`/reports/inventory-balance?${new URLSearchParams(params)}`),
+  inventoryValuationReport: (params = {}) => request(`/reports/valuation${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   purchaseOrders: (params = {}) => request(`/purchase-orders${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   purchaseOrder: id => request(`/purchase-orders/${encodeURIComponent(id)}`),
   cancelPurchaseOrder: id => request(`/purchase-orders/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
