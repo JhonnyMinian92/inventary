@@ -89,8 +89,6 @@ export default function ProductForm({ initialValue, categories, units = [], load
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState('');
-  const [attributesError, setAttributesError] = useState('');
-  const [attributesText, setAttributesText] = useState(() => JSON.stringify(objectValue(initialValue?.attributes), null, 2));
 
   useEffect(() => {
     const categoryId = form.categoryId;
@@ -132,10 +130,6 @@ export default function ProductForm({ initialValue, categories, units = [], load
       categoryId,
       attributes: categoryId === current.categoryId ? current.attributes : {}
     }));
-    if (categoryId !== form.categoryId) {
-      setAttributesText('{}');
-      setAttributesError('');
-    }
   }
 
   function changeAttribute(key, value) {
@@ -145,30 +139,22 @@ export default function ProductForm({ initialValue, categories, units = [], load
   function handleSubmit(event) {
     event.preventDefault();
     if (schemaLoading) return;
-    let attributes = form.attributes;
+    if (!form.categoryId) {
+      onError?.('Selecciona una categoría para crear o actualizar el producto.');
+      return;
+    }
+    if (schemaError) {
+      onError?.('No se puede guardar hasta cargar correctamente las propiedades de la categoría.');
+      return;
+    }
+
+    let attributes = null;
     if (definitions.length > 0) {
       attributes = {};
       for (const definition of definitions) {
         const value = form.attributes[definition.key];
         if (value !== undefined && value !== null && value !== '') attributes[definition.key] = value;
       }
-    }
-    if (!form.categoryId || definitions.length === 0) {
-      try {
-        attributes = JSON.parse(attributesText || '{}');
-      } catch {
-        setAttributesError('Las propiedades deben contener un objeto JSON válido.');
-        return;
-      }
-      if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) {
-        setAttributesError('Las propiedades del producto deben ser un objeto JSON.');
-        return;
-      }
-      setAttributesError('');
-    }
-    if (schemaError && form.categoryId) {
-      onError?.('No se puede guardar hasta cargar el esquema de la categoría correctamente.');
-      return;
     }
     onSubmit({ ...form, attributes });
   }
@@ -225,16 +211,10 @@ export default function ProductForm({ initialValue, categories, units = [], load
     {!schemaLoading && !schemaError && definitions.map(definition =>
       <AttributeInput key={definition.key} definition={definition} value={form.attributes[definition.key]} onChange={changeAttribute} />
     )}
-    {!schemaLoading && !schemaError && definitions.length === 0 &&
-      <label className="field wide">
-        <span>Propiedades adicionales (objeto JSON)</span>
-        <textarea rows="4" spellCheck="false" value={attributesText} onChange={event => { setAttributesText(event.target.value); setAttributesError(''); }} />
-        <small className="field-help">Usa un objeto JSON, por ejemplo: {"{\"color\":\"Negro\",\"garantiaMeses\":12}"}.</small>
-      </label>
+    {!schemaLoading && !schemaError && form.categoryId && definitions.length === 0 &&
+      <p className="form-hint wide">Esta categoría todavía no tiene propiedades definidas. Para capturar campos como talla, color o material, configúralos primero en Categorías; el producto se guardará sin propiedades adicionales.</p>
     }
-    {attributesError && <div className="alert error wide">{attributesError}</div>}
     {schemaError && <div className="alert error wide">{schemaError}</div>}
-    {schemaError && form.categoryId && <button type="button" className="button secondary wide" onClick={() => changeCategory('')}>Quitar categoría y editar propiedades manualmente</button>}
     <div className="form-actions wide">
       <button type="button" className="button secondary" onClick={onCancel}>Cancelar</button>
       <button className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>
