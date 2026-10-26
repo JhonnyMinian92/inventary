@@ -6,8 +6,8 @@ const configs = {
     label: 'Almacenes',
     singular: 'almacén',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 60 },
-      { key: 'name', label: 'Nombre', required: true, maxLength: 160 },
+      { key: 'code', label: 'Código', required: true, maxLength: 40 },
+      { key: 'name', label: 'Nombre', required: true, maxLength: 140 },
       { key: 'address', label: 'Dirección', maxLength: 500 }
     ],
     list: api.warehouses,
@@ -20,8 +20,8 @@ const configs = {
     label: 'Proveedores',
     singular: 'proveedor',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 60 },
-      { key: 'name', label: 'Nombre comercial', required: true, maxLength: 160 },
+      { key: 'code', label: 'Código', required: true, maxLength: 40 },
+      { key: 'name', label: 'Nombre comercial', required: true, maxLength: 180 },
       { key: 'taxId', label: 'RUC / identificación tributaria', maxLength: 32 },
       { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 160 },
       { key: 'phone', label: 'Teléfono', maxLength: 40 }
@@ -36,8 +36,8 @@ const configs = {
     label: 'Clientes',
     singular: 'cliente',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 60 },
-      { key: 'name', label: 'Nombre', required: true, maxLength: 160 },
+      { key: 'code', label: 'Código', required: true, maxLength: 40 },
+      { key: 'name', label: 'Nombre', required: true, maxLength: 180 },
       { key: 'taxId', label: 'RUC / identificación tributaria', maxLength: 32 },
       { key: 'email', label: 'Correo electrónico', type: 'email', maxLength: 160 },
       { key: 'phone', label: 'Teléfono', maxLength: 40 }
@@ -55,7 +55,7 @@ const configs = {
       { key: 'code', label: 'Código', required: true, maxLength: 20 },
       { key: 'name', label: 'Nombre', required: true, maxLength: 80 },
       { key: 'dimension', label: 'Dimensión', required: true, options: ['COUNT', 'MASS', 'LENGTH', 'VOLUME', 'AREA', 'TIME', 'OTHER'] },
-      { key: 'decimalScale', label: 'Decimales permitidos', required: true, type: 'number', min: 0, max: 6 }
+      { key: 'decimalScale', label: 'Decimales permitidos', required: true, type: 'number', min: 0, max: 3 }
     ],
     list: api.units,
     create: api.createUnit,
@@ -127,8 +127,8 @@ export default function OperationsCatalogs({ onChanged }) {
     let payload;
     if (kind === 'units') {
       const decimalScale = Number(form.decimalScale);
-      if (!Number.isInteger(decimalScale) || decimalScale < 0 || decimalScale > 6) {
-        setError('La escala decimal debe ser un entero entre 0 y 6.');
+      if (!Number.isInteger(decimalScale) || decimalScale < 0 || decimalScale > 3) {
+        setError('La escala decimal debe ser un entero entre 0 y 3.');
         return;
       }
       payload = editing
