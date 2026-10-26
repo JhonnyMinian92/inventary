@@ -78,6 +78,7 @@ export const api = {
   activateCustomer: id => request(`/customers/${encodeURIComponent(id)}/activate`, { method: 'POST' }),
   deactivateCustomer: id => request(`/customers/${encodeURIComponent(id)}/deactivate`, { method: 'POST' }),
   balances: (params = {}) => request(`/inventory/balances${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
+  createInventoryAdjustment: data => request('/inventory/adjustments', { method: 'POST', body: data, idempotent: true }),
   balance: (productId, warehouseId) => request(`/inventory/balances/${encodeURIComponent(productId)}/${encodeURIComponent(warehouseId)}`),
   movements: (params = {}) => request(`/inventory/movements${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   inventoryBalanceReport: params => request(`/reports/inventory-balance?${new URLSearchParams(params)}`),
