@@ -59,7 +59,7 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
             </select>
           </label>
           <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
-          <label className="field"><span>Costo unitario<b> *</b></span><input type="number" min="0" step="0.0001" required value={line.unitCost} onChange={event => updateLine(index, 'unitCost', event.target.value)} /></label>
+          <label className="field"><span>Costo unitario<b> *</b></span><input type="number" min="0" step="0.01" required value={line.unitCost} onChange={event => updateLine(index, 'unitCost', event.target.value)} /></label>
         </div>
         <div className="line-editor-foot"><span>{product ? 'SKU: ' + (product.sku || product.code || '—') : 'Selecciona el producto'}</span><strong>{money(lineTotal)}</strong></div>
       </section>;
