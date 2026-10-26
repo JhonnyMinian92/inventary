@@ -4,6 +4,8 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 1 — Fundación y catálogo
 
+**Estado del código fuente: completada en `master`.** La compilación y las pruebas quedan pendientes deliberadamente hasta que se complete el 100 % del frontend.
+
 - Mantener React + Vite como única aplicación web.
 - Centralizar las llamadas REST, autorización Bearer, errores e idempotencia en **src/api.js**.
 - Completar el inicio de sesión y el marco común de navegación.
