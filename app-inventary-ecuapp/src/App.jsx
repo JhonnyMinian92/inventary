@@ -133,9 +133,9 @@ function App() {
       categoryId: form.categoryId,
       costPrice: Number(form.costPrice),
       salePrice: Number(form.salePrice),
-      description: form.description.trim(),
-      attributes: form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes) ? form.attributes : {}
+      description: form.description.trim()
     };
+    if (form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes)) data.attributes = form.attributes;
     if (form.unitOfMeasureId) data.unitOfMeasureId = form.unitOfMeasureId;
     if (!Number.isFinite(data.costPrice) || data.costPrice < 0 || !Number.isFinite(data.salePrice) || data.salePrice < 0) {
       setError('El costo y el precio de venta deben ser números válidos no negativos.');
