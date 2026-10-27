@@ -43,9 +43,16 @@ services:
       REPORTS_TIME_ZONE: ${REPORTS_TIME_ZONE:-America/Guayaquil}
       PURCHASING_REQUIRE_DISTINCT_APPROVER: ${PURCHASING_REQUIRE_DISTINCT_APPROVER:-true}
       MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      MEDIA_STORAGE_PATH: ${MEDIA_STORAGE_PATH:-/data/product-images}
+      MEDIA_MAX_FILE_SIZE: ${MEDIA_MAX_FILE_SIZE:-5MB}
+      MEDIA_MAX_REQUEST_SIZE: ${MEDIA_MAX_REQUEST_SIZE:-6MB}
+      MEDIA_MAX_UPLOAD_BYTES: ${MEDIA_MAX_UPLOAD_BYTES:-5242880}
       FORWARD_HEADERS_STRATEGY: ${FORWARD_HEADERS_STRATEGY:-none}
+    volumes:
+      - inventary-media-data:/data/product-images
     ports:
       - "${API_PORT:-8080}:8080"
     restart: unless-stopped
 volumes:
   inventary-postgres-data:
+  inventary-media-data:
