@@ -244,7 +244,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
     }
     {schemaError && <div className="alert error wide">{schemaError}</div>}
     <div className="form-actions wide">
-      <button type="button" className="button secondary" onClick={onCancel}>Cancelar</button>
+      <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
       <button className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>
     </div>
   </form>;
