@@ -54,6 +54,14 @@ class CatalogApiTest extends ApiTestSupport {
             422, "BUSINESS_RULE_VIOLATION");
         assertTrue(httpGet(token("VENDEDOR"), "/api/v1/catalog/unit-conversions", 200).toString().contains(conv.get("id").asText()));
 
+        JsonNode unusedUnit = httpPost(admin, "/api/v1/catalog/units",
+            Map.of("code", "DEL" + suffix().substring(0, 6), "name", "Unidad temporal", "dimension", "LENGTH", "decimalScale", 3), 201);
+        String unusedUnitId = unusedUnit.get("id").asText();
+        httpPut(admin, "/api/v1/catalog/units/" + unusedUnitId, Map.of("name", "Unidad temporal", "decimalScale", 3, "active", false), 200);
+        httpDelete(admin, "/api/v1/catalog/units/" + unusedUnitId, 204);
+        assertFalse(httpGet(admin, "/api/v1/catalog/units?active=false", 200).toString().contains(unusedUnitId));
+
+
         problem(call(put("/api/v1/catalog/units/00000000-0000-0000-0000-000000000001"), admin, Map.of("name", "Unidad", "decimalScale", 3, "active", false)),
             422, "BUSINESS_RULE_VIOLATION");
         JsonNode cat = category();
@@ -171,6 +179,38 @@ class CatalogApiTest extends ApiTestSupport {
         httpPost(admin, "/api/v1/catalog/categories/" + categoryId + "/deactivate", null, 204);
         assertFalse(httpGet(admin, "/api/v1/catalog/products/" + productId, 200).get("active").asBoolean());
         assertFalse(httpGet(admin, "/api/v1/catalog/categories/" + categoryId, 200).get("active").asBoolean());
+    }
+
+    @Test
+    void physicalDeletionOnlyAllowsInactiveUnusedProductsAndCategories() {
+        String admin = admin();
+
+        JsonNode removableProduct = product("1.00", "2.00");
+        String removableProductId = removableProduct.get("id").asText();
+        httpPost(admin, "/api/v1/catalog/products/" + removableProductId + "/deactivate", null, 204);
+        httpDelete(admin, "/api/v1/catalog/products/" + removableProductId, 204);
+        problem(call(get("/api/v1/catalog/products/" + removableProductId), admin, null), 404, "RESOURCE_NOT_FOUND");
+
+        JsonNode movedProduct = product("1.00", "2.00");
+        String movedProductId = movedProduct.get("id").asText();
+        String warehouseId = warehouse().get("id").asText();
+        stock(movedProductId, warehouseId, "1", "1.00");
+        adjust(movedProductId, warehouseId, "DECREASE", "1", null);
+        httpPost(admin, "/api/v1/catalog/products/" + movedProductId + "/deactivate", null, 204);
+        problem(call(delete("/api/v1/catalog/products/" + movedProductId), admin, null), 409, "CONFLICT");
+        assertFalse(httpGet(admin, "/api/v1/catalog/products/" + movedProductId, 200).get("active").asBoolean());
+
+        JsonNode removableCategory = category();
+        String categoryId = removableCategory.get("id").asText();
+        httpPost(admin, "/api/v1/catalog/categories/" + categoryId + "/deactivate", null, 204);
+        httpDelete(admin, "/api/v1/catalog/categories/" + categoryId, 204);
+        problem(call(get("/api/v1/catalog/categories/" + categoryId), admin, null), 404, "RESOURCE_NOT_FOUND");
+
+        JsonNode usedCategory = category();
+        String usedCategoryId = usedCategory.get("id").asText();
+        product(usedCategoryId, "1.00", "2.00");
+        httpPost(admin, "/api/v1/catalog/categories/" + usedCategoryId + "/deactivate", null, 204);
+        problem(call(delete("/api/v1/catalog/categories/" + usedCategoryId), admin, null), 409, "CONFLICT");
     }
 
     @Test
