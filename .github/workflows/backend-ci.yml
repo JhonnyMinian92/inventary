@@ -115,6 +115,12 @@ jobs:
           exit 1
       - name: Clean up Docker Compose smoke-test resources
         if: always()
+        env:
+          DB_USERNAME: ci-postgres
+          DB_PASSWORD: ci-only-compose-password
+          JWT_SECRET: ci-only-jwt-secret-key-at-least-32-bytes
+          POSTGRES_PORT: "55432"
+          API_PORT: "18080"
         run: docker compose down --volumes --remove-orphans
       - name: Upload test reports
         if: always()
