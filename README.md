@@ -39,14 +39,14 @@ Un sistema monolítico con columnas fijas en base de datos es obsoleto y genera 
 * **Prevención de Sobrecarga:** Implementación de *Rate Limiting* (límite de peticiones) en los API Gateways/Controllers para evitar ataques DDoS o fuerza bruta.
 * **Aislamiento de Fallos (Circuit Breakers):** En la arquitectura de microservicios, si el servicio de auditoría cae, el servicio de ventas almacenará temporalmente los logs en una cola (ej. RabbitMQ/Kafka) para no detener la facturación.
 * **Seguridad a Nivel de Base de Datos:** Las consultas utilizarán *Prepared Statements* (vía Hibernate) anulando la posibilidad de Inyección SQL.
-* **Validación Estricta (Fail-Fast):** Validaciones de DTOs en la capa de entrada (Spring Validation) y validación reactiva en el Frontend (Angular Strict Typed Forms) para rechazar datos corruptos antes de que consuman recursos.
+* **Validación Estricta (Fail-Fast):** Validaciones de DTOs en la entrada del backend (Spring Validation) y validaciones de formularios controlados en React para detectar datos incompletos antes de enviar una petición. El backend mantiene la validación autoritativa.
 
 ### Cómo el sistema protegerá a cada usuario (Privacidad y Aislamiento)
 
 * **Autenticación Stateless Segura:** Para el MVP, JWT firmado con HS256 y secreto `JWT_SECRET` obligatorio por entorno, con expiración configurada y validación en endpoints privados. La integración OIDC y la firma asimétrica RS256 quedan como evolución explícita, no como capacidad implementada por defecto.
-* **Principio de Mínimo Privilegio (RBAC):** Las vistas del frontend y los endpoints del backend se bloquean según el rol del usuario.
-* **Enmascaramiento de Datos:** Los usuarios sin permisos administrativos no podrán ver los márgenes de ganancia (costo de compra vs precio de venta), solo el precio de venta final.
-* **Sanitización:** Prevención de ataques XSS (Cross-Site Scripting) delegando la sanitización al motor de plantillas de Angular.
+* **Principio de Mínimo Privilegio (RBAC):** El backend aplica la autorización en cada endpoint. El frontend gestiona los estados 401/403 y evita asumir que ocultar un control equivale a autorización.
+* **Enmascaramiento de Datos:** Los DTOs y permisos del backend gobiernan la exposición de costos e informes financieros; el frontend solo debe presentar los campos autorizados que devuelve la API.
+* **Renderizado seguro:** React escapa el texto renderizado de forma predeterminada. Los componentes no deben introducir HTML no confiable con dangerouslySetInnerHTML; la validación del backend sigue siendo obligatoria.
 
 ---
 
@@ -69,7 +69,7 @@ Para evitar el "código espagueti" y asegurar la escalabilidad, se aplicará **C
 ### Patrones de Diseño Clave:
 
 * **CQRS (Command Query Responsibility Segregation):** Separar las operaciones de lectura (ej. buscar productos) de las de escritura (ej. registrar una venta). Esto permite optimizar las búsquedas y proteger las transacciones.
-* **Facade Pattern (Frontend):** En Angular, los componentes no llamarán directamente al `HttpClient`. Pasarán por una Capa Facade (Servicios de Estado) que orquesta las llamadas y actualiza las Signals.
+* **Cliente REST centralizado (Frontend):** Los módulos React utilizan `src/api.js` para centralizar la base URL, autenticación Bearer, errores HTTP y claves de idempotencia; los componentes no implementan peticiones fetch por su cuenta.
 * **Strategy Pattern (Backend):** Para aplicar diferentes algoritmos de cálculo de precios o descuentos sin llenar el código de múltiples `if/else`.
 * **Entity-Attribute-Value (EAV) vs JSONB:** En lugar del antipatrón relacional EAV para productos dinámicos, se usará el tipo de dato nativo `JSONB` de PostgreSQL.
 * *Justificación Postgres:* Permite guardar cualquier estructura JSON (ej. `{"talla":"M", "color":"Rojo"}`) en una columna del producto e indexarla con un índice **GIN**. Esto otorga la flexibilidad de NoSQL con la consistencia transaccional (ACID) de SQL.
@@ -82,56 +82,56 @@ Para evitar el "código espagueti" y asegurar la escalabilidad, se aplicará **C
 
 ### Frontend: `app-inventary-ecuapp` (React + Vite)
 
-Frontend SPA implementado con React y Vite, con cliente REST centralizado, componentes por dominio, formularios controlados y estilos responsive. La implementación vigente está en `app-inventary-ecuapp/src/` y se documenta en `app-inventary-ecuapp/README.md`.
+Frontend SPA implementado con React y Vite. La estructura que existe actualmente en el repositorio es:
 
 ```text
 app-inventary-ecuapp/
-├── src/
-│   ├── app/
-│   │   ├── core/                  # Singleton services, guards, interceptors, tokens
-│   │   │   ├── auth/              # JWT interceptor, Auth guard
-│   │   │   └── http/              # Error handling interceptor
-│   │   ├── shared/                # UI components reutilizables (Botones, Tablas, Modales)
-│   │   │   ├── components/
-│   │   │   └── ui-kit/            # Componentes puramente presentacionales (Dumb components)
-│   │   ├── features/              # Dominios de la aplicación (Smart components)
-│   │   │   ├── products/          # Catálogo, atributos dinámicos
-│   │   │   ├── purchases/         # Módulo de ingresos y proveedores
-│   │   │   ├── sales/             # Módulo de salidas, facturación, POS
-│   │   │   ├── audit/             # Visor de trazabilidad
-│   │   │   └── users/             # Gestión de RBAC
-│   │   ├── layout/                # Sidebar, Topbar, Footer
-│   │   └── app.routes.ts          # Configuración de Lazy Loading por feature
-│   ├── environments/
-│   └── styles/                    # Tailwind CSS o SCSS global
-
+├── .env.example
+├── .nvmrc
+├── package.json
+├── README.md
+├── docs/
+│   ├── api-coverage.md
+│   ├── frontend-roadmap.md
+│   └── troubleshooting.md
+└── src/
+    ├── api.js
+    ├── App.jsx
+    ├── main.jsx
+    ├── styles.css
+    ├── components/
+    │   ├── DataTable.jsx
+    │   └── TransactionDetails.jsx
+    ├── hooks/
+    │   └── useAccessibleDialog.js
+    └── features/
+        ├── catalog/
+        │   ├── CatalogTables.jsx
+        │   ├── CategoryForm.jsx
+        │   └── ProductForm.jsx
+        ├── dashboard/
+        │   └── Overview.jsx
+        ├── inventory/
+        │   └── InventoryOperations.jsx
+        ├── operations/
+        │   ├── OperationsCatalogs.jsx
+        │   └── UnitConversions.jsx
+        ├── purchasing/
+        │   ├── PurchaseForm.jsx
+        │   ├── PurchaseReturns.jsx
+        │   ├── PurchaseTable.jsx
+        │   └── ReceiptForm.jsx
+        ├── reports/
+        │   └── ReportsCenter.jsx
+        └── sales/
+            ├── SaleForm.jsx
+            ├── SalesReturns.jsx
+            └── SalesTable.jsx
 ```
 
 ### Backend: `microservices-inventary-ecuapp` (Java Spring Boot)
 
-Estructura basada en Arquitectura Hexagonal. Aunque inicie como un monolito modular, esta separación permite extraer dominios a microservicios independientes (ej. separar Ventas de Auditoría) en el futuro mediante contenedores Docker.
-
-```text
-microservices-inventary-ecuapp/
-├── inventory-service/             # Dominio principal (Microservicio o Módulo)
-│   ├── src/main/java/com/ecuapp/inventory/
-│   │   ├── application/           # Casos de uso (Servicios de Aplicación). Lógica de orquestación.
-│   │   │   ├── port/              # Puertos (Interfaces). Ej: ProductRepositoryPort
-│   │   │   └── usecase/           # Implementación de las operaciones del negocio.
-│   │   ├── domain/                # Modelos de negocio puros, libres de frameworks. (Clean Code)
-│   │   │   ├── model/             # Entidades de dominio (Product, Sale, Purchase)
-│   │   │   └── exception/         # Excepciones de negocio (ej. InsufficientStockException)
-│   │   ├── infrastructure/        # Adaptadores tecnológicos (Base de datos, API, Seguridad)
-│   │   │   ├── adapter/
-│   │   │   │   ├── in/            # Adaptadores de Entrada (REST Controllers, WebSockets)
-│   │   │   │   │   └── web/       # Endpoints protegidos por @PreAuthorize
-│   │   │   │   └── out/           # Adaptadores de Salida (Bases de datos, APIs externas)
-│   │   │   │       └── persistence/# JPA Repositories, Entities (@Entity), Mappers
-│   │   │   └── config/            # Configuraciones de Spring (Security, Beans, OpenAPI)
-├── audit-service/                 # (Opcional a futuro) Microservicio independiente para logs
-└── api-gateway/                   # (Opcional a futuro) Enrutamiento, Rate Limiting, Filtros JWT
-
-```
+El backend Spring Boot mantiene los módulos y controladores bajo `src/main/java/com/ecuapp/inventary/`. Los dominios identificados incluyen autenticación, catálogo, inventario, almacenes, contrapartes, compras, ventas, devoluciones, traslados, reportes, auditoría, GraphQL, medios e integraciones. La matriz de rutas REST consumidas por el frontend está en `app-inventary-ecuapp/docs/api-coverage.md`.
 
 ## 7. Conclusión del Diseño
 
