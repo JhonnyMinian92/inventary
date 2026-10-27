@@ -25,6 +25,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -127,6 +128,22 @@ public class ProductService implements ProductUseCases {
    throw new ConflictException("No se puede desactivar un producto incluido en un conteo abierto. Contabilice o cancele el conteo primero.");
   p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));
  }
+ @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
+ public void deleteProduct(UUID id,String actor){
+  Product p=products.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));
+  if(p.isActive())throw new ConflictException("Desactive el producto antes de intentar su eliminación física.");
+  if(balances.hasPhysicalStock(id)||balances.existsByProductId(id)||movements.existsByProductId(id))
+   throw new ConflictException("No se puede eliminar físicamente un producto con saldos o movimientos de inventario.");
+  if(variants.existsByProductId(id)||images.existsByProductId(id))
+   throw new ConflictException("No se puede eliminar físicamente un producto con variantes o imágenes asociadas.");
+  try {
+   products.deleteAndFlush(p);
+  } catch(DataIntegrityViolationException ex) {
+   throw new ConflictException("El producto conserva referencias o historial transaccional; use la desactivación lógica.");
+  }
+  audit.record(actor,"PRODUCT_DELETED","PRODUCT",id,Map.of("sku",p.getSku()));
+ }
+
  @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public void activateProduct(UUID id,String actor){
   Product p=require(id);
