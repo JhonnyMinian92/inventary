@@ -195,7 +195,8 @@ function App() {
     };
     if (form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes)) data.attributes = form.attributes;
     if (form.unitOfMeasureId) data.unitOfMeasureId = form.unitOfMeasureId;
-    if (!Number.isFinite(data.costPrice) || data.costPrice < 0 || !Number.isFinite(data.salePrice) || data.salePrice < 0) {
+    if (String(form.costPrice ?? '').trim() === '' || String(form.salePrice ?? '').trim() === '' ||
+        !Number.isFinite(data.costPrice) || data.costPrice < 0 || !Number.isFinite(data.salePrice) || data.salePrice < 0) {
       setError('El costo y el precio de venta deben ser números válidos no negativos.');
       return;
     }
@@ -434,11 +435,11 @@ function App() {
     {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta',confirmPurchaseCancel:'Confirmar cancelación de compra',confirmStatusChange:statusChangeTarget ? (statusChangeTarget.activate ? 'Confirmar activación' : 'Confirmar desactivación') : 'Confirmar cambio de estado',purchaseDetail:'Detalle de orden de compra',saleDetail:'Detalle de venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); if (modal === 'confirmPurchaseCancel') setPurchaseToCancel(null); if (modal === 'confirmStatusChange') setStatusChangeTarget(null); if (modal === 'purchaseDetail') setPurchaseDetail(null); if (modal === 'saleDetail') setSaleDetail(null); }}><>
       {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
       {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitCategory} onError={setError}/>}
-      {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={() => setModal('')} onSubmit={submitPurchase}/>}
+      {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={() => setModal('')} onSubmit={submitPurchase} onError={setError}/>}
       {modal === 'purchaseDetail' && purchaseDetail && <PurchaseOrderDetail order={purchaseDetail}/>}
       {modal === 'saleDetail' && saleDetail && <SaleDetail sale={saleDetail}/>}
       {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={() => { setModal(''); setSelectedOrder(null); }} onSubmit={submitReceipt}/>}
-      {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={() => setModal('')} onSubmit={submitSale}/>}
+      {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={() => setModal('')} onSubmit={submitSale} onError={setError}/>}
       {modal === 'confirmStatusChange' && statusChangeTarget && <form className="form-grid" onSubmit={confirmStatusChange}>
         <div className="alert warning wide" role="alert"><CircleAlert size={18}/><span>¿Confirmas que deseas {statusChangeTarget.activate ? 'activar' : 'desactivar'} el {statusChangeTarget.kind === 'product' ? 'producto' : 'categoría'} <strong>{statusChangeTarget.item.name || statusChangeTarget.item.sku || pickId(statusChangeTarget.item)}</strong>?</span></div>
         <p className="form-hint wide">{statusChangeTarget.activate ? 'El registro volverá a estar disponible según las reglas del backend.' : 'No se borran movimientos ni documentos históricos. Las operaciones futuras que requieran este registro podrán ser rechazadas.'}</p>
