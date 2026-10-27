@@ -1,21 +1,29 @@
-name: Frontend Build (manual after source completion)
+name: Frontend Build
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - "app-inventary-ecuapp/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "app-inventary-ecuapp/**"
+      - ".github/workflows/frontend-ci.yml"
   workflow_dispatch:
-    inputs:
-      confirm_source_complete:
-        description: "Marca esta opción solo cuando el 100% del código fuente esté completo."
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: frontend-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    if: inputs.confirm_source_complete == true
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: app-inventary-ecuapp
@@ -24,5 +32,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: npm run build
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build production frontend
+        run: npm run build
