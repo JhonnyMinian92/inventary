@@ -17,4 +17,5 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant,U
  @EntityGraph(attributePaths={"unitOfMeasure","product"})
  List<ProductVariant> findByProductIdAndActiveTrue(UUID productId);
  boolean existsByUnitOfMeasureIdAndActiveTrue(UUID unitOfMeasureId);
+ boolean existsByProductId(UUID productId);
 }
