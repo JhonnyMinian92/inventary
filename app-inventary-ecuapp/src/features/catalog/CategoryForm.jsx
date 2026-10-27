@@ -112,6 +112,14 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
         setValidationMessage('Cada propiedad debe tener una clave y un nombre visible.');
         return;
       }
+      if (!/^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(row.key.trim())) {
+        setValidationMessage('La clave técnica debe empezar por una letra y usar letras, números, guion o guion bajo (máximo 80 caracteres).');
+        return;
+      }
+      if (row.displayName.trim().length > 120) {
+        setValidationMessage('El nombre visible de cada propiedad debe tener como máximo 120 caracteres.');
+        return;
+      }
       if (row.valueType === 'ENUM') {
         const options = row.optionsText.split(/[\\n,]/).map(value => value.trim()).filter(Boolean);
         if (!options.length) {
