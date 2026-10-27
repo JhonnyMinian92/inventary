@@ -25,21 +25,25 @@ public class ReorderService {
  @Transactional(readOnly=true) public List<ReorderDtos.Suggestion> suggestions(){
   List<ReorderDtos.Suggestion> result=new ArrayList<>();
   for(ReorderRule rule:rules.findByActiveTrue()){
-   BigDecimal available=balances.findByProductIdAndWarehouseId(rule.getProduct().getId(),rule.getWarehouse().getId()).map(StockBalance::available).orElse(BigDecimal.ZERO.setScale(3));
+   Product product=rule.getProduct();Warehouse warehouse=rule.getWarehouse();BusinessPartner preferred=rule.getPreferredSupplier();
+   if(!product.isActive()||!product.getCategory().isActive()||product.getKind()!=ProductKind.STOCKED_GOOD||!warehouse.isActive()
+      ||(preferred!=null&&!preferred.isActive()))continue;
+   BigDecimal available=balances.findByProductIdAndWarehouseId(product.getId(),warehouse.getId()).map(StockBalance::available).orElse(BigDecimal.ZERO.setScale(3));
    if(available.compareTo(rule.getMinimumQuantity())<=0){
     BigDecimal suggestion=rule.getTargetQuantity().subtract(available).max(BigDecimal.ZERO).setScale(3,RoundingMode.HALF_UP);
-    result.add(new ReorderDtos.Suggestion(rule.getProduct().getId(),rule.getProduct().getSku(),rule.getProduct().getName(),rule.getWarehouse().getId(),
-     rule.getWarehouse().getCode(),available,rule.getMinimumQuantity(),rule.getTargetQuantity(),suggestion,rule.getLeadTimeDays(),
-     rule.getPreferredSupplier()==null?null:rule.getPreferredSupplier().getId(),rule.getPreferredSupplier()==null?null:rule.getPreferredSupplier().getName()));
+    result.add(new ReorderDtos.Suggestion(product.getId(),product.getSku(),product.getName(),warehouse.getId(),
+     warehouse.getCode(),available,rule.getMinimumQuantity(),rule.getTargetQuantity(),suggestion,rule.getLeadTimeDays(),
+     preferred==null?null:preferred.getId(),preferred==null?null:preferred.getName()));
    }
   }
   return result;
  }
  @Transactional public ReorderDtos.View create(ReorderDtos.WriteRequest r,String actor){
   if(r.targetQuantity().compareTo(r.minimumQuantity())<0)throw new BusinessRuleException("La cantidad objetivo debe ser igual o superior al mínimo.");
-  Product product=products.findById(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
-  Warehouse warehouse=warehouses.findById(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
-  if(!product.isActive()||!warehouse.isActive())throw new BusinessRuleException("El producto y almacén deben estar activos.");
+  Product product=products.findForUpdate(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
+  Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
+  if(!product.isActive()||!product.getCategory().isActive()||!warehouse.isActive())throw new BusinessRuleException("El producto, su categoría y el almacén deben estar activos.");
+  if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos físicos con control de stock admiten reglas de reposición.");
   if(rules.existsByProductIdAndWarehouseId(product.getId(),warehouse.getId()))throw new ConflictException("Ya existe una regla de reposición para ese producto y almacén.");
   BusinessPartner supplier=supplier(r.preferredSupplierId());
   ReorderRule rule=rules.saveAndFlush(new ReorderRule(product,warehouse,scale(r.minimumQuantity()),scale(r.targetQuantity()),r.leadTimeDays(),supplier));
