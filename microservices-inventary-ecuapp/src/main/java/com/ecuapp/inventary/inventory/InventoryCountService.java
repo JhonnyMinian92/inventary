@@ -117,7 +117,7 @@ public class InventoryCountService {
         for (InventoryCountDtos.LineRequest item : ordered) {
             Product product = products.findForUpdate(item.productId())
                 .orElseThrow(() -> new ResourceNotFoundException("Producto", item.productId()));
-            if (!product.isActive()) throw new BusinessRuleException("No se puede contar un producto inactivo.");
+            // Physical counts remain available after a stocked product is deactivated.
             if (product.getKind() != ProductKind.STOCKED_GOOD) {
                 throw new BusinessRuleException("Solo los productos con control físico admiten conteos de inventario.");
             }
