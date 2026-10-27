@@ -56,6 +56,26 @@ function readWorkflowFromUrl() {
   return '';
 }
 
+function readSecondaryWorkflowFromUrl() {
+  const parts = routeSegmentsFromUrl();
+  if (parts[0] === 'inventory' && parts[2] === 'new' && ['transfer', 'count', 'adjustment', 'reorder'].includes(parts[1])) return `inventory-${parts[1]}`;
+  if (parts[0] === 'purchases' && parts[1] === 'returns' && parts[2] === 'new') return 'purchase-return';
+  if (parts[0] === 'sales' && parts[1] === 'returns' && parts[2] === 'new') return 'sales-return';
+  return '';
+}
+
+function secondaryWorkflowHash(workflow) {
+  const routes = {
+    'inventory-transfer': '#/inventory/transfer/new',
+    'inventory-count': '#/inventory/count/new',
+    'inventory-adjustment': '#/inventory/adjustment/new',
+    'inventory-reorder': '#/inventory/reorder/new',
+    'purchase-return': '#/purchases/returns/new',
+    'sales-return': '#/sales/returns/new'
+  };
+  return routes[workflow] || '#/overview';
+}
+
 function readWorkflowEntityId() {
   const parts = routeSegmentsFromUrl();
   const isReceive = parts[0] === 'purchases' && parts.length >= 3 && parts[2] === 'receive';
@@ -163,12 +183,13 @@ function App() {
     const syncSectionFromUrl = () => {
       const nextSection = readSectionFromUrl();
       const nextWorkflow = readWorkflowFromUrl();
+      const nextSecondaryWorkflow = readSecondaryWorkflowFromUrl();
       const nextEntityId = readWorkflowEntityId();
       setSection(nextSection);
       setModal(nextWorkflow);
       setRouteEntityId(nextEntityId);
       if (nextWorkflow === 'receive') setSelectedOrder(null);
-      const expectedHash = nextWorkflow ? workflowHash(nextWorkflow, nextEntityId) : `#/${nextSection}`;
+      const expectedHash = nextWorkflow ? workflowHash(nextWorkflow, nextEntityId) : nextSecondaryWorkflow ? secondaryWorkflowHash(nextSecondaryWorkflow) : `#/${nextSection}`;
       if (window.location.hash !== expectedHash) {
         window.history.replaceState(window.history.state, '', expectedHash);
       }
@@ -185,7 +206,7 @@ function App() {
 
   const navigateSection = useCallback(nextSection => {
     const targetSection = VALID_SECTIONS.has(nextSection) ? nextSection : 'overview';
-    if (WORKFLOW_MODALS.has(modal) && !window.confirm('¿Salir de este formulario? Los cambios que no hayas guardado se perderán.')) return;
+    if ((WORKFLOW_MODALS.has(modal) || readSecondaryWorkflowFromUrl()) && !window.confirm('¿Salir de este formulario? Los cambios que no hayas guardado se perderán.')) return;
     setSection(targetSection);
     setModal('');
     setRouteEntityId('');
