@@ -292,6 +292,7 @@ function App() {
   async function openPurchaseDetail(order) {
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       const detail = await api.purchaseOrder(pickId(order));
       setPurchaseDetail(detail);
@@ -311,6 +312,7 @@ function App() {
   async function openSaleDetail(sale) {
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       const detail = await api.sale(pickId(sale));
       setSaleDetail(detail);
@@ -330,6 +332,7 @@ function App() {
   async function openReceive(order) {
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       const detail = await api.purchaseOrder(pickId(order));
       setSelectedOrder(detail);
