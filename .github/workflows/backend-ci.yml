@@ -4,12 +4,24 @@ on:
   push:
     branches: [master]
     paths:
-      - "microservices-inventary-ecuapp/**"
+      - "microservices-inventary-ecuapp/src/**"
+      - "microservices-inventary-ecuapp/pom.xml"
+      - "microservices-inventary-ecuapp/mvnw"
+      - "microservices-inventary-ecuapp/.mvn/**"
+      - "microservices-inventary-ecuapp/Dockerfile"
+      - "microservices-inventary-ecuapp/docker-compose.yml"
+      - "microservices-inventary-ecuapp/.env.example"
       - ".github/workflows/backend-ci.yml"
   pull_request:
     branches: [master]
     paths:
-      - "microservices-inventary-ecuapp/**"
+      - "microservices-inventary-ecuapp/src/**"
+      - "microservices-inventary-ecuapp/pom.xml"
+      - "microservices-inventary-ecuapp/mvnw"
+      - "microservices-inventary-ecuapp/.mvn/**"
+      - "microservices-inventary-ecuapp/Dockerfile"
+      - "microservices-inventary-ecuapp/docker-compose.yml"
+      - "microservices-inventary-ecuapp/.env.example"
       - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
     inputs:
