@@ -19,6 +19,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const [availabilityByProduct, setAvailabilityByProduct] = useState({});
   const [availabilityWarning, setAvailabilityWarning] = useState('');
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityRetry, setAvailabilityRetry] = useState(0);
   const selectedProductIds = useMemo(() => [...new Set(lines.map(line => line.productId).filter(Boolean))].sort().join(','), [lines]);
   const activeProducts = useMemo(() => products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD'), [products]);
   const activeWarehouses = useMemo(() => warehouses.filter(item => item.active !== false && item.status !== 'INACTIVE'), [warehouses]);
@@ -43,6 +44,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     let active = true;
     const ids = selectedProductIds.split(',').filter(Boolean);
     setAvailabilityLoading(true);
+    setAvailabilityWarning('');
     Promise.all(ids.map(async productId => {
       try {
         const result = await api.availableStock({ productId, warehouseId });
@@ -60,7 +62,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
       if (active) setAvailabilityLoading(false);
     });
     return () => { active = false; };
-  }, [warehouseId, selectedProductIds]);
+  }, [warehouseId, selectedProductIds, availabilityRetry]);
 
   function updateLine(index, field, value) {
     setLines(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
@@ -108,7 +110,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     }
     const oversold = items.find(item => {
       const stock = stockFor(item.productId);
-      return stock.verified && stock.value !== null && item.quantity > stock.value;
+      return stock.value !== null && item.quantity > stock.value;
     });
     if (oversold) {
       const product = activeProducts.find(item => String(idOf(item)) === String(oversold.productId));
@@ -140,15 +142,28 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   function submit(event) {
     event.preventDefault();
     setValidationMessage('');
+    if (step === 0) {
+      if (validateBasics()) setStep(1);
+      return;
+    }
+    if (step === 1) {
+      if (!validateLines()) return;
+      if (availabilityLoading) {
+        setValidationMessage('Espera un momento mientras comprobamos las existencias.');
+        return;
+      }
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
     if (!validateBasics()) { setStep(0); return; }
     if (!validateLines()) { setStep(1); return; }
     const unverified = lines.some(line => !stockFor(line.productId).verified);
     if (unverified && availabilityWarning) {
-      setValidationMessage('No se pudo verificar todo el inventario. Vuelve a revisar los artículos o inténtalo nuevamente antes de confirmar.');
+      setValidationMessage('No se pudo verificar todo el inventario. Revisa las existencias otra vez antes de confirmar.');
       setStep(1);
       return;
     }
-    if (step < 2) { nextStep(); return; }
     const data = { warehouseId, channel: 'POS', items: lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) })) };
     if (customerId) data.customerId = customerId;
     else {
@@ -221,7 +236,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
         })}
       </div>
       {availabilityLoading && <p className="form-hint" role="status">Comprobando existencias…</p>}
-      {availabilityWarning && <p className="inline-warning" role="status">{availabilityWarning}</p>}
+      {availabilityWarning && <div className="inline-warning stock-retry" role="status"><span>{availabilityWarning}</span><button type="button" className="button secondary" disabled={availabilityLoading || loading} onClick={() => setAvailabilityRetry(value => value + 1)}>Volver a comprobar</button></div>}
       <div className="workflow-inline-actions"><button type="button" className="button secondary" disabled={loading || lines.length >= 100 || !activeProducts.some(item => !lines.some(line => String(line.productId) === String(idOf(item))))} onClick={() => { setLines(current => [...current, emptyLine()]); setValidationMessage(''); }}><ShoppingCart size={16}/> Añadir artículo</button><span className="workflow-inline-total"><small>Total estimado</small><strong>{money(totals.amount)}</strong></span></div>
     </section>}
 
