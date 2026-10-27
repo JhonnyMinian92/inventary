@@ -4,6 +4,12 @@ import com.ecuapp.inventary.common.ConflictException;
 import com.ecuapp.inventary.common.Pages;
 import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.inventory.StockBalanceRepository;
+import com.ecuapp.inventary.inventory.InventoryCountRepository;
+import com.ecuapp.inventary.inventory.InventoryCountStatus;
+import com.ecuapp.inventary.purchasing.PurchaseOrderRepository;
+import com.ecuapp.inventary.purchasing.PurchaseOrderStatus;
+import com.ecuapp.inventary.transfers.StockTransferRepository;
+import com.ecuapp.inventary.transfers.TransferStatus;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,7 +23,11 @@ import java.util.UUID;
 public class WarehouseService {
  private static final Set<String> SORT=Set.of("name","code","createdAt","updatedAt","active");
  private final WarehouseRepository repo;private final WarehouseLocationRepository locations;private final StockBalanceRepository balances;private final AuditService audit;
- public WarehouseService(WarehouseRepository repo,WarehouseLocationRepository locations,StockBalanceRepository balances,AuditService audit){this.repo=repo;this.locations=locations;this.balances=balances;this.audit=audit;}
+ private final PurchaseOrderRepository purchaseOrders;private final StockTransferRepository transfers;private final InventoryCountRepository counts;
+ public WarehouseService(WarehouseRepository repo,WarehouseLocationRepository locations,StockBalanceRepository balances,AuditService audit,
+  PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts){
+  this.repo=repo;this.locations=locations;this.balances=balances;this.audit=audit;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;
+ }
  @Transactional(readOnly=true) public Page<WarehouseDtos.View> list(Boolean active,Pageable p){return repo.search(active,Pages.of(p,SORT,Sort.by("name"))).map(WarehouseDtos.View::from);}
  @Transactional(readOnly=true) public WarehouseDtos.View get(UUID id){return WarehouseDtos.View.from(require(id));}
  @Transactional public WarehouseDtos.View create(WarehouseDtos.WriteRequest r,String actor){
@@ -28,8 +38,14 @@ public class WarehouseService {
  }
  @Transactional public WarehouseDtos.View update(UUID id,WarehouseDtos.WriteRequest r,String actor){Warehouse w=require(id);String code=r.code().trim().toUpperCase(Locale.ROOT);if(!w.getCode().equals(code))throw new ConflictException("El código de almacén es inmutable; cree otro almacén para cambiarlo.");w.update(r.name().trim(),clean(r.address()));repo.flush();audit.record(actor,"WAREHOUSE_UPDATED","WAREHOUSE",id,Map.of("code",w.getCode()));return WarehouseDtos.View.from(w);}
  @Transactional public void deactivate(UUID id,String actor){
-  Warehouse w=require(id);if(!w.isActive())return;
+  Warehouse w=repo.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Almacén",id));if(!w.isActive())return;
   if(balances.warehouseHasStock(id))throw new ConflictException("El almacén tiene existencias o reservas; transfiéralas o ajústelas antes de desactivarlo.");
+  if(purchaseOrders.existsForWarehouseInStatuses(id,EnumSet.of(PurchaseOrderStatus.DRAFT,PurchaseOrderStatus.SUBMITTED,PurchaseOrderStatus.APPROVED,PurchaseOrderStatus.PARTIALLY_RECEIVED)))
+   throw new ConflictException("No se puede desactivar un almacén con órdenes de compra pendientes o recepciones por completar.");
+  if(transfers.existsForWarehouseInStatuses(id,EnumSet.of(TransferStatus.DRAFT,TransferStatus.IN_TRANSIT)))
+   throw new ConflictException("No se puede desactivar un almacén que participa en transferencias en borrador o en tránsito.");
+  if(counts.existsForWarehouseWithStatus(id,InventoryCountStatus.OPEN))
+   throw new ConflictException("No se puede desactivar un almacén con conteos físicos abiertos.");
   w.deactivate();audit.record(actor,"WAREHOUSE_DEACTIVATED","WAREHOUSE",id,Map.of("code",w.getCode()));
  }
  @Transactional public void activate(UUID id,String actor){Warehouse w=require(id);if(w.isActive())return;w.activate();audit.record(actor,"WAREHOUSE_ACTIVATED","WAREHOUSE",id,Map.of("code",w.getCode()));}
