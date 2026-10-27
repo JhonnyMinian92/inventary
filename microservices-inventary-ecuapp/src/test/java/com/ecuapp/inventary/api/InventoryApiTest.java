@@ -44,6 +44,38 @@ class InventoryApiTest extends ApiTestSupport {
     }
 
     @Test
+    void warehouseCannotBeDeactivatedWhileAnApprovedPurchaseOrderIsPending() {
+        String admin = admin();
+        JsonNode warehouse = warehouse();
+        JsonNode product = product("1.00", "2.00");
+        JsonNode supplier = supplier();
+        JsonNode order = approvedOrder(supplier.get("id").asText(), warehouse.get("id").asText(),
+            List.of(Map.of("productId", product.get("id").asText(), "quantity", new BigDecimal("2.000"), "unitCost", new BigDecimal("1.00"))));
+
+        problem(call(post("/api/v1/warehouses/" + warehouse.get("id").asText() + "/deactivate"), admin, null), 409, "CONFLICT");
+        assertTrue(httpGet(admin, "/api/v1/warehouses/" + warehouse.get("id").asText(), 200).get("active").asBoolean());
+
+        httpPost(admin, "/api/v1/purchase-orders/" + order.get("id").asText() + "/cancel", null, 200);
+        httpPost(admin, "/api/v1/warehouses/" + warehouse.get("id").asText() + "/deactivate", null, 204);
+        assertFalse(httpGet(admin, "/api/v1/warehouses/" + warehouse.get("id").asText(), 200).get("active").asBoolean());
+    }
+
+    @Test
+    void warehouseCannotBeDeactivatedWhileACountIsOpen() {
+        String admin = admin();
+        JsonNode warehouse = warehouse();
+        JsonNode product = product("1.00", "2.00");
+        JsonNode count = httpPost(admin, "/api/v1/inventory/counts",
+            Map.of("warehouseId", warehouse.get("id").asText(), "items", List.of(Map.of(
+                "productId", product.get("id").asText(), "countedQuantity", new BigDecimal("0.000")))),
+            201, "Idempotency-Key", key());
+
+        problem(call(post("/api/v1/warehouses/" + warehouse.get("id").asText() + "/deactivate"), admin, null), 409, "CONFLICT");
+        httpPost(admin, "/api/v1/inventory/counts/" + count.get("id").asText() + "/cancel", null, 200);
+        httpPost(admin, "/api/v1/warehouses/" + warehouse.get("id").asText() + "/deactivate", null, 204);
+    }
+
+    @Test
     void adjustmentsAreIdempotentNeverGoNegativeAndValueStock() {
         String admin = admin();
         String productId = product("2.00", "5.00").get("id").asText();
