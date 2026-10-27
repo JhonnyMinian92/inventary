@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Activity, CalendarRange, Download, FileSpreadsheet, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { api, listFrom } from '../../api';
+import { buildCsv } from '../../utils/csv.js';
 
 const REPORT_TABS = [
   { id: 'balance', label: 'Balance de inventario' },
@@ -78,12 +79,8 @@ function marginText(rows) {
   });
   return [...grouped.entries()].map(([currency, values]) => currency + ': ' + (values.sales > 0 ? (values.profit / values.sales * 100).toLocaleString('es-EC', { maximumFractionDigits: 2 }) + '%' : '—')).join(' · ') || '—';
 }
-function asCsvValue(value) {
-  const text = value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return '"' + text.replaceAll('"', '""') + '"';
-}
 function downloadCsv(fileName, columns, rows) {
-  const csv = [columns.map(column => asCsvValue(column.label)).join(','), ...(rows || []).map(row => columns.map(column => asCsvValue(typeof column.csvValue === 'function' ? column.csvValue(row) : row[column.key])).join(','))].join('\r\n');
+  const csv = buildCsv(columns, rows);
   const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
