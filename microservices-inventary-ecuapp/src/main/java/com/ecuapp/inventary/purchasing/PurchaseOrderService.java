@@ -59,7 +59,7 @@ public class PurchaseOrderService {
   if(idempotency.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED&&idempotency.getResourceId()!=null)
    return PurchaseDtos.OrderView.from(orders.findDetailedById(idempotency.getResourceId()).orElseThrow(()->new ResourceNotFoundException("Orden de compra",idempotency.getResourceId())));
   if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
-  BusinessPartner supplier=partners.findByIdAndTypeIn(r.supplierId(),List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",r.supplierId()));
+  BusinessPartner supplier=partners.findForUpdateByIdAndTypeIn(r.supplierId(),List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",r.supplierId()));
   if(!supplier.isActive())throw new BusinessRuleException("El proveedor está inactivo.");
   Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
   if(!warehouse.isActive())throw new BusinessRuleException("El almacén está inactivo.");
