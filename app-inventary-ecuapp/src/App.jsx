@@ -31,11 +31,42 @@ const nav = [
 ];
 
 const VALID_SECTIONS = new Set(nav.map(item => item.id));
+const WORKFLOW_MODALS = new Set(['product', 'category', 'purchase', 'sale', 'receive']);
+const WORKFLOW_SECTIONS = { product: 'products', category: 'categories', purchase: 'purchases', sale: 'sales', receive: 'purchases' };
+
+function routeSegmentsFromUrl() {
+  if (typeof window === 'undefined') return [];
+  return window.location.hash.slice(1).replace(/^\\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
+}
 
 function readSectionFromUrl() {
-  if (typeof window === 'undefined') return 'overview';
-  const sectionId = window.location.hash.slice(1).replace(/^\/+/, '').split(/[/?]/)[0];
+  const sectionId = routeSegmentsFromUrl()[0];
   return VALID_SECTIONS.has(sectionId) ? sectionId : 'overview';
+}
+
+function readWorkflowFromUrl() {
+  const parts = routeSegmentsFromUrl();
+  if (parts[0] === 'products' && parts[1] === 'new') return 'product';
+  if (parts[0] === 'categories' && parts[1] === 'new') return 'category';
+  if (parts[0] === 'purchases' && parts[1] === 'new') return 'purchase';
+  if (parts[0] === 'sales' && parts[1] === 'new') return 'sale';
+  if (parts[0] === 'purchases' && parts.length >= 3 && parts[2] === 'receive') return 'receive';
+  return '';
+}
+
+function readWorkflowEntityId() {
+  const parts = routeSegmentsFromUrl();
+  if (parts[0] !== 'purchases' || parts.length < 3 || parts[2] !== 'receive') return '';
+  try { return decodeURIComponent(parts[1]); } catch { return parts[1]; }
+}
+
+function workflowHash(workflow, entityId = '') {
+  if (workflow === 'product') return '#/products/new';
+  if (workflow === 'category') return '#/categories/new';
+  if (workflow === 'purchase') return '#/purchases/new';
+  if (workflow === 'sale') return '#/sales/new';
+  if (workflow === 'receive' && entityId) return `#/purchases/${encodeURIComponent(entityId)}/receive`;
+  return `#/${WORKFLOW_SECTIONS[workflow] || 'overview'}`;
 }
 
 function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
@@ -49,6 +80,7 @@ function App() {
   const [token, setTokenState] = useState(getToken());
   const [user, setUser] = useState(null);
   const [section, setSection] = useState(readSectionFromUrl);
+  const [routeEntityId, setRouteEntityId] = useState(readWorkflowEntityId);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
@@ -73,7 +105,7 @@ function App() {
   const [apiStatus, setApiStatus] = useState('checking');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [modal, setModal] = useState('');
+  const [modal, setModal] = useState(readWorkflowFromUrl);
   const [editing, setEditing] = useState(null);
   const [inventoryFilter, setInventoryFilter] = useState({ warehouseId: '', productId: '' });
 
@@ -125,15 +157,19 @@ function App() {
   useEffect(() => {
     const syncSectionFromUrl = () => {
       const nextSection = readSectionFromUrl();
+      const nextWorkflow = readWorkflowFromUrl();
+      const nextEntityId = readWorkflowEntityId();
       setSection(nextSection);
-      if (window.location.hash !== `#/${nextSection}`) {
-        window.history.replaceState(window.history.state, '', `#/${nextSection}`);
+      setModal(nextWorkflow);
+      setRouteEntityId(nextEntityId);
+      if (nextWorkflow === 'receive') setSelectedOrder(null);
+      const expectedHash = nextWorkflow ? workflowHash(nextWorkflow, nextEntityId) : `#/${nextSection}`;
+      if (window.location.hash !== expectedHash) {
+        window.history.replaceState(window.history.state, '', expectedHash);
       }
     };
 
-    if (window.location.hash !== `#/${section}`) {
-      window.history.replaceState(window.history.state, '', `#/${section}`);
-    }
+    syncSectionFromUrl();
     window.addEventListener('hashchange', syncSectionFromUrl);
     window.addEventListener('popstate', syncSectionFromUrl);
     return () => {
@@ -144,16 +180,70 @@ function App() {
 
   const navigateSection = useCallback(nextSection => {
     const targetSection = VALID_SECTIONS.has(nextSection) ? nextSection : 'overview';
+    if (WORKFLOW_MODALS.has(modal) && !window.confirm('¿Salir de este formulario? Los cambios que no hayas guardado se perderán.')) return;
     setSection(targetSection);
+    setModal('');
+    setRouteEntityId('');
+    setEditing(null);
+    setSelectedOrder(null);
     const targetHash = `#/${targetSection}`;
     if (window.location.hash !== targetHash) {
       window.history.pushState({ section: targetSection }, '', targetHash);
     }
     window.scrollTo({ top: 0, behavior: 'auto' });
-  }, []);
+  }, [modal]);
+
+  function startWorkflow(workflow, entityId = '') {
+    const targetSection = WORKFLOW_SECTIONS[workflow] || 'overview';
+    setError('');
+    setNotice('');
+    setSection(targetSection);
+    setModal(workflow);
+    setRouteEntityId(entityId ? String(entityId) : '');
+    const targetHash = workflowHash(workflow, entityId ? String(entityId) : '');
+    if (window.location.hash !== targetHash) {
+      window.history.pushState({ workflow, entityId: entityId ? String(entityId) : '' }, '', targetHash);
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function closeWorkflow() {
+    if (loading) return;
+    const parentSection = WORKFLOW_SECTIONS[modal] || section;
+    setModal('');
+    setRouteEntityId('');
+    setEditing(null);
+    setSelectedOrder(null);
+    setError('');
+    setNotice('');
+    setSection(parentSection);
+    window.history.replaceState({ section: parentSection }, '', `#/${parentSection}`);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  useEffect(() => {
+    if (modal !== 'receive' || !routeEntityId || String(pickId(selectedOrder)) === String(routeEntityId)) return undefined;
+    let active = true;
+    setLoading(true);
+    setError('');
+    api.purchaseOrder(routeEntityId)
+      .then(detail => { if (active) setSelectedOrder(detail); })
+      .catch(error => {
+        if (!active) return;
+        if (error?.status === 401) {
+          setToken('');
+          setTokenState('');
+          setUser(null);
+          setError('La sesión venció. Inicia sesión nuevamente.');
+        } else setError(error?.message || 'No se pudo cargar la orden para recibirla.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [modal, routeEntityId, selectedOrder]);
 
   const visibleProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.code, p.description].some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))), [products, search]);
   const isInitialLoading = loading && !hasLoadedData;
+  const isWorkflow = WORKFLOW_MODALS.has(modal);
   const stockTotal = balances.reduce((sum, row) => sum + Number(quantity(row)), 0);
   const valuationTotals = Array.isArray(valuation?.totals) ? valuation.totals : [];
   const inventoryValueLabel = !valuation ? '—' : valuationTotals.length === 1 ? money(valuationTotals[0].totalValue) : valuationTotals.length > 1 ? 'Varias monedas' : money(0);
