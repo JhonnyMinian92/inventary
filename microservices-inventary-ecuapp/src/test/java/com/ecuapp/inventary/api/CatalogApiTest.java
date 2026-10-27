@@ -317,6 +317,8 @@ class CatalogApiTest extends ApiTestSupport {
         assertEquals(200, served.getResponse().getStatus());
         assertEquals("image/png", served.getResponse().getContentType());
         assertArrayEquals(imageData, served.getResponse().getContentAsByteArray());
+        httpDelete(admin, base + "/" + view.get("id").asText(), 204);
+        problem(call(get(publicUrl), null, null), 404, "RESOURCE_NOT_FOUND");
 
         MockMultipartFile spoofed = new MockMultipartFile("file", "looks-like.png", "image/png", "this is not a png".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         MvcResult invalid = mvc.perform(multipart(base + "/upload")
@@ -390,7 +392,6 @@ class CatalogApiTest extends ApiTestSupport {
         httpPatch(admin, base + "/" + first.get("id").asText(), Map.of("altText", "nuevo", "sortOrder", 5, "primaryImage", true), 200);
         httpDelete(admin, base + "/" + second.get("id").asText(), 204);
         httpDelete(admin, base + "/" + second.get("id").asText(), 204);
-        problem(call(get(second.get("imageUrl").asText()), null, null), 404, "RESOURCE_NOT_FOUND");
         assertEquals(1, httpGet(admin, base, 200).size());
         JsonNode publicDetail = httpGet(null, "/api/v1/public/catalog/products/" + product.get("sku").asText(), 200);
         assertEquals(1, publicDetail.get("images").size());
