@@ -1,79 +1,155 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, ShoppingCart, Trash2 } from 'lucide-react';
 import { api } from '../../api';
+import StepProgress from '../../components/StepProgress.jsx';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
+function labelOf(item) { return item?.name || item?.description || item?.code || idOf(item); }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 
 export default function SaleForm({ products, warehouses, customers, balances, loading, onCancel, onSubmit, onError }) {
-  const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
+  const [step, setStep] = useState(0);
+  const [validationMessage, setValidationMessage] = useState('');
+  const [warehouseId, setWarehouseId] = useState(warehouses.find(item => item.active !== false && item.status !== 'INACTIVE')?.id || '');
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [lines, setLines] = useState([emptyLine()]);
   const [availabilityByProduct, setAvailabilityByProduct] = useState({});
   const [availabilityWarning, setAvailabilityWarning] = useState('');
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const selectedProductIds = useMemo(() => [...new Set(lines.map(line => line.productId).filter(Boolean))].sort().join(','), [lines]);
+  const activeProducts = useMemo(() => products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD'), [products]);
+  const activeWarehouses = useMemo(() => warehouses.filter(item => item.active !== false && item.status !== 'INACTIVE'), [warehouses]);
+  const activeCustomers = useMemo(() => customers.filter(item => item.active !== false && item.status !== 'INACTIVE'), [customers]);
+  const selectedWarehouse = activeWarehouses.find(item => String(idOf(item)) === String(warehouseId));
+  const selectedCustomer = activeCustomers.find(item => String(idOf(item)) === String(customerId));
   const totals = useMemo(() => lines.reduce((result, line) => {
-    const product = products.find(item => String(idOf(item)) === String(line.productId));
-    const qty = Math.max(0, Number(line.quantity || 0));
-    result.quantity += qty;
-    result.amount += qty * Math.max(0, Number(product?.salePrice || 0));
+    const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
+    const qty = Number(line.quantity);
+    result.quantity += Number.isFinite(qty) && qty > 0 ? qty : 0;
+    result.amount += Number.isFinite(qty) && qty > 0 ? qty * Number(product?.salePrice || 0) : 0;
     return result;
-  }, { quantity: 0, amount: 0 }), [lines, products]);
+  }, { quantity: 0, amount: 0 }), [lines, activeProducts]);
 
   useEffect(() => {
     if (!warehouseId || !selectedProductIds) {
       setAvailabilityByProduct({});
       setAvailabilityWarning('');
+      setAvailabilityLoading(false);
       return undefined;
     }
     let active = true;
     const ids = selectedProductIds.split(',').filter(Boolean);
+    setAvailabilityLoading(true);
     Promise.all(ids.map(async productId => {
       try {
         const result = await api.availableStock({ productId, warehouseId });
-        return [productId, Number(result?.available ?? 0)];
+        const amount = Number(result?.available);
+        return [productId, Number.isFinite(amount) ? amount : null];
       } catch {
         return [productId, null];
       }
     })).then(entries => {
       if (!active) return;
-      const next = Object.fromEntries(entries.filter(([,value]) => value !== null));
+      const next = Object.fromEntries(entries.filter(([, value]) => value !== null));
       setAvailabilityByProduct(next);
-      setAvailabilityWarning(entries.some(([,value]) => value === null) ? 'No fue posible consultar la disponibilidad en tiempo real de algunos artículos; las existencias mostradas son aproximadas.' : '');
+      setAvailabilityWarning(entries.some(([, value]) => value === null) ? 'No pudimos comprobar algunas existencias en tiempo real. El sistema volverá a validarlas al registrar la venta.' : '');
+    }).finally(() => {
+      if (active) setAvailabilityLoading(false);
     });
     return () => { active = false; };
   }, [warehouseId, selectedProductIds]);
 
   function updateLine(index, field, value) {
     setLines(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
+    setValidationMessage('');
   }
 
-  function available(productId) {
-    if (Object.prototype.hasOwnProperty.call(availabilityByProduct, productId)) return availabilityByProduct[productId];
-    return balances.filter(balance => String(balance.productId || balance.product?.id) === String(productId) &&
-      String(balance.warehouseId || balance.warehouse?.id) === String(warehouseId))
-      .reduce((sum, balance) => sum + Number(balance.available ?? balance.onHand ?? 0), 0);
+  function stockFor(productId) {
+    if (Object.prototype.hasOwnProperty.call(availabilityByProduct, String(productId))) {
+      return { value: availabilityByProduct[String(productId)], verified: true };
+    }
+    const matching = balances.filter(balance => String(balance.productId || balance.product?.id) === String(productId) &&
+      String(balance.warehouseId || balance.warehouse?.id) === String(warehouseId));
+    if (matching.length) {
+      return { value: matching.reduce((sum, balance) => sum + Number(balance.available ?? balance.onHand ?? 0), 0), verified: false };
+    }
+    return { value: null, verified: false };
+  }
+
+  function validateBasics() {
+    if (!warehouseId || !selectedWarehouse) {
+      setValidationMessage('Selecciona un almacén activo para registrar la salida.');
+      return false;
+    }
+    if (customerId && !selectedCustomer) {
+      setValidationMessage('El cliente seleccionado ya no está activo. Elige otro o usa una venta rápida.');
+      return false;
+    }
+    return true;
+  }
+
+  function validateLines() {
+    const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) }));
+    if (!items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+      setValidationMessage('Elige un producto y una cantidad mayor que cero en cada línea.');
+      return false;
+    }
+    if (items.some(item => !activeProducts.some(product => String(idOf(product)) === String(item.productId)))) {
+      setValidationMessage('Uno de los productos ya no está activo. Elige otro para continuar.');
+      return false;
+    }
+    const ids = items.map(item => String(item.productId));
+    if (new Set(ids).size !== ids.length) {
+      setValidationMessage('Un producto solo puede aparecer una vez. Ajusta su cantidad en la misma línea.');
+      return false;
+    }
+    const oversold = items.find(item => {
+      const stock = stockFor(item.productId);
+      return stock.verified && stock.value !== null && item.quantity > stock.value;
+    });
+    if (oversold) {
+      const product = activeProducts.find(item => String(idOf(item)) === String(oversold.productId));
+      const stock = stockFor(oversold.productId);
+      setValidationMessage(`No hay existencias suficientes de "${product?.name || 'este producto'}". Disponible: ${stock.value}.`);
+      return false;
+    }
+    return true;
+  }
+
+  function nextStep() {
+    setValidationMessage('');
+    if (step === 0 && !validateBasics()) return;
+    if (step === 1 && !validateLines()) return;
+    if (step === 1 && availabilityLoading) {
+      setValidationMessage('Espera un momento mientras comprobamos las existencias.');
+      return;
+    }
+    setStep(current => Math.min(2, current + 1));
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function previousStep() {
+    setValidationMessage('');
+    setStep(current => Math.max(0, current - 1));
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   function submit(event) {
     event.preventDefault();
-    const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) }));
-    if (!warehouseId) {
-      onError?.('Selecciona el almacén desde el que saldrá la mercancía.');
+    setValidationMessage('');
+    if (!validateBasics()) { setStep(0); return; }
+    if (!validateLines()) { setStep(1); return; }
+    const unverified = lines.some(line => !stockFor(line.productId).verified);
+    if (unverified && availabilityWarning) {
+      setValidationMessage('No se pudo verificar todo el inventario. Vuelve a revisar los artículos o inténtalo nuevamente antes de confirmar.');
+      setStep(1);
       return;
     }
-    if (!items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
-      onError?.('Selecciona un producto y confirma que cada cantidad sea mayor que cero.');
-      return;
-    }
-    const productIds = items.map(item => String(item.productId));
-    if (new Set(productIds).size !== productIds.length) {
-      onError?.('Cada producto debe aparecer una sola vez en la venta.');
-      return;
-    }
-    const data = { warehouseId, channel: 'POS', items };
+    if (step < 2) { nextStep(); return; }
+    const data = { warehouseId, channel: 'POS', items: lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) })) };
     if (customerId) data.customerId = customerId;
     else {
       if (customerName.trim()) data.customerName = customerName.trim();
@@ -82,40 +158,105 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     onSubmit(data);
   }
 
-  return <form className="form-grid" onSubmit={submit}>
-    <label className="field">
-      <span>Almacén de salida<b> *</b></span>
-      <select required value={warehouseId} onChange={event => setWarehouseId(event.target.value)}>
-        <option value="">Seleccionar almacén</option>
-        {warehouses.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.code || idOf(item)}</option>)}
-      </select>
-    </label>
-    <label className="field">
-      <span>Cliente registrado</span>
-      <select value={customerId} onChange={event => { setCustomerId(event.target.value); if (event.target.value) { setCustomerName(''); setCustomerPhone(''); } }}>
-        <option value="">Venta rápida / otro cliente</option>
-        {customers.filter(item => item.active !== false && item.status !== 'INACTIVE').map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.code || idOf(item)}</option>)}
-      </select>
-    </label>
-    {!customerId && <><label className="field"><span>Nombre del cliente (opcional)</span><input maxLength="160" value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Cliente de mostrador" /></label><label className="field"><span>Teléfono del cliente (opcional)</span><input maxLength="40" value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="099…" /></label></>}
+  return <form className="workflow-form" onSubmit={submit} noValidate>
+    <StepProgress steps={['Datos de venta', 'Artículos', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
+    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
 
-    <div className="form-subheading wide"><strong>Artículos de la venta</strong><small>El precio y el stock se confirman al registrar la venta.</small></div>
-    {lines.map((line, index) => {
-      const product = products.find(item => String(idOf(item)) === String(line.productId));
-      const stock = line.productId && warehouseId ? available(line.productId) : null;
-      const qty = Number(line.quantity || 0);
-      return <section className="line-editor wide" key={index}>
-        <div className="line-editor-heading"><strong>Artículo {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" onClick={() => setLines(current => current.filter((_, lineIndex) => lineIndex !== index))}>Quitar</button>}</div>
-        <div className="form-grid compact-grid">
-          <label className="field wide"><span>Producto<b> *</b></span><select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}><option value="">Seleccionar producto</option>{products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD' && !lines.some((otherLine, otherIndex) => otherIndex !== index && String(otherLine.productId) === String(idOf(item)))).map(item => <option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku || item.code || idOf(item)}</option>)}</select></label>
-          <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
-          <div className="stock-hint"><small>Stock disponible</small><strong>{stock == null ? '—' : stock.toLocaleString('es-EC')}</strong><small>Precio actual: {product ? money(product.salePrice) : '—'}</small></div>
-        </div>
-        {stock != null && qty > stock && <p className="inline-warning">La cantidad supera el stock mostrado. El backend rechazará la venta si no hay disponibilidad suficiente.</p>}
-      </section>;
-    })}
-    {availabilityWarning && <p className="form-hint wide">{availabilityWarning}</p>}
-    <div className="wide line-add-row"><button type="button" className="button secondary" disabled={lines.length >= 100} onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir artículo</button><div className="order-total"><span>Total estimado</span><strong>{money(totals.amount)}</strong><small>Estimación con precios de catálogo · {totals.quantity} unidades</small></div></div>
-    <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Registrando…' : 'Registrar venta'}</button></div>
+    {step === 0 && <section className="workflow-stage" aria-labelledby="sale-stage-title">
+      <div className="workflow-stage-heading">
+        <span className="workflow-stage-icon"><ShoppingCart size={20}/></span>
+        <div><h2 id="sale-stage-title">Datos de la venta</h2><p>Indica de qué almacén saldrán los productos y quién compra.</p></div>
+      </div>
+      <div className="form-grid workflow-fields">
+        <label className="field"><span>Almacén de salida<b> *</b></span>
+          <select required value={warehouseId} onChange={event => { setWarehouseId(event.target.value); setValidationMessage(''); }}>
+            <option value="">Seleccionar almacén</option>
+            {activeWarehouses.map(item => <option key={idOf(item)} value={idOf(item)}>{labelOf(item)}{item.code ? ` · ${item.code}` : ''}</option>)}
+          </select>
+          {!activeWarehouses.length && <small className="field-help">No hay almacenes activos disponibles.</small>}
+        </label>
+        <label className="field"><span>Cliente <small>(opcional)</small></span>
+          <select value={customerId} onChange={event => { setCustomerId(event.target.value); if (event.target.value) { setCustomerName(''); setCustomerPhone(''); } setValidationMessage(''); }}>
+            <option value="">Venta rápida / sin cliente registrado</option>
+            {activeCustomers.map(item => <option key={idOf(item)} value={idOf(item)}>{labelOf(item)}{item.code ? ` · ${item.code}` : ''}</option>)}
+          </select>
+        </label>
+        {!customerId && <>
+          <label className="field"><span>Nombre del cliente <small>(opcional)</small></span><input maxLength="160" value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Nombre para el comprobante" /></label>
+          <label className="field"><span>Teléfono <small>(opcional)</small></span><input type="tel" autoComplete="tel" maxLength="40" value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="Ej. 099 123 4567" /></label>
+        </>}
+      </div>
+    </section>}
+
+    {step === 1 && <section className="workflow-stage" aria-labelledby="sale-products-title">
+      <div className="workflow-stage-heading">
+        <span className="workflow-stage-icon"><ShoppingCart size={20}/></span>
+        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Solo aparecen productos de inventario activos. Revisa el stock antes de continuar.</p></div>
+      </div>
+      {!activeProducts.length && <div className="empty-state workflow-empty">No hay productos de inventario activos para vender.</div>}
+      <div className="workflow-line-list">
+        {lines.map((line, index) => {
+          const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
+          const stock = line.productId && warehouseId ? stockFor(line.productId) : { value: null, verified: false };
+          const qty = Number(line.quantity);
+          const qtyValid = Number.isFinite(qty) && qty > 0;
+          return <section className="line-editor workflow-line" key={index} aria-label={`Artículo ${index + 1}`}>
+            <div className="line-editor-heading"><strong>Artículo {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" disabled={loading} onClick={() => { setLines(current => current.filter((_, lineIndex) => lineIndex !== index)); setValidationMessage(''); }}><Trash2 size={14}/> Quitar</button>}</div>
+            <div className="form-grid compact-grid">
+              <label className="field wide"><span>Producto<b> *</b></span>
+                <select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}>
+                  <option value="">Seleccionar producto</option>
+                  {activeProducts.filter(item => !lines.some((otherLine, otherIndex) => otherIndex !== index && String(otherLine.productId) === String(idOf(item)))).map(item => <option key={idOf(item)} value={idOf(item)}>{labelOf(item)} · {item.sku || item.code || idOf(item)}</option>)}
+                </select>
+              </label>
+              <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
+              <div className={qtyValid && stock.value !== null && qty > stock.value ? 'stock-hint stock-hint-warning' : 'stock-hint'}>
+                <small>Disponible {stock.verified ? '(actualizado)' : stock.value === null ? '(por verificar)' : '(último saldo)'}</small>
+                <strong>{stock.value === null ? (availabilityLoading ? 'Comprobando…' : '—') : stock.value.toLocaleString('es-EC')}</strong>
+                <small>Precio de catálogo: {product ? money(product.salePrice) : '—'}</small>
+              </div>
+            </div>
+            {qtyValid && stock.value !== null && qty > stock.value && <p className="inline-warning">La cantidad supera las existencias mostradas. Reduce la cantidad para continuar.</p>}
+          </section>;
+        })}
+      </div>
+      {availabilityLoading && <p className="form-hint" role="status">Comprobando existencias…</p>}
+      {availabilityWarning && <p className="inline-warning" role="status">{availabilityWarning}</p>}
+      <div className="workflow-inline-actions"><button type="button" className="button secondary" disabled={loading || lines.length >= 100 || !activeProducts.some(item => !lines.some(line => String(line.productId) === String(idOf(item))))} onClick={() => { setLines(current => [...current, emptyLine()]); setValidationMessage(''); }}><ShoppingCart size={16}/> Añadir artículo</button><span className="workflow-inline-total"><small>Total estimado</small><strong>{money(totals.amount)}</strong></span></div>
+    </section>}
+
+    {step === 2 && <section className="workflow-stage" aria-labelledby="sale-review-title">
+      <div className="workflow-stage-heading">
+        <span className="workflow-stage-icon"><ShoppingCart size={20}/></span>
+        <div><h2 id="sale-review-title">Revisa antes de registrar</h2><p>Verifica el almacén, el cliente y los artículos.</p></div>
+      </div>
+      <div className="workflow-review-grid">
+        <div className="workflow-review-card"><small>Almacén de salida</small><strong>{labelOf(selectedWarehouse)}</strong></div>
+        <div className="workflow-review-card"><small>Cliente</small><strong>{selectedCustomer ? labelOf(selectedCustomer) : customerName.trim() || 'Venta rápida'}</strong></div>
+        <div className="workflow-review-card"><small>Artículos diferentes</small><strong>{lines.length}</strong></div>
+        <div className="workflow-review-card workflow-review-total"><small>Total estimado</small><strong>{money(totals.amount)}</strong></div>
+      </div>
+      <div className="workflow-review-lines">
+        {lines.map((line, index) => {
+          const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
+          const qty = Number(line.quantity);
+          return <div className="workflow-review-line" key={index}>
+            <div><strong>{product?.name || 'Producto no seleccionado'}</strong><small>{line.quantity} × {money(product?.salePrice)}</small></div>
+            <strong>{money((Number.isFinite(qty) ? qty : 0) * Number(product?.salePrice || 0))}</strong>
+          </div>;
+        })}
+      </div>
+      {availabilityWarning && <p className="inline-warning">{availabilityWarning}</p>}
+      <p className="form-hint">El total es una estimación. El precio final y la disponibilidad se vuelven a validar al registrar.</p>
+    </section>}
+
+    <div className="form-actions workflow-actions">
+      <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
+      <div className="workflow-actions-right">
+        {step > 0 && <button type="button" className="button secondary" disabled={loading} onClick={previousStep}><ArrowLeft size={16}/> Atrás</button>}
+        {step < 2 ? <button type="button" className="button primary" disabled={loading || (step === 1 && !activeProducts.length)} onClick={nextStep}>Continuar <ArrowRight size={16}/></button>
+          : <button type="submit" className="button primary" disabled={loading || availabilityLoading}>{loading ? 'Registrando…' : 'Confirmar venta'}</button>}
+      </div>
+    </div>
   </form>;
 }
