@@ -23,13 +23,13 @@ public final class ReportDtos {
                                   BigDecimal netSales, BigDecimal costOfSales, BigDecimal grossProfit) {}
     public record DailySales(LocalDate date, long salesCount, BigDecimal grossSales) {}
     public record SalesReport(LocalDate from, LocalDate to, String zone, UUID warehouseId, Instant generatedAt, SalesSummary summary,
-                              List<DailySales> daily, List<SalesProductRow> products) {}
+                              List<DailySales> daily, List<SalesProductRow> products, long totalProducts, boolean productsTruncated) {}
 
     public record PurchasesSummary(long receiptsCount, long returnsCount, BigDecimal receivedAmount, BigDecimal returnedAmount, BigDecimal netAmount) {}
     public record PurchasesRow(UUID supplierId, String supplierName, UUID productId, String sku, String productName, String currency,
                                BigDecimal receivedQuantity, BigDecimal receivedAmount, BigDecimal returnedQuantity, BigDecimal returnedAmount) {}
     public record PurchasesReport(LocalDate from, LocalDate to, String zone, UUID warehouseId, UUID supplierId, Instant generatedAt,
-                                  PurchasesSummary summary, List<PurchasesRow> items) {}
+                                  PurchasesSummary summary, List<PurchasesRow> items, long totalItems, boolean itemsTruncated) {}
 
     public record KardexLine(UUID movementId, Instant occurredAt, String movementType, String referenceType, UUID referenceId, String notes,
                              BigDecimal quantityIn, BigDecimal quantityOut, BigDecimal valueIn, BigDecimal valueOut,
