@@ -22,6 +22,8 @@ public class WarehouseController {
  public WarehouseDtos.View update(@PathVariable UUID id,@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.update(id,r,auth.getName());}
  @PostMapping("/{id}/deactivate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('inventory:manage')")
  public void deactivate(@PathVariable UUID id,Authentication auth){service.deactivate(id,auth.getName());}
+ @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('inventory:manage')")
+ public void delete(@PathVariable UUID id,Authentication auth){service.delete(id,auth.getName());}
  @PostMapping("/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('inventory:manage')")
  public void activate(@PathVariable UUID id,Authentication auth){service.activate(id,auth.getName());}
  /** Stock is kept in the MAIN location; extra locations are registered for layout and future multi-bin operations. */
