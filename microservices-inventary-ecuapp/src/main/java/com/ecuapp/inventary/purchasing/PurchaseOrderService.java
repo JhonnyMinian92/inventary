@@ -61,14 +61,14 @@ public class PurchaseOrderService {
   if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   BusinessPartner supplier=partners.findByIdAndTypeIn(r.supplierId(),List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",r.supplierId()));
   if(!supplier.isActive())throw new BusinessRuleException("El proveedor está inactivo.");
-  Warehouse warehouse=warehouses.findById(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
+  Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
   if(!warehouse.isActive())throw new BusinessRuleException("El almacén está inactivo.");
   BigDecimal subtotal=BigDecimal.ZERO.setScale(2);String currency=null;Set<UUID> unique=new HashSet<>();
   List<PurchaseDtos.OrderLineRequest> sorted=new ArrayList<>(r.items());sorted.sort(Comparator.comparing(x->x.productId().toString()));
   List<PurchaseOrderLine> newLines=new ArrayList<>();
   for(PurchaseDtos.OrderLineRequest line:sorted){
    if(!unique.add(line.productId()))throw new BusinessRuleException("No repita el mismo producto en varias líneas de una orden de compra.");
-   Product product=products.findById(line.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
+   Product product=products.findForUpdate(line.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
    if(!product.isActive())throw new BusinessRuleException("No se puede comprar un producto inactivo.");
    if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo se pueden recibir físicamente productos con control de stock.");
    if(currency==null)currency=product.getCurrency();else if(!currency.equals(product.getCurrency()))throw new BusinessRuleException("Todos los productos de una orden deben usar la misma moneda.");
