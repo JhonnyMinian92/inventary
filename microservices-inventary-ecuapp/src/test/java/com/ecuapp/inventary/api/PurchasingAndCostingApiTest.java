@@ -73,7 +73,9 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         assertEquals("APPROVED", approved.get("status").asText());
         assertEquals(username("SUPER_ADMIN"), approved.get("approvedBy").asText());
         assertEquals("APPROVED", httpPost(admin(), "/api/v1/purchase-orders/" + id + "/approve", null, 200).get("status").asText());
-        problem(call(post("/api/v1/purchase-orders/" + id + "/cancel"), manager, null), 409, "CONFLICT");
+        // An approved order with no receipts can be cancelled; repeating the transition is idempotent.
+        assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
+        assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
 
         JsonNode list = httpGet(token("AUDITOR"), "/api/v1/purchase-orders?status=APPROVED&supplierId=" + supplierId + "&from=" + Instant.now().minusSeconds(600), 200);
         assertEquals(1, list.get("page").get("totalElements").asInt());
