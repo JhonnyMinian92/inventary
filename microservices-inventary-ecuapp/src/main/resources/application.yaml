@@ -3,6 +3,10 @@ spring:
     name: inventary
   lifecycle:
     timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
+  servlet:
+    multipart:
+      max-file-size: ${MEDIA_MAX_FILE_SIZE:5MB}
+      max-request-size: ${MEDIA_MAX_REQUEST_SIZE:6MB}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -99,6 +103,9 @@ app:
   bootstrap-admin:
     username: ${BOOTSTRAP_ADMIN_USERNAME:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+  media:
+    storage-path: ${MEDIA_STORAGE_PATH:./data/product-images}
+    max-upload-bytes: ${MEDIA_MAX_UPLOAD_BYTES:5242880}
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
