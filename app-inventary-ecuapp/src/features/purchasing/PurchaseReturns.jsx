@@ -6,6 +6,11 @@ import StepProgress from '../../components/StepProgress.jsx';
 function idOf(item) { return item?.id ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
+function readPurchaseReturnFromUrl() {
+  if (typeof window === 'undefined') return false;
+  const parts = window.location.hash.slice(1).replace(/^\\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
+  return parts[0] === 'purchases' && parts[1] === 'returns' && parts[2] === 'new';
+}
 
 export default function PurchaseReturns({ onChanged }) {
   const [returns, setReturns] = useState([]);
@@ -13,7 +18,7 @@ export default function PurchaseReturns({ onChanged }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(readPurchaseReturnFromUrl);
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
   const [receiptId, setReceiptId] = useState('');
@@ -38,6 +43,24 @@ export default function PurchaseReturns({ onChanged }) {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const nextOpen = readPurchaseReturnFromUrl();
+      const hasChanges = Boolean(receiptId || reason.trim() || lines.some(line => Number(line.quantity) > 0));
+      if (!nextOpen && formOpen && hasChanges && !window.confirm('¿Salir de la devolución? Se perderán las cantidades que hayas escrito.')) {
+        window.history.pushState({ workflow: 'purchase-return' }, '', '#/purchases/returns/new');
+        return;
+      }
+      setFormOpen(nextOpen);
+    };
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('hashchange', syncRoute);
+    return () => {
+      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener('hashchange', syncRoute);
+    };
+  }, [formOpen, receiptId, reason, lines]);
 
   useEffect(() => {
     if (!receiptId) {
@@ -95,6 +118,7 @@ export default function PurchaseReturns({ onChanged }) {
     setError('');
     setNotice('');
     setFormOpen(true);
+    window.history.pushState({ workflow: 'purchase-return' }, '', '#/purchases/returns/new');
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -109,6 +133,7 @@ export default function PurchaseReturns({ onChanged }) {
     setStep(0);
     setValidationMessage('');
     setError('');
+    window.history.replaceState({ section: 'purchases' }, '', '#/purchases');
   }
 
   function updateLine(index, quantity) {
@@ -184,6 +209,7 @@ export default function PurchaseReturns({ onChanged }) {
       setLines([]);
       setReason('');
       setStep(0);
+      window.history.replaceState({ section: 'purchases' }, '', '#/purchases');
       await refresh();
       await onChanged?.();
       setNotice('Devolución registrada. Se actualizó el inventario.');
