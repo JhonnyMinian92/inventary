@@ -704,3 +704,61 @@ button:disabled { opacity: .58; cursor: not-allowed; }
   .stock-retry { align-items: stretch; flex-direction: column; }
   .stock-retry .button { width: 100%; }
 }
+
+
+/* Full-page return flows and focused inventory operation workspaces */
+.return-workspace,
+.inventory-workspace {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  margin-top: 17px;
+}
+.return-workspace {
+  padding: clamp(14px, 2vw, 24px);
+  background: #f9faff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.return-workspace-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.return-workspace-heading > div { min-width: 0; }
+.return-workspace-heading h3 {
+  color: var(--ink);
+  margin: 7px 0 5px;
+  font: 800 22px/1.25 Manrope, sans-serif;
+  letter-spacing: -.5px;
+}
+.return-workspace-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.inventory-workspace {
+  padding: clamp(12px, 1.8vw, 22px);
+  background: #f8f9fd;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.inventory-workspace .workflow-page-heading { margin-bottom: 0; }
+.inventory-workspace .workflow-stage { box-shadow: none; }
+.inventory-workspace .workflow-actions { bottom: 8px; }
+.inventory-workspace .workflow-validation { margin: 0; }
+.inventory-operations .catalog-tabs { margin-top: 9px; }
+.inventory-operations .workflow-review-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+@media(max-width: 560px) {
+  .return-workspace { padding: 12px 10px; margin-inline: -3px; }
+  .return-workspace-heading { flex-direction: column; align-items: stretch; gap: 12px; }
+  .return-workspace-heading h3 { font-size: 20px; }
+  .return-workspace-heading > .button { width: 100%; }
+  .inventory-workspace { padding: 11px 9px; margin-inline: -3px; }
+  .inventory-workspace .workflow-page-heading { flex-direction: column; }
+  .inventory-workspace .workflow-page-heading > .button { width: 100%; }
+  .inventory-workspace .workflow-actions { bottom: 6px; }
+}
