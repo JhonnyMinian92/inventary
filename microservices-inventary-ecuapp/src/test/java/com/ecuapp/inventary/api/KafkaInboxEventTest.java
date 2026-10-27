@@ -30,6 +30,11 @@ class KafkaInboxEventTest extends ApiTestSupport {
 
         if (publicProducts != null) publicProducts.put("fresh", "keep");
         assertEquals(KafkaInboxEventService.Result.DUPLICATE, inbox.process(original));
+        String reordered = """
+            {"payload":{"total":12.5,"saleId":"%s"},"occurredAt":"2026-10-27T00:00:00Z","eventType":"SALE_CREATED","aggregateId":"%s","aggregateType":"SALE","eventId":"%s"}
+            """.formatted(aggregateId, aggregateId, eventId).trim();
+        assertEquals(KafkaInboxEventService.Result.DUPLICATE, inbox.process(reordered),
+            "Reordering JSON object keys must not be interpreted as a changed event.");
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kafka_inbox_event WHERE event_id = ?", Integer.class, eventId));
         if (publicProducts != null) assertEquals("keep", publicProducts.get("fresh").get(), "A duplicate must not repeat side effects.");
 
