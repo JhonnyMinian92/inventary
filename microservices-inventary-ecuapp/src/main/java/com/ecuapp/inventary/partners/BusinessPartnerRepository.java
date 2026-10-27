@@ -7,7 +7,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
-public interface BusinessPartnerRepository extends JpaRepository<BusinessPartner,UUID>{
+public interface BusinessPartnerRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<BusinessPartner,UUID>{
  boolean existsByCode(String code);
  boolean existsByCodeIgnoreCase(String code);
  boolean existsByTaxId(String taxId);
