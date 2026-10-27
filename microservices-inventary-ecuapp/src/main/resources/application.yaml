@@ -106,6 +106,7 @@ app:
   media:
     storage-path: ${MEDIA_STORAGE_PATH:./data/product-images}
     max-upload-bytes: ${MEDIA_MAX_UPLOAD_BYTES:5242880}
+    max-request-bytes: ${MEDIA_MAX_REQUEST_BYTES:6291456}
 logging:
   level:
     root: ${LOG_LEVEL_ROOT:INFO}
