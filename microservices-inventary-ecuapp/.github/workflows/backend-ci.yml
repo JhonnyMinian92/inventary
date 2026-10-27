@@ -1,17 +1,31 @@
-name: backend-ci
+name: Backend CI
 
-# Manual trigger only, as agreed for this project. Runs the full suite (unit, PostgreSQL integration,
-# HTTP/security contract and concurrency tests) against a real PostgreSQL 16 service.
 on:
+  push:
+    branches: [master]
+    paths:
+      - "microservices-inventary-ecuapp/**"
+      - ".github/workflows/backend-ci.yml"
+      - "microservices-inventary-ecuapp/.github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "microservices-inventary-ecuapp/**"
+      - ".github/workflows/backend-ci.yml"
+      - "microservices-inventary-ecuapp/.github/workflows/backend-ci.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16-alpine
@@ -35,16 +49,15 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Locate backend module
-        id: module
-        run: |
-          if [ -f microservices-inventary-ecuapp/pom.xml ]; then echo "dir=microservices-inventary-ecuapp" >> "$GITHUB_OUTPUT"; else echo "dir=." >> "$GITHUB_OUTPUT"; fi
-      - name: mvn verify
-        working-directory: ${{ steps.module.outputs.dir }}
-        run: mvn -B verify
-      - name: Test reports
+      - name: Verify Maven wrapper
+        run: test -x microservices-inventary-ecuapp/mvnw
+      - name: Verify backend and PostgreSQL 16
+        working-directory: microservices-inventary-ecuapp
+        run: ./mvnw -B --no-transfer-progress verify
+      - name: Publish test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: surefire-reports
-          path: ${{ steps.module.outputs.dir }}/target/surefire-reports
+          name: backend-surefire-reports
+          path: microservices-inventary-ecuapp/target/surefire-reports
+          if-no-files-found: warn
