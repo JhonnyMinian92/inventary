@@ -3,6 +3,8 @@ package com.ecuapp.inventary.media;
 import com.ecuapp.inventary.common.BusinessRuleException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
@@ -56,7 +58,7 @@ public class ProductImageStorage {
             throw new BusinessRuleException("Selecciona un archivo de imagen no vacío.");
         }
         if (upload.getSize() > maxBytes) {
-            throw new BusinessRuleException("La imagen supera el límite de tamaño permitido.");
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "La imagen supera el límite de tamaño permitido.");
         }
 
         final byte[] bytes;
@@ -66,7 +68,7 @@ public class ProductImageStorage {
             throw new BusinessRuleException("No se pudo leer el archivo de imagen.");
         }
         if (bytes.length == 0 || bytes.length > maxBytes) {
-            throw new BusinessRuleException("El archivo de imagen no cumple el tamaño permitido.");
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo de imagen no cumple el tamaño permitido.");
         }
 
         String extension;
