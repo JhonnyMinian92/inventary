@@ -11,5 +11,6 @@ public interface ProductUseCases {
     ProductResult createProduct(ProductCommand command, String actor);
     ProductResult updateProduct(UUID id, ProductCommand command, String actor);
     void deactivateProduct(UUID id, String actor);
+    void deleteProduct(UUID id, String actor);
     void activateProduct(UUID id, String actor);
 }
