@@ -139,6 +139,10 @@ export default function ProductForm({ initialValue, categories, units = [], load
   function handleSubmit(event) {
     event.preventDefault();
     if (schemaLoading) return;
+    if (!String(form.name || '').trim() || !String(form.sku || '').trim()) {
+      onError?.('Completa el nombre y el SKU del producto.');
+      return;
+    }
     if (!form.categoryId) {
       onError?.('Selecciona una categoría para crear o actualizar el producto.');
       return;
@@ -153,7 +157,31 @@ export default function ProductForm({ initialValue, categories, units = [], load
       attributes = {};
       for (const definition of definitions) {
         const value = form.attributes[definition.key];
-        if (value !== undefined && value !== null && value !== '') attributes[definition.key] = value;
+        const isEmpty = value === undefined || value === null || String(value).trim() === '';
+        if (definition.required && isEmpty) {
+          onError?.(`Completa el campo "${definition.displayName || definition.key}".`);
+          return;
+        }
+        if (!isEmpty && definition.valueType === 'NUMBER') {
+          const numericValue = Number(value);
+          const constraints = definition.constraints || {};
+          if (!Number.isFinite(numericValue) ||
+              (constraints.min != null && numericValue < Number(constraints.min)) ||
+              (constraints.max != null && numericValue > Number(constraints.max))) {
+            onError?.(`El valor de "${definition.displayName || definition.key}" está fuera del rango permitido.`);
+            return;
+          }
+        }
+        if (!isEmpty && definition.valueType === 'STRING') {
+          const constraints = definition.constraints || {};
+          const length = String(value).length;
+          if ((constraints.minLength != null && length < Number(constraints.minLength)) ||
+              (constraints.maxLength != null && length > Number(constraints.maxLength))) {
+            onError?.(`Revisa la longitud de "${definition.displayName || definition.key}".`);
+            return;
+          }
+        }
+        if (!isEmpty) attributes[definition.key] = value;
       }
     }
     onSubmit({ ...form, attributes });
