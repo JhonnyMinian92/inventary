@@ -390,6 +390,7 @@ class CatalogApiTest extends ApiTestSupport {
         httpPatch(admin, base + "/" + first.get("id").asText(), Map.of("altText", "nuevo", "sortOrder", 5, "primaryImage", true), 200);
         httpDelete(admin, base + "/" + second.get("id").asText(), 204);
         httpDelete(admin, base + "/" + second.get("id").asText(), 204);
+        problem(call(get(second.get("imageUrl").asText()), null, null), 404, "RESOURCE_NOT_FOUND");
         assertEquals(1, httpGet(admin, base, 200).size());
         JsonNode publicDetail = httpGet(null, "/api/v1/public/catalog/products/" + product.get("sku").asText(), 200);
         assertEquals(1, publicDetail.get("images").size());
