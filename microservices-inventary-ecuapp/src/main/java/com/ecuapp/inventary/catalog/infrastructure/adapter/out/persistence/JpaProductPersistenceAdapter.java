@@ -46,6 +46,11 @@ public class JpaProductPersistenceAdapter implements ProductPersistencePort {
     }
 
     @Override
+    public void deleteAndFlush(Product product) {
+        repository.deleteAndFlush(product);
+    }
+
+    @Override
     public Optional<Product> findBySku(String sku) {
         return repository.findBySkuIgnoreCase(sku);
     }
