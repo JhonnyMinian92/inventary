@@ -7,6 +7,7 @@ import java.util.UUID;
 public interface ProductImageRepository extends JpaRepository<ProductImage,UUID>{
  List<ProductImage> findByProductIdAndPublishedTrueOrderBySortOrderAsc(UUID productId);
  Optional<ProductImage> findByIdAndProductId(UUID imageId,UUID productId);
+ boolean existsByImageUrlAndPublishedTrue(String imageUrl);
  boolean existsByProductId(UUID productId);
  @Modifying(flushAutomatically=true,clearAutomatically=true)
  @Query("update ProductImage i set i.primaryImage=false where i.product.id=:productId and i.published=true")
