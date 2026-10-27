@@ -56,7 +56,10 @@ public class PurchaseOrder {
  /** @return false when the order was already cancelled (idempotent retry). */
  public boolean cancel(String actor){
   if(status==PurchaseOrderStatus.CANCELLED)return false;
-  if(status!=PurchaseOrderStatus.DRAFT&&status!=PurchaseOrderStatus.SUBMITTED)throw new ConflictException("Solo se puede cancelar una orden antes de aprobar/recibir.");
+  // Approved orders can still be cancelled before any goods receipt; after the first receipt
+  // recalculateReceiptStatus changes the state to PARTIALLY_RECEIVED/RECEIVED and cancellation is rejected.
+  if(status!=PurchaseOrderStatus.DRAFT&&status!=PurchaseOrderStatus.SUBMITTED&&status!=PurchaseOrderStatus.APPROVED)
+   throw new ConflictException("Solo se pueden cancelar órdenes en borrador, enviadas o aprobadas sin recepciones.");
   status=PurchaseOrderStatus.CANCELLED;cancelledBy=actor;cancelledAt=Instant.now();return true;
  }
  public void recalculateReceiptStatus(){
