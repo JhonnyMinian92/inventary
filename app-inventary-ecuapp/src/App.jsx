@@ -36,7 +36,7 @@ const WORKFLOW_SECTIONS = { product: 'products', category: 'categories', purchas
 
 function routeSegmentsFromUrl() {
   if (typeof window === 'undefined') return [];
-  return window.location.hash.slice(1).replace(/^\\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
+  return window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
 }
 
 function readSectionFromUrl() {
