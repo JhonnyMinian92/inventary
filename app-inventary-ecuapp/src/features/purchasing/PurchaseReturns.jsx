@@ -22,8 +22,8 @@ export default function PurchaseReturns({ onChanged }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     const [returnResult, receiptResult] = await Promise.allSettled([
-      api.purchaseReturns({ size: 100 }),
-      api.goodsReceipts({ size: 100 })
+      listAllPages(api.purchaseReturns, { size: 100 }),
+      listAllPages(api.goodsReceipts, { size: 100 })
     ]);
     const failures = [];
     if (returnResult.status === 'fulfilled') setReturns(listFrom(returnResult.value));
@@ -45,7 +45,7 @@ export default function PurchaseReturns({ onChanged }) {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.goodsReceipt(receiptId), api.purchaseReturns({ goodsReceiptId: receiptId, size: 100 })])
+    Promise.all([api.goodsReceipt(receiptId), listAllPages(api.purchaseReturns, { goodsReceiptId: receiptId, size: 100 })])
       .then(([receiptDetail, returnPayload]) => {
         if (!active) return;
         const priorReturns = listFrom(returnPayload).filter(item => String(item.status || '').toUpperCase() !== 'CANCELLED');
