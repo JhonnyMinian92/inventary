@@ -77,8 +77,8 @@ public class InventoryService {
     .orElseThrow(()->new ResourceNotFoundException("Movimiento de inventario",idempotency.getResourceId())));
   if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)
    throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
-  Product product=products.findById(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
-  Warehouse warehouse=warehouses.findById(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
+  Product product=products.findForUpdate(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
+  Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
   if(!product.isActive())throw new BusinessRuleException("No se puede ajustar un producto inactivo.");
   if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control de stock admiten movimientos físicos.");
   if(!warehouse.isActive())throw new BusinessRuleException("No se puede ajustar un almacén inactivo.");
