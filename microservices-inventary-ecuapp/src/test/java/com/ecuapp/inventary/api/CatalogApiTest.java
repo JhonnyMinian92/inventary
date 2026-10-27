@@ -208,7 +208,8 @@ class CatalogApiTest extends ApiTestSupport {
 
         JsonNode usedCategory = category();
         String usedCategoryId = usedCategory.get("id").asText();
-        product(usedCategoryId, "1.00", "2.00");
+        JsonNode inactiveProduct = product(usedCategoryId, "1.00", "2.00");
+        httpPost(admin, "/api/v1/catalog/products/" + inactiveProduct.get("id").asText() + "/deactivate", null, 204);
         httpPost(admin, "/api/v1/catalog/categories/" + usedCategoryId + "/deactivate", null, 204);
         problem(call(delete("/api/v1/catalog/categories/" + usedCategoryId), admin, null), 409, "CONFLICT");
     }
