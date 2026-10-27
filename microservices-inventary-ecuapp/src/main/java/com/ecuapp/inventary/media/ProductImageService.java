@@ -66,8 +66,23 @@ public class ProductImageService {
  }
  @Transactional public void unpublish(UUID productId,UUID imageId,String actor){
   ProductImage image=images.findByIdAndProductId(imageId,productId).orElseThrow(()->new ResourceNotFoundException("Imagen de producto",imageId));
+  if(!image.isPublished())return;
+  String fileName=uploadedFileName(image.getImageUrl());
   image.unpublish();
   audit.record(actor,"PRODUCT_IMAGE_UNPUBLISHED","PRODUCT_IMAGE",imageId,Map.of("productId",productId.toString()));
+  if(fileName!=null&&TransactionSynchronizationManager.isSynchronizationActive()){
+   TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
+    @Override public void afterCompletion(int status){
+     if(status==STATUS_COMMITTED)storage.deleteQuietly(fileName);
+    }
+   });
+  }
+ }
+ private String uploadedFileName(String imageUrl){
+  String prefix="/api/v1/public/media/products/";
+  if(imageUrl==null||!imageUrl.startsWith(prefix))return null;
+  String fileName=imageUrl.substring(prefix.length());
+  try{storage.resolve(fileName);return fileName;}catch(RuntimeException invalid){return null;}
  }
  private String clean(String v){return v==null||v.isBlank()?null:v.trim();}
 }
