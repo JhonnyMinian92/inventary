@@ -1,6 +1,6 @@
 # Cobertura de API del frontend
 
-Esta matriz se revisó contra los controladores Spring bajo `microservices-inventary-ecuapp/src/main/java/com/ecuapp/inventary` y el cliente `src/api.js`. Describe las rutas que consume el frontend; no sustituye las reglas de autorización del servidor.
+Esta matriz se revisó contra los controladores Spring bajo `microservices-inventary-ecuapp/src/main/java/com/ecuapp/inventary` y el cliente `src/api.js`. Describe las rutas que consume el frontend; no sustituye las reglas de autorización del servidor. Las rutas de la tabla son relativas a la URL base configurada en `VITE_API_BASE_URL`, que incluye el prefijo `/api/v1`.
 
 | Módulo de UI | Rutas REST consumidas | Propósito |
 |---|---|---|
