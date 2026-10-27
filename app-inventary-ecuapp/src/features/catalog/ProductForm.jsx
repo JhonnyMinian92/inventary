@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Boxes } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Boxes, ImagePlus, Star, Trash2, UploadCloud } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
-import { api } from '../../api';
+import { api, resolveApiUrl } from '../../api';
 
 function objectValue(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return { ...value };
@@ -87,12 +87,22 @@ function AttributeInput({ definition, value, onChange }) {
 }
 
 export default function ProductForm({ initialValue, categories, units = [], loading, onCancel, onSubmit, onError }) {
+  const productId = initialValue?.id || initialValue?.productId || '';
+  const imageInputRef = useRef(null);
   const [form, setForm] = useState(() => normalizeProduct(initialValue));
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState('');
+  const [images, setImages] = useState([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imageAltText, setImageAltText] = useState('');
+  const [imagePrimary, setImagePrimary] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [imageNotice, setImageNotice] = useState('');
 
   useEffect(() => {
     const categoryId = form.categoryId;
@@ -123,6 +133,79 @@ export default function ProductForm({ initialValue, categories, units = [], load
 
     return () => { active = false; };
   }, [form.categoryId]);
+
+  useEffect(() => {
+    if (!productId) {
+      setImages([]);
+      setImagesLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setImagesLoading(true);
+    setImageError('');
+    api.productImages(productId)
+      .then(result => { if (active) setImages(Array.isArray(result) ? result : []); })
+      .catch(error => { if (active) setImageError(error?.message || 'No se pudieron cargar las imágenes del producto.'); })
+      .finally(() => { if (active) setImagesLoading(false); });
+    return () => { active = false; };
+  }, [productId]);
+
+  async function uploadImage() {
+    setImageError('');
+    setImageNotice('');
+    if (!productId) {
+      setImageError('Guarda el producto primero. Después podrás abrirlo para añadir imágenes.');
+      return;
+    }
+    if (!imageFile) {
+      setImageError('Selecciona un archivo PNG o JPEG.');
+      return;
+    }
+    if (!['image/png', 'image/jpeg'].includes(imageFile.type)) {
+      setImageError('Elige una imagen PNG o JPEG. Otros formatos no están permitidos.');
+      return;
+    }
+    if (imageFile.size < 1 || imageFile.size > 5 * 1024 * 1024) {
+      setImageError('La imagen debe pesar menos de 5 MB.');
+      return;
+    }
+    setImageBusy(true);
+    try {
+      const created = await api.uploadProductImage(productId, imageFile, {
+        altText: imageAltText.trim(),
+        sortOrder: images.length,
+        primaryImage: imagePrimary || images.length === 0
+      });
+      setImages(current => [...current, created].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)));
+      setImageFile(null);
+      setImageAltText('');
+      setImagePrimary(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      setImageNotice('Imagen guardada.');
+    } catch (error) {
+      setImageError(error?.message || 'No se pudo guardar la imagen.');
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  async function removeImage(image) {
+    const imageId = image?.id;
+    if (!productId || !imageId || imageBusy) return;
+    if (!window.confirm('¿Quitar esta imagen del catálogo público?')) return;
+    setImageError('');
+    setImageNotice('');
+    setImageBusy(true);
+    try {
+      await api.unpublishProductImage(productId, imageId);
+      setImages(current => current.filter(item => String(item.id) !== String(imageId)));
+      setImageNotice('Imagen retirada del catálogo público.');
+    } catch (error) {
+      setImageError(error?.message || 'No se pudo retirar la imagen.');
+    } finally {
+      setImageBusy(false);
+    }
+  }
 
   function changeField(key, value) {
     setForm(current => ({ ...current, [key]: value }));
@@ -289,6 +372,42 @@ export default function ProductForm({ initialValue, categories, units = [], load
     }
     {schemaError && <div className="alert error wide">{schemaError}</div>}
       </div>
+      {initialValue && productId ? <section className="product-image-manager wide" aria-labelledby="product-images-title">
+        <div className="product-image-manager-heading">
+          <span className="workflow-stage-icon"><ImagePlus size={19}/></span>
+          <div><h3 id="product-images-title">Imágenes del producto</h3><p>Se aceptan imágenes PNG o JPEG de hasta 5 MB.</p></div>
+        </div>
+        {imageError && <div className="alert error" role="alert">{imageError}</div>}
+        {imageNotice && <div className="alert success" role="status">{imageNotice}</div>}
+        <div className="product-image-upload-fields">
+          <label className="field"><span>Archivo de imagen<b> *</b></span>
+            <input ref={imageInputRef} type="file" accept="image/png,image/jpeg" disabled={imageBusy || loading} onChange={event => { setImageFile(event.target.files?.[0] || null); setImageError(''); setImageNotice(''); }} />
+            <small className="field-help">{imageFile ? `${imageFile.name} · ${(imageFile.size / 1024 / 1024).toFixed(2)} MB` : 'El archivo se valida también en el servidor.'}</small>
+          </label>
+          <label className="field"><span>Texto alternativo <small>(opcional)</small></span>
+            <input maxLength="300" value={imageAltText} disabled={imageBusy || loading} onChange={event => setImageAltText(event.target.value)} placeholder="Describe brevemente la imagen" />
+          </label>
+          <label className="checkbox-field product-image-primary">
+            <span>Marcar como imagen principal</span>
+            <input type="checkbox" checked={imagePrimary || images.length === 0} disabled={imageBusy || loading || images.length === 0} onChange={event => setImagePrimary(event.target.checked)} />
+          </label>
+          <button type="button" className="button secondary" disabled={imageBusy || loading || imagesLoading || !imageFile} onClick={uploadImage}>
+            <UploadCloud size={16}/>{imageBusy ? 'Guardando imagen…' : 'Subir imagen'}
+          </button>
+        </div>
+        <div className="product-image-gallery" aria-live="polite">
+          {imagesLoading && <p className="form-hint">Cargando imágenes…</p>}
+          {!imagesLoading && !images.length && <p className="form-hint">Todavía no hay imágenes adicionales para este producto.</p>}
+          {images.map(image => <article className="product-image-card" key={image.id}>
+            <img src={resolveApiUrl(image.imageUrl)} alt={image.altText || form.name || 'Imagen del producto'} loading="lazy" />
+            <div className="product-image-card-details">
+              <strong>{image.altText || 'Imagen del producto'}</strong>
+              {image.primaryImage && <span className="product-image-primary-label"><Star size={12} fill="currentColor"/> Principal</span>}
+              <button type="button" className="text-button danger-text" disabled={imageBusy || loading} onClick={() => removeImage(image)}><Trash2 size={14}/> Quitar imagen</button>
+            </div>
+          </article>)}
+        </div>
+      </section> : <p className="form-hint wide product-image-first-save">Guarda el producto y vuelve a editarlo para añadir imágenes.</p>}
     </section>}
     {step === 2 && <section className="workflow-stage" aria-labelledby="product-review-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-review-title">Confirma los datos</h2><p>Comprueba la información antes de guardar.</p></div></div>
