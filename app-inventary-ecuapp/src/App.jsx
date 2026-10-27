@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, Tags, Warehouse } from 'lucide-react';
-import { api, getToken, listFrom, setToken } from './api';
+import { api, getToken, listFrom, listAllPages, setToken } from './api';
 import ProductForm from './features/catalog/ProductForm.jsx';
 import CategoryForm from './features/catalog/CategoryForm.jsx';
 import PurchaseForm from './features/purchasing/PurchaseForm.jsx';
@@ -71,9 +71,11 @@ function App() {
   const loadData = useCallback(async () => {
     setLoading(true); setError('');
     const tasks = [
-      ['products', api.products({ size: 100 })], ['categories', api.categories({ size: 100 })], ['units', api.units()],
-      ['warehouses', api.warehouses({ size: 100 })], ['suppliers', api.suppliers({ size: 100 })], ['customers', api.customers({ size: 100 })], ['balances', api.balances({ size: 100 })], ['movements', api.movements({ size: 100 })],
-      ['purchases', api.purchaseOrders({ size: 100 })], ['sales', api.sales({ size: 100 })], ['valuation', api.inventoryValuationReport({ size: 100 })]
+      ['products', listAllPages(api.products, { size: 100 })], ['categories', listAllPages(api.categories, { size: 100 })], ['units', api.units()],
+      ['warehouses', listAllPages(api.warehouses, { size: 100 })], ['suppliers', listAllPages(api.suppliers, { size: 100 })],
+      ['customers', listAllPages(api.customers, { size: 100 })], ['balances', listAllPages(api.balances, { size: 100 })],
+      ['movements', listAllPages(api.movements, { size: 100 })], ['purchases', listAllPages(api.purchaseOrders, { size: 100 })],
+      ['sales', listAllPages(api.sales, { size: 100 })], ['valuation', api.inventoryValuationReport({ size: 100 })]
     ];
     const results = await Promise.allSettled(tasks.map(t => t[1]));
     const unauthorized = results.some(result => result.status === 'rejected' && result.reason?.status === 401);
