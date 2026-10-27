@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, Warehouse, Wrench } from 'lucide-react';
 import { api, listFrom, listAllPages } from '../../api';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
+import StepProgress from '../../components/StepProgress.jsx';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
@@ -18,10 +20,11 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState('');
+  const [workflowStep, setWorkflowStep] = useState(0);
+  const [validationMessage, setValidationMessage] = useState('');
   const [ruleEditing, setRuleEditing] = useState(null);
   const [reasonDialog, setReasonDialog] = useState(null);
   const [reasonText, setReasonText] = useState('');
-  const dialogRef = useAccessibleDialog(Boolean(modal), () => setModal(''));
   const reasonDialogRef = useAccessibleDialog(Boolean(reasonDialog), () => setReasonDialog(null));
   const [transferForm, setTransferForm] = useState({ sourceWarehouseId: '', destinationWarehouseId: '', items: [emptyLine()] });
   const [countForm, setCountForm] = useState({ warehouseId: '', items: [emptyLine()] });
@@ -50,6 +53,26 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   function updateLine(formKind, index, field, value) {
     const setter = formKind === 'transfer' ? setTransferForm : setCountForm;
     setter(current => ({ ...current, items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line) }));
+    setValidationMessage('');
+  }
+
+  function startOperation(kind) {
+    setError('');
+    setNotice('');
+    setValidationMessage('');
+    setWorkflowStep(0);
+    setModal(kind);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function closeOperation() {
+    if (loading) return;
+    if (!window.confirm('¿Salir de este formulario? Los datos que no hayas guardado se perderán.')) return;
+    setModal('');
+    setWorkflowStep(0);
+    setValidationMessage('');
+    setRuleEditing(null);
+    setError('');
   }
 
   function addLine(formKind) {
@@ -70,6 +93,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       await action();
       setNotice(success);
       setModal('');
+      setWorkflowStep(0);
+      setValidationMessage('');
       setRuleEditing(null);
       await refresh();
       await onChanged?.();
@@ -84,11 +109,29 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   function submitTransfer(event) {
     event.preventDefault();
+    setValidationMessage('');
+    if (workflowStep === 0) {
+      if (!transferForm.sourceWarehouseId || !transferForm.destinationWarehouseId) {
+        setValidationMessage('Selecciona el almacén de origen y el de destino.');
+        return;
+      }
+      if (transferForm.sourceWarehouseId === transferForm.destinationWarehouseId) {
+        setValidationMessage('El almacén de origen y el de destino deben ser diferentes.');
+        return;
+      }
+      setWorkflowStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
     const items = transferForm.items.map(line => ({ productId: line.productId, quantity: Number(line.quantity) }));
     const hasDuplicateProducts = new Set(items.map(item => item.productId)).size !== items.length;
-    if (!transferForm.sourceWarehouseId || !transferForm.destinationWarehouseId || transferForm.sourceWarehouseId === transferForm.destinationWarehouseId ||
-        !items.length || hasDuplicateProducts || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
-      setError(hasDuplicateProducts ? 'Cada producto debe aparecer una sola vez en el traslado.' : 'Selecciona almacenes diferentes y completa todas las líneas con cantidades positivas.');
+    if (!items.length || hasDuplicateProducts || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+      setValidationMessage(hasDuplicateProducts ? 'Cada producto debe aparecer una sola vez en el traslado.' : 'Añade productos con cantidades mayores que cero.');
+      return;
+    }
+    if (workflowStep === 1) {
+      setWorkflowStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
     void operate(() => api.createInventoryTransfer({
@@ -100,10 +143,25 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   function submitCount(event) {
     event.preventDefault();
+    setValidationMessage('');
+    if (workflowStep === 0) {
+      if (!countForm.warehouseId) {
+        setValidationMessage('Selecciona el almacén donde se hizo el conteo.');
+        return;
+      }
+      setWorkflowStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
     const items = countForm.items.map(line => ({ productId: line.productId, countedQuantity: Number(line.quantity) }));
     const hasDuplicateProducts = new Set(items.map(item => item.productId)).size !== items.length;
-    if (!countForm.warehouseId || !items.length || hasDuplicateProducts || items.some(item => !item.productId || !Number.isFinite(item.countedQuantity) || item.countedQuantity < 0)) {
-      setError(hasDuplicateProducts ? 'Cada producto debe aparecer una sola vez en el conteo físico.' : 'Selecciona el almacén y productos, con cantidades contadas iguales o mayores que cero.');
+    if (!items.length || hasDuplicateProducts || items.some(item => !item.productId || !Number.isFinite(item.countedQuantity) || item.countedQuantity < 0)) {
+      setValidationMessage(hasDuplicateProducts ? 'Cada producto debe aparecer una sola vez en el conteo físico.' : 'Completa cada producto con una cantidad contada igual o mayor que cero.');
+      return;
+    }
+    if (workflowStep === 1) {
+      setWorkflowStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
     void operate(() => api.createInventoryCount({ warehouseId: countForm.warehouseId, items }), 'Conteo creado. Revisa las cantidades antes de contabilizar los ajustes.');
@@ -111,12 +169,27 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   function submitRule(event) {
     event.preventDefault();
+    setValidationMessage('');
+    if (workflowStep === 0) {
+      if (!ruleForm.productId || !ruleForm.warehouseId) {
+        setValidationMessage('Selecciona un producto y un almacén para esta regla.');
+        return;
+      }
+      setWorkflowStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
     const minimumQuantity = Number(ruleForm.minimumQuantity);
     const targetQuantity = Number(ruleForm.targetQuantity);
     const leadTimeDays = Number(ruleForm.leadTimeDays);
-    if (!ruleForm.productId || !ruleForm.warehouseId || minimumQuantity < 0 || targetQuantity <= minimumQuantity || leadTimeDays < 0 ||
+    if (minimumQuantity < 0 || targetQuantity <= minimumQuantity || leadTimeDays < 0 ||
         !Number.isFinite(minimumQuantity) || !Number.isFinite(targetQuantity) || !Number.isFinite(leadTimeDays)) {
-      setError('El objetivo debe superar el mínimo; el mínimo y el plazo no pueden ser negativos.');
+      setValidationMessage('El objetivo debe ser mayor que el mínimo. El mínimo y el plazo no pueden ser negativos.');
+      return;
+    }
+    if (workflowStep === 1) {
+      setWorkflowStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
     const data = { productId: ruleForm.productId, warehouseId: ruleForm.warehouseId, minimumQuantity, targetQuantity, leadTimeDays };
@@ -127,11 +200,26 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   function submitAdjustment(event) {
     event.preventDefault();
+    setValidationMessage('');
+    if (workflowStep === 0) {
+      if (!adjustmentForm.productId || !adjustmentForm.warehouseId || !adjustmentForm.direction) {
+        setValidationMessage('Selecciona el almacén, el producto y el tipo de ajuste.');
+        return;
+      }
+      setWorkflowStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
     const quantity = Number(adjustmentForm.quantity);
     const unitCost = Number(adjustmentForm.unitCost);
-    if (!adjustmentForm.productId || !adjustmentForm.warehouseId || !adjustmentForm.reason.trim() || !Number.isFinite(quantity) || quantity <= 0 ||
+    if (!adjustmentForm.reason.trim() || !Number.isFinite(quantity) || quantity <= 0 ||
         (adjustmentForm.direction === 'INCREASE' && (!Number.isFinite(unitCost) || unitCost < 0))) {
-      setError('Selecciona producto y almacén, indica un motivo y usa una cantidad positiva. Para entradas, el costo unitario debe ser válido.');
+      setValidationMessage('Indica un motivo y una cantidad positiva. Para entradas, el costo unitario debe ser válido.');
+      return;
+    }
+    if (workflowStep === 1) {
+      setWorkflowStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
     const payload = {
