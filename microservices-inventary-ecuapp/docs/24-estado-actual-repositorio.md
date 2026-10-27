@@ -1,7 +1,6 @@
 # 24 — Estado actual verificable del repositorio
 
-**Corte documental:** 2026-10-26. **Rama observada:** master. **Commit base inspeccionado:** 7d240c9403244e6a7c25d7f22a96fb5af7e12269.  
-El presente informe describe ese árbol antes de este commit documental; no declara validado el runtime del HEAD. El commit que añade esta documentación no modifica código de aplicación.
+**Corte actualizado:** 2026-10-27. **Rama:** `master`. Este documento conserva los snapshots históricos debajo; la adenda al inicio y los resultados de Actions enlazados son la referencia para el estado vigente. El backend pasó Maven verify contra PostgreSQL 16 y un smoke test real de Docker Compose con volumen vacío en [backend-ci 40504351485](https://github.com/JhonnyMinian92/inventary/actions/runs/40504351485) sobre el commit `ac60c93a97c90c6384262880bf970dea813a6dce`. El frontend pasó `npm test` y `npm run build` en [Frontend Build 40504502526](https://github.com/JhonnyMinian92/inventary/actions/runs/40504502526) sobre el commit `26dc33cd209133be037beb13fb7990933cde394d`. La ejecución del workflow revisado para el último ajuste de limpieza de Compose está en curso; no afecta al código de aplicación.
 
 ## 1. Dictamen
 
@@ -14,7 +13,7 @@ Separar estos estados es obligatorio:
 - **Fuera de alcance:** no debe ofrecerse como capacidad de esta entrega.
 - **Pendiente de decisión:** necesita aprobación explícita de producto/arquitectura.
 
-En el corte, el código estáticamente presente es amplio, pero el build del HEAD actual, la integración Docker y la validación en PostgreSQL 16 no se han confirmado para este corte. No declarar “100 % validado en producción”.
+El cierre de calidad ahora cuenta con una ruta reproducible en CI: Maven verify contra PostgreSQL 16, validación de los perfiles normal/Kafka de Compose y arranque de la API desde una base vacía. Esto demuestra compilación e integración del entorno de prueba; no equivale a una certificación de producción ni de cargas reales.
 
 ## 2. Identidad y estructura
 
@@ -28,15 +27,15 @@ SHA base revisado: 7d240c9403244e6a7c25d7f22a96fb5af7e12269.
 - Node >=22.12.0 y <23; .nvmrc declara la línea 22; npm 10 u 11.
 - SPA coordinada por src/App.jsx; cliente REST compartido, Bearer, errores e idempotencia temporal en src/api.js.
 - UI observada: dashboard; productos/categorías/atributos; almacenes, proveedores, clientes y unidades; compras y recepción parcial; devolución a proveedor; ventas, solicitudes/aprobaciones de cancelación y devoluciones de cliente; saldos, movimientos, ajustes, conteos, traslados, reabastecimiento; reportes y CSV.
-- package.json solo declara dev, build y preview; no declara test ni lint. No se encontró package-lock.json en el árbol de referencia, por lo que no hay instalación reproducible mediante npm ci.
+- `package.json` declara `test` con Node test runner, además de `build`; `npm test` y `npm run build` están incluidos en el workflow frontend. No se encontró `package-lock.json`; la instalación usa `npm install`, de modo que versionar un lockfile sigue siendo una mejora de reproducibilidad recomendada.
 - El token de acceso está guardado en localStorage. Revisar XSS/CSP y modelo de almacenamiento antes de producción.
-- No están como pantallas completas: administración avanzada de usuarios/roles, auditoría completa, Outbox, política de costeo, GraphQL, imágenes, gestión directa de variantes y flujos conversacionales WhatsApp.
+- La SPA incorpora un flujo de imágenes en edición de productos existentes, con subida PNG/JPEG y galería; mantiene sin UI dedicada parte de la administración avanzada, auditoría completa, Outbox, políticas de costeo y gestión directa de variantes.
 
 ### Backend: microservices-inventary-ecuapp
 
 - Java 21, Spring Boot 3.5.6, Spring MVC, Spring Security, Spring Data JPA/Hibernate, PostgreSQL, Flyway, Bean Validation, Actuator, Spring GraphQL, Caffeine, Spring Kafka y springdoc-openapi.
 - 25 controladores HTTP observados en el árbol de referencia.
-- Migraciones Flyway V1–V14. Hibernate valida el esquema; Flyway aplica migraciones incrementales.
+- Migraciones Flyway V1–V15. V15 incorpora inbox persistente para deduplicación Kafka. Hibernate valida el esquema; las pruebas de CI verifican las migraciones con PostgreSQL 16.
 - JWT HS256 con issuer/audience, expiración, usuario activo, versión de token y permisos consultados desde la base.
 - RBAC por autoridades/permiso y restricciones de método.
 - Integridad de inventario con transacciones, bloqueos, claves únicas, idempotencia, movimientos históricos y asientos/capas de valoración.
@@ -63,19 +62,19 @@ SHA base revisado: 7d240c9403244e6a7c25d7f22a96fb5af7e12269.
 | Reportes | Seis familias de endpoints | Balance limita rango a 366 días y página a 100 |
 | Auditoría | Eventos de auditoría consultables | Mantener logs sin credenciales ni cuerpos sensibles |
 | WhatsApp/n8n | Catálogo, carrito, cotización, pedido, cancelación/backoffice | No es una pasarela de pago |
-| Outbox/Kafka | Outbox, relay y endpoints operativos | Consumidores/proyecciones Kafka no incluidos |
+| Outbox/Kafka | Outbox, relay, endpoints operativos y consumidor opcional con inbox, deduplicación por eventId, hash canónico y DLQ con reintentos acotados | Deshabilitado por defecto; el consumidor implementado invalida caché pública, no genera proyecciones analíticas |
 | API GraphQL | Consultas públicas del catálogo | No sustituye comandos REST |
-| Operación | Docker Compose, Actuator, rate limit local | Compose no aparece ejecutado en evidencia histórica |
+| Operación | Docker Compose, Actuator, rate limit local, checks de CI | El workflow actual valida Compose y arranca API + PostgreSQL desde volumen vacío; el rate limit sigue siendo local por instancia |
 | Fiscal/pagos | No implementado de forma fiscal | Impuesto 0, sin SRI ni pasarela/reembolso |
 | Multiempresa | No implementado | No anunciar SaaS multi-tenant |
-| Imágenes | URL HTTPS y metadatos | Sin carga binaria gestionada |
+| Imágenes | Metadatos HTTPS y subida binaria segura PNG/JPEG, validación real, tamaño/resolución máximos, almacenamiento UUID y endpoint público condicionado a publicación | Carga limitada a 5 MiB; almacenamiento persistente configurado en Compose |
 | Rate limit distribuido | No implementado | Límite local por instancia |
 
 ## 4. Evidencia disponible y límites
 
 El documento histórico fechado el 2026-10-23 afirma 76 pruebas backend verdes y un smoke test de 192 llamadas que cubrió 138 operaciones documentadas. También explica que se ejecutó en una copia local que no era un repositorio Git y sin SHA inicial/final. Debe conservarse como evidencia histórica, no como certificación del HEAD.
 
-Los workflows de frontend y backend observados son manuales. Las corridas de frontend visibles corresponden a commits anteriores al SHA de referencia. Ejecutar las pruebas sobre PostgreSQL 16 y en el mismo SHA que se publique.
+Los workflows de frontend y backend se ejecutan automáticamente sobre cambios relevantes a `master` y PRs. La evidencia más reciente debe comprobarse en Actions enlazadas arriba; cualquier release posterior debe estar asociada al SHA exacto que fue verificado.
 
 ## 5. Documentación autoritativa
 
