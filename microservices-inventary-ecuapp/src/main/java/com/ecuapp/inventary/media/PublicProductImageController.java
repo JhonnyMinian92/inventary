@@ -25,15 +25,21 @@ public class PublicProductImageController {
         "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(png|jpg)"
     );
     private final ProductImageStorage storage;
+    private final ProductImageRepository images;
 
-    public PublicProductImageController(ProductImageStorage storage) {
+    public PublicProductImageController(ProductImageStorage storage, ProductImageRepository images) {
         this.storage = storage;
+        this.images = images;
     }
 
     @GetMapping("/api/v1/public/media/products/{fileName:.+}")
     public ResponseEntity<Resource> get(@PathVariable String fileName) {
         if (fileName == null || !SAFE_FILENAME.matcher(fileName).matches()) {
             throw new ResourceNotFoundException("Imagen pública", "no-disponible");
+        }
+        String publicUrl = "/api/v1/public/media/products/" + fileName;
+        if (!images.existsByImageUrlAndPublishedTrue(publicUrl)) {
+            throw new ResourceNotFoundException("Imagen pública", fileName);
         }
         Path path = storage.resolve(fileName);
         if (!Files.isRegularFile(path)) {
@@ -50,7 +56,7 @@ public class PublicProductImageController {
         return ResponseEntity.ok()
             .contentType(contentType)
             .contentLength(length)
-            .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic())
+            .cacheControl(CacheControl.maxAge(Duration.ofMinutes(1)).cachePublic().mustRevalidate())
             .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(fileName).build().toString())
             .header("X-Content-Type-Options", "nosniff")
             .body(new FileSystemResource(path));
