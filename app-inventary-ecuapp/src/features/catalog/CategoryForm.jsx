@@ -190,7 +190,7 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
       <button type="button" className="button secondary" disabled={schemaLoading || Boolean(schemaError)} onClick={() => setDefinitions(current => [...current, emptyDefinition()])}>+ Añadir propiedad</button>
     </div>
     <div className="form-actions wide">
-      <button type="button" className="button secondary" onClick={onCancel}>Cancelar</button>
+      <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
       <button className="button primary" disabled={loading || schemaLoading || !schemaLoaded || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar categoría'}</button>
     </div>
     {schemaError && initialValue && <p className="form-hint wide">Cierra y vuelve a abrir el editor para intentar leer el esquema de nuevo antes de modificarlo.</p>}
