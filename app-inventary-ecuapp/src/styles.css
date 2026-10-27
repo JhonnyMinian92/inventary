@@ -331,3 +331,24 @@ button:disabled { opacity: .58; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .skeleton-bar, .icon-button.is-loading svg { animation: none; }
 }
+
+
+/* Clear feedback for destructive and cautionary actions */
+.alert.warning {
+  color: #80591b;
+  background: #fff7e6;
+  border: 1px solid #f2dfb2;
+}
+.button.danger {
+  color: #fff;
+  background: #c83f4d;
+  border-color: #c83f4d;
+}
+.button.danger:hover { background: #a92f3d; border-color: #a92f3d; }
+.modal-feedback { margin-bottom: 14px; align-items: flex-start; }
+.modal-feedback > svg { flex: 0 0 auto; margin-top: 1px; }
+.modal-feedback > button { flex: 0 0 auto; margin-left: auto; }
+@media (max-width: 560px) {
+  .alert { align-items: flex-start; padding: 10px 11px; font-size: 11px; }
+  .modal-feedback { margin-bottom: 12px; }
+}
