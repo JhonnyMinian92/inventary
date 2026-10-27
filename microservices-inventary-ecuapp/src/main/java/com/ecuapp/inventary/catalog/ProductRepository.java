@@ -1,16 +1,24 @@
 package com.ecuapp.inventary.catalog;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.Optional;
 import java.util.UUID;
 public interface ProductRepository extends JpaRepository<Product,UUID> {
  boolean existsBySku(String sku);
  boolean existsBySkuIgnoreCase(String sku);
- java.util.Optional<Product> findBySkuIgnoreCase(String sku);
+ Optional<Product> findBySkuIgnoreCase(String sku);
  boolean existsByUnitOfMeasureIdAndActiveTrue(UUID unitOfMeasureId);
+ @Query("select case when count(p)>0 then true else false end from Product p where p.category.id=:categoryId and p.active=true")
+ boolean existsActiveByCategoryId(@Param("categoryId") UUID categoryId);
+ @Lock(LockModeType.PESSIMISTIC_WRITE)
+ @Query("select p from Product p where p.id=:id")
+ Optional<Product> findForUpdate(@Param("id") UUID id);
  @EntityGraph(attributePaths={"category"})
  @Query("""
   select p from Product p
