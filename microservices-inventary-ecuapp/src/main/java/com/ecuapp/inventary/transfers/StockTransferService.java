@@ -97,7 +97,7 @@ public class StockTransferService {
   for(TransferDtos.LineRequest item:ordered){
    if(!seen.add(item.productId()))throw new BusinessRuleException("No repita un producto en más de una línea de transferencia.");
    Product product=products.findForUpdate(item.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",item.productId()));
-   if(!product.isActive())throw new BusinessRuleException("No se puede transferir un producto inactivo.");
+   // Internal transfers remain available for stock reconciliation after a product is deactivated.
    if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control físico admiten transferencias.");
    BigDecimal quantity=item.quantity().setScale(3,RoundingMode.UNNECESSARY);
    lines.add(new StockTransferLine(product,quantity,product.getCostPrice()));
