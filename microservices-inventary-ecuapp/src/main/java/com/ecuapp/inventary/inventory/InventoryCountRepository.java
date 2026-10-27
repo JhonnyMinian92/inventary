@@ -21,6 +21,9 @@ public interface InventoryCountRepository extends JpaRepository<InventoryCount, 
     @Query("select case when count(c)>0 then true else false end from InventoryCount c where c.warehouse.id=:warehouseId and c.status=:status")
     boolean existsForWarehouseWithStatus(@Param("warehouseId") UUID warehouseId,@Param("status") InventoryCountStatus status);
 
+    @Query("select case when count(c)>0 then true else false end from InventoryCount c where c.warehouse.id=:warehouseId")
+    boolean existsForWarehouse(@Param("warehouseId") UUID warehouseId);
+
     @Query("select case when count(distinct c)>0 then true else false end from InventoryCount c join c.lines l where l.product.id=:productId and c.status=:status")
     boolean existsForProductWithStatus(@Param("productId") UUID productId,@Param("status") InventoryCountStatus status);
 
