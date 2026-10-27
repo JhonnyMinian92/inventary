@@ -41,6 +41,8 @@ public class ProductController {
  public ProductDtos.View update(@PathVariable UUID id,@Valid @RequestBody ProductDtos.WriteRequest r,Authentication auth){return ProductDtos.View.from(products.updateProduct(id,command(r),auth.getName()),true);}
  @PostMapping("/{id}/deactivate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
  public void deactivate(@PathVariable UUID id,Authentication auth){products.deactivateProduct(id,auth.getName());}
+ @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
+ public void delete(@PathVariable UUID id,Authentication auth){products.deleteProduct(id,auth.getName());}
  @PostMapping("/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
  public void activate(@PathVariable UUID id,Authentication auth){products.activateProduct(id,auth.getName());}
  private boolean canSeeCost(Authentication auth){
