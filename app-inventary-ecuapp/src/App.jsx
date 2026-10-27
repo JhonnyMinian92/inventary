@@ -488,7 +488,7 @@ function Login({ onLogin, error }) {
 }
 function PanelHeading({title,subtitle,action,onAction,icon:Icon=Layers3}) { return <div className="panel-heading"><div className="panel-title-icon"><span><Icon size={20}/></span><div><h2>{title}</h2><p>{subtitle}</p></div></div>{action&&<button type="button" className="button primary" onClick={onAction}><Plus size={16}/>{action}</button>}</div>; }
 function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
-function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
+function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
 function Modal({title,onClose,children,busy,error,notice,onDismissError,onDismissNotice}) {
   const dialogRef = useAccessibleDialog(true, onClose);
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (!busy && event.target === event.currentTarget) onClose(); }}>
