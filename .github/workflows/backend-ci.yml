@@ -21,10 +21,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: backend-ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   verify:
     name: Maven verify with PostgreSQL 16
