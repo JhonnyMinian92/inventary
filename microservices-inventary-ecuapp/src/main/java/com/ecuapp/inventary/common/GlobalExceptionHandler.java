@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -103,6 +104,10 @@ public class GlobalExceptionHandler {
  ResponseEntity<ProblemDetail> credentials(BadCredentialsException ex,HttpServletRequest req){return response(HttpStatus.UNAUTHORIZED,"No autorizado","Credenciales inválidas.","INVALID_CREDENTIALS",req);}
  @ExceptionHandler(AuthenticationException.class)
  ResponseEntity<ProblemDetail> authentication(AuthenticationException ex,HttpServletRequest req){return response(HttpStatus.UNAUTHORIZED,"No autenticado","Se requiere una sesión válida para acceder a este recurso.","AUTHENTICATION_REQUIRED",req);}
+ @ExceptionHandler(MaxUploadSizeExceededException.class)
+ ResponseEntity<ProblemDetail> uploadTooLarge(MaxUploadSizeExceededException ex,HttpServletRequest req){
+  return response(HttpStatus.PAYLOAD_TOO_LARGE,"Archivo demasiado grande","La imagen supera el tamaño máximo de carga permitido.","PAYLOAD_TOO_LARGE",req);
+ }
  @ExceptionHandler(ResponseStatusException.class)
  ResponseEntity<ProblemDetail> status(ResponseStatusException ex,HttpServletRequest req){
   HttpStatusCode code=ex.getStatusCode();HttpStatus status=HttpStatus.resolve(code.value());if(status==null)status=HttpStatus.BAD_REQUEST;
