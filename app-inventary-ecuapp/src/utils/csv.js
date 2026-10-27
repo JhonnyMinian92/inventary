@@ -5,7 +5,7 @@
  */
 export function asCsvValue(value) {
   const isNumeric = typeof value === 'number' && Number.isFinite(value);
-  const text = value === null || value === undefined
+  const text = value === null || value === undefined || (typeof value === 'number' && !Number.isFinite(value))
     ? ''
     : typeof value === 'object'
       ? JSON.stringify(value)
