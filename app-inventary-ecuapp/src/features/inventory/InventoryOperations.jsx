@@ -238,12 +238,13 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     <div className="panel-heading"><div className="panel-title-icon"><span>⇄</span><div><h2>Operaciones de inventario</h2><p>Traslados entre almacenes, conteos físicos y reposición de existencias.</p></div></div><button className="button secondary" onClick={() => void refresh()} disabled={loading}>Actualizar</button></div>
     {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
     {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
-    {!modal && <div className="catalog-tabs" role="tablist" aria-label="Operaciones de inventario">
+    {!modal && <>
+    <div className="catalog-tabs" role="tablist" aria-label="Operaciones de inventario">
       <button className={tab === 'transfers' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'transfers'} onClick={() => setTab('transfers')}>Traslados <span>{transfers.length}</span></button>
       <button className={tab === 'counts' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'counts'} onClick={() => setTab('counts')}>Conteos físicos <span>{counts.length}</span></button>
       <button className={tab === 'reorder' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'reorder'} onClick={() => setTab('reorder')}>Reposición <span>{suggestions.length}</span></button>
       <button className={tab === 'adjustments' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'adjustments'} onClick={() => setTab('adjustments')}>Ajustes</button>
-    </div>}
+    </div>
 
     {tab === 'transfers' && <>
       <div className="toolbar"><p className="muted">Un traslado reduce el origen al despacharse y aumenta el destino al recibirse.</p><button className="button primary" onClick={() => { setTransferForm({ sourceWarehouseId: warehouses[0]?.id || '', destinationWarehouseId: warehouses[1]?.id || '', items: [emptyLine()] }); startOperation('transfer'); }}>+ Nuevo traslado</button></div>
@@ -296,6 +297,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       </tbody></table>{!rules.length && <div className="empty-state">No hay reglas de reposición configuradas.</div>}</div>
     </>}
 
+    </>}
     {modal && <section className="inventory-workspace" aria-labelledby="inventory-workflow-title">
       <header className="workflow-page-heading">
         <div className="workflow-page-copy">
