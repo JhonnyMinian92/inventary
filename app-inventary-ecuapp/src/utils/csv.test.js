@@ -18,7 +18,7 @@ test('neutralizes formula injection after leading whitespace and controls', () =
   assert.match(hyperlink, /""https:\/\/example\.invalid""/);
   assert.match(hyperlink, /""open""\)"$/);
   assert.equal(asCsvValue('\t@SUM(1,2)'), "\"'\\t@SUM(1,2)\"");
-  assert.equal(asCsvValue('\uFEFF+1+1'), "\"'\\uFEFF+1+1\"".replaceAll('\\uFEFF', '\uFEFF'));
+  assert.equal(asCsvValue('\uFEFF+1+1'), '"' + "'\uFEFF+1+1" + '"');
 });
 
 test('preserves finite numeric cells, including negative numeric values', () => {
