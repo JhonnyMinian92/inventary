@@ -191,6 +191,20 @@ function App() {
     if (completed) setStatusChangeTarget(null);
   }
 
+  async function deleteProduct(product) {
+    if (!product || product.active !== false) return;
+    const label = product.name || product.sku || pickId(product);
+    if (!window.confirm('Eliminar físicamente el producto "' + label + '"? Esta acción solo es posible si no tiene existencias, movimientos, variantes, imágenes ni documentos relacionados.')) return;
+    await runAction(() => api.deleteProduct(pickId(product)), 'Producto eliminado físicamente.');
+  }
+
+  async function deleteCategory(category) {
+    if (!category || category.active !== false) return;
+    const label = category.name || pickId(category);
+    if (!window.confirm('Eliminar físicamente la categoría "' + label + '"? Solo se permite si no tiene productos ni referencias históricas.')) return;
+    await runAction(() => api.deleteCategory(pickId(category)), 'Categoría eliminada físicamente.');
+  }
+
   async function logout() {
     try {
       await api.logout();
@@ -358,8 +372,8 @@ function App() {
       {error && <div className="alert error" role="alert" aria-live="assertive"><CircleAlert size={18}/><span>{error}</span><button type="button" aria-label="Cerrar mensaje de error" onClick={() => setError('')}>×</button></div>}
       {notice && <div className="alert success" role="status" aria-live="polite"><Activity size={18}/><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
       {section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValueLabel} purchases={purchases} sales={sales} movements={movements} setSection={setSection} loading={loading} onNewProduct={() => openProduct()} onNewCategory={() => openCategory()} onNewPurchase={() => setModal('purchase')} onNewSale={() => setModal('sale')}/>}
-      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input aria-label="Buscar productos por nombre o SKU" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus}/></section>}
-      {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus}/></section>}
+      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input aria-label="Buscar productos por nombre o SKU" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus} onDelete={deleteProduct}/></section>}
+      {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus} onDelete={deleteCategory}/></section>}
       {section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
       {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onView={openPurchaseDetail} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={requestPurchaseCancellation} onReceive={openReceive}/><PurchaseReturns onChanged={loadData}/></section>}
       {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><SalesTable rows={sales} loading={loading} onView={openSaleDetail} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation}/><SalesReturns onChanged={loadData}/></section>}
