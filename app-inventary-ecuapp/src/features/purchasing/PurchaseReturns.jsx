@@ -8,7 +8,7 @@ function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
 function readPurchaseReturnFromUrl() {
   if (typeof window === 'undefined') return false;
-  const parts = window.location.hash.slice(1).replace(/^\\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
+  const parts = window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
   return parts[0] === 'purchases' && parts[1] === 'returns' && parts[2] === 'new';
 }
 
