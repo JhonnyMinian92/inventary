@@ -28,6 +28,8 @@ public class PartnerController {
  public PartnerDtos.View updateSupplier(@PathVariable UUID id,@Valid @RequestBody PartnerDtos.WriteRequest r,Authentication a){return service.update(PartnerType.SUPPLIER,id,r,a.getName());}
  @PostMapping("/api/v1/suppliers/{id}/deactivate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('partners:manage')")
  public void deactivateSupplier(@PathVariable UUID id,Authentication a){service.deactivate(PartnerType.SUPPLIER,id,a.getName());}
+ @DeleteMapping("/api/v1/suppliers/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('partners:manage')")
+ public void deleteSupplier(@PathVariable UUID id,Authentication a){service.delete(PartnerType.SUPPLIER,id,a.getName());}
  @PostMapping("/api/v1/suppliers/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('partners:manage')")
  public void activateSupplier(@PathVariable UUID id,Authentication a){service.activate(PartnerType.SUPPLIER,id,a.getName());}
 
@@ -40,6 +42,8 @@ public class PartnerController {
  public PartnerDtos.View updateCustomer(@PathVariable UUID id,@Valid @RequestBody PartnerDtos.WriteRequest r,Authentication a){return service.update(PartnerType.CUSTOMER,id,r,a.getName());}
  @PostMapping("/api/v1/customers/{id}/deactivate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('customers:manage')")
  public void deactivateCustomer(@PathVariable UUID id,Authentication a){service.deactivate(PartnerType.CUSTOMER,id,a.getName());}
+ @DeleteMapping("/api/v1/customers/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('customers:manage')")
+ public void deleteCustomer(@PathVariable UUID id,Authentication a){service.delete(PartnerType.CUSTOMER,id,a.getName());}
  @PostMapping("/api/v1/customers/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('customers:manage')")
  public void activateCustomer(@PathVariable UUID id,Authentication a){service.activate(PartnerType.CUSTOMER,id,a.getName());}
 }
