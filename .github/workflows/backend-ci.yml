@@ -1,38 +1,62 @@
 name: backend-ci
+
 on:
+  push:
+    branches: [master]
+    paths:
+      - "microservices-inventary-ecuapp/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "microservices-inventary-ecuapp/**"
+      - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
     inputs:
       reason:
         description: "Motivo de la validación manual"
         required: false
         default: "Validación solicitada tras completar la implementación fuente"
+
 permissions:
   contents: read
+
 concurrency:
   group: backend-ci-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Maven verify with PostgreSQL 16
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: inventary
+          POSTGRES_DB: inventary_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ci-only-postgres-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d inventary"
+          --health-cmd "pg_isready -U postgres -d inventary_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
     defaults:
       run:
         working-directory: microservices-inventary-ecuapp
+    env:
+      TEST_DATASOURCE_URL: jdbc:postgresql://localhost:5432/inventary_test
+      TEST_DB_USERNAME: postgres
+      TEST_DB_PASSWORD: ci-only-postgres-password
+      DB_USERNAME: postgres
+      DB_PASSWORD: ci-only-postgres-password
+      JWT_SECRET: ci-only-secret-key-32-bytes-or-longer-please
+      BOOTSTRAP_ADMIN_USERNAME: ci-admin
+      BOOTSTRAP_ADMIN_PASSWORD: ci-only-admin-password-123!
+      SWAGGER_ENABLED: "false"
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -43,13 +67,14 @@ jobs:
           java-version: "21"
           cache: maven
           cache-dependency-path: microservices-inventary-ecuapp/pom.xml
-      - name: Verify with Maven
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/inventary
-          DB_USERNAME: postgres
-          DB_PASSWORD: ci-only-postgres-password
-          JWT_SECRET: ci-only-secret-key-32-bytes-or-longer-please
-          BOOTSTRAP_ADMIN_USERNAME: ci-admin
-          BOOTSTRAP_ADMIN_PASSWORD: ci-only-admin-password-123!
-          SWAGGER_ENABLED: "false"
-        run: mvn -B verify
+      - name: Verify Maven wrapper
+        run: test -x ./mvnw
+      - name: Verify with Maven and PostgreSQL 16
+        run: ./mvnw -B --no-transfer-progress verify
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: microservices-inventary-ecuapp/target/surefire-reports
+          if-no-files-found: warn
