@@ -55,6 +55,7 @@ public class SalesReturnService {
   }
   Sale sale=sales.findForUpdateById(request.sourceSaleId()).orElseThrow(()->new ResourceNotFoundException("Venta",request.sourceSaleId()));
   if(sale.getStatus()!=SaleStatus.COMPLETED)throw new BusinessRuleException("Solo se pueden devolver ventas completadas.");
+  if(!sale.getWarehouse().isActive())throw new BusinessRuleException("Reactive el almacén de la venta antes de registrar una devolución para no ingresar mercancía a un almacén inactivo.");
   Map<UUID,SaleItem> saleItems=sale.getItems().stream().collect(Collectors.toMap(SaleItem::getId, i->i));
   Set<UUID> seen=new HashSet<>();List<Calc> calc=new ArrayList<>();
   for(SalesReturnDtos.LineRequest line:request.items()){
