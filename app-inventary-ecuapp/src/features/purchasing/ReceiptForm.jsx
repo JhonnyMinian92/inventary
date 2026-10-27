@@ -34,6 +34,6 @@ export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
         <label className="field"><span>Cantidad a recibir</span><input type="number" min="0" max={max} step="0.001" value={quantities[index] ?? '0'} onChange={event => setQuantities(current => current.map((value, qtyIndex) => qtyIndex === index ? event.target.value : value))} /></label>
       </div>;
     })}
-    <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !pending.length || !orderLines.length}>{loading ? 'Contabilizando…' : 'Contabilizar recepción'}</button></div>
+    <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !pending.length || !orderLines.length}>{loading ? 'Contabilizando…' : 'Contabilizar recepción'}</button></div>
   </form>;
 }
