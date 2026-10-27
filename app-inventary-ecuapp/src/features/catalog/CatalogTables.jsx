@@ -3,7 +3,7 @@ import { ShoppingBag } from 'lucide-react';
 function idOf(item) { return item?.id ?? item?.productId ?? item?.categoryId ?? ''; }
 function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
 
-export function ProductsTable({ products = [], categories = [], onEdit, onToggleActive }) {
+export function ProductsTable({ products = [], categories = [], onEdit, onToggleActive, onDelete }) {
   const categoryName = id => categories.find(category => String(idOf(category)) === String(id))?.name || '—';
   return <div className="table-wrap">
     <table aria-label="Catálogo de productos">
@@ -17,7 +17,7 @@ export function ProductsTable({ products = [], categories = [], onEdit, onToggle
           <td>{product.category?.name || categoryName(product.categoryId)}</td>
           <td>{titleCase(product.kind || 'STOCKED_GOOD')}</td>
           <td><span className={'pill ' + (inactive ? 'inactive' : 'active')}>{inactive ? 'Inactivo' : 'Activo'}</span></td>
-          <td><div className="row-actions"><button type="button" className="small-action" aria-label={'Editar producto ' + (product.name || product.sku)} onClick={() => onEdit(product)}>Editar</button><button type="button" className="small-action" aria-label={(inactive ? 'Activar' : 'Desactivar') + ' producto ' + (product.name || product.sku)} onClick={() => onToggleActive(product)}>{inactive ? 'Activar' : 'Desactivar'}</button></div></td>
+          <td><div className="row-actions"><button type="button" className="small-action" aria-label={'Editar producto ' + (product.name || product.sku)} onClick={() => onEdit(product)}>Editar</button><button type="button" className="small-action" aria-label={(inactive ? 'Activar' : 'Desactivar') + ' producto ' + (product.name || product.sku)} onClick={() => onToggleActive(product)}>{inactive ? 'Activar' : 'Desactivar'}</button>{inactive && onDelete && <button type="button" className="small-action danger" aria-label={"Eliminar físicamente producto " + (product.name || product.sku)} onClick={() => onDelete(product)}>Eliminar</button>}</div></td>
         </tr>;
       })}</tbody>
     </table>
@@ -25,7 +25,7 @@ export function ProductsTable({ products = [], categories = [], onEdit, onToggle
   </div>;
 }
 
-export function CategoriesTable({ categories = [], onEdit, onToggleActive }) {
+export function CategoriesTable({ categories = [], onEdit, onToggleActive, onDelete }) {
   return <div className="table-wrap">
     <table aria-label="Catálogo de categorías">
       <caption className="visually-hidden">Categorías registradas y su estado</caption>
@@ -35,7 +35,7 @@ export function CategoriesTable({ categories = [], onEdit, onToggleActive }) {
         return <tr key={idOf(category) || index}>
           <td><strong>{category.name || 'Sin nombre'}</strong></td><td><code>{category.code || '—'}</code></td><td>{category.description || '—'}</td><td>{category.productCount ?? '—'}</td>
           <td><span className={'pill ' + (inactive ? 'inactive' : 'active')}>{inactive ? 'Inactiva' : 'Activa'}</span></td>
-          <td><div className="row-actions"><button type="button" className="small-action" aria-label={'Editar categoría ' + (category.name || category.code)} onClick={() => onEdit(category)}>Editar</button><button type="button" className="small-action" aria-label={(inactive ? 'Activar' : 'Desactivar') + ' categoría ' + (category.name || category.code)} onClick={() => onToggleActive(category)}>{inactive ? 'Activar' : 'Desactivar'}</button></div></td>
+          <td><div className="row-actions"><button type="button" className="small-action" aria-label={'Editar categoría ' + (category.name || category.code)} onClick={() => onEdit(category)}>Editar</button><button type="button" className="small-action" aria-label={(inactive ? 'Activar' : 'Desactivar') + ' categoría ' + (category.name || category.code)} onClick={() => onToggleActive(category)}>{inactive ? 'Activar' : 'Desactivar'}</button>{inactive && onDelete && <button type="button" className="small-action danger" aria-label={"Eliminar físicamente categoría " + (category.name || category.code)} onClick={() => onDelete(category)}>Eliminar</button>}</div></td>
         </tr>;
       })}</tbody>
     </table>
