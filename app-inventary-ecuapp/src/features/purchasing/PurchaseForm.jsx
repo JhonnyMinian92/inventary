@@ -4,7 +4,7 @@ const emptyLine = () => ({ productId: '', quantity: '1', unitCost: '0' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 
-export default function PurchaseForm({ products, warehouses, suppliers, loading, initialValue, onCancel, onSubmit }) {
+export default function PurchaseForm({ products, warehouses, suppliers, loading, initialValue, onCancel, onSubmit, onError }) {
   const [warehouseId, setWarehouseId] = useState(initialValue?.warehouseId || warehouses[0]?.id || '');
   const [supplierId, setSupplierId] = useState(initialValue?.supplierId || initialValue?.supplier?.id || '');
   const [notes, setNotes] = useState(initialValue?.notes || '');
@@ -23,7 +23,19 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
   function submit(event) {
     event.preventDefault();
     const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity), unitCost: Number(line.unitCost) }));
-    if (!warehouseId || !supplierId || !items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitCost) || item.unitCost < 0)) return;
+    if (!warehouseId || !supplierId) {
+      onError?.('Selecciona el almacén y el proveedor de la compra.');
+      return;
+    }
+    if (!items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitCost) || item.unitCost < 0)) {
+      onError?.('Revisa las líneas: cada producto debe tener una cantidad mayor que cero y un costo no negativo.');
+      return;
+    }
+    const productIds = items.map(item => String(item.productId));
+    if (new Set(productIds).size !== productIds.length) {
+      onError?.('Cada producto debe aparecer una sola vez en la compra.');
+      return;
+    }
     onSubmit({ warehouseId, supplierId, notes: notes.trim(), items });
   }
 
