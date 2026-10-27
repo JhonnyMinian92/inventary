@@ -95,7 +95,7 @@ public class InventoryCountService {
             return InventoryCountDtos.View.from(requireDetailed(previous.get().getId()));
         }
 
-        Warehouse warehouse = warehouses.findById(request.warehouseId())
+        Warehouse warehouse = warehouses.findForUpdate(request.warehouseId())
             .orElseThrow(() -> new ResourceNotFoundException("Almacén", request.warehouseId()));
         if (!warehouse.isActive()) throw new BusinessRuleException("No se puede contar un almacén inactivo.");
 
@@ -112,7 +112,19 @@ public class InventoryCountService {
             item.countedQuantity().setScale(3, RoundingMode.UNNECESSARY);
         }
 
-        // Stable lock order reduces deadlocks when counts overlap on the same products.
+        // Lock product rows before balances in stable order. This serializes a new count with product deactivation.
+        Map<UUID, Product> lockedProducts = new HashMap<>();
+        for (InventoryCountDtos.LineRequest item : ordered) {
+            Product product = products.findForUpdate(item.productId())
+                .orElseThrow(() -> new ResourceNotFoundException("Producto", item.productId()));
+            if (!product.isActive()) throw new BusinessRuleException("No se puede contar un producto inactivo.");
+            if (product.getKind() != ProductKind.STOCKED_GOOD) {
+                throw new BusinessRuleException("Solo los productos con control físico admiten conteos de inventario.");
+            }
+            lockedProducts.put(item.productId(), product);
+        }
+
+        // Product locks and balance locks are both acquired in stable product-id order.
         Map<UUID, StockBalance> snapshots = new HashMap<>();
         for (InventoryCountDtos.LineRequest item : ordered) {
             StockBalance balance = balances.findForUpdate(item.productId(), warehouse.getId()).orElse(null);
@@ -123,12 +135,7 @@ public class InventoryCountService {
             + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT);
         InventoryCount count = new InventoryCount(number, warehouse, key, hash, actor);
         for (InventoryCountDtos.LineRequest item : ordered) {
-            Product product = products.findById(item.productId())
-                .orElseThrow(() -> new ResourceNotFoundException("Producto", item.productId()));
-            if (!product.isActive()) throw new BusinessRuleException("No se puede contar un producto inactivo.");
-            if (product.getKind() != ProductKind.STOCKED_GOOD) {
-                throw new BusinessRuleException("Solo los productos con control físico admiten conteos de inventario.");
-            }
+            Product product = lockedProducts.get(item.productId());
             BigDecimal counted = item.countedQuantity().setScale(3, RoundingMode.UNNECESSARY);
             StockBalance balance = snapshots.get(item.productId());
             BigDecimal expected = balance == null ? BigDecimal.ZERO.setScale(3) : balance.getOnHand();
