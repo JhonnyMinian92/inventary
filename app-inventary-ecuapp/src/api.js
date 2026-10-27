@@ -120,6 +120,16 @@ export const api = {
   me: () => request('/auth/me'),
   products: (params = {}) => request(`/catalog/products${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   product: id => request(`/catalog/products/${encodeURIComponent(id)}`),
+  productImages: id => request(`/catalog/products/${encodeURIComponent(id)}/images`),
+  uploadProductImage: (id, file, options = {}) => {
+    const body = new FormData();
+    body.append('file', file);
+    if (options.altText) body.append('altText', options.altText);
+    body.append('sortOrder', String(options.sortOrder ?? 0));
+    body.append('primaryImage', String(Boolean(options.primaryImage)));
+    return request(`/catalog/products/${encodeURIComponent(id)}/images/upload`, { method: 'POST', body });
+  },
+  unpublishProductImage: (productId, imageId) => request(`/catalog/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`, { method: 'DELETE' }),
   createProduct: data => request('/catalog/products', { method: 'POST', body: data }),
   updateProduct: (id, data) => request(`/catalog/products/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
   deleteProduct: id => request(`/catalog/products/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -209,6 +219,12 @@ export const api = {
   availableStock: (params = {}) => request(`/inventory/availability${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   createSale: data => request('/sales', { method: 'POST', body: data, idempotent: true })
 };
+
+export function resolveApiUrl(path) {
+  if (!path) return '';
+  const base = new URL(API_BASE, window.location.href);
+  return new URL(path, base).toString();
+}
 
 export function listFrom(payload) {
   if (Array.isArray(payload)) return payload;
