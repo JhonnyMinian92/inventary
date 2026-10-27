@@ -39,6 +39,13 @@ public class CatalogStructureController {
         return structure.updateUnit(id, request, auth.getName());
     }
 
+    @DeleteMapping("/units/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('catalog:manage')")
+    public void deleteUnit(@PathVariable UUID id, Authentication auth) {
+        structure.deleteUnit(id, auth.getName());
+    }
+
     @GetMapping("/unit-conversions")
     public List<CatalogStructureDtos.ConversionView> conversions() {
         return structure.listConversions();
