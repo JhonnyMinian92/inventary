@@ -22,6 +22,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [modal, setModal] = useState('');
   const [workflowStep, setWorkflowStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  const [workflowDirty, setWorkflowDirty] = useState(false);
   const [ruleEditing, setRuleEditing] = useState(null);
   const [reasonDialog, setReasonDialog] = useState(null);
   const [reasonText, setReasonText] = useState('');
@@ -61,15 +62,17 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     setNotice('');
     setValidationMessage('');
     setWorkflowStep(0);
+    setWorkflowDirty(false);
     setModal(kind);
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   function closeOperation() {
     if (loading) return;
-    if (!window.confirm('¿Salir de este formulario? Los datos que no hayas guardado se perderán.')) return;
+    if (workflowDirty && !window.confirm('¿Salir de este formulario? Se perderán los cambios que no hayas guardado.')) return;
     setModal('');
     setWorkflowStep(0);
+    setWorkflowDirty(false);
     setValidationMessage('');
     setRuleEditing(null);
     setError('');
@@ -78,11 +81,13 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   function addLine(formKind) {
     const setter = formKind === 'transfer' ? setTransferForm : setCountForm;
     setter(current => ({ ...current, items: [...current.items, emptyLine()] }));
+    setWorkflowDirty(true);
   }
 
   function removeLine(formKind, index) {
     const setter = formKind === 'transfer' ? setTransferForm : setCountForm;
     setter(current => ({ ...current, items: current.items.filter((_, lineIndex) => lineIndex !== index) }));
+    setWorkflowDirty(true);
   }
 
   async function operate(action, success) {
@@ -94,6 +99,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       setNotice(success);
       setModal('');
       setWorkflowStep(0);
+      setWorkflowDirty(false);
       setValidationMessage('');
       setRuleEditing(null);
       await refresh();
@@ -236,7 +242,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const transferStatus = statusOf;
   return <section className="panel inventory-operations">
     <div className="panel-heading"><div className="panel-title-icon"><span>⇄</span><div><h2>Operaciones de inventario</h2><p>Traslados entre almacenes, conteos físicos y reposición de existencias.</p></div></div><button className="button secondary" onClick={() => void refresh()} disabled={loading}>Actualizar</button></div>
-    {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
+    {error && !modal && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
     {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     {!modal && <>
     <div className="catalog-tabs" role="tablist" aria-label="Operaciones de inventario">
@@ -315,7 +321,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
       {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
 
-      {modal === 'transfer' && <form className="workflow-form" onSubmit={submitTransfer} noValidate>
+      {modal === 'transfer' && <form className="workflow-form" onSubmit={submitTransfer} onChange={() => setWorkflowDirty(true)} noValidate>
         {workflowStep === 0 && <section className="workflow-stage">
           <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Warehouse size={20}/></span><div><h2>¿De dónde sale y a dónde va?</h2><p>El origen y el destino deben ser almacenes diferentes.</p></div></div>
           <div className="form-grid workflow-fields">
@@ -342,7 +348,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
         <div className="form-actions workflow-actions"><button type="button" className="button secondary" disabled={loading} onClick={closeOperation}>Cancelar</button><div className="workflow-actions-right">{workflowStep>0&&<button type="button" className="button secondary" disabled={loading} onClick={()=>{setValidationMessage('');setWorkflowStep(value=>Math.max(0,value-1));}}><ArrowLeft size={16}/> Atrás</button>}{workflowStep<2?<button type="submit" className="button primary" disabled={loading}>{workflowStep===0?'Continuar':'Revisar traslado'} <ArrowRight size={16}/></button>:<button type="submit" className="button primary" disabled={loading}>{loading?'Creando…':'Crear traslado'}</button>}</div></div>
       </form>}
 
-      {modal === 'count' && <form className="workflow-form" onSubmit={submitCount} noValidate>
+      {modal === 'count' && <form className="workflow-form" onSubmit={submitCount} onChange={() => setWorkflowDirty(true)} noValidate>
         {workflowStep === 0 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><Warehouse size={20}/></span><div><h2>¿Qué almacén vas a contar?</h2><p>Selecciona dónde se hizo el conteo.</p></div></div><label className="field"><span>Almacén<b> *</b></span><select value={countForm.warehouseId} onChange={event=>{setCountForm(current=>({...current,warehouseId:event.target.value}));setValidationMessage('');}}><option value="">Seleccionar almacén</option>{warehouses.filter(item=>item.active!==false&&item.status!=='INACTIVE').map(item=><option key={idOf(item)} value={idOf(item)}>{item.name}{item.code?' · '+item.code:''}</option>)}</select></label></section>}
         {workflowStep === 1 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><PackagePlus size={20}/></span><div><h2>Introduce las cantidades contadas</h2><p>Usa cero si no quedan unidades de ese producto.</p></div></div>
           <div className="workflow-line-list">{countForm.items.map((line,index)=><section className="line-editor workflow-line" key={index}><div className="line-editor-heading"><strong>Producto {index+1}</strong>{countForm.items.length>1&&<button type="button" className="text-button danger-text" disabled={loading} onClick={()=>removeLine('count',index)}>Quitar</button>}</div><div className="form-grid compact-grid"><label className="field wide"><span>Producto<b> *</b></span><select value={line.productId} onChange={event=>updateLine('count',index,'productId',event.target.value)}><option value="">Seleccionar producto</option>{products.filter(item=>item.active!==false&&item.status!=='INACTIVE'&&(item.kind||'STOCKED_GOOD')==='STOCKED_GOOD'&&!countForm.items.some((other,i)=>i!==index&&String(other.productId)===String(idOf(item)))).map(item=><option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku||item.code||idOf(item)}</option>)}</select></label><label className="field"><span>Cantidad física<b> *</b></span><input type="number" min="0" step="0.001" inputMode="decimal" value={line.quantity} onChange={event=>updateLine('count',index,'quantity',event.target.value)}/></label></div></section>)}</div>
@@ -352,14 +358,14 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
         <div className="form-actions workflow-actions"><button type="button" className="button secondary" disabled={loading} onClick={closeOperation}>Cancelar</button><div className="workflow-actions-right">{workflowStep>0&&<button type="button" className="button secondary" disabled={loading} onClick={()=>{setValidationMessage('');setWorkflowStep(value=>Math.max(0,value-1));}}><ArrowLeft size={16}/> Atrás</button>}{workflowStep<2?<button type="submit" className="button primary" disabled={loading}>{workflowStep===0?'Continuar':'Revisar conteo'} <ArrowRight size={16}/></button>:<button type="submit" className="button primary" disabled={loading}>{loading?'Guardando…':'Crear conteo'}</button>}</div></div>
       </form>}
 
-      {modal === 'rule' && <form className="workflow-form" onSubmit={submitRule} noValidate>
+      {modal === 'rule' && <form className="workflow-form" onSubmit={submitRule} onChange={() => setWorkflowDirty(true)} noValidate>
         {workflowStep === 0 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><Wrench size={20}/></span><div><h2>¿Qué producto quieres reponer?</h2><p>Asocia esta regla a un producto y un almacén.</p></div></div><div className="form-grid workflow-fields"><label className="field wide"><span>Producto<b> *</b></span><select value={ruleForm.productId} onChange={event=>{setRuleForm(current=>({...current,productId:event.target.value}));setValidationMessage('');}}><option value="">Seleccionar producto</option>{products.filter(item=>item.active!==false&&item.status!=='INACTIVE'&&(item.kind||'STOCKED_GOOD')==='STOCKED_GOOD').map(item=><option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku||item.code||idOf(item)}</option>)}</select></label><label className="field"><span>Almacén<b> *</b></span><select value={ruleForm.warehouseId} onChange={event=>setRuleForm(current=>({...current,warehouseId:event.target.value}))}><option value="">Seleccionar almacén</option>{warehouses.filter(item=>item.active!==false&&item.status!=='INACTIVE').map(item=><option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label><label className="field"><span>Proveedor preferido <small>(opcional)</small></span><select value={ruleForm.preferredSupplierId} onChange={event=>setRuleForm(current=>({...current,preferredSupplierId:event.target.value}))}><option value="">Sin preferencia</option>{suppliers.filter(item=>item.active!==false&&item.status!=='INACTIVE').map(item=><option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label></div></section>}
         {workflowStep === 1 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><Wrench size={20}/></span><div><h2>Define el mínimo y el objetivo</h2><p>El objetivo debe ser mayor que el mínimo.</p></div></div><div className="form-grid workflow-fields"><label className="field"><span>Cantidad mínima<b> *</b></span><input type="number" min="0" step="0.001" inputMode="decimal" value={ruleForm.minimumQuantity} onChange={event=>setRuleForm(current=>({...current,minimumQuantity:event.target.value}))}/></label><label className="field"><span>Cantidad objetivo<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" value={ruleForm.targetQuantity} onChange={event=>setRuleForm(current=>({...current,targetQuantity:event.target.value}))}/></label><label className="field"><span>Plazo de suministro (días)<b> *</b></span><input type="number" min="0" step="1" value={ruleForm.leadTimeDays} onChange={event=>setRuleForm(current=>({...current,leadTimeDays:event.target.value}))}/></label></div></section>}
         {workflowStep === 2 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><ClipboardCheck size={20}/></span><div><h2>Confirma la regla</h2><p>Al llegar al mínimo aparecerán sugerencias de reposición.</p></div></div><div className="workflow-review-grid"><div className="workflow-review-card"><small>Producto</small><strong>{products.find(item=>String(idOf(item))===String(ruleForm.productId))?.name||'—'}</strong></div><div className="workflow-review-card"><small>Almacén</small><strong>{warehouses.find(item=>String(idOf(item))===String(ruleForm.warehouseId))?.name||'—'}</strong></div><div className="workflow-review-card"><small>Mínimo</small><strong>{ruleForm.minimumQuantity}</strong></div><div className="workflow-review-card"><small>Objetivo</small><strong>{ruleForm.targetQuantity}</strong></div><div className="workflow-review-card"><small>Plazo</small><strong>{ruleForm.leadTimeDays} días</strong></div></div></section>}
         <div className="form-actions workflow-actions"><button type="button" className="button secondary" disabled={loading} onClick={closeOperation}>Cancelar</button><div className="workflow-actions-right">{workflowStep>0&&<button type="button" className="button secondary" disabled={loading} onClick={()=>{setValidationMessage('');setWorkflowStep(value=>Math.max(0,value-1));}}><ArrowLeft size={16}/> Atrás</button>}{workflowStep<2?<button type="submit" className="button primary" disabled={loading}>{workflowStep===0?'Continuar':'Revisar regla'} <ArrowRight size={16}/></button>:<button type="submit" className="button primary" disabled={loading}>{loading?'Guardando…':ruleEditing?'Guardar cambios':'Crear regla'}</button>}</div></div>
       </form>}
 
-      {modal === 'adjustment' && <form className="workflow-form" onSubmit={submitAdjustment} noValidate>
+      {modal === 'adjustment' && <form className="workflow-form" onSubmit={submitAdjustment} onChange={() => setWorkflowDirty(true)} noValidate>
         {workflowStep === 0 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><Wrench size={20}/></span><div><h2>Selecciona qué vas a ajustar</h2><p>Una entrada aumenta existencias y una salida las reduce.</p></div></div><div className="form-grid workflow-fields"><label className="field"><span>Almacén<b> *</b></span><select value={adjustmentForm.warehouseId} onChange={event=>setAdjustmentForm(current=>({...current,warehouseId:event.target.value}))}><option value="">Seleccionar almacén</option>{warehouses.filter(item=>item.active!==false&&item.status!=='INACTIVE').map(item=><option key={idOf(item)} value={idOf(item)}>{item.name}</option>)}</select></label><label className="field"><span>Producto<b> *</b></span><select value={adjustmentForm.productId} onChange={event=>setAdjustmentForm(current=>({...current,productId:event.target.value}))}><option value="">Seleccionar producto</option>{products.filter(item=>item.active!==false&&item.status!=='INACTIVE'&&(item.kind||'STOCKED_GOOD')==='STOCKED_GOOD').map(item=><option key={idOf(item)} value={idOf(item)}>{item.name} · {item.sku||item.code||idOf(item)}</option>)}</select></label><label className="field"><span>Tipo de ajuste<b> *</b></span><select value={adjustmentForm.direction} onChange={event=>setAdjustmentForm(current=>({...current,direction:event.target.value}))}><option value="INCREASE">Entrada / aumentar</option><option value="DECREASE">Salida / disminuir</option></select></label></div></section>}
         {workflowStep === 1 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><Wrench size={20}/></span><div><h2>Indica cantidad y motivo</h2><p>El motivo queda registrado en el historial.</p></div></div><div className="form-grid workflow-fields"><label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" value={adjustmentForm.quantity} onChange={event=>setAdjustmentForm(current=>({...current,quantity:event.target.value}))}/></label>{adjustmentForm.direction==='INCREASE'&&<label className="field"><span>Costo por unidad<b> *</b></span><input type="number" min="0" step="0.0001" inputMode="decimal" value={adjustmentForm.unitCost} onChange={event=>setAdjustmentForm(current=>({...current,unitCost:event.target.value}))}/></label>}<label className="field wide"><span>Motivo<b> *</b></span><textarea rows="3" maxLength="500" value={adjustmentForm.reason} onChange={event=>setAdjustmentForm(current=>({...current,reason:event.target.value}))} placeholder="Ej. Diferencia detectada en conteo físico"/></label></div></section>}
         {workflowStep === 2 && <section className="workflow-stage"><div className="workflow-stage-heading"><span className="workflow-stage-icon"><ClipboardCheck size={20}/></span><div><h2>Confirma el ajuste</h2><p>Comprueba los datos antes de registrar.</p></div></div><div className="workflow-review-grid"><div className="workflow-review-card"><small>Tipo</small><strong>{adjustmentForm.direction==='INCREASE'?'Entrada / aumentar':'Salida / disminuir'}</strong></div><div className="workflow-review-card"><small>Producto</small><strong>{products.find(item=>String(idOf(item))===String(adjustmentForm.productId))?.name||'—'}</strong></div><div className="workflow-review-card"><small>Almacén</small><strong>{warehouses.find(item=>String(idOf(item))===String(adjustmentForm.warehouseId))?.name||'—'}</strong></div><div className="workflow-review-card"><small>Cantidad</small><strong>{adjustmentForm.quantity}</strong></div>{adjustmentForm.direction==='INCREASE'&&<div className="workflow-review-card"><small>Costo unitario</small><strong>{new Intl.NumberFormat('es-EC',{style:'currency',currency:'USD'}).format(Number(adjustmentForm.unitCost||0))}</strong></div>}</div><p className="workflow-review-note"><strong>Motivo:</strong> {adjustmentForm.reason.trim()||'—'}</p></section>}
