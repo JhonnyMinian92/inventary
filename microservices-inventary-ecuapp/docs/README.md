@@ -17,6 +17,7 @@
 - [03 — Arquitectura y patrones, decisiones históricas](03-arquitectura-y-patrones.md)
 - [04 — Modelo de dominio y reglas](04-modelo-dominio-y-reglas.md)
 - [05 — Catálogo de APIs e índice contractual](05-catalogo-apis.md)
+- [29 — Catálogo propuesto original, conservado como histórico](29-catalogo-apis-propuesta-historica.md)
 - [06 — Flujos de negocio y API](06-flujos-de-negocio-y-api.md)
 - [07 — Seguridad y definición de hecho](07-seguridad-y-definicion-de-hecho.md)
 - [08 — Plan de trabajo](08-plan-de-trabajo.md)

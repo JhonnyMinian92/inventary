@@ -12,6 +12,29 @@ Este catálogo corresponde a las rutas anotadas en el código fuente del backend
 - El permiso del servidor es autoritativo; ocultar botones en UI no es seguridad.
 - GET /v3/api-docs y Swagger UI solo están disponibles cuando SWAGGER_ENABLED se habilita en entorno controlado.
 
+## Matriz de implementación y evidencia por familia API
+
+La matriz distingue el código presente, la evidencia histórica y la validación actual. “Prueba histórica” significa que la clase aparece en el informe del 2026-10-23; el informe indica que la copia probada no tenía SHA Git. Los commits de esta consolidación solo modifican Markdown. No se ha vuelto a ejecutar la suite contra el HEAD documental.
+
+| Familia de rutas | Controladores / fuente principal | Pruebas históricas descritas | Estado de validación del HEAD |
+|---|---|---|---|
+| Login, identidad, usuarios, roles y permisos | auth/AuthController, UserManagementController, RoleManagementController, SecurityConfig | AuthAdminApiTest, SecurityContractApiTest, RoleMatrixApiTest | Código presente; pruebas de otro snapshot; reejecutar |
+| Productos, categorías y esquema de atributos | catalog/ProductController, CategoryController, CatalogStructureController | CatalogApiTest, DomainRulesTest | Código presente; pruebas históricas; reejecutar |
+| Variantes, unidades, conversiones e imágenes | catalog/CatalogStructureController, media/ProductImageController | CatalogApiTest | Código presente; pruebas históricas; reejecutar |
+| Catálogo público REST y GraphQL | catalog/PublicCatalogController, graphql/GraphqlCatalogController, graphql/schema.graphqls | CatalogApiTest, SecurityContractApiTest | Código presente; pruebas históricas; reejecutar |
+| Proveedores, clientes y almacenes | partners/PartnerController, warehouse/WarehouseController | CatalogApiTest, InventoryApiTest | Código presente; pruebas históricas; reejecutar |
+| Saldos, disponibilidad, movimientos, ajustes, conteos, reposición | inventory/InventoryController, InventoryCountController, ReorderController | InventoryApiTest, StockBalanceTest | Código presente; pruebas históricas; reejecutar |
+| Traslados/compensaciones | transfers/StockTransferController | TransfersApiTest | Código presente; pruebas históricas; reejecutar |
+| Compras, recepción y devoluciones a proveedor | purchasing/PurchaseOrderController, PurchaseReturnController | PurchasingAndCostingApiTest | Código presente; pruebas históricas; reejecutar |
+| Ventas, cancelación y devoluciones de cliente | sales/SalesController, returns/SalesReturnController | SalesApiTest | Código presente; pruebas históricas; reejecutar |
+| Política de coste y reportes | inventory/CostingPolicyController, reports/InventoryBalanceReportController | PurchasingAndCostingApiTest, ReportsApiTest, InventoryBalanceReportServiceTest | Código presente; pruebas históricas; reejecutar |
+| Integración y backoffice WhatsApp | whatsapp/WhatsAppIntegrationController, WhatsAppOrderBackofficeController | WhatsAppApiTest | Código presente; pruebas históricas; reejecutar |
+| Auditoría y Outbox | audit/AuditController, sales/OutboxOperationsController | AuditAndOutboxApiTest | Código presente; pruebas históricas; reejecutar |
+| Actuator, CORS, rate limit, errores y OpenAPI | config/*, application.yaml | SecurityContractApiTest | Código/config presentes; pruebas históricas; reejecutar |
+| Cliente frontend / consumo REST | app-inventary-ecuapp/src/api.js y features/* | No hay script test/lint declarado en package.json | Build/tests del frontend pendientes de ejecución en HEAD |
+
+Las clases citadas proceden del informe de ejecución histórico y deben comprobarse con el árbol actual antes de usarse como prueba. La declaración exacta del estado de una ruta requiere: controlador y DTO en el SHA; tests positivos y negativos; autorización; transacción/efecto persistido; idempotencia/concurrencia donde aplica; y resultado de ejecución referido a ese SHA.
+
 ## 1. Sesión y administración
 
 | Método | Ruta | Acceso / finalidad |

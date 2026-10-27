@@ -22,3 +22,8 @@ Este archivo se mantiene como el punto de entrada histórico al tema. Parte de l
 - Los errores del handler común usan application/problem+json y requestId; no incluyen stack trace ni SQL.
 - No confiar en payload del cliente para precios de venta, stock, permisos o identidad de WhatsApp.
 - Los reportes financieros exigen reports:financial y deben interpretarse usando la zona horaria y las fechas de la respuesta.
+
+
+## Archivo de diseño histórico
+
+La propuesta original completa se conserva en [29 — Catálogo propuesto histórico](29-catalogo-apis-propuesta-historica.md). Úsela para entender decisiones anteriores, no como contrato de ejecución.
