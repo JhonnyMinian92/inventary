@@ -19,8 +19,8 @@ import java.util.regex.Pattern;
 public class CategoryService {
  private static final Pattern NON_SLUG=Pattern.compile("[^a-z0-9]+");
  private static final Set<String> SORT=Set.of("name","slug","createdAt","updatedAt","active");
- private final CategoryRepository repository; private final AuditService audit;
- public CategoryService(CategoryRepository repository,AuditService audit){this.repository=repository;this.audit=audit;}
+ private final CategoryRepository repository; private final ProductRepository products; private final AuditService audit;
+ public CategoryService(CategoryRepository repository,ProductRepository products,AuditService audit){this.repository=repository;this.products=products;this.audit=audit;}
  @Transactional(readOnly=true) public Page<CategoryDtos.View> list(Boolean active,Pageable pageable){return repository.search(active,Pages.of(pageable,SORT,Sort.by("name"))).map(CategoryDtos.View::from);}
  @Transactional(readOnly=true) public CategoryDtos.View get(UUID id){return CategoryDtos.View.from(require(id));}
  @Transactional public CategoryDtos.View create(CategoryDtos.WriteRequest request,String actor){
@@ -42,7 +42,7 @@ public class CategoryService {
   audit.record(actor,"CATEGORY_UPDATED","CATEGORY",id,Map.of("name",name)); return CategoryDtos.View.from(c);
  }
  @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
- public void deactivate(UUID id,String actor){Category c=require(id);if(!c.isActive())return;c.deactivate();audit.record(actor,"CATEGORY_DEACTIVATED","CATEGORY",id,Map.of("slug",c.getSlug()));}
+ public void deactivate(UUID id,String actor){Category c=repository.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())return;if(products.existsActiveByCategoryId(id))throw new ConflictException("No se puede desactivar una categoría con productos activos. Desactive primero cada producto y resuelva las existencias pendientes.");c.deactivate();audit.record(actor,"CATEGORY_DEACTIVATED","CATEGORY",id,Map.of("slug",c.getSlug()));}
  @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public void activate(UUID id,String actor){Category c=require(id);if(c.isActive())return;c.activate();audit.record(actor,"CATEGORY_ACTIVATED","CATEGORY",id,Map.of("slug",c.getSlug()));}
  private Category require(UUID id){return repository.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));}
