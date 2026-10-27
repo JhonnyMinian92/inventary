@@ -367,6 +367,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         <div className="report-subheading"><div><h3>Ventas diarias</h3><p>Totales brutos por día dentro del periodo.</p></div>{listFrom(data?.daily).length > 0 && <button type="button" className="button secondary" onClick={exportDailySales}><Download size={15}/> Exportar CSV diario</button>}</div>
         <ReportTable rows={listFrom(data?.daily)} columns={[{key:'date',label:'Fecha'},{key:'salesCount',label:'Ventas'},{key:'grossSales',label:'Ventas brutas',format:'money'}]} caption="Resumen diario de ventas" empty="No hubo ventas en el periodo."/>
         <div className="report-subheading"><div><h3>Resultados por producto</h3><p>Las cantidades e importes son netos de anulaciones y devoluciones según la API.</p></div></div>
+        {data?.productsTruncated && <div className="alert warning" role="status"><ShieldAlert size={18}/><span>La tabla y su CSV muestran {rows.length} de {number(data.totalProducts)} productos. Los indicadores de ventas resumen todo el periodo; ajusta las fechas o filtros para consultar los productos restantes.</span></div>}
         <ReportTable rows={rows} columns={columns} caption="Ventas netas por producto" empty="No hay ventas por producto para este periodo."/>
       </>;
     }
@@ -381,6 +382,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
           { label: 'Importe devuelto', value: money(summary.returnedAmount) },
           { label: 'Compras netas', value: money(summary.netAmount) }
         ]}/>
+        {data?.itemsTruncated && <div className="alert warning" role="status"><ShieldAlert size={18}/><span>La tabla y su CSV muestran {rows.length} de {number(data.totalItems)} combinaciones proveedor-producto. Los totales financieros incluyen todos los registros del periodo; ajusta las fechas o filtros para acotar el detalle.</span></div>}
         <ReportTable rows={rows} columns={columns} caption="Recepciones y devoluciones por proveedor y producto" empty="No hay recepciones contabilizadas en este periodo."/>
       </>;
     }
