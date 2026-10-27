@@ -116,6 +116,6 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     })}
     {availabilityWarning && <p className="form-hint wide">{availabilityWarning}</p>}
     <div className="wide line-add-row"><button type="button" className="button secondary" disabled={lines.length >= 100} onClick={() => setLines(current => [...current, emptyLine()])}>+ Añadir artículo</button><div className="order-total"><span>Total estimado</span><strong>{money(totals.amount)}</strong><small>Estimación con precios de catálogo · {totals.quantity} unidades</small></div></div>
-    <div className="form-actions wide"><button type="button" className="button secondary" onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Registrando…' : 'Registrar venta'}</button></div>
+    <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading || !lines.length}>{loading ? 'Registrando…' : 'Registrar venta'}</button></div>
   </form>;
 }
