@@ -16,6 +16,8 @@ public interface ProductRepository extends JpaRepository<Product,UUID> {
  boolean existsByUnitOfMeasureIdAndActiveTrue(UUID unitOfMeasureId);
  @Query("select case when count(p)>0 then true else false end from Product p where p.category.id=:categoryId and p.active=true")
  boolean existsActiveByCategoryId(@Param("categoryId") UUID categoryId);
+ @Query("select case when count(p)>0 then true else false end from Product p where p.category.id=:categoryId")
+ boolean existsByCategoryId(@Param("categoryId") UUID categoryId);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select p from Product p where p.id=:id")
  Optional<Product> findForUpdate(@Param("id") UUID id);
