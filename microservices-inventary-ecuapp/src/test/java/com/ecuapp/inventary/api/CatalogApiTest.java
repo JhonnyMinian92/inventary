@@ -302,7 +302,9 @@ class CatalogApiTest extends ApiTestSupport {
         problem(call(get("/api/v1/public/catalog/products/" + hidden.get("id").asText()), null, null), 404, "RESOURCE_NOT_FOUND");
         problem(call(get("/api/v1/public/catalog/products?sort=costPrice"), null, null), 400, "INVALID_QUERY");
         assertTrue(httpGet(null, "/api/v1/public/catalog/categories?size=100", 200).toString().contains(categoryId));
-        // Deactivating a product evicts the public cache immediately.
+        // A product with available stock cannot be deactivated; first reconcile its stock,
+        // then confirm that deactivation invalidates the public catalog cache.
+        adjust(visible.get("id").asText(), warehouseId, "DECREASE", "3", null);
         httpPost(admin, "/api/v1/catalog/products/" + visible.get("id").asText() + "/deactivate", null, 204);
         assertEquals(0, httpGet(null, "/api/v1/public/catalog/products?categoryId=" + categoryId, 200).get("page").get("totalElements").asInt());
         problem(call(post("/api/v1/public/catalog/products"), null, Map.of()), 401, null);
