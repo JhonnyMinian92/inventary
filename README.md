@@ -2,7 +2,7 @@
 
 Inventary es una aplicación web para administrar catálogo, compras, recepciones, existencias, ventas, devoluciones, traslados y reportes. El repositorio contiene una SPA React/Vite y una API transaccional Java/Spring Boot/PostgreSQL.
 
-> **Estado documental al 26-10-2026:** el código es amplio, pero no se declara listo para producción hasta verificar build, pruebas, migraciones, Docker Compose y CI contra el SHA exacto del release. Las ejecuciones históricas no validan automáticamente commits posteriores.
+> **Estado de entrega al 27-10-2026:** el frontend dispone de pruebas automáticas y build en GitHub Actions; backend ejecuta Maven verify contra PostgreSQL 16 y ahora incluye validación de configuración Compose más un smoke test desde un volumen PostgreSQL vacío. Antes de desplegar, comprueba que el workflow más reciente termina en verde para el último commit de código.
 
 ## Componentes
 
