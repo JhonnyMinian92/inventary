@@ -7,7 +7,7 @@ Inventary es una aplicación web para administrar catálogo, compras, recepcione
 ## Componentes
 
 - **Frontend:** app-inventary-ecuapp — React, Vite; consume REST a través de src/api.js.
-- **Backend:** microservices-inventary-ecuapp — Java 21, Spring Boot 3.5.6, PostgreSQL, Flyway V1–V14, JWT/RBAC, REST y GraphQL.
+- **Backend:** microservices-inventary-ecuapp — Java 21, Spring Boot 3.5.6, PostgreSQL, Flyway V1–V15, JWT/RBAC, REST, GraphQL, carga de imágenes y consumidor Kafka opcional.
 - **Arquitectura real:** monolito modular Spring Boot, no varios microservicios desplegables de forma independiente.
 - **Persistencia:** PostgreSQL es la fuente transaccional; no actualizar saldos directamente ni usar ddl-auto=update.
 
@@ -44,7 +44,7 @@ VITE_API_BASE_URL define el prefijo del backend. CORS_ALLOWED_ORIGINS debe inclu
 - Catálogo público, GraphQL de consulta, integración WhatsApp/n8n y Outbox.
 - Auditoría, errores Problem Details, limitación de solicitudes y Actuator.
 
-La presencia de una implementación no equivale a validación del SHA actual; leer el estado de verificación por área en la documentación.
+La presencia de una implementación no sustituye la validación de cada commit. Los checks de frontend ejecutan `npm test` y `npm run build`; el backend ejecuta `./mvnw verify` contra PostgreSQL 16. Consulta el SHA y resultado de Actions antes de desplegar.
 
 ## Documentación autoritativa
 
@@ -62,8 +62,8 @@ La presencia de una implementación no equivale a validación del SHA actual; le
 
 ## Límites de alcance
 
-No están implementados en esta versión: facturación electrónica SRI/impuestos completos, pasarela de pago y reembolso, multiempresa, stock independiente por variante, picking multi-bin, carga binaria de imágenes, consumidores/proyecciones Kafka y rate limit distribuido. El frontend no cubre todas las APIs administrativas/operativas. Consultar el estado actual antes de ofrecer capacidades.
+Fuera del alcance de esta versión: facturación electrónica SRI completa, pasarela de pago/reembolso, multiempresa, picking multi-bin, proyecciones analíticas Kafka y rate limit distribuido. Se incorporó carga binaria segura PNG/JPEG y un consumidor Kafka idempotente para invalidación de caché; el consumidor y el broker permanecen deshabilitados por defecto. El frontend aún no cubre todos los endpoints administrativos/operativos.
 
 ## CI y release
 
-Los workflows del árbol de referencia son manuales. Para aceptar un release, automatizar build/tests para push y pull_request, exigir checks verdes, ejecutar backend contra PostgreSQL 16 y proteger master. No declarar Docker Compose validado hasta ejecutarlo. Toda afirmación de “validado” debe citar SHA, versiones, comando y resultado.
+Los workflows del repositorio automatizan el build/test de frontend y `mvnw verify` con PostgreSQL 16 en push/PR a `master`. Antes de liberar, confirmar checks verdes del SHA exacto y probar el perfil Docker Kafka cuando se habilite; el CI de base de datos no sustituye pruebas de despliegue en el entorno objetivo.
