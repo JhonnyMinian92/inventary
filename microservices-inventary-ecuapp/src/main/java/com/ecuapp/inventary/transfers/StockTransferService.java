@@ -80,15 +80,23 @@ public class StockTransferService {
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
   if(request.sourceWarehouseId().equals(request.destinationWarehouseId()))
    throw new BusinessRuleException("El almacén de origen y destino deben ser diferentes.");
-  Warehouse source=warehouses.findById(request.sourceWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén origen",request.sourceWarehouseId()));
-  Warehouse destination=warehouses.findById(request.destinationWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén destino",request.destinationWarehouseId()));
+  Warehouse source;
+  Warehouse destination;
+  // Every transfer locks both warehouses in the same UUID order so it serializes with deactivation.
+  if(request.sourceWarehouseId().compareTo(request.destinationWarehouseId())<0){
+   source=warehouses.findForUpdate(request.sourceWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén origen",request.sourceWarehouseId()));
+   destination=warehouses.findForUpdate(request.destinationWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén destino",request.destinationWarehouseId()));
+  }else{
+   destination=warehouses.findForUpdate(request.destinationWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén destino",request.destinationWarehouseId()));
+   source=warehouses.findForUpdate(request.sourceWarehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén origen",request.sourceWarehouseId()));
+  }
   if(!source.isActive()||!destination.isActive())throw new BusinessRuleException("Ambos almacenes deben estar activos.");
   List<TransferDtos.LineRequest> ordered=new ArrayList<>(request.items());
   ordered.sort(Comparator.comparing(x->x.productId().toString()));
   Set<UUID> seen=new HashSet<>();List<StockTransferLine> lines=new ArrayList<>();
   for(TransferDtos.LineRequest item:ordered){
    if(!seen.add(item.productId()))throw new BusinessRuleException("No repita un producto en más de una línea de transferencia.");
-   Product product=products.findById(item.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",item.productId()));
+   Product product=products.findForUpdate(item.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",item.productId()));
    if(!product.isActive())throw new BusinessRuleException("No se puede transferir un producto inactivo.");
    if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control físico admiten transferencias.");
    BigDecimal quantity=item.quantity().setScale(3,RoundingMode.UNNECESSARY);
