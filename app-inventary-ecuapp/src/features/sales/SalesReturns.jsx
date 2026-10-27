@@ -22,8 +22,8 @@ export default function SalesReturns({ onChanged }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     const [returnsResult, salesResult] = await Promise.allSettled([
-      api.salesReturns({ size: 100, sort: 'createdAt,desc' }),
-      api.sales({ size: 100, sort: 'soldAt,desc' })
+      listAllPages(api.salesReturns, { size: 100, sort: 'createdAt,desc' }),
+      listAllPages(api.sales, { size: 100, sort: 'soldAt,desc' })
     ]);
     const failures = [];
     if (returnsResult.status === 'fulfilled') setRows(listFrom(returnsResult.value));
@@ -45,7 +45,7 @@ export default function SalesReturns({ onChanged }) {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.sale(sourceSaleId), api.salesReturns({ sourceSaleId, size: 100 })])
+    Promise.all([api.sale(sourceSaleId), listAllPages(api.salesReturns, { sourceSaleId, size: 100 })])
       .then(([sale, returnsPayload]) => {
         if (!active) return;
         const returns = listFrom(returnsPayload).filter(item => String(item.status || '').toUpperCase() !== 'CANCELLED');
