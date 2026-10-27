@@ -86,9 +86,16 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
   function submit(event) {
     event.preventDefault();
     setValidationMessage('');
+    if (step === 0) {
+      if (validateBasics()) setStep(1);
+      return;
+    }
+    if (step === 1) {
+      if (validateLines()) setStep(2);
+      return;
+    }
     if (!validateBasics()) { setStep(0); return; }
     if (!validateLines()) { setStep(1); return; }
-    if (step < 2) { nextStep(); return; }
     onSubmit({ warehouseId, supplierId, notes: notes.trim(), items: normalizedItems() });
   }
 
