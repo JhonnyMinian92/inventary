@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** este backlog se originó como plan de implementación; varias tareas ya están presentes en el código, mientras otras son alcance futuro. No utilizarlo como checklist vivo sin cotejar [24 — Estado actual](24-estado-actual-repositorio.md) y [28 — Plan de cierre vigente](28-plan-cierre-y-validacion.md). Las prioridades inmediatas son validar el SHA de release en PostgreSQL 16, automatizar CI, generar lockfile frontend, probar el escenario agotamiento/reposición/reporte y ejecutar Docker Compose.
+
 # 08 — Backlog de tareas, secuencia y estimación de entrega
 
 ## 1. Cómo interpretar la estimación

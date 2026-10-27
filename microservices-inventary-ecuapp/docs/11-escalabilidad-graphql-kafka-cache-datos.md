@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** separar diseño futuro de capacidades actuales. La topología vigente es monolito modular Spring Boot con PostgreSQL; Caffeine y el rate limit son locales al proceso. El Outbox/relay está presente, pero los consumidores y proyecciones Kafka no están implementados. GraphQL ofrece consultas públicas de catálogo y no sustituye comandos REST transaccionales. Ver [26 — Arquitectura actual](26-arquitectura-y-patrones-actuales.md), [24 — Estado actual](24-estado-actual-repositorio.md) y [28 — Plan de cierre](28-plan-cierre-y-validacion.md).
+
 # 11 — Escalabilidad, GraphQL, Kafka, caché y estrategia de datos
 
 ## 1. Decisiones arquitectónicas recomendadas

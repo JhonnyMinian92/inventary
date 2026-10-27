@@ -1,3 +1,5 @@
+> **Estado y documentación consolidada (2026-10-26):** comenzar por [estado actual por dominio](docs/24-estado-actual-repositorio.md), [referencia de APIs](docs/25-referencia-apis.md), [arquitectura/patrones realmente presentes](docs/26-arquitectura-y-patrones-actuales.md), [guía de consumo](docs/27-guia-consumo-apis.md) y [plan de validación](docs/28-plan-cierre-y-validacion.md). Las secciones heredadas de este README son auxiliares: la referencia 25 prevalece sobre rutas de diseño antiguas. La ejecución histórica del 2026-10-23 no tiene SHA Git inequívoco de la copia local y no valida el HEAD actual.  
+>
 # Inventary Backend
 
 Backend de inventario y ventas construido con Java 21, Spring Boot 3.5, Spring MVC, Spring Data JPA y PostgreSQL. Las entidades usan UUID, importes `NUMERIC(14,2)`, cantidades `NUMERIC(14,3)`, marcas temporales `TIMESTAMPTZ`, claves foráneas y restricciones explícitas.

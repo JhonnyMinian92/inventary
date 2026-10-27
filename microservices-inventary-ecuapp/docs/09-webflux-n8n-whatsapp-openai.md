@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** las secciones de arquitectura/contrato de este documento describen parte de la visión y decisiones del canal. La API implementada real está en [25 — Referencia de APIs](25-referencia-apis.md). El backend actual usa Spring MVC, no una migración global a WebFlux. El canal WhatsApp usa X-Integration-Key y requiere identidad verificada; las cotizaciones expiran y el pago se confirma manualmente. No hay pasarela de pago, reembolso o factura fiscal integrados. Consumir esta integración solo tras validar credenciales y pruebas de no duplicación.
+
 # 09 — WebFlux, n8n local, WhatsApp y OpenAI: arquitectura de venta conversacional
 
 ## 1. Decisión ejecutiva

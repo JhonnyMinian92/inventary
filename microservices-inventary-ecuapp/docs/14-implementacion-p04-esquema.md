@@ -1,3 +1,5 @@
+> **Marcador de vigencia — 2026-10-26:** este archivo se conserva como registro histórico de decisión/hito, no como inventario vivo de endpoints ni prueba de que el HEAD actual pasó validación. Para estado vigente, usar [24 — Estado actual](24-estado-actual-repositorio.md), [25 — Referencia API actual](25-referencia-apis.md), [26 — Arquitectura/patrones](26-arquitectura-y-patrones-actuales.md) y [28 — Plan de cierre](28-plan-cierre-y-validacion.md). Confirmar cada ruta y comportamiento en el código del SHA desplegado.
+
 # P04 — Esquema PostgreSQL y entidades del dominio
 
 ## Objetivo

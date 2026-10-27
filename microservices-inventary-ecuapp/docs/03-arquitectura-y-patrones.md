@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** este documento conserva decisiones de diseño. El código implementado es un monolito modular Spring Boot MVC con frontend React/Vite separado; la arquitectura hexagonal solo está aplicada parcialmente, sobre todo en catálogo. No describir los dominios como microservicios independientes. Usar [26 — Arquitectura y patrones actuales](26-arquitectura-y-patrones-actuales.md) como fuente del árbol/patrones implementados y [24](24-estado-actual-repositorio.md) para límites y validación.
+
 # 03 — Arquitectura backend y patrones de diseño
 
 ## 1. Decisión de arquitectura

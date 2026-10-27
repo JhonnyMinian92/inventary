@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** la Definition of Done sigue siendo obligatoria, pero la evidencia fechada 2026-10-23 no acredita por sí sola el HEAD actual. Exigir JWT/RBAC por HTTP, PostgreSQL 16, migraciones V1–V14, concurrencia e integración del frontend para el SHA de release. Usar [28 — Plan de cierre](28-plan-cierre-y-validacion.md) como checklist vigente y [24](24-estado-actual-repositorio.md) para estado y exclusiones.
+
 # 07 — Seguridad, revisión estática y definición de hecho por API
 
 ## 1. Principio operativo

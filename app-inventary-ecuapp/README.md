@@ -1,3 +1,5 @@
+> **Estado actual — 2026-10-26:** el código fuente cubre los flujos principales, pero el workflow de frontend es manual y las ejecuciones disponibles son de commits anteriores al HEAD observado. El package.json no declara test/lint y no se encontró package-lock.json en el árbol de referencia; por ello, no afirmar que la aplicación frontend está completamente validada. Ver [estado de todo el repositorio](../microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md), [contrato de APIs](../microservices-inventary-ecuapp/docs/25-referencia-apis.md), [guía de consumo](../microservices-inventary-ecuapp/docs/27-guia-consumo-apis.md) y [plan de cierre](../microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md).
+
 # Inventary Web — React
 
 Aplicación web SPA de inventario construida con **React + Vite**. El frontend usa un cliente REST compartido en **src/api.js** y consume directamente el backend bajo **/api/v1**; no mantiene un inventario simulado ni modifica el saldo directamente desde el navegador.

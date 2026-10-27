@@ -1,3 +1,5 @@
+> **Actualización — 2026-10-26:** además de los errores locales descritos a continuación, confirmar que el frontend se construye contra el SHA actual, que CORS coincide con el origen real y que package-lock.json se ha versionado antes de usar npm ci. La referencia API actual es [25](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md). Para comandos de compra/venta con respuesta de red incierta, consultar primero el estado backend antes de repetir una operación.
+
 # Ejecución y solución de problemas
 
 ## Requisitos

@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** esta matriz enumera las rutas consumidas por la SPA, no todas las APIs del backend. La referencia contractual completa y sus permisos están en [25 — Referencia de APIs](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md); el estado por dominio está en [24](../../microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md). Mantener esta matriz alineada con src/api.js no implica que las rutas hayan pasado pruebas de integración en el HEAD actual.
+
 # Cobertura de API del frontend
 
 Esta matriz se revisó contra los controladores Spring bajo `microservices-inventary-ecuapp/src/main/java/com/ecuapp/inventary` y el cliente `src/api.js`. Describe las rutas que consume el frontend; no sustituye las reglas de autorización del servidor. Las rutas de la tabla son relativas a la URL base configurada en `VITE_API_BASE_URL`, que incluye el prefijo `/api/v1`.

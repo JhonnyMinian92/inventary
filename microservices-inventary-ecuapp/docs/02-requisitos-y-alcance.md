@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** este documento expresa requisitos y decisiones, no prueba cumplimiento. Para separar implementación, evidencia histórica y exclusiones actuales, usar [24 — Estado actual](24-estado-actual-repositorio.md), [25 — API actual](25-referencia-apis.md) y [28 — Plan de cierre](28-plan-cierre-y-validacion.md). Pagos/SRI, multiempresa, stock por variante/multi-bin, imágenes binarias y consumidores Kafka siguen fuera del alcance actual a menos que se apruebe una nueva decisión.
+
 # 02 — Alcance, requerimientos y criterios de aceptación
 
 ## 1. Estado y alcance

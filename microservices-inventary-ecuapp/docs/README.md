@@ -1,70 +1,52 @@
-# Inventary — documentación técnica del backend
+# Inventary — índice de documentación técnica
 
-## Propósito
+**Corte documental:** 2026-10-26. La fuente viva para el estado del código es la rama master. El commit que publica esta consolidación es documental; la validación de runtime debe registrarse por SHA en CI.
 
-Esta carpeta es la especificación de referencia para diseñar e implementar el backend de Inventary. Describe alcance, requisitos, arquitectura, dominio, contrato REST propuesto, flujos, seguridad, tareas y estimación. No declara implementado ningún endpoint que todavía no exista en el código.
+## Empezar por aquí
 
-## Estado comprobado del repositorio
+1. [24 — Estado actual del repositorio](24-estado-actual-repositorio.md): funcionalidades, límites y evidencia.
+2. [25 — Referencia actual de APIs](25-referencia-apis.md): rutas actuales, métodos, permisos, ejemplos y errores.
+3. [26 — Arquitectura, jerarquía y patrones](26-arquitectura-y-patrones-actuales.md): código real frente a arquitectura objetivo.
+4. [27 — Guía de consumo](27-guia-consumo-apis.md): autenticación, curl/JSON, idempotencia, reportes.
+5. [28 — Próximos pasos y Definition of Done](28-plan-cierre-y-validacion.md): riesgos, validación y criterios de salida.
+6. [23 — Runbook operativo](23-runbook-operacion.md): configuración, despliegue, backup/restore, Outbox y proxy.
 
-**Actualización 2026-10-23 (P13):** el backend compila, migra (Flyway V1–V14) y pasa 76 pruebas contra PostgreSQL real, y las 138 operaciones REST se probaron por HTTP contra la base `inventary`. Evidencia, estado de cada hallazgo de la auditoría y exclusiones: [Resultado de la auditoría](RESULTADO_AUDITORIA_EJECUCION.md). Operación: [23 — Runbook](23-runbook-operacion.md). Los párrafos siguientes describen el estado previo a esa validación.
+## Documentos de negocio y diseño
 
-El backend ya contiene una aplicación Spring Boot con endpoints REST, servicios, entidades JPA, repositorios, migraciones Flyway y configuración de seguridad. La arquitectura se está migrando gradualmente hacia un monolito modular con límites hexagonales; no todos los módulos históricos están migrados todavía.
+- [02 — Requisitos y alcance](02-requisitos-y-alcance.md)
+- [03 — Arquitectura y patrones, decisiones históricas](03-arquitectura-y-patrones.md)
+- [04 — Modelo de dominio y reglas](04-modelo-dominio-y-reglas.md)
+- [05 — Catálogo de APIs e índice contractual](05-catalogo-apis.md)
+- [06 — Flujos de negocio y API](06-flujos-de-negocio-y-api.md)
+- [07 — Seguridad y definición de hecho](07-seguridad-y-definicion-de-hecho.md)
+- [08 — Plan de trabajo](08-plan-de-trabajo.md)
+- [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md)
+- [11 — Escalabilidad, GraphQL, Kafka y caché](11-escalabilidad-graphql-kafka-cache-datos.md)
 
-La entrega P03 establece una primera rebanada vertical en catálogo de productos: puerto de entrada de casos de uso, comandos/resultados de aplicación, puerto de persistencia, adaptador JPA, DTOs HTTP y errores RFC 9457. El alcance exacto y el límite pendiente del modelo JPA se describen en [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md). Las pruebas y la compilación no se ejecutaron y quedan para la fase final.
+## Decisiones e hitos históricos
 
-## Documentos
+- [12 — Decisiones P01](12-decisiones-p01.md)
+- [13 — Implementación P03](13-implementacion-p03-arquitectura.md)
+- [14 — Implementación P04](14-implementacion-p04-esquema.md)
+- [15 — Implementación P05](15-implementacion-p05-seguridad.md)
+- [16 — Implementación P06](16-implementacion-p06-ventas-atomicas.md)
+- [17 — Implementación P07](17-implementacion-p07-inventario-operativo.md)
+- [18 — Implementación P08](18-implementacion-p08-compras-y-recepciones.md)
+- [19 — Implementación P09](19-implementacion-p09-devoluciones-y-anulaciones.md)
+- [20 — Implementación P10](20-implementacion-p10-transferencias-consistentes.md)
+- [21 — Implementación P11](21-implementacion-p11-auditoria-documentacion-api.md)
+- [22 — Entrega P12](22-entrega-p12-integracion-codigo.md)
 
-| Documento | Contenido |
-|---|---|
-| [01 — Análisis competitivo](01-analisis-competitivo.md) | Referentes, capacidades comparables y decisiones que sí conviene adoptar. |
-| [02 — Alcance y requisitos](02-requisitos-y-alcance.md) | Alcance, supuestos, requisitos funcionales y no funcionales, criterios de aceptación. |
-| [03 — Arquitectura y patrones](03-arquitectura-y-patrones.md) | Arquitectura objetivo, módulos, límites y patrones de diseño. |
-| [04 — Modelo de dominio](04-modelo-dominio-y-reglas.md) | Entidades, relaciones, stock, estados y reglas transaccionales. |
-| [05 — Catálogo de APIs](05-catalogo-apis.md) | Endpoints REST propuestos, permisos, solicitudes, respuestas y errores. |
-| [06 — Flujos de negocio y APIs](06-flujos-de-negocio-y-api.md) | Diagramas Mermaid y flujo por familia de endpoints/comandos. |
-| [07 — Seguridad y definición de hecho](07-seguridad-y-definicion-de-hecho.md) | Controles, amenazas, revisión estática y checklist para cada API. |
-| [08 — Plan de trabajo](08-plan-de-trabajo.md) | Backlog, dependencias, hitos y estimación del 100 % del backend descrito. |
-| [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md) | Decisión MVC/WebFlux, arquitectura del canal comercial, catálogo público y compra conversacional. |
-| [10 — Estimación del agente IA y tokens](10-estimacion-agente-ia-tokens.md) | Tiempo por tarea, tokens orientativos, presupuesto total y factores que modifican la estimación. |
-| [11 — Escalabilidad, GraphQL, Kafka, caché y datos](11-escalabilidad-graphql-kafka-cache-datos.md) | Decisiones sobre transacciones, eventos, caché, DataSource/pools, réplicas, particionamiento y vector search. |
-| [12 — Decisiones P01](12-decisiones-p01.md) | Defaults de MVP, alcance, roles, permisos y reglas de negocio para desbloquear la implementación. |
-| [13 — Implementación P03: arquitectura hexagonal](13-implementacion-p03-arquitectura.md) | Estado real de capas, puertos, adaptadores, errores y límites de la migración. |
-| [14 — Implementación P04: esquema PostgreSQL y entidades](14-implementacion-p04-esquema.md) | Migración incremental V9, unidades, variantes, ubicaciones, reservas, costeo e idempotencia. |
-| [15 — Implementación P05: seguridad e identidad](15-implementacion-p05-seguridad.md) | JWT, roles/permisos RBAC, invalidación de tokens, bootstrap inicial seguro y CORS. |
-| [16 — Implementación P06: ventas atómicas e idempotencia](16-implementacion-p06-ventas-atomicas.md) | Precios del servidor, descuento de stock transaccional, movimientos por línea y deduplicación concurrente de solicitudes. |
-| [17 — Implementación P07: inventario operativo](17-implementacion-p07-inventario-operativo.md) | Conteos físicos, diferencias, ajustes transaccionales, idempotencia, trazabilidad y ledger append-only. |
-| [18 — Implementación P08: compras y recepciones parciales](18-implementacion-p08-compras-y-recepciones.md) | Proveedores, órdenes de compra idempotentes, estados, recepciones parciales y movimientos de entrada trazables. |
-| [19 — Implementación P09: devoluciones y anulaciones aprobadas](19-implementacion-p09-devoluciones-y-anulaciones.md) | Devoluciones idempotentes de compra/venta, trazabilidad de ledger y solicitud/aprobación segregadas de cancelaciones. |
-| [20 — Implementación P10: transferencias consistentes](20-implementacion-p10-transferencias-consistentes.md) | Transiciones idempotentes, compensación de cancelación, reversión bilateral, bloqueo estable, auditoría y Outbox. |
-| [21 — Implementación P11: auditoría, documentación y API](21-implementacion-p11-auditoria-documentacion-api.md) | Auditoría de fallos HTTP, filtros de consulta, errores RFC 9457 y contrato OpenAPI. |
-| [22 — P12: integración del código y entrega](22-entrega-p12-integracion-codigo.md) | Rama de integración, Docker/PostgreSQL, CI manual y lista de entrega pendiente de validación. |
-| [23 — Runbook de operación](23-runbook-operacion.md) | Variables, despliegue, rollback, respaldos, Outbox, métricas, rate limit e idempotencia por comando. |
-| [Resultado de la auditoría](RESULTADO_AUDITORIA_EJECUCION.md) | Comandos ejecutados, pruebas, cobertura de APIs, matriz RBAC, estado de cada hallazgo y exclusiones. |
+Los documentos P03–P12 son registros de decisiones/hitos y pueden reflejar el estado de cuando se redactaron. Para estado vivo usar 24; para rutas/contratos usar 25; para arquitectura implementada usar 26. No copiar rutas de un documento histórico sin comprobar el controlador actual.
 
-## Convenciones
+## Evidencia y operación
 
-- Prefijo REST: /api/v1.
-- Fechas y horas en ISO 8601 con zona explícita; persistencia temporal en UTC.
-- Cantidades y costos: BigDecimal/NUMERIC, nunca float/double para importes.
-- Errores de dominio con HTTP coherente y cuerpo application/problem+json.
-- Los comandos que cambian inventario deben ser idempotentes, autorizados y auditables.
-- Cada operación debe estar acotada por empresa/organización si se confirma el modo multiempresa; nunca confiar un companyId enviado por el cliente sin verificar el contexto autorizado.
-- Documentación OpenAPI como contrato a mantener sincronizado con los DTOs.
-- Los diagramas representan comportamiento objetivo. Las pruebas funcionales y de integración las ejecutará el responsable localmente; no se ejecutaron pruebas durante la elaboración de estos documentos.
+- [Resultado histórico de ejecución](RESULTADO_AUDITORIA_EJECUCION.md)
+- [Auditoría original de pendientes](../AUDITORIA_TECNICA_PENDIENTES.md)
+- [Pendientes históricos del reporte de balance](../PENDIENTES.md)
+- [README backend](../README.md)
+- [Auditoría de la raíz del repositorio](../../AUDITORIA_TECNICA_PENDIENTES.md)
 
-## Decisiones que bloquean una implementación definitiva
+## Regla de calidad documental
 
-Antes de cerrar el modelo y estimación, confirmar:
-
-1. ¿Una sola empresa por instalación o SaaS multiempresa?
-2. ¿Se emitirán comprobantes electrónicos SRI en el MVP o solo documentos internos?
-3. ¿Qué política de costos estará habilitada y con qué criterio contable? LIFO queda sujeto a aprobación contable y jurisdiccional antes de activarlo.
-4. ¿Habrá caja/pagos, contabilidad, e-commerce, fabricación o solo inventario, compras y ventas?
-5. ¿Quién emitirá los tokens: proveedor OIDC externo o servicio de identidad propio?
-6. Volumen esperado: usuarios concurrentes, productos/SKUs, almacenes y movimientos diarios.
-
-La estimación de 08 — Plan de trabajo identifica estos supuestos y no considera que “cero errores” pueda garantizarse solo mediante revisión estática.
-
-## Canal comercial y medios
-
-El contrato de catálogo público y las rutas de pedidos WhatsApp están documentados en [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md); los endpoints de administración y exposición de medios se amplían en [05 — Catálogo de APIs](05-catalogo-apis.md), sección 11.
+“Implementado en código” no significa “validado”. Validado requiere una ejecución reproducible contra el SHA exacto. Histórico describe una corrida anterior; Fuera de alcance describe algo no ofrecido en esta versión. Nunca marcar un resultado como exitoso por inferencia. Para cada endpoint se deben actualizar contrato, DTO, autorización, tests, guía y estado en el mismo cambio.

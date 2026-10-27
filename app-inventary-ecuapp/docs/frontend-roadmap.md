@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** las fases de código fuente se describen como completadas, pero la fase de validación debe seguir considerándose abierta hasta que build, pruebas frontend y flujo navegador pasen sobre el SHA actual. La acción prioritaria es versionar package-lock.json, cambiar CI a npm ci y añadir pruebas de cliente/componentes/E2E. La evidencia de workflow disponible corresponde a un commit anterior al HEAD de referencia. Ver [plan de cierre](../../microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md).
+
 # Plan de implementación del frontend
 
 La construcción del frontend se divide por fases de código fuente. Las pruebas integrales se ejecutarán después de completar todo el alcance de código fuente, según lo solicitado.

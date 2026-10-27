@@ -1,3 +1,5 @@
+> **Adenda operativa — 2026-10-26:** usar este runbook junto a [24 — Estado actual](24-estado-actual-repositorio.md) y [28 — Plan de cierre](28-plan-cierre-y-validacion.md). La evidencia histórica se ejecutó en PostgreSQL 18.6 y no demuestra que Docker Compose o PostgreSQL 16 hayan sido validados en este HEAD. Antes de datos reales, rotar secretos, cambiar la contraseña inicial de admin, validar backup/restore, CORS, proxy y permisos; no reutilizar la base de smoke-test sin revisión aprobada.
+
 # 23 — Runbook de operación del backend
 
 Guía para quien despliega y opera la API. Complementa `README.md` y `docs/RESULTADO_AUDITORIA_EJECUCION.md`.

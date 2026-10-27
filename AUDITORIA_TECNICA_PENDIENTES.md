@@ -1,3 +1,5 @@
+> **Nota de vigencia — 2026-10-26:** este documento conserva hallazgos de una revisión anterior. Algunos apartados describen un árbol donde el frontend no existía, rutas aún propuestas o estado previo a V14; esos textos son históricos y no constituyen inventario vivo. Consultar [estado actual](microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md), [referencia de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md), [arquitectura implementada](microservices-inventary-ecuapp/docs/26-arquitectura-y-patrones-actuales.md) y [plan de cierre](microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md). El cuerpo original se preserva como registro histórico y no demuestra validación del HEAD actual.
+
 # Auditoría técnica de Inventary — pendientes, defectos y plan de cierre
 
 > **Objetivo:** documento operativo para que un agente local audite, complete, corrija y pruebe el backend y sus APIs REST/GraphQL hasta obtener una entrega reproducible.

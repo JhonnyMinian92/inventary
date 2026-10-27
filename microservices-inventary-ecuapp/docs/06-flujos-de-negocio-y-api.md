@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** los flujos en este documento deben leerse junto con las rutas reales de [25 — Referencia API](25-referencia-apis.md). Los comandos contabilizados deben usar el backend y sus transacciones; el cliente no modifica saldos por su cuenta. Compra y recepción son etapas distintas; venta total seguida de recompra del mismo SKU debe verificarse por rango histórico. Los ejemplos de endpoints propuestos en documentos anteriores no prevalecen frente a los controladores del SHA desplegado.
+
 # 06 — Diagramas de negocio y flujo de cada familia de API
 
 ## 1. Flujo común de todas las solicitudes

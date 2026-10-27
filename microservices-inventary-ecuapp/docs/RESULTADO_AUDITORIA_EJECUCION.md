@@ -1,3 +1,5 @@
+> **Vigencia de esta evidencia:** registro histórico fechado 2026-10-23, no certificación del HEAD de master del 2026-10-26. El propio informe indica que la copia local probada no era un repositorio Git y no se registraron SHA inicial/final. Las 76 pruebas, el smoke HTTP y PostgreSQL 18.6 describen aquella ejecución concreta; no sustituyen validación actual en PostgreSQL 16, Docker Compose ni CI sobre el SHA a publicar. Que el frontend estuviera fuera de alcance en aquella corrida no significa que el frontend actual no exista. Consultar [24](24-estado-actual-repositorio.md) y [28](28-plan-cierre-y-validacion.md) para estado vivo y próximos pasos.
+
 # Resultado de la ejecución de la auditoría técnica — backend Inventary
 
 > Documento de evidencia solicitado en `AUDITORIA_TECNICA_PENDIENTES.md` §12.

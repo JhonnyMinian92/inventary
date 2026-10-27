@@ -1,3 +1,5 @@
+> **Adenda de estado — 2026-10-26:** el código actual incluye costeo FIFO/promedio y migración V14; las capas iniciales para existencias anteriores usan product.costPrice como estimación, no reconstrucción de costo histórico. Las variantes no tienen inventario/costo separado y no hay picking multi-bin operativo. Las existencias cambian mediante comandos que registran movimientos, no mediante un CRUD de stock. Ver [24](24-estado-actual-repositorio.md), [25](25-referencia-apis.md) y [26](26-arquitectura-y-patrones-actuales.md).
+
 # 04 — Modelo de dominio, persistencia y reglas inquebrantables
 
 ## 1. Entidades principales
