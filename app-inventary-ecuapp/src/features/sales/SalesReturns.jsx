@@ -6,6 +6,11 @@ import StepProgress from '../../components/StepProgress.jsx';
 function idOf(value) { return value?.id ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
+function readSalesReturnFromUrl() {
+  if (typeof window === 'undefined') return false;
+  const parts = window.location.hash.slice(1).replace(/^\\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
+  return parts[0] === 'sales' && parts[1] === 'returns' && parts[2] === 'new';
+}
 
 export default function SalesReturns({ onChanged }) {
   const [rows, setRows] = useState([]);
@@ -13,7 +18,7 @@ export default function SalesReturns({ onChanged }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(readSalesReturnFromUrl);
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
   const [sourceSaleId, setSourceSaleId] = useState('');
@@ -38,6 +43,24 @@ export default function SalesReturns({ onChanged }) {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const nextOpen = readSalesReturnFromUrl();
+      const hasChanges = Boolean(sourceSaleId || reason.trim() || lines.some(line => Number(line.quantity) > 0));
+      if (!nextOpen && formOpen && hasChanges && !window.confirm('¿Salir de la devolución? Se perderán las cantidades que hayas escrito.')) {
+        window.history.pushState({ workflow: 'sales-return' }, '', '#/sales/returns/new');
+        return;
+      }
+      setFormOpen(nextOpen);
+    };
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('hashchange', syncRoute);
+    return () => {
+      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener('hashchange', syncRoute);
+    };
+  }, [formOpen, sourceSaleId, reason, lines]);
 
   useEffect(() => {
     if (!sourceSaleId) {
@@ -97,6 +120,7 @@ export default function SalesReturns({ onChanged }) {
     setError('');
     setNotice('');
     setFormOpen(true);
+    window.history.pushState({ workflow: 'sales-return' }, '', '#/sales/returns/new');
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -111,6 +135,7 @@ export default function SalesReturns({ onChanged }) {
     setStep(0);
     setValidationMessage('');
     setError('');
+    window.history.replaceState({ section: 'sales' }, '', '#/sales');
   }
 
   function updateLine(index, field, value) {
@@ -186,6 +211,7 @@ export default function SalesReturns({ onChanged }) {
       setLines([]);
       setReason('');
       setStep(0);
+      window.history.replaceState({ section: 'sales' }, '', '#/sales');
       await refresh();
       await onChanged?.();
       setNotice('Devolución registrada. El inventario se actualizó según el destino de cada artículo.');
