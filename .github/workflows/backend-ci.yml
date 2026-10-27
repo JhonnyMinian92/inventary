@@ -68,7 +68,7 @@ jobs:
           cache: maven
           cache-dependency-path: microservices-inventary-ecuapp/pom.xml
       - name: Verify Maven wrapper
-        run: test -x ./mvnw
+        run: test -f ./mvnw && chmod +x ./mvnw
       - name: Verify with Maven and PostgreSQL 16
         run: ./mvnw -B --no-transfer-progress verify
       - name: Upload test reports
