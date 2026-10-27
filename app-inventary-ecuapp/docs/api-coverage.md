@@ -8,6 +8,7 @@ Esta matriz se revisó contra los controladores Spring bajo `microservices-inven
 |---|---|---|
 | Sesión | `POST /auth/login`, `GET /auth/me`, `POST /auth/logout` | Iniciar sesión, recuperar usuario y cerrar sesión. |
 | Productos | `GET /catalog/products`, `GET /catalog/products/{id}`, `POST /catalog/products`, `PUT /catalog/products/{id}`, `POST /catalog/products/{id}/activate`, `POST /catalog/products/{id}/deactivate` | Catálogo, detalle y estado del producto. |
+| Imágenes de producto | `GET /catalog/products/{id}/images`, `POST /catalog/products/{id}/images/upload`, `DELETE /catalog/products/{id}/images/{imageId}` | Editar productos existentes: consultar galería, subir PNG/JPEG y retirar imágenes del catálogo público. |
 | Categorías y atributos | `GET /catalog/categories`, `POST /catalog/categories`, `PUT /catalog/categories/{id}`, `POST /catalog/categories/{id}/activate`, `POST /catalog/categories/{id}/deactivate`, `GET /catalog/categories/{id}/attributes`, `PUT /catalog/categories/{id}/attributes` | Categorías y esquema de propiedades dinámicas. |
 | Unidades | `GET /catalog/units`, `POST /catalog/units`, `PUT /catalog/units/{id}`, `GET /catalog/unit-conversions`, `POST /catalog/unit-conversions` | Unidades y factores de conversión. |
 | Almacenes | `GET /warehouses`, `GET /warehouses/{id}`, `POST /warehouses`, `PUT /warehouses/{id}`, `POST /warehouses/{id}/activate`, `POST /warehouses/{id}/deactivate` | Catálogo de almacenes. |
