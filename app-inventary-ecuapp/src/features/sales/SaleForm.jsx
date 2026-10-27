@@ -5,7 +5,7 @@ const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 
-export default function SaleForm({ products, warehouses, customers, balances, loading, onCancel, onSubmit }) {
+export default function SaleForm({ products, warehouses, customers, balances, loading, onCancel, onSubmit, onError }) {
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id || '');
   const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -60,7 +60,19 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   function submit(event) {
     event.preventDefault();
     const items = lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) }));
-    if (!warehouseId || !items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) return;
+    if (!warehouseId) {
+      onError?.('Selecciona el almacén desde el que saldrá la mercancía.');
+      return;
+    }
+    if (!items.length || items.some(item => !item.productId || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+      onError?.('Selecciona un producto y confirma que cada cantidad sea mayor que cero.');
+      return;
+    }
+    const productIds = items.map(item => String(item.productId));
+    if (new Set(productIds).size !== productIds.length) {
+      onError?.('Cada producto debe aparecer una sola vez en la venta.');
+      return;
+    }
     const data = { warehouseId, channel: 'POS', items };
     if (customerId) data.customerId = customerId;
     else {
