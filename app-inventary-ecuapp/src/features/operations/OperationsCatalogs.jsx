@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { api, listFrom } from '../../api';
+import { api, listFrom, listAllPages } from '../../api';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import UnitConversions from './UnitConversions.jsx';
 
@@ -91,7 +91,7 @@ export default function OperationsCatalogs({ onChanged }) {
     setLoading(true);
     setError('');
     const [warehouses, suppliers, customers, units] = await Promise.allSettled([
-      api.warehouses({ size: 100 }), api.suppliers({ size: 100 }), api.customers({ size: 100 }), api.units()
+      listAllPages(api.warehouses, { size: 100 }), listAllPages(api.suppliers, { size: 100 }), listAllPages(api.customers, { size: 100 }), api.units()
     ]);
     const result = { warehouses: [], suppliers: [], customers: [], units: [] };
     const failures = [];
