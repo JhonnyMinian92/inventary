@@ -30,6 +30,14 @@ const nav = [
   { id: 'reports', label: 'Reportes', icon: ClipboardList }
 ];
 
+const VALID_SECTIONS = new Set(nav.map(item => item.id));
+
+function readSectionFromUrl() {
+  if (typeof window === 'undefined') return 'overview';
+  const sectionId = window.location.hash.slice(1).replace(/^\/+/, '').split(/[/?]/)[0];
+  return VALID_SECTIONS.has(sectionId) ? sectionId : 'overview';
+}
+
 function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
@@ -40,7 +48,7 @@ function quantity(x) { return x?.onHand ?? x?.quantity ?? x?.available ?? x?.sto
 function App() {
   const [token, setTokenState] = useState(getToken());
   const [user, setUser] = useState(null);
-  const [section, setSection] = useState('overview');
+  const [section, setSection] = useState(readSectionFromUrl);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
@@ -61,6 +69,7 @@ function App() {
   const [saleCancelReason, setSaleCancelReason] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [hasLoadedData, setHasLoadedData] = useState(false);
   const [apiStatus, setApiStatus] = useState('checking');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -85,6 +94,7 @@ function App() {
       setTokenState('');
       setUser(null);
       setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+      setHasLoadedData(true);
       setLoading(false);
       return;
     }
@@ -102,6 +112,7 @@ function App() {
       } else if (['products', 'categories', 'warehouses', 'balances'].includes(key)) failed.push(`${key}: ${result.reason?.message || 'error'}`);
     });
     if (failed.length) setError(`No se pudieron cargar algunos datos. ${failed.join(' · ')}`);
+    setHasLoadedData(true);
     setLoading(false);
   }, []);
 
@@ -111,7 +122,38 @@ function App() {
     loadData();
   }, [token, loadData]);
 
+  useEffect(() => {
+    const syncSectionFromUrl = () => {
+      const nextSection = readSectionFromUrl();
+      setSection(nextSection);
+      if (window.location.hash !== `#/${nextSection}`) {
+        window.history.replaceState(window.history.state, '', `#/${nextSection}`);
+      }
+    };
+
+    if (window.location.hash !== `#/${section}`) {
+      window.history.replaceState(window.history.state, '', `#/${section}`);
+    }
+    window.addEventListener('hashchange', syncSectionFromUrl);
+    window.addEventListener('popstate', syncSectionFromUrl);
+    return () => {
+      window.removeEventListener('hashchange', syncSectionFromUrl);
+      window.removeEventListener('popstate', syncSectionFromUrl);
+    };
+  }, []);
+
+  const navigateSection = useCallback(nextSection => {
+    const targetSection = VALID_SECTIONS.has(nextSection) ? nextSection : 'overview';
+    setSection(targetSection);
+    const targetHash = `#/${targetSection}`;
+    if (window.location.hash !== targetHash) {
+      window.history.pushState({ section: targetSection }, '', targetHash);
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
   const visibleProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.code, p.description].some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))), [products, search]);
+  const isInitialLoading = loading && !hasLoadedData;
   const stockTotal = balances.reduce((sum, row) => sum + Number(quantity(row)), 0);
   const valuationTotals = Array.isArray(valuation?.totals) ? valuation.totals : [];
   const inventoryValueLabel = !valuation ? '—' : valuationTotals.length === 1 ? money(valuationTotals[0].totalValue) : valuationTotals.length > 1 ? 'Varias monedas' : money(0);
@@ -134,6 +176,10 @@ function App() {
   }
 
   async function submitProduct(form) {
+    if (!String(form.name || '').trim() || !String(form.sku || '').trim()) {
+      setError('Escribe el nombre y el SKU del producto.');
+      return;
+    }
     if (!form.categoryId) {
       setError('Selecciona una categoría. El backend requiere una categoría para registrar el producto.');
       return;
@@ -157,6 +203,10 @@ function App() {
   }
 
   async function submitCategory(form) {
+    if (!String(form.name || '').trim()) {
+      setError('Escribe un nombre para la categoría.');
+      return;
+    }
     const data = { name: form.name.trim(), description: form.description.trim() };
     await runAction(async () => {
       const result = editing ? await api.updateCategory(pickId(editing), data) : await api.createCategory(data);
@@ -364,21 +414,22 @@ function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Boxes size={22}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div>
       <div className="workspace-label">ESPACIO DE TRABAJO</div>
-      <nav>{nav.map(item => <button key={item.id} className={section === item.id ? 'nav-item active' : 'nav-item'} onClick={() => setSection(item.id)}><item.icon size={18}/><span>{item.label}</span>{section === item.id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
+      <nav aria-label="Navegación principal">{nav.map(item => <button type="button" key={item.id} title={item.label} aria-current={section === item.id ? 'page' : undefined} className={section === item.id ? 'nav-item active' : 'nav-item'} onClick={() => navigateSection(item.id)}><item.icon size={18}/><span>{item.label}</span>{section === item.id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="api-status"><span className={'status-dot ' + apiStatus}/><span>{apiStatus === 'connected' ? 'API disponible' : apiStatus === 'checking' ? 'Conectando a la API…' : 'API sin conexión'}</span></div><button className="nav-item logout" onClick={logout}><LogOut size={18}/> Cerrar sesión</button></div>
     </aside>
     <main className="main-content">
-      <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button type="button" className="icon-button" onClick={loadData} title="Actualizar datos" aria-label="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
+      <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button type="button" className={loading ? "icon-button is-loading" : "icon-button"} onClick={loadData} disabled={loading} aria-busy={loading} title="Actualizar datos" aria-label="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{(user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r) .join(', ') || 'Sesión activa'}</small></div></div></div></header>
       {error && <div className="alert error" role="alert" aria-live="assertive"><CircleAlert size={18}/><span>{error}</span><button type="button" aria-label="Cerrar mensaje de error" onClick={() => setError('')}>×</button></div>}
       {notice && <div className="alert success" role="status" aria-live="polite"><Activity size={18}/><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
-      {section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValueLabel} purchases={purchases} sales={sales} movements={movements} setSection={setSection} loading={loading} onNewProduct={() => openProduct()} onNewCategory={() => openCategory()} onNewPurchase={() => setModal('purchase')} onNewSale={() => setModal('sale')}/>}
-      {section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input aria-label="Buscar productos por nombre o SKU" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus} onDelete={deleteProduct}/></section>}
-      {section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus} onDelete={deleteCategory}/></section>}
-      {section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
-      {section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onView={openPurchaseDetail} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={requestPurchaseCancellation} onReceive={openReceive}/><PurchaseReturns onChanged={loadData}/></section>}
-      {section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><SalesTable rows={sales} loading={loading} onView={openSaleDetail} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation}/><SalesReturns onChanged={loadData}/></section>}
-      {section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseCode','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['type','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['occurredAt','Fecha'],['referenceType','Tipo de documento'],['referenceId','Referencia']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
-      {section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => { setToken(''); setTokenState(''); setUser(null); }} />}
+      {isInitialLoading && <PageSkeleton />}
+      {!isInitialLoading && section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValueLabel} purchases={purchases} sales={sales} movements={movements} setSection={navigateSection} loading={loading} onNewProduct={() => openProduct()} onNewCategory={() => openCategory()} onNewPurchase={() => setModal('purchase')} onNewSale={() => setModal('sale')}/>}
+      {!isInitialLoading && section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input aria-label="Buscar productos por nombre o SKU" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus} onDelete={deleteProduct}/></section>}
+      {!isInitialLoading && section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus} onDelete={deleteCategory}/></section>}
+      {!isInitialLoading && section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
+      {!isInitialLoading && section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => setModal('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onView={openPurchaseDetail} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={requestPurchaseCancellation} onReceive={openReceive}/><PurchaseReturns onChanged={loadData}/></section>}
+      {!isInitialLoading && section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas de varios productos; el backend valida precios, stock y contabilización." action="Nueva venta" onAction={() => setModal('sale')} icon={ArrowUpFromLine}/><SalesTable rows={sales} loading={loading} onView={openSaleDetail} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation}/><SalesReturns onChanged={loadData}/></section>}
+      {!isInitialLoading && section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseCode','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['type','Movimiento'],['productName','Producto'],['quantity','Cantidad'],['occurredAt','Fecha'],['referenceType','Tipo de documento'],['referenceId','Referencia']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
+      {!isInitialLoading && section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => { setToken(''); setTokenState(''); setUser(null); }} />}
     </main>
     {modal && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta',confirmPurchaseCancel:'Confirmar cancelación de compra',confirmStatusChange:statusChangeTarget ? (statusChangeTarget.activate ? 'Confirmar activación' : 'Confirmar desactivación') : 'Confirmar cambio de estado',purchaseDetail:'Detalle de orden de compra',saleDetail:'Detalle de venta'}[modal] || 'Operación'} onClose={() => { setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); if (modal === 'confirmPurchaseCancel') setPurchaseToCancel(null); if (modal === 'confirmStatusChange') setStatusChangeTarget(null); if (modal === 'purchaseDetail') setPurchaseDetail(null); if (modal === 'saleDetail') setSaleDetail(null); }}><>
       {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
@@ -398,6 +449,26 @@ function App() {
 
     </></Modal>}
   </div>;
+}
+
+function PageSkeleton() {
+  return <section className="page-skeleton" role="status" aria-label="Cargando información">
+    <span className="visually-hidden">Cargando información…</span>
+    <div className="skeleton-metrics">
+      {Array.from({ length: 4 }, (_, index) => <div className="skeleton-card" key={index}>
+        <span className="skeleton-bar short" />
+        <span className="skeleton-bar number" />
+        <span className="skeleton-bar medium" />
+      </div>)}
+    </div>
+    <div className="skeleton-panel">
+      <span className="skeleton-bar heading" />
+      <span className="skeleton-bar long" />
+      <span className="skeleton-bar long" />
+      <span className="skeleton-bar long" />
+      <span className="skeleton-bar medium" />
+    </div>
+  </section>;
 }
 
 function Login({ onLogin, error }) {
