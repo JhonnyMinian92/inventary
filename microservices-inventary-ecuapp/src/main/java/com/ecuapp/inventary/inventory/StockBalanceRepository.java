@@ -17,6 +17,7 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance,UUID>
  Optional<StockBalance> findForUpdate(@Param("productId") UUID productId,@Param("warehouseId") UUID warehouseId);
  Optional<StockBalance> findByProductIdAndWarehouseId(UUID productId,UUID warehouseId);
  boolean existsByProductId(UUID productId);
+ boolean existsByWarehouseId(UUID warehouseId);
  @Query("select distinct b.product.id from StockBalance b where b.product.id in :productIds and (b.onHand - b.reserved) > 0 and b.warehouse.active=true")
  Set<UUID> findProductIdsWithAvailableStock(@Param("productIds") Collection<UUID> productIds);
  @Query("select case when count(b)>0 then true else false end from StockBalance b where b.product.id=:productId and (b.onHand>0 or b.reserved>0)")
