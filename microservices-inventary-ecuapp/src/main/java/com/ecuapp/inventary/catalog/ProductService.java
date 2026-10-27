@@ -14,6 +14,12 @@ import com.ecuapp.inventary.common.InvalidQueryException;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import com.ecuapp.inventary.inventory.StockBalanceRepository;
 import com.ecuapp.inventary.inventory.StockMovementRepository;
+import com.ecuapp.inventary.inventory.InventoryCountRepository;
+import com.ecuapp.inventary.inventory.InventoryCountStatus;
+import com.ecuapp.inventary.purchasing.PurchaseOrderRepository;
+import com.ecuapp.inventary.purchasing.PurchaseOrderStatus;
+import com.ecuapp.inventary.transfers.StockTransferRepository;
+import com.ecuapp.inventary.transfers.TransferStatus;
 import com.ecuapp.inventary.media.ProductImageRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -30,10 +36,12 @@ public class ProductService implements ProductUseCases {
  private final ProductPersistencePort products;private final CategoryRepository categories;private final StockBalanceRepository balances;private final AuditService audit;
  private final UnitOfMeasureRepository units;private final CategoryAttributeDefinitionRepository definitions;private final AttributeSchemaValidator validator;
  private final ProductVariantRepository variants;private final StockMovementRepository movements;private final ProductImageRepository images;
+ private final PurchaseOrderRepository purchaseOrders;private final StockTransferRepository transfers;private final InventoryCountRepository counts;
  public ProductService(ProductPersistencePort products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit,UnitOfMeasureRepository units,
-  CategoryAttributeDefinitionRepository definitions,AttributeSchemaValidator validator,ProductVariantRepository variants,StockMovementRepository movements,ProductImageRepository images){
+  CategoryAttributeDefinitionRepository definitions,AttributeSchemaValidator validator,ProductVariantRepository variants,StockMovementRepository movements,ProductImageRepository images,
+  PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts){
   this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;this.units=units;this.definitions=definitions;this.validator=validator;
-  this.variants=variants;this.movements=movements;this.images=images;
+  this.variants=variants;this.movements=movements;this.images=images;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;
  }
 
  @Cacheable(cacheNames="publicProductList",key="'q=' + #query + '|c=' + #categoryId + '|' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
@@ -107,8 +115,16 @@ public class ProductService implements ProductUseCases {
  }
  @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public void deactivateProduct(UUID id,String actor){
-  Product p=require(id);
+  Product p=products.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));
   if(!p.isActive())return;
+  if(balances.hasPhysicalStock(id))
+   throw new ConflictException("No se puede desactivar un producto con existencias o reservas. Traslade, devuelva o ajuste el inventario primero.");
+  if(purchaseOrders.existsForProductInStatuses(id,EnumSet.of(PurchaseOrderStatus.DRAFT,PurchaseOrderStatus.SUBMITTED,PurchaseOrderStatus.APPROVED,PurchaseOrderStatus.PARTIALLY_RECEIVED)))
+   throw new ConflictException("No se puede desactivar un producto que aparece en órdenes de compra pendientes. Cierre o cancele esas órdenes primero.");
+  if(transfers.existsForProductInStatuses(id,EnumSet.of(TransferStatus.DRAFT,TransferStatus.IN_TRANSIT)))
+   throw new ConflictException("No se puede desactivar un producto que aparece en transferencias pendientes. Complete o cancele esas transferencias primero.");
+  if(counts.existsForProductWithStatus(id,InventoryCountStatus.OPEN))
+   throw new ConflictException("No se puede desactivar un producto incluido en un conteo abierto. Contabilice o cancele el conteo primero.");
   p.deactivate();audit.record(actor,"PRODUCT_DEACTIVATED","PRODUCT",id,Map.of("sku",p.getSku()));
  }
  @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
@@ -140,7 +156,7 @@ public class ProductService implements ProductUseCases {
   return new PageQuery(pageable.getPageNumber(),pageable.getPageSize(),pageable.getSort().stream().map(order->new PageQuery.SortTerm(order.getProperty(),order.isDescending()?PageQuery.Direction.DESC:PageQuery.Direction.ASC)).toList());
  }
  private Product require(UUID id){return products.findById(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));}
- private Category requireActiveCategory(UUID id){Category c=categories.findById(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
+ private Category requireActiveCategory(UUID id){Category c=categories.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Categoría",id));if(!c.isActive())throw new ConflictException("No se pueden asociar productos a una categoría inactiva.");return c;}
  private UnitOfMeasure requireActiveUnit(UUID id){
   UnitOfMeasure unit=units.findById(id).orElseThrow(()->new ResourceNotFoundException("Unidad de medida",id));
   if(!unit.isActive())throw new BusinessRuleException("La unidad de medida está inactiva.");
