@@ -229,12 +229,12 @@ function App() {
   useEffect(() => {
     if (modal === 'product' && routeEntityId && products.length) {
       setEditing(products.find(item => String(pickId(item)) === String(routeEntityId)) || null);
-      return undefined;
-    }
-    if (modal === 'category' && routeEntityId && categories.length) {
+    } else if (modal === 'category' && routeEntityId && categories.length) {
       setEditing(categories.find(item => String(pickId(item)) === String(routeEntityId)) || null);
-      return undefined;
     }
+  }, [modal, routeEntityId, products, categories]);
+
+  useEffect(() => {
     if (modal !== 'receive' || !routeEntityId || String(pickId(selectedOrder)) === String(routeEntityId)) return undefined;
     let active = true;
     setLoading(true);
@@ -252,7 +252,7 @@ function App() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [modal, routeEntityId, products, categories, selectedOrder]);
+  }, [modal, routeEntityId]);
 
   const visibleProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.code, p.description].some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))), [products, search]);
   const isInitialLoading = loading && !hasLoadedData;
