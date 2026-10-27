@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Tags, Trash2 } from 'lucide-react';
 import { api } from '../../api';
+import StepProgress from '../../components/StepProgress.jsx';
 
 function emptyDefinition() {
   return { key: '', displayName: '', valueType: 'STRING', required: false, optionsText: '', maxLength: '' };
@@ -37,6 +39,8 @@ function buildDefinitions(rows) {
 }
 
 export default function CategoryForm({ initialValue, loading, onCancel, onSubmit, onError }) {
+  const [step, setStep] = useState(0);
+  const [validationMessage, setValidationMessage] = useState('');
   const [name, setName] = useState(initialValue?.name || '');
   const [description, setDescription] = useState(initialValue?.description || '');
   const [definitions, setDefinitions] = useState([]);
@@ -82,50 +86,73 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (!schemaLoaded) {
-      onError?.('Espera a que se cargue el esquema de la categoría antes de guardar.');
+    setValidationMessage('');
+
+    if (step === 0) {
+      if (!name.trim()) {
+        setValidationMessage('Escribe un nombre para la categoría.');
+        return;
+      }
+      setStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
-    if (!name.trim()) {
-      onError?.('Escribe un nombre para la categoría.');
+    if (!schemaLoaded || schemaLoading) {
+      setValidationMessage('Espera a que terminen de cargar las propiedades existentes.');
       return;
     }
+    if (schemaError) {
+      setValidationMessage('No se puede continuar hasta cargar el esquema de propiedades. Vuelve a intentarlo.');
+      return;
+    }
+
     const rows = definitions.filter(row => row.key.trim() || row.displayName.trim());
     for (const row of rows) {
       if (!row.key.trim() || !row.displayName.trim()) {
-        onError?.('Cada propiedad debe tener una clave y un nombre visible.');
+        setValidationMessage('Cada propiedad debe tener una clave y un nombre visible.');
         return;
       }
       if (row.valueType === 'ENUM') {
-        const options = row.optionsText.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
+        const options = row.optionsText.split(/[\\n,]/).map(value => value.trim()).filter(Boolean);
         if (!options.length) {
-          onError?.('Cada propiedad de tipo lista debe incluir al menos una opción.');
+          setValidationMessage('Añade al menos una opción a cada campo de tipo lista.');
           return;
         }
         if (new Set(options.map(value => value.toLocaleLowerCase())).size !== options.length) {
-          onError?.('Las opciones de una lista no pueden repetirse.');
+          setValidationMessage('Las opciones de una lista no pueden repetirse.');
           return;
         }
       }
       if (row.maxLength !== '' && (!Number.isInteger(Number(row.maxLength)) || Number(row.maxLength) < 1)) {
-        onError?.('La longitud máxima debe ser un entero positivo.');
+        setValidationMessage('La longitud máxima debe ser un entero positivo.');
         return;
       }
     }
     const keys = rows.map(row => row.key.trim().toLowerCase());
     if (new Set(keys).size !== keys.length) {
-      onError?.('No puede haber claves de propiedades repetidas.');
+      setValidationMessage('No puede haber claves de propiedades repetidas.');
       return;
     }
-
-    onSubmit({
-      name: name.trim(),
-      description: description.trim(),
-      definitions: buildDefinitions(rows)
-    });
+    if (step === 1) {
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    onSubmit({ name: name.trim(), description: description.trim(), definitions: buildDefinitions(rows) });
   }
 
-  return <form className="form-grid" onSubmit={handleSubmit}>
+  function previousStep() {
+    setValidationMessage('');
+    setStep(current => Math.max(0, current - 1));
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  return <form className="workflow-form" onSubmit={handleSubmit} noValidate>
+    <StepProgress steps={['Datos básicos', 'Propiedades', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
+    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
+    {step === 0 && <section className="workflow-stage" aria-labelledby="category-basic-title">
+      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Tags size={20}/></span><div><h2 id="category-basic-title">Crea una categoría clara</h2><p>El nombre ayudará a identificar y organizar los productos.</p></div></div>
+      <div className="form-grid workflow-fields">
     <label className="field">
       <span>Nombre<b> *</b></span>
       <input required maxLength="120" value={name} onChange={event => setName(event.target.value)} />
@@ -135,6 +162,11 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
       <textarea rows="2" maxLength="1000" value={description} onChange={event => setDescription(event.target.value)} />
     </label>
 
+      </div>
+    </section>}
+    {step === 1 && <section className="workflow-stage" aria-labelledby="category-properties-title">
+    <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Tags size={20}/></span><div><h2 id="category-properties-title">Define los campos opcionales</h2><p>Añade propiedades como talla, color o material cuando realmente las necesites.</p></div></div>
+    <div className="form-grid workflow-fields">
     <div className="form-subheading wide">
       <strong>Propiedades de esta categoría</strong>
       <small>Define los campos que estarán disponibles en todos los productos de la categoría.</small>
@@ -189,10 +221,30 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
     <div className="wide">
       <button type="button" className="button secondary" disabled={schemaLoading || Boolean(schemaError)} onClick={() => setDefinitions(current => [...current, emptyDefinition()])}>+ Añadir propiedad</button>
     </div>
-    <div className="form-actions wide">
-      <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
-      <button className="button primary" disabled={loading || schemaLoading || !schemaLoaded || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar categoría'}</button>
+      {schemaError && initialValue && <p className="form-hint wide">Vuelve a abrir la categoría para intentar cargar sus propiedades.</p>}
     </div>
-    {schemaError && initialValue && <p className="form-hint wide">Cierra y vuelve a abrir el editor para intentar leer el esquema de nuevo antes de modificarlo.</p>}
+    </section>}
+    {step === 2 && <section className="workflow-stage" aria-labelledby="category-review-title">
+      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Tags size={20}/></span><div><h2 id="category-review-title">Confirma la categoría</h2><p>Revisa la información y los campos antes de guardar.</p></div></div>
+      <div className="workflow-review-grid">
+        <div className="workflow-review-card"><small>Nombre</small><strong>{name.trim() || '—'}</strong></div>
+        <div className="workflow-review-card"><small>Propiedades</small><strong>{definitions.filter(row => row.key.trim() && row.displayName.trim()).length}</strong></div>
+      </div>
+      {description.trim() && <p className="workflow-review-note"><strong>Descripción:</strong> {description.trim()}</p>}
+      {definitions.filter(row => row.key.trim() && row.displayName.trim()).length > 0 && <div className="workflow-review-lines">
+        {definitions.filter(row => row.key.trim() && row.displayName.trim()).map((row, index) => <div className="workflow-review-line" key={row.key || index}>
+          <div><strong>{row.displayName}</strong><small>{row.key} · {({ STRING: 'Texto', NUMBER: 'Número', BOOLEAN: 'Sí / No', DATE: 'Fecha', ENUM: 'Lista' })[row.valueType] || row.valueType}{row.required ? ' · Obligatorio' : ''}</small></div>
+          <span className="workflow-review-tag">Incluido</span>
+        </div>)}
+      </div>}
+    </section>}
+    <div className="form-actions workflow-actions">
+      <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
+      <div className="workflow-actions-right">
+        {step > 0 && <button type="button" className="button secondary" disabled={loading} onClick={previousStep}><ArrowLeft size={16}/> Atrás</button>}
+        {step < 2 ? <button type="submit" className="button primary" disabled={loading || (step === 1 && (schemaLoading || !schemaLoaded || Boolean(schemaError)))}>{step === 0 ? 'Continuar' : 'Revisar'} <ArrowRight size={16}/></button>
+          : <button type="submit" className="button primary" disabled={loading || schemaLoading || !schemaLoaded || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar categoría'}</button>}
+      </div>
+    </div>
   </form>;
 }
