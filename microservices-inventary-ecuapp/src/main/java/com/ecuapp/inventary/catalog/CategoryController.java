@@ -21,6 +21,8 @@ public class CategoryController {
  public CategoryDtos.View update(@PathVariable UUID id,@Valid @RequestBody CategoryDtos.WriteRequest request,Authentication auth){return service.update(id,request,auth.getName());}
  @PostMapping("/{id}/deactivate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
  public void deactivate(@PathVariable UUID id,Authentication auth){service.deactivate(id,auth.getName());}
+ @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
+ public void delete(@PathVariable UUID id,Authentication auth){service.delete(id,auth.getName());}
  @PostMapping("/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('catalog:manage')")
  public void activate(@PathVariable UUID id,Authentication auth){service.activate(id,auth.getName());}
  @GetMapping("/{id}/attributes") public CatalogStructureDtos.AttributeSchemaView attributes(@PathVariable UUID id){return structure.schema(id);}
