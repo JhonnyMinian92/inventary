@@ -64,7 +64,8 @@ public class WarehouseService {
   String code=w.getCode();
   try{
    locations.deleteAll(locations.findByWarehouseIdOrderByCodeAsc(id));
-   repo.deleteAndFlush(w);
+   locations.flush();
+    repo.deleteAndFlush(w);
   }catch(DataIntegrityViolationException ex){
    throw new ConflictException("El almacén conserva referencias de historial o configuración y no puede eliminarse físicamente.");
   }
