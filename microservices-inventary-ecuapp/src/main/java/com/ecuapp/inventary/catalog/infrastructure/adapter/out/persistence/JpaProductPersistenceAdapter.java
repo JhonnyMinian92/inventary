@@ -41,6 +41,11 @@ public class JpaProductPersistenceAdapter implements ProductPersistencePort {
     }
 
     @Override
+    public Optional<Product> findForUpdate(UUID id) {
+        return repository.findForUpdate(id);
+    }
+
+    @Override
     public Optional<Product> findBySku(String sku) {
         return repository.findBySkuIgnoreCase(sku);
     }
