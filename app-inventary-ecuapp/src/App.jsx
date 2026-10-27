@@ -239,7 +239,7 @@ function App() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [modal, routeEntityId, selectedOrder]);
+  }, [modal, routeEntityId]);
 
   const visibleProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.code, p.description].some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))), [products, search]);
   const isInitialLoading = loading && !hasLoadedData;
@@ -249,8 +249,23 @@ function App() {
   const inventoryValueLabel = !valuation ? '—' : valuationTotals.length === 1 ? money(valuationTotals[0].totalValue) : valuationTotals.length > 1 ? 'Varias monedas' : money(0);
 
   async function runAction(action, success) {
+    const wasWorkflow = WORKFLOW_MODALS.has(modal);
+    const workflowSection = WORKFLOW_SECTIONS[modal] || section;
     setLoading(true); setError(''); setNotice('');
-    try { await action(); setNotice(success); setModal(''); setEditing(null); await loadData(); return true; }
+    try {
+      await action();
+      setNotice(success);
+      setModal('');
+      setEditing(null);
+      if (wasWorkflow) {
+        setRouteEntityId('');
+        setSelectedOrder(null);
+        setSection(workflowSection);
+        window.history.replaceState({ section: workflowSection }, '', `#/${workflowSection}`);
+      }
+      await loadData();
+      return true;
+    }
     catch (e) {
       if (e.status === 401) {
         setToken('');
@@ -496,16 +511,12 @@ function App() {
 
 
   function openProduct(product = null) {
-    setError('');
-    setNotice('');
     setEditing(product);
-    setModal('product');
+    startWorkflow('product');
   }
   function openCategory(category = null) {
-    setError('');
-    setNotice('');
     setEditing(category);
-    setModal('category');
+    startWorkflow('category');
   }
 
   if (!token) return <Login onLogin={async (username, password) => {
