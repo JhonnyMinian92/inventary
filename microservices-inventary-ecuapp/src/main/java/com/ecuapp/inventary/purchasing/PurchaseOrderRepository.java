@@ -15,6 +15,8 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
  boolean existsForWarehouseInStatuses(@Param("warehouseId") UUID warehouseId,@Param("statuses") Collection<PurchaseOrderStatus> statuses);
  @Query("select case when count(distinct p)>0 then true else false end from PurchaseOrder p join p.lines l where l.product.id=:productId and p.status in :statuses")
  boolean existsForProductInStatuses(@Param("productId") UUID productId,@Param("statuses") Collection<PurchaseOrderStatus> statuses);
+ @Query("select case when count(p)>0 then true else false end from PurchaseOrder p where p.supplier.id=:supplierId and p.status in :statuses")
+ boolean existsForSupplierInStatuses(@Param("supplierId") UUID supplierId,@Param("statuses") Collection<PurchaseOrderStatus> statuses);
  @EntityGraph(attributePaths={"lines","lines.product","supplier","warehouse"})
  @Query("select distinct p from PurchaseOrder p where p.id=:id")
  Optional<PurchaseOrder> findDetailedById(@Param("id") UUID id);
