@@ -149,6 +149,10 @@ export default function ProductForm({ initialValue, categories, units = [], load
         setValidationMessage('Escribe el nombre y el código del producto.');
         return;
       }
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(String(form.sku).trim())) {
+        setValidationMessage('El código debe iniciar con letra o número y usar hasta 64 caracteres: letras, números, punto, guion o guion bajo.');
+        return;
+      }
       if (!form.categoryId) {
         setValidationMessage('Selecciona una categoría para continuar.');
         return;
@@ -302,7 +306,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
       <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
       <div className="workflow-actions-right">
         {step > 0 && <button type="button" className="button secondary" disabled={loading} onClick={previousStep}><ArrowLeft size={16}/> Atrás</button>}
-        {step < 2 ? <button type="submit" className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{step === 0 ? 'Continuar' : 'Revisar'} <ArrowRight size={16}/></button>
+        {step < 2 ? <button type="submit" className="button primary" disabled={loading || (step > 0 && (schemaLoading || Boolean(schemaError)))}>{step === 0 ? 'Continuar' : 'Revisar'} <ArrowRight size={16}/></button>
           : <button type="submit" className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>}
       </div>
     </div>
