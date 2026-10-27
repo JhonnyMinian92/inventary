@@ -10,6 +10,23 @@ function statusOf(item) { return String(item?.status || 'DRAFT').toUpperCase(); 
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
 function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, value => value.toUpperCase()); }
 
+function readInventoryWorkflowFromUrl() {
+  if (typeof window === 'undefined') return '';
+  const parts = window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
+  if (parts[0] !== 'inventory' || parts[2] !== 'new') return '';
+  return ['transfer', 'count', 'adjustment', 'reorder'].includes(parts[1]) ? parts[1] : '';
+}
+
+function inventoryWorkflowHash(kind) {
+  const paths = {
+    transfer: '#/inventory/transfer/new',
+    count: '#/inventory/count/new',
+    adjustment: '#/inventory/adjustment/new',
+    rule: '#/inventory/reorder/new'
+  };
+  return paths[kind] || '#/inventory';
+}
+
 export default function InventoryOperations({ products, warehouses, suppliers, onChanged }) {
   const [tab, setTab] = useState('transfers');
   const [transfers, setTransfers] = useState([]);
@@ -19,7 +36,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [modal, setModal] = useState('');
+  const [modal, setModal] = useState(readInventoryWorkflowFromUrl);
   const [workflowStep, setWorkflowStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
   const [workflowDirty, setWorkflowDirty] = useState(false);
@@ -51,6 +68,27 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    const syncWorkflow = () => {
+      const nextWorkflow = readInventoryWorkflowFromUrl();
+      if (!nextWorkflow && modal && workflowDirty && !window.confirm('¿Salir del formulario? Se perderán los cambios sin guardar.')) {
+        window.history.pushState({ inventoryWorkflow: modal }, '', inventoryWorkflowHash(modal));
+        return;
+      }
+      setModal(nextWorkflow);
+      setWorkflowStep(0);
+      setWorkflowDirty(false);
+      setValidationMessage('');
+      if (!nextWorkflow) setRuleEditing(null);
+    };
+    window.addEventListener('popstate', syncWorkflow);
+    window.addEventListener('hashchange', syncWorkflow);
+    return () => {
+      window.removeEventListener('popstate', syncWorkflow);
+      window.removeEventListener('hashchange', syncWorkflow);
+    };
+  }, [modal, workflowDirty]);
+
   function updateLine(formKind, index, field, value) {
     const setter = formKind === 'transfer' ? setTransferForm : setCountForm;
     setter(current => ({ ...current, items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line) }));
@@ -64,6 +102,10 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     setWorkflowStep(0);
     setWorkflowDirty(false);
     setModal(kind);
+    const targetHash = inventoryWorkflowHash(kind);
+    if (window.location.hash !== targetHash) {
+      window.history.pushState({ inventoryWorkflow: kind }, '', targetHash);
+    }
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -76,6 +118,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     setValidationMessage('');
     setRuleEditing(null);
     setError('');
+    window.history.replaceState({ section: 'inventory' }, '', '#/inventory');
   }
 
   function addLine(formKind) {
@@ -102,6 +145,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       setWorkflowDirty(false);
       setValidationMessage('');
       setRuleEditing(null);
+      window.history.replaceState({ section: 'inventory' }, '', '#/inventory');
       await refresh();
       await onChanged?.();
       return true;
