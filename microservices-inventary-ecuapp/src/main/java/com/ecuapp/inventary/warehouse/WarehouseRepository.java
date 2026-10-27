@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
-public interface WarehouseRepository extends JpaRepository<Warehouse,UUID>{
+public interface WarehouseRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<Warehouse,UUID>{
  boolean existsByCode(String code);
  boolean existsByCodeIgnoreCase(String code);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
