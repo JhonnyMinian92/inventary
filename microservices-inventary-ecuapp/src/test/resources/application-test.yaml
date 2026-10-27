@@ -29,3 +29,9 @@ logging:
   level:
     root: WARN
     com.ecuapp.inventary: INFO
+
+# Keep uploaded integration-test images outside the checkout and bound their size.
+app:
+  media:
+    storage-path: ${java.io.tmpdir}/inventary-test-product-images
+    max-upload-bytes: 5242880
