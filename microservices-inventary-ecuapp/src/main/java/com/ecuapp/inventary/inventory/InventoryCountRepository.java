@@ -18,6 +18,12 @@ public interface InventoryCountRepository extends JpaRepository<InventoryCount, 
                                                                 @Param("status") InventoryCountStatus status,
                                                                 org.springframework.data.domain.Pageable pageable);
 
+    @Query("select case when count(c)>0 then true else false end from InventoryCount c where c.warehouse.id=:warehouseId and c.status=:status")
+    boolean existsForWarehouseWithStatus(@Param("warehouseId") UUID warehouseId,@Param("status") InventoryCountStatus status);
+
+    @Query("select case when count(distinct c)>0 then true else false end from InventoryCount c join c.lines l where l.product.id=:productId and c.status=:status")
+    boolean existsForProductWithStatus(@Param("productId") UUID productId,@Param("status") InventoryCountStatus status);
+
     @EntityGraph(attributePaths = {"warehouse", "lines", "lines.product"})
     @Query("select distinct c from InventoryCount c where c.id = :id")
     Optional<InventoryCount> findDetailedById(@Param("id") UUID id);
