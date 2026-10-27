@@ -79,9 +79,10 @@ public class InventoryService {
    throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   Product product=products.findForUpdate(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
   Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
-  if(!product.isActive())throw new BusinessRuleException("No se puede ajustar un producto inactivo.");
+  if(r.direction()==InventoryDtos.Direction.INCREASE&&(!product.isActive()||!warehouse.isActive()))
+   throw new BusinessRuleException("No se puede aumentar existencias de un producto o almacén inactivo. Para retirar saldo residual, registre un ajuste de salida autorizado.");
   if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo los productos con control de stock admiten movimientos físicos.");
-  if(!warehouse.isActive())throw new BusinessRuleException("No se puede ajustar un almacén inactivo.");
+  
   StockBalance balance=balances.findForUpdate(product.getId(),warehouse.getId()).orElse(null);
   if(balance==null){
    if(r.direction()==InventoryDtos.Direction.DECREASE)throw new BusinessRuleException("No existe saldo disponible para disminuir.");
