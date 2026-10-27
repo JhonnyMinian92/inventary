@@ -97,7 +97,7 @@ public class SaleService {
   for(SaleDtos.LineRequest line:sorted){
    if(!uniqueProducts.add(line.productId()))
     throw new BusinessRuleException("No repita el mismo producto en varias líneas de una venta; consolide las cantidades.");
-   Product product=products.findById(line.productId())
+   Product product=products.findForUpdate(line.productId())
     .orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
    if(!product.isActive()||!product.getCategory().isActive())
     throw new BusinessRuleException("El producto "+product.getSku()+" está inactivo o su categoría no está publicada.");
