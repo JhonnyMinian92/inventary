@@ -152,6 +152,28 @@ class CatalogApiTest extends ApiTestSupport {
     }
 
     @Test
+    void deactivationCannotStrandStockOrActiveProductsInAnInactiveCategory() {
+        String admin = admin();
+        JsonNode category = category();
+        String categoryId = category.get("id").asText();
+        JsonNode product = product(categoryId, "1.00", "2.00");
+        String productId = product.get("id").asText();
+        String warehouseId = warehouse().get("id").asText();
+        stock(productId, warehouseId, "2", "1.00");
+
+        problem(call(post("/api/v1/catalog/products/" + productId + "/deactivate"), admin, null), 409, "CONFLICT");
+        assertTrue(httpGet(admin, "/api/v1/catalog/products/" + productId, 200).get("active").asBoolean());
+        problem(call(post("/api/v1/catalog/categories/" + categoryId + "/deactivate"), admin, null), 409, "CONFLICT");
+        assertTrue(httpGet(admin, "/api/v1/catalog/categories/" + categoryId, 200).get("active").asBoolean());
+
+        adjust(productId, warehouseId, "DECREASE", "2", null);
+        httpPost(admin, "/api/v1/catalog/products/" + productId + "/deactivate", null, 204);
+        httpPost(admin, "/api/v1/catalog/categories/" + categoryId + "/deactivate", null, 204);
+        assertFalse(httpGet(admin, "/api/v1/catalog/products/" + productId, 200).get("active").asBoolean());
+        assertFalse(httpGet(admin, "/api/v1/catalog/categories/" + categoryId, 200).get("active").asBoolean());
+    }
+
+    @Test
     void productKindAndUnitCannotChangeOnceStockOrMovementsExist() {
         String admin = admin();
         String categoryId = category().get("id").asText();
