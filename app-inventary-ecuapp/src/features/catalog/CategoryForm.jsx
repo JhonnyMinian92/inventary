@@ -86,15 +86,26 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
       onError?.('Espera a que se cargue el esquema de la categoría antes de guardar.');
       return;
     }
+    if (!name.trim()) {
+      onError?.('Escribe un nombre para la categoría.');
+      return;
+    }
     const rows = definitions.filter(row => row.key.trim() || row.displayName.trim());
     for (const row of rows) {
       if (!row.key.trim() || !row.displayName.trim()) {
         onError?.('Cada propiedad debe tener una clave y un nombre visible.');
         return;
       }
-      if (row.valueType === 'ENUM' && !row.optionsText.split(/[\n,]/).some(value => value.trim())) {
-        onError?.('Cada propiedad de tipo lista debe incluir al menos una opción.');
-        return;
+      if (row.valueType === 'ENUM') {
+        const options = row.optionsText.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
+        if (!options.length) {
+          onError?.('Cada propiedad de tipo lista debe incluir al menos una opción.');
+          return;
+        }
+        if (new Set(options.map(value => value.toLocaleLowerCase())).size !== options.length) {
+          onError?.('Las opciones de una lista no pueden repetirse.');
+          return;
+        }
       }
       if (row.maxLength !== '' && (!Number.isInteger(Number(row.maxLength)) || Number(row.maxLength) < 1)) {
         onError?.('La longitud máxima debe ser un entero positivo.');
