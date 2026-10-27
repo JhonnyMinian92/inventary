@@ -12,6 +12,9 @@ public interface BusinessPartnerRepository extends JpaRepository<BusinessPartner
  boolean existsByCodeIgnoreCase(String code);
  boolean existsByTaxId(String taxId);
  Optional<BusinessPartner> findByIdAndTypeIn(UUID id,Collection<PartnerType> types);
+ @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+ @Query("select p from BusinessPartner p where p.id=:id and p.type in :types")
+ Optional<BusinessPartner> findForUpdateByIdAndTypeIn(@Param("id") UUID id,@Param("types") Collection<PartnerType> types);
  Page<BusinessPartner> findByTypeIn(Collection<PartnerType> types,Pageable pageable);
  @Query("""
   select p from BusinessPartner p
