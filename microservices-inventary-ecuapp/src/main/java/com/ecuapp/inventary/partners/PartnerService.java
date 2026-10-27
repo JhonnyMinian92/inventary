@@ -6,6 +6,7 @@ import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Locale;
@@ -37,6 +38,17 @@ public class PartnerService {
   if(tax!=null&&!tax.equals(partner.getTaxId())&&repo.existsByTaxId(tax))throw new ConflictException("Ya existe un contacto comercial con ese identificador fiscal.");
   partner.update(r.name().trim(),tax,lower(r.email()),clean(r.phone()),clean(r.address()));repo.flush();
   audit.record(actor,type.name()+"_UPDATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));return PartnerDtos.View.from(partner);
+ }
+ @Transactional public void delete(PartnerType type,UUID id,String actor){
+  BusinessPartner partner=require(type,id);
+  if(partner.isActive())throw new ConflictException("Desactive el contacto antes de intentar su eliminación física.");
+  String code=partner.getCode();PartnerType actualType=partner.getType();
+  try{
+   repo.deleteAndFlush(partner);
+  }catch(DataIntegrityViolationException ex){
+   throw new ConflictException("El contacto conserva referencias comerciales o financieras y no puede eliminarse físicamente.");
+  }
+  audit.record(actor,actualType.name()+"_DELETED","BUSINESS_PARTNER",id,java.util.Map.of("code",code,"partnerType",actualType.name()));
  }
  @Transactional public void deactivate(PartnerType type,UUID id,String actor){BusinessPartner partner=require(type,id);if(!partner.isActive())return;partner.deactivate();audit.record(actor,type.name()+"_DEACTIVATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));}
  @Transactional public void activate(PartnerType type,UUID id,String actor){BusinessPartner partner=require(type,id);if(partner.isActive())return;partner.activate();audit.record(actor,type.name()+"_ACTIVATED","BUSINESS_PARTNER",id,java.util.Map.of("code",partner.getCode()));}
