@@ -159,6 +159,30 @@ public class OperationalReportService {
         LIMIT :limit
         """.formatted(INBOUND_TYPES, OUTBOUND_TYPES);
 
+    private static final String PURCHASE_AMOUNTS_SQL = """
+        WITH amounts AS (
+          SELECT grl.line_total AS received_amount, 0::numeric AS returned_amount
+          FROM goods_receipt_line grl
+          JOIN goods_receipt gr ON gr.id = grl.receipt_id
+          WHERE gr.status = 'POSTED' AND gr.received_at >= :fromInclusive AND gr.received_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR gr.warehouse_id = CAST(:warehouseId AS UUID))
+            AND (CAST(:supplierId AS UUID) IS NULL OR EXISTS (
+              SELECT 1 FROM purchase_order po WHERE po.id = gr.purchase_order_id AND po.supplier_id = CAST(:supplierId AS UUID)
+            ))
+          UNION ALL
+          SELECT 0::numeric AS received_amount, prl.line_total AS returned_amount
+          FROM purchase_return_line prl
+          JOIN purchase_return pr ON pr.id = prl.purchase_return_id
+          JOIN purchase_order po ON po.id = pr.purchase_order_id
+          WHERE pr.status = 'POSTED' AND pr.created_at >= :fromInclusive AND pr.created_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR pr.warehouse_id = CAST(:warehouseId AS UUID))
+            AND (CAST(:supplierId AS UUID) IS NULL OR po.supplier_id = CAST(:supplierId AS UUID))
+        )
+        SELECT COALESCE(SUM(received_amount), 0) AS received_amount,
+               COALESCE(SUM(returned_amount), 0) AS returned_amount
+        FROM amounts
+        """;
+
     private final NamedParameterJdbcTemplate jdbc;
     private final InventoryCostingService costing;
     private final ProductRepository products;
@@ -231,8 +255,12 @@ public class OperationalReportService {
             rs.getString("product_name"), rs.getString("currency"), rs.getBigDecimal("received_quantity"), rs.getBigDecimal("received_amount"),
             rs.getBigDecimal("returned_quantity"), rs.getBigDecimal("returned_amount")));
         long[] counts = jdbc.queryForObject(PURCHASE_COUNTS_SQL, params, (rs, i) -> new long[]{rs.getLong("receipts"), rs.getLong("returns")});
-        BigDecimal received = rows.stream().map(ReportDtos.PurchasesRow::receivedAmount).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal returned = rows.stream().map(ReportDtos.PurchasesRow::returnedAmount).reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal[] amounts = jdbc.queryForObject(PURCHASE_AMOUNTS_SQL, params, (rs, i) -> new BigDecimal[]{
+            rs.getBigDecimal("received_amount"), rs.getBigDecimal("returned_amount")});
+        BigDecimal received = amounts == null || amounts[0] == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            : amounts[0].setScale(2, RoundingMode.HALF_UP);
+        BigDecimal returned = amounts == null || amounts[1] == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+            : amounts[1].setScale(2, RoundingMode.HALF_UP);
         ReportDtos.PurchasesSummary summary = new ReportDtos.PurchasesSummary(counts[0], counts[1], received, returned, received.subtract(returned));
         return new ReportDtos.PurchasesReport(period.from(), period.to(), period.zone().getId(), warehouseId, supplierId, Instant.now(), summary, rows);
     }
