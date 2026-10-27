@@ -128,7 +128,7 @@ public class SaleService {
   BusinessPartner customer=null;
   String customerName=clean(request.customerName()),customerPhone=clean(request.customerPhone());
   if(request.customerId()!=null){
-   customer=partners.findByIdAndTypeIn(request.customerId(),List.of(PartnerType.CUSTOMER,PartnerType.BOTH))
+   customer=partners.findForUpdateByIdAndTypeIn(request.customerId(),List.of(PartnerType.CUSTOMER,PartnerType.BOTH))
     .orElseThrow(()->new ResourceNotFoundException("Cliente",request.customerId()));
    if(!customer.isActive())throw new BusinessRuleException("El cliente está inactivo.");
    customerName=customer.getName();customerPhone=customer.getPhone();
