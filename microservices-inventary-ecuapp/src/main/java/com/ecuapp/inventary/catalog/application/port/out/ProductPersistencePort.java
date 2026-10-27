@@ -18,6 +18,7 @@ public interface ProductPersistencePort {
     PageResult<Product> findActivePublic(String query, UUID categoryId, PageQuery page);
     Optional<Product> findById(UUID id);
     Optional<Product> findForUpdate(UUID id);
+    void deleteAndFlush(Product product);
     Optional<Product> findBySku(String sku);
     boolean existsBySku(String sku);
     Product save(Product product);
