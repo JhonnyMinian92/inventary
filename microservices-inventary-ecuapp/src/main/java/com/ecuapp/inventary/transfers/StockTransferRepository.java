@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 public interface StockTransferRepository extends JpaRepository<StockTransfer,UUID>{
@@ -11,6 +12,10 @@ public interface StockTransferRepository extends JpaRepository<StockTransfer,UUI
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select t from StockTransfer t where t.id=:id")
  Optional<StockTransfer> findForUpdate(@Param("id") UUID id);
+ @Query("select case when count(t)>0 then true else false end from StockTransfer t where (t.sourceWarehouse.id=:warehouseId or t.destinationWarehouse.id=:warehouseId) and t.status in :statuses")
+ boolean existsForWarehouseInStatuses(@Param("warehouseId") UUID warehouseId,@Param("statuses") Collection<TransferStatus> statuses);
+ @Query("select case when count(distinct t)>0 then true else false end from StockTransfer t join t.lines l where l.product.id=:productId and t.status in :statuses")
+ boolean existsForProductInStatuses(@Param("productId") UUID productId,@Param("statuses") Collection<TransferStatus> statuses);
  @EntityGraph(attributePaths={"sourceWarehouse","destinationWarehouse","lines","lines.product"})
  @Query("select distinct t from StockTransfer t where t.id=:id")
  Optional<StockTransfer> findDetailedById(@Param("id") UUID id);
