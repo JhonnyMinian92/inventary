@@ -5,6 +5,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.HttpHeaders;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -278,6 +285,60 @@ class CatalogApiTest extends ApiTestSupport {
         httpPost(admin, "/api/v1/catalog/variants/" + m.get("id").asText() + "/deactivate", null, 204);
         assertEquals(1, httpGet(null, "/api/v1/public/catalog/products/" + productId, 200).get("variants").size());
         problem(call(get("/api/v1/catalog/variants/" + UUID.randomUUID()), admin, null), 404, "RESOURCE_NOT_FOUND");
+    }
+
+    @Test
+    void productImageUploadsValidateDecodedContentSizeAndPublicServing() throws Exception {
+        String admin = admin();
+        JsonNode product = product("1.00", "2.00");
+        String base = "/api/v1/catalog/products/" + product.get("id").asText() + "/images";
+
+        ByteArrayOutputStream pngBytes = new ByteArrayOutputStream();
+        assertTrue(ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB), "png", pngBytes));
+        byte[] imageData = pngBytes.toByteArray();
+        MockMultipartFile valid = new MockMultipartFile("file", "not-the-real-name.bin", "text/plain", imageData);
+        MvcResult uploaded = mvc.perform(multipart(base + "/upload")
+            .file(valid)
+            .param("altText", "Imagen principal")
+            .param("sortOrder", "1")
+            .param("primaryImage", "true")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)
+            .with(randomIp()))
+            .andReturn();
+        assertEquals(201, uploaded.getResponse().getStatus(), uploaded.getResponse().getContentAsString());
+        JsonNode view = json.readTree(uploaded.getResponse().getContentAsString());
+        String publicUrl = view.get("imageUrl").asText();
+        assertTrue(publicUrl.matches("/api/v1/public/media/products/[0-9a-f-]{36}\\.png"));
+        assertEquals("Imagen principal", view.get("altText").asText());
+        assertTrue(view.get("primaryImage").asBoolean());
+
+        MvcResult served = mvc.perform(get(publicUrl).with(randomIp())).andReturn();
+        assertEquals(200, served.getResponse().getStatus());
+        assertEquals("image/png", served.getResponse().getContentType());
+        assertArrayEquals(imageData, served.getResponse().getContentAsByteArray());
+
+        MockMultipartFile spoofed = new MockMultipartFile("file", "looks-like.png", "image/png", "this is not a png".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MvcResult invalid = mvc.perform(multipart(base + "/upload")
+            .file(spoofed)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)
+            .with(randomIp()))
+            .andReturn();
+        assertEquals(422, invalid.getResponse().getStatus(), invalid.getResponse().getContentAsString());
+        assertEquals("BUSINESS_RULE_VIOLATION", json.readTree(invalid.getResponse().getContentAsString()).get("code").asText());
+
+        MockMultipartFile tooLarge = new MockMultipartFile("file", "large.png", "image/png", new byte[5 * 1024 * 1024 + 1]);
+        MvcResult oversized = mvc.perform(multipart(base + "/upload")
+            .file(tooLarge)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + admin)
+            .with(randomIp()))
+            .andReturn();
+        assertEquals(413, oversized.getResponse().getStatus(), oversized.getResponse().getContentAsString());
+
+        mvc.perform(multipart(base + "/upload")
+            .file(valid)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token("VENDEDOR"))
+            .with(randomIp()))
+            .andExpect(status().isForbidden());
     }
 
     @Test
