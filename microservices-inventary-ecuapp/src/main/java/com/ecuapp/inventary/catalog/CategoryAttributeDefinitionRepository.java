@@ -10,4 +10,7 @@ public interface CategoryAttributeDefinitionRepository extends JpaRepository<Cat
  List<CategoryAttributeDefinition> findByCategoryIdAndActiveTrueOrderByAttributeKeyAsc(UUID categoryId);
  @Query("select coalesce(max(d.schemaVersion),0) from CategoryAttributeDefinition d where d.category.id=:categoryId")
  int maxSchemaVersion(@Param("categoryId") UUID categoryId);
+ @org.springframework.data.jpa.repository.Modifying(flushAutomatically=true)
+ @Query("delete from CategoryAttributeDefinition d where d.category.id=:categoryId")
+ int deleteByCategoryId(@Param("categoryId") UUID categoryId);
 }
