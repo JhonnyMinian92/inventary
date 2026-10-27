@@ -73,14 +73,14 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         assertEquals("APPROVED", approved.get("status").asText());
         assertEquals(username("SUPER_ADMIN"), approved.get("approvedBy").asText());
         assertEquals("APPROVED", httpPost(admin(), "/api/v1/purchase-orders/" + id + "/approve", null, 200).get("status").asText());
-        // An approved order with no receipts can be cancelled; repeating the transition is idempotent.
-        assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
-        assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
-
         JsonNode list = httpGet(token("AUDITOR"), "/api/v1/purchase-orders?status=APPROVED&supplierId=" + supplierId + "&from=" + Instant.now().minusSeconds(600), 200);
         assertEquals(1, list.get("page").get("totalElements").asInt());
         problem(call(get("/api/v1/purchase-orders?sort=notes"), admin(), null), 400, "INVALID_QUERY");
         assertEquals(1, jdbc.queryForObject("select count(*) from audit_event where resource_id=?::uuid and action='PURCHASE_ORDER_APPROVED'", Integer.class, id));
+
+        // An approved order with no receipts can be cancelled; repeating the transition is idempotent.
+        assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
+        assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
     }
 
     @Test
