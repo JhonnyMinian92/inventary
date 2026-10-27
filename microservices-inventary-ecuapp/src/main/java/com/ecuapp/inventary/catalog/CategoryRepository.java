@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
-public interface CategoryRepository extends JpaRepository<Category,UUID> {
+public interface CategoryRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<Category,UUID> {
  boolean existsByNameIgnoreCase(String name);
  boolean existsBySlug(String slug);
  Page<Category> findByActiveTrue(Pageable pageable);
