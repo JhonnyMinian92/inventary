@@ -15,18 +15,25 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.regex.Pattern;
 
 /** Rejects oversized request bodies (declared Content-Length) before they are parsed. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 15)
 public class RequestBodyLimitFilter extends OncePerRequestFilter {
+    private static final Pattern PRODUCT_IMAGE_UPLOAD_PATH = Pattern.compile(
+        "/api/v1/catalog/products/[0-9a-fA-F-]{36}/images/upload"
+    );
     private final long maxBytes;
+    private final long maxMediaUploadRequestBytes;
     private final ApiProblemFactory problems;
     private final ObjectMapper mapper;
 
     public RequestBodyLimitFilter(@Value("${app.security.max-request-body-bytes:1048576}") long maxBytes,
+                                  @Value("${app.media.max-request-bytes:6291456}") long maxMediaUploadRequestBytes,
                                   ApiProblemFactory problems, ObjectMapper mapper) {
         this.maxBytes = maxBytes;
+        this.maxMediaUploadRequestBytes = maxMediaUploadRequestBytes;
         this.problems = problems;
         this.mapper = mapper;
     }
@@ -34,7 +41,8 @@ public class RequestBodyLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
         throws ServletException, IOException {
-        if (request.getContentLengthLong() > maxBytes) {
+        long requestLimit = isValidatedMediaUpload(request) ? maxMediaUploadRequestBytes : maxBytes;
+        if (request.getContentLengthLong() > requestLimit) {
             response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
@@ -45,5 +53,12 @@ public class RequestBodyLimitFilter extends OncePerRequestFilter {
             return;
         }
         chain.doFilter(request, response);
+    }
+
+    private boolean isValidatedMediaUpload(HttpServletRequest request) {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) return false;
+        if (!PRODUCT_IMAGE_UPLOAD_PATH.matcher(request.getRequestURI()).matches()) return false;
+        String contentType = request.getContentType();
+        return contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).startsWith("multipart/form-data");
     }
 }
