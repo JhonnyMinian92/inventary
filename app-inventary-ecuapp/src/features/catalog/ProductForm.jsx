@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Boxes } from 'lucide-react';
+import StepProgress from '../../components/StepProgress.jsx';
 import { api } from '../../api';
 
 function objectValue(value) {
@@ -86,6 +88,8 @@ function AttributeInput({ definition, value, onChange }) {
 
 export default function ProductForm({ initialValue, categories, units = [], loading, onCancel, onSubmit, onError }) {
   const [form, setForm] = useState(() => normalizeProduct(initialValue));
+  const [step, setStep] = useState(0);
+  const [validationMessage, setValidationMessage] = useState('');
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState('');
@@ -138,56 +142,88 @@ export default function ProductForm({ initialValue, categories, units = [], load
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (schemaLoading) return;
-    if (!String(form.name || '').trim() || !String(form.sku || '').trim()) {
-      onError?.('Completa el nombre y el SKU del producto.');
+    setValidationMessage('');
+
+    if (step === 0) {
+      if (!String(form.name || '').trim() || !String(form.sku || '').trim()) {
+        setValidationMessage('Escribe el nombre y el código del producto.');
+        return;
+      }
+      if (!form.categoryId) {
+        setValidationMessage('Selecciona una categoría para continuar.');
+        return;
+      }
+      setStep(1);
+      window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
-    if (!form.categoryId) {
-      onError?.('Selecciona una categoría para crear o actualizar el producto.');
+
+    if (schemaLoading) {
+      setValidationMessage('Espera a que terminen de cargar los campos de la categoría.');
       return;
     }
     if (schemaError) {
-      onError?.('No se puede guardar hasta cargar correctamente las propiedades de la categoría.');
+      setValidationMessage('No se puede continuar hasta cargar correctamente los campos de la categoría.');
+      return;
+    }
+    if (String(form.costPrice ?? '').trim() === '' || String(form.salePrice ?? '').trim() === '' ||
+        !Number.isFinite(Number(form.costPrice)) || Number(form.costPrice) < 0 ||
+        !Number.isFinite(Number(form.salePrice)) || Number(form.salePrice) < 0) {
+      setValidationMessage('El costo y el precio deben ser números válidos iguales o mayores que cero.');
       return;
     }
 
-    let attributes = null;
-    if (definitions.length > 0) {
-      attributes = {};
-      for (const definition of definitions) {
-        const value = form.attributes[definition.key];
-        const isEmpty = value === undefined || value === null || String(value).trim() === '';
-        if (definition.required && isEmpty) {
-          onError?.(`Completa el campo "${definition.displayName || definition.key}".`);
+    const attributes = definitions.length ? {} : null;
+    for (const definition of definitions) {
+      const value = form.attributes[definition.key];
+      const isEmpty = value === undefined || value === null || String(value).trim() === '';
+      const label = definition.displayName || definition.key;
+      if (definition.required && isEmpty) {
+        setValidationMessage(`Completa el campo "${label}".`);
+        return;
+      }
+      if (!isEmpty && definition.valueType === 'NUMBER') {
+        const numericValue = Number(value);
+        const constraints = definition.constraints || {};
+        if (!Number.isFinite(numericValue) ||
+            (constraints.min != null && numericValue < Number(constraints.min)) ||
+            (constraints.max != null && numericValue > Number(constraints.max))) {
+          setValidationMessage(`El valor de "${label}" está fuera del rango permitido.`);
           return;
         }
-        if (!isEmpty && definition.valueType === 'NUMBER') {
-          const numericValue = Number(value);
-          const constraints = definition.constraints || {};
-          if (!Number.isFinite(numericValue) ||
-              (constraints.min != null && numericValue < Number(constraints.min)) ||
-              (constraints.max != null && numericValue > Number(constraints.max))) {
-            onError?.(`El valor de "${definition.displayName || definition.key}" está fuera del rango permitido.`);
-            return;
-          }
-        }
-        if (!isEmpty && definition.valueType === 'STRING') {
-          const constraints = definition.constraints || {};
-          const length = String(value).length;
-          if ((constraints.minLength != null && length < Number(constraints.minLength)) ||
-              (constraints.maxLength != null && length > Number(constraints.maxLength))) {
-            onError?.(`Revisa la longitud de "${definition.displayName || definition.key}".`);
-            return;
-          }
-        }
-        if (!isEmpty) attributes[definition.key] = value;
       }
+      if (!isEmpty && definition.valueType === 'STRING') {
+        const constraints = definition.constraints || {};
+        const length = String(value).length;
+        if ((constraints.minLength != null && length < Number(constraints.minLength)) ||
+            (constraints.maxLength != null && length > Number(constraints.maxLength))) {
+          setValidationMessage(`Revisa la longitud de "${label}".`);
+          return;
+        }
+      }
+      if (!isEmpty && attributes) attributes[definition.key] = value;
     }
-    onSubmit({ ...form, attributes });
+
+    if (step === 1) {
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+    onSubmit({ ...form, name: form.name.trim(), sku: form.sku.trim(), attributes });
   }
 
-  return <form className="form-grid" onSubmit={handleSubmit}>
+  function previousStep() {
+    setValidationMessage('');
+    setStep(current => Math.max(0, current - 1));
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  return <form className="workflow-form" onSubmit={handleSubmit} noValidate>
+    <StepProgress steps={['Información', 'Precios y campos', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
+    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
+    {step === 0 && <section className="workflow-stage" aria-labelledby="product-basic-title">
+      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-basic-title">Identifica el producto</h2><p>Primero define cómo se encontrará en el catálogo.</p></div></div>
+      <div className="form-grid workflow-fields">
     <label className="field">
       <span>Nombre del producto<b> *</b></span>
       <input required maxLength="160" value={form.name} onChange={event => changeField('name', event.target.value)} placeholder="Ej. Teclado mecánico" autoComplete="off" />
@@ -218,6 +254,11 @@ export default function ProductForm({ initialValue, categories, units = [], load
         {units.filter(unit => unit.active !== false && unit.status !== 'INACTIVE').map(unit => <option key={unit.id} value={unit.id}>{unit.name} · {unit.code}</option>)}
       </select>
     </label>
+      </div>
+    </section>}
+    {step === 1 && <section className="workflow-stage" aria-labelledby="product-pricing-title">
+      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-pricing-title">Precios y detalles</h2><p>Revisa los precios y completa solo los campos que correspondan.</p></div></div>
+      <div className="form-grid workflow-fields">
     <label className="field">
       <span>Costo de compra<b> *</b></span>
       <input type="number" min="0" step="0.01" required value={form.costPrice} onChange={event => changeField('costPrice', event.target.value)} />
@@ -243,9 +284,27 @@ export default function ProductForm({ initialValue, categories, units = [], load
       <p className="form-hint wide">Esta categoría todavía no tiene propiedades definidas. Para capturar campos como talla, color o material, configúralos primero en Categorías; el producto se guardará sin propiedades adicionales.</p>
     }
     {schemaError && <div className="alert error wide">{schemaError}</div>}
-    <div className="form-actions wide">
+      </div>
+    </section>}
+    {step === 2 && <section className="workflow-stage" aria-labelledby="product-review-title">
+      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-review-title">Confirma los datos</h2><p>Comprueba la información antes de guardar.</p></div></div>
+      <div className="workflow-review-grid">
+        <div className="workflow-review-card"><small>Nombre</small><strong>{form.name.trim() || '—'}</strong></div>
+        <div className="workflow-review-card"><small>Código / SKU</small><strong>{form.sku.trim() || '—'}</strong></div>
+        <div className="workflow-review-card"><small>Categoría</small><strong>{categories.find(item => String(item.id || item.categoryId) === String(form.categoryId))?.name || '—'}</strong></div>
+        <div className="workflow-review-card"><small>Costo</small><strong>{new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.costPrice || 0))}</strong></div>
+        <div className="workflow-review-card"><small>Precio de venta</small><strong>{new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.salePrice || 0))}</strong></div>
+        <div className="workflow-review-card"><small>Campos adicionales</small><strong>{Object.values(form.attributes || {}).filter(value => value !== '' && value !== null && value !== undefined).length}</strong></div>
+      </div>
+      {form.description.trim() && <p className="workflow-review-note"><strong>Descripción:</strong> {form.description.trim()}</p>}
+    </section>}
+    <div className="form-actions workflow-actions">
       <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
-      <button className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>
+      <div className="workflow-actions-right">
+        {step > 0 && <button type="button" className="button secondary" disabled={loading} onClick={previousStep}><ArrowLeft size={16}/> Atrás</button>}
+        {step < 2 ? <button type="submit" className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{step === 0 ? 'Continuar' : 'Revisar'} <ArrowRight size={16}/></button>
+          : <button type="submit" className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>}
+      </div>
     </div>
   </form>;
 }
