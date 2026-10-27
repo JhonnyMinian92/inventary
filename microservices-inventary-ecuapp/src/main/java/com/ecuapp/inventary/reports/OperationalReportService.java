@@ -138,6 +138,44 @@ public class OperationalReportService {
              AND (CAST(:supplierId AS UUID) IS NULL OR po.supplier_id = CAST(:supplierId AS UUID))) AS returns
         """;
 
+    private static final String PURCHASE_ROW_COUNT_SQL = """
+        WITH purchase_pairs AS (
+          SELECT po.supplier_id, grl.product_id
+          FROM goods_receipt_line grl
+          JOIN goods_receipt gr ON gr.id = grl.receipt_id
+          JOIN purchase_order po ON po.id = gr.purchase_order_id
+          WHERE gr.status = 'POSTED' AND gr.received_at >= :fromInclusive AND gr.received_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR gr.warehouse_id = CAST(:warehouseId AS UUID))
+            AND (CAST(:supplierId AS UUID) IS NULL OR po.supplier_id = CAST(:supplierId AS UUID))
+          UNION
+          SELECT po.supplier_id, prl.product_id
+          FROM purchase_return_line prl
+          JOIN purchase_return pr ON pr.id = prl.purchase_return_id
+          JOIN purchase_order po ON po.id = pr.purchase_order_id
+          WHERE pr.status = 'POSTED' AND pr.created_at >= :fromInclusive AND pr.created_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR pr.warehouse_id = CAST(:warehouseId AS UUID))
+            AND (CAST(:supplierId AS UUID) IS NULL OR po.supplier_id = CAST(:supplierId AS UUID))
+        )
+        SELECT COUNT(*) FROM purchase_pairs
+        """;
+
+    private static final String SALES_PRODUCT_COUNT_SQL = """
+        WITH product_events AS (
+          SELECT si.product_id FROM sale_item si JOIN sale s ON s.id = si.sale_id
+          WHERE s.sold_at >= :fromInclusive AND s.sold_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR s.warehouse_id = CAST(:warehouseId AS UUID))
+          UNION
+          SELECT si.product_id FROM sale_item si JOIN sale s ON s.id = si.sale_id
+          WHERE s.status = 'CANCELLED' AND s.cancellation_approved_at >= :fromInclusive AND s.cancellation_approved_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR s.warehouse_id = CAST(:warehouseId AS UUID))
+          UNION
+          SELECT srl.product_id FROM sales_return_line srl JOIN sales_return sr ON sr.id = srl.sales_return_id
+          WHERE sr.status = 'POSTED' AND sr.created_at >= :fromInclusive AND sr.created_at < :toExclusive
+            AND (CAST(:warehouseId AS UUID) IS NULL OR sr.warehouse_id = CAST(:warehouseId AS UUID))
+        )
+        SELECT COUNT(*) FROM product_events
+        """;
+
     private static final String KARDEX_OPENING_SQL = """
         SELECT
           COALESCE((SELECT SUM(CASE WHEN movement_type IN (%1$s) THEN quantity WHEN movement_type IN (%2$s) THEN -quantity ELSE 0 END)
@@ -242,7 +280,10 @@ public class OperationalReportService {
         List<ReportDtos.SalesProductRow> productRows = jdbc.query(SALES_PRODUCTS_SQL, params, (rs, i) ->
             new ReportDtos.SalesProductRow(rs.getObject("product_id", UUID.class), rs.getString("sku"), rs.getString("product_name"),
                 rs.getString("currency"), rs.getBigDecimal("quantity"), rs.getBigDecimal("amount"), rs.getBigDecimal("cost"), rs.getBigDecimal("profit")));
-        return new ReportDtos.SalesReport(period.from(), period.to(), period.zone().getId(), warehouseId, Instant.now(), summary, daily, productRows);
+        Long totalProductsValue = jdbc.queryForObject(SALES_PRODUCT_COUNT_SQL, params, Long.class);
+        long totalProducts = totalProductsValue == null ? 0L : totalProductsValue;
+        return new ReportDtos.SalesReport(period.from(), period.to(), period.zone().getId(), warehouseId, Instant.now(), summary, daily,
+            productRows, totalProducts, totalProducts > productRows.size());
     }
 
     @Transactional(readOnly = true)
@@ -262,7 +303,10 @@ public class OperationalReportService {
         BigDecimal returned = amounts == null || amounts[1] == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
             : amounts[1].setScale(2, RoundingMode.HALF_UP);
         ReportDtos.PurchasesSummary summary = new ReportDtos.PurchasesSummary(counts[0], counts[1], received, returned, received.subtract(returned));
-        return new ReportDtos.PurchasesReport(period.from(), period.to(), period.zone().getId(), warehouseId, supplierId, Instant.now(), summary, rows);
+        Long totalItemsValue = jdbc.queryForObject(PURCHASE_ROW_COUNT_SQL, params, Long.class);
+        long totalItems = totalItemsValue == null ? 0L : totalItemsValue;
+        return new ReportDtos.PurchasesReport(period.from(), period.to(), period.zone().getId(), warehouseId, supplierId, Instant.now(),
+            summary, rows, totalItems, totalItems > rows.size());
     }
 
     @Transactional(readOnly = true)
