@@ -99,7 +99,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     </label>
     {!customerId && <><label className="field"><span>Nombre del cliente (opcional)</span><input maxLength="160" value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Cliente de mostrador" /></label><label className="field"><span>Teléfono del cliente (opcional)</span><input maxLength="40" value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="099…" /></label></>}
 
-    <div className="form-subheading wide"><strong>Artículos de la venta</strong><small>El precio final y la disponibilidad se calculan y validan en la transacción del backend.</small></div>
+    <div className="form-subheading wide"><strong>Artículos de la venta</strong><small>El precio y el stock se confirman al registrar la venta.</small></div>
     {lines.map((line, index) => {
       const product = products.find(item => String(idOf(item)) === String(line.productId));
       const stock = line.productId && warehouseId ? available(line.productId) : null;
