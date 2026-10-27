@@ -7,6 +7,7 @@ import com.ecuapp.inventary.common.ResourceNotFoundException;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.RoundingMode;
@@ -64,6 +65,31 @@ public class CatalogStructureService {
         unit.update(request.name().trim(), request.decimalScale().shortValue(), request.active());
         audit.record(actor, "UNIT_OF_MEASURE_UPDATED", "UNIT_OF_MEASURE", id, Map.of("code", unit.getCode(), "active", request.active()));
         return CatalogStructureDtos.UnitView.from(unit);
+    }
+
+    @Transactional
+    public void deleteUnit(UUID id, String actor) {
+        UnitOfMeasure unit = units.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Unidad de medida", id));
+        if (UnitOfMeasure.DEFAULT_UNIT_ID.equals(id)) {
+            throw new ConflictException("La unidad base EA no se puede eliminar físicamente.");
+        }
+        if (unit.isActive()) {
+            throw new ConflictException("Desactive la unidad antes de intentar su eliminación física.");
+        }
+        if (products.existsByUnitOfMeasureId(id) || variants.existsByUnitOfMeasureId(id)) {
+            throw new ConflictException("No se puede eliminar una unidad que aún está asignada a productos o variantes, incluso si están inactivos.");
+        }
+        if (conversions.existsForUnit(id)) {
+            throw new ConflictException("No se puede eliminar una unidad utilizada por conversiones registradas.");
+        }
+        String code = unit.getCode();
+        try {
+            units.deleteAndFlush(unit);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ConflictException("La unidad conserva referencias históricas y no puede eliminarse físicamente.");
+        }
+        audit.record(actor, "UNIT_OF_MEASURE_DELETED", "UNIT_OF_MEASURE", id, Map.of("code", code));
     }
 
     @Transactional(readOnly = true)
