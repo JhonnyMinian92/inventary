@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, Tags, Warehouse } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, Tags, Warehouse } from 'lucide-react';
 import { api, getToken, listFrom, listAllPages, setToken } from './api';
 import ProductForm from './features/catalog/ProductForm.jsx';
 import CategoryForm from './features/catalog/CategoryForm.jsx';
@@ -47,7 +47,9 @@ function readSectionFromUrl() {
 function readWorkflowFromUrl() {
   const parts = routeSegmentsFromUrl();
   if (parts[0] === 'products' && parts[1] === 'new') return 'product';
+  if (parts[0] === 'products' && parts.length >= 3 && parts[2] === 'edit') return 'product';
   if (parts[0] === 'categories' && parts[1] === 'new') return 'category';
+  if (parts[0] === 'categories' && parts.length >= 3 && parts[2] === 'edit') return 'category';
   if (parts[0] === 'purchases' && parts[1] === 'new') return 'purchase';
   if (parts[0] === 'sales' && parts[1] === 'new') return 'sale';
   if (parts[0] === 'purchases' && parts.length >= 3 && parts[2] === 'receive') return 'receive';
@@ -56,13 +58,16 @@ function readWorkflowFromUrl() {
 
 function readWorkflowEntityId() {
   const parts = routeSegmentsFromUrl();
-  if (parts[0] !== 'purchases' || parts.length < 3 || parts[2] !== 'receive') return '';
+  const isReceive = parts[0] === 'purchases' && parts.length >= 3 && parts[2] === 'receive';
+  const isProductEdit = parts[0] === 'products' && parts.length >= 3 && parts[2] === 'edit';
+  const isCategoryEdit = parts[0] === 'categories' && parts.length >= 3 && parts[2] === 'edit';
+  if (!isReceive && !isProductEdit && !isCategoryEdit) return '';
   try { return decodeURIComponent(parts[1]); } catch { return parts[1]; }
 }
 
 function workflowHash(workflow, entityId = '') {
-  if (workflow === 'product') return '#/products/new';
-  if (workflow === 'category') return '#/categories/new';
+  if (workflow === 'product') return entityId ? `#/products/${encodeURIComponent(entityId)}/edit` : '#/products/new';
+  if (workflow === 'category') return entityId ? `#/categories/${encodeURIComponent(entityId)}/edit` : '#/categories/new';
   if (workflow === 'purchase') return '#/purchases/new';
   if (workflow === 'sale') return '#/sales/new';
   if (workflow === 'receive' && entityId) return `#/purchases/${encodeURIComponent(entityId)}/receive`;
@@ -222,6 +227,14 @@ function App() {
   }
 
   useEffect(() => {
+    if (modal === 'product' && routeEntityId && products.length) {
+      setEditing(products.find(item => String(pickId(item)) === String(routeEntityId)) || null);
+      return undefined;
+    }
+    if (modal === 'category' && routeEntityId && categories.length) {
+      setEditing(categories.find(item => String(pickId(item)) === String(routeEntityId)) || null);
+      return undefined;
+    }
     if (modal !== 'receive' || !routeEntityId || String(pickId(selectedOrder)) === String(routeEntityId)) return undefined;
     let active = true;
     setLoading(true);
@@ -239,7 +252,7 @@ function App() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [modal, routeEntityId]);
+  }, [modal, routeEntityId, products, categories, selectedOrder]);
 
   const visibleProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.code, p.description].some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))), [products, search]);
   const isInitialLoading = loading && !hasLoadedData;
@@ -512,11 +525,11 @@ function App() {
 
   function openProduct(product = null) {
     setEditing(product);
-    startWorkflow('product');
+    startWorkflow('product', product ? pickId(product) : '');
   }
   function openCategory(category = null) {
     setEditing(category);
-    startWorkflow('category');
+    startWorkflow('category', category ? pickId(category) : '');
   }
 
   if (!token) return <Login onLogin={async (username, password) => {
@@ -607,7 +620,7 @@ function WorkflowPage({ title, subtitle, onCancel, children }) {
         <h2 id="workflow-page-title">{title}</h2>
         {subtitle && <p>{subtitle}</p>}
       </div>
-      <button type="button" className="button secondary workflow-exit" onClick={onCancel}><ChevronRight size={16} className="workflow-exit-icon"/> Salir del formulario</button>
+      <button type="button" className="button secondary workflow-exit" onClick={onCancel}><ArrowLeft size={16}/> Volver</button>
     </header>
     <div className="workflow-page-body">{children}</div>
   </section>;
