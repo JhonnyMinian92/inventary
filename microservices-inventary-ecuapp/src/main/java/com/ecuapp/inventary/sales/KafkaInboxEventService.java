@@ -4,6 +4,8 @@ import com.ecuapp.inventary.common.ConflictException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -73,7 +76,14 @@ public class KafkaInboxEventService {
         JsonNode payload = envelope.get("payload");
         if (payload == null || !payload.isObject()) throw new IllegalArgumentException("El payload Kafka debe ser un objeto JSON.");
 
-        String hash = sha256(rawEnvelope);
+        // JSON object key ordering is not semantically meaningful. Canonicalize nested objects
+        // before hashing so a legitimate redelivery with reordered keys is still recognized.
+        final String hash;
+        try {
+            hash = sha256(mapper.writeValueAsString(canonicalize(envelope)));
+        } catch (JsonProcessingException ex) {
+            throw new IllegalArgumentException("No se pudo normalizar el envelope Kafka.");
+        }
         int inserted = inbox.insertIfAbsent(eventId, eventType, aggregateType, aggregateId, hash);
         if (inserted == 0) {
             String previousHash = inbox.findPayloadHash(eventId);
@@ -91,6 +101,22 @@ public class KafkaInboxEventService {
         if (publicProducts != null) publicProducts.clear();
         processedCounter.increment();
         return Result.PROCESSED;
+    }
+
+    private JsonNode canonicalize(JsonNode node) {
+        if (node.isObject()) {
+            ObjectNode sorted = mapper.createObjectNode();
+            TreeMap<String, JsonNode> fields = new TreeMap<>();
+            node.fields().forEachRemaining(entry -> fields.put(entry.getKey(), entry.getValue()));
+            fields.forEach((key, value) -> sorted.set(key, canonicalize(value)));
+            return sorted;
+        }
+        if (node.isArray()) {
+            ArrayNode values = mapper.createArrayNode();
+            node.forEach(value -> values.add(canonicalize(value)));
+            return values;
+        }
+        return node.deepCopy();
     }
 
     private UUID uuid(JsonNode envelope, String field) {
