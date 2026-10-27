@@ -1,4 +1,4 @@
-> **Estado y documentación consolidada (2026-10-26):** comenzar por [estado actual por dominio](docs/24-estado-actual-repositorio.md), [referencia de APIs](docs/25-referencia-apis.md), [arquitectura/patrones realmente presentes](docs/26-arquitectura-y-patrones-actuales.md), [guía de consumo](docs/27-guia-consumo-apis.md) y [plan de validación](docs/28-plan-cierre-y-validacion.md). Las secciones heredadas de este README son auxiliares: la referencia 25 prevalece sobre rutas de diseño antiguas. La ejecución histórica del 2026-10-23 no tiene SHA Git inequívoco de la copia local y no valida el HEAD actual.  
+> **Estado y documentación consolidada (2026-10-27):** comenzar por [estado actual por dominio](docs/24-estado-actual-repositorio.md), [referencia de APIs](docs/25-referencia-apis.md), [arquitectura/patrones realmente presentes](docs/26-arquitectura-y-patrones-actuales.md), [guía de consumo](docs/27-guia-consumo-apis.md) y [plan de validación](docs/28-plan-cierre-y-validacion.md). La CI actual ejecuta `./mvnw verify` con PostgreSQL 16 en push/PR y publica reportes. Los documentos históricos no sustituyen evidencia del SHA actual.
 >
 # Inventary Backend
 
@@ -91,6 +91,14 @@ Los permisos RBAC se guardan en PostgreSQL y se derivan de la asignación vigent
 
 Configura JWT_SECRET con al menos 32 bytes aleatorios y CORS_ALLOWED_ORIGINS con orígenes exactos separados por coma. El comodín * no está permitido. El límite de login es por instancia; producción debe complementarlo en gateway/WAF.
 
+## Imágenes de producto y almacenamiento
+
+La API permite adjuntar imágenes al catálogo mediante `multipart/form-data`: `POST /api/v1/catalog/products/{productId}/images/upload` con la parte `file` y parámetros opcionales `altText`, `sortOrder` y `primaryImage`. Solo se aceptan PNG/JPEG que pasan validación de firma, decodificación y resolución; el tamaño por defecto es 5 MiB y el cuerpo multipart 6 MiB. La ruta se configura con `MEDIA_STORAGE_PATH` y en Compose persiste en el volumen `inventary-media-data`. Se usan nombres UUID generados por el servidor; la ruta pública solo sirve un archivo si su fila de imagen sigue publicada. La subida requiere `catalog:manage`; los errores de tamaño devuelven 413.
+
+## Kafka opcional y Outbox
+
+`KAFKA_ENABLED=false` por defecto. Para probar el broker local: `docker compose --profile kafka up --build` con `KAFKA_ENABLED=true` y `KAFKA_BOOTSTRAP_SERVERS=kafka:9092`. El relay publica eventos Outbox después del commit y el consumidor procesa envelopes mediante `kafka_inbox_event`, deduplica por `eventId` y hash del contenido e invalida la caché de catálogo público. Errores persistentes se reintentan de manera acotada y se envían al topic DLQ configurable. Este consumidor no implementa proyecciones analíticas; el broker y consumidor no se habilitan por defecto.
+
 ## Ventas e idempotencia
 
 La creación de ventas usa `POST /api/v1/sales` con el header `Idempotency-Key`. El servidor obtiene los precios del catálogo; el cliente envía únicamente producto y cantidad. Stock, venta, líneas, movimientos, auditoría, Outbox y registro de idempotencia se guardan en una sola transacción. Los reintentos con la misma clave y contenido devuelven la venta creada; reutilizar la clave con otra solicitud devuelve conflicto. Ver [P06 — Ventas con descuento atómico de stock](docs/16-implementacion-p06-ventas-atomicas.md).
@@ -108,7 +116,7 @@ Las rutas privadas requieren JWT y permiso RBAC; login, health, GET del catálog
 | Unidades | `/api/v1/catalog/units`, `/api/v1/catalog/unit-conversions` | Unidades por dimensión y factores de conversión |
 | Productos | `/api/v1/catalog/products` | CRUD, filtros `q`, `categoryId`, `active`, `kind`; tipo (`STOCKED_GOOD`, `NON_STOCKED_GOOD`, `SERVICE`), unidad y atributos validados; SKU inmutable; el costo solo se muestra con `catalog:manage` o `reports:financial` |
 | Variantes | `/api/v1/catalog/products/{productId}/variants`, `/api/v1/catalog/variants/{variantId}` | SKU, código de barras y combinación de opciones únicos; precio propio opcional. El stock se lleva por producto |
-| Imágenes | `/api/v1/catalog/products/{productId}/images` | Metadatos por URL HTTPS, una principal, despublicación idempotente; no carga binarios |
+| Imágenes | `/api/v1/catalog/products/{productId}/images`, `POST /api/v1/catalog/products/{productId}/images/upload`, `GET /api/v1/public/media/products/{fileName}` | Metadatos por URL HTTPS, subida PNG/JPEG validada por contenido/tamaño/resolución, almacenamiento por UUID, publicación y retirada segura |
 | Catálogo público | `/api/v1/public/catalog/products`, `/products/{sku|uuid|sku de variante|código de barras}`, `/categories` | Solo activos, disponibilidad vendible, variantes e imágenes publicadas; nunca costos |
 | Almacenes | `/api/v1/warehouses`, `/{id}/locations` | CRUD, activar/desactivar (bloqueado con stock o reservas), ubicaciones |
 | Inventario | `/api/v1/inventory/balances`, `/availability`, `/movements`, `/movements/{id}` | Saldos filtrables, disponibilidad informativa, kardex filtrable por producto, almacén, tipo, referencia y fechas, detalle con valoración |
