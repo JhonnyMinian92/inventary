@@ -76,6 +76,25 @@ class InventoryApiTest extends ApiTestSupport {
     }
 
     @Test
+    void warehousePhysicalDeletionRequiresNoInventoryOrOperationalHistory() {
+        String admin = admin();
+        JsonNode unused = warehouse();
+        String unusedId = unused.get("id").asText();
+        httpPost(admin, "/api/v1/warehouses/" + unusedId + "/deactivate", null, 204);
+        httpDelete(admin, "/api/v1/warehouses/" + unusedId, 204);
+        problem(call(get("/api/v1/warehouses/" + unusedId), admin, null), 404, "RESOURCE_NOT_FOUND");
+
+        JsonNode used = warehouse();
+        String usedId = used.get("id").asText();
+        JsonNode product = product("1.00", "2.00");
+        stock(product.get("id").asText(), usedId, "1", "1.00");
+        adjust(product.get("id").asText(), usedId, "DECREASE", "1", null);
+        httpPost(admin, "/api/v1/warehouses/" + usedId + "/deactivate", null, 204);
+        problem(call(delete("/api/v1/warehouses/" + usedId), admin, null), 409, "CONFLICT");
+        assertFalse(httpGet(admin, "/api/v1/warehouses/" + usedId, 200).get("active").asBoolean());
+    }
+
+    @Test
     void adjustmentsAreIdempotentNeverGoNegativeAndValueStock() {
         String admin = admin();
         String productId = product("2.00", "5.00").get("id").asText();
