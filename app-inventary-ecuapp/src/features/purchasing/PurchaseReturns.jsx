@@ -42,7 +42,8 @@ export default function PurchaseReturns({ onChanged }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  // Reload on open too: receipts posted since the list was mounted must be selectable.
+  useEffect(() => { void refresh(); }, [refresh, formOpen]);
 
   useEffect(() => {
     const syncRoute = () => {

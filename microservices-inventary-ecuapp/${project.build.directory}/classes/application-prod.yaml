@@ -1,0 +1,14 @@
+# Perfil explícito de producción: documentación interactiva y herramientas de desarrollo deshabilitadas.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+spring:
+  graphql:
+    graphiql:
+      enabled: false
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}

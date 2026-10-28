@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN useradd --system --uid 10001 --create-home appuser
+RUN useradd --system --uid 10001 --create-home appuser && mkdir -p /data/product-images && chown 10001 /data/product-images
 COPY --from=build /workspace/target/inventary-0.1.0-SNAPSHOT.jar /app/app.jar
 USER 10001
 EXPOSE 8080

@@ -8,7 +8,7 @@ const configs = {
     label: 'Almacenes',
     singular: 'almacén',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 40, pattern: '[A-Za-z0-9][A-Za-z0-9._-]{0,39}' },
+      { key: 'code', label: 'Código', required: true, maxLength: 40, pattern: '[A-Za-z0-9][A-Za-z0-9._\\-]{0,39}' },
       { key: 'name', label: 'Nombre', required: true, maxLength: 140 },
       { key: 'address', label: 'Dirección', maxLength: 500 }
     ],

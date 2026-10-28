@@ -11,7 +11,22 @@ Inventary es una aplicación web para administrar catálogo, compras, recepcione
 - **Arquitectura real:** monolito modular Spring Boot, no varios microservicios desplegables de forma independiente.
 - **Persistencia:** PostgreSQL es la fuente transaccional; no actualizar saldos directamente ni usar ddl-auto=update.
 
-## Inicio rápido
+## Inicio rápido con Docker (frontend + backend)
+
+Requisitos: Docker Desktop y un PostgreSQL accesible desde el anfitrión con la base `inventary` ya creada (puede estar vacía: Flyway crea las tablas al arrancar).
+
+~~~bash
+cp .env.example .env   # ajustar DB_USERNAME, DB_PASSWORD, JWT_SECRET y el usuario inicial
+docker compose up --build -d
+~~~
+
+- Frontend: http://localhost:3000 (nginx sirve la SPA y reenvía `/api/` al backend; no requiere CORS).
+- API: http://localhost:8080/api/v1 — Swagger en http://localhost:8080/swagger-ui.html con `SWAGGER_ENABLED=true`.
+- La API se conecta a `host.docker.internal:5432`; cambiar `SPRING_DATASOURCE_URL` en `.env` si la BD está en otro host.
+- El primer arranque crea `BOOTSTRAP_ADMIN_USERNAME` solo si no existen usuarios. Aprobar compras y anulaciones de venta exige un segundo usuario con rol `SUPER_ADMIN` (`POST /api/v1/admin/users`).
+- Para un PostgreSQL en contenedor usar `microservices-inventary-ecuapp/docker-compose.yml`.
+
+## Inicio rápido sin Docker
 
 Requisitos: Java 21, PostgreSQL compatible, Node.js 22.12.x, npm 10/11. Crear .env local a partir de .env.example; nunca subir secretos.
 

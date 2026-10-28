@@ -1,0 +1,52 @@
+# Stack completo (frontend + backend) contra el PostgreSQL instalado en la máquina anfitriona.
+# Uso: copiar .env.example a .env, ajustar credenciales y ejecutar `docker compose up --build -d`.
+# Para un PostgreSQL en contenedor usar microservices-inventary-ecuapp/docker-compose.yml.
+services:
+  api:
+    build:
+      context: microservices-inventary-ecuapp
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://host.docker.internal:5432/inventary}
+      DB_USERNAME: ${DB_USERNAME:?Define DB_USERNAME en .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-2}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-60}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      WHATSAPP_INTEGRATION_API_KEY: ${WHATSAPP_INTEGRATION_API_KEY:-}
+      KAFKA_ENABLED: "false"
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      GRAPHIQL_ENABLED: ${GRAPHIQL_ENABLED:-false}
+      REPORTS_TIME_ZONE: ${REPORTS_TIME_ZONE:-America/Guayaquil}
+      PURCHASING_REQUIRE_DISTINCT_APPROVER: ${PURCHASING_REQUIRE_DISTINCT_APPROVER:-true}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      MEDIA_STORAGE_PATH: /data/product-images
+      FORWARD_HEADERS_STRATEGY: none
+    volumes:
+      - inventary-media-data:/data/product-images
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
+  web:
+    build:
+      context: app-inventary-ecuapp
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    restart: unless-stopped
+volumes:
+  inventary-media-data:

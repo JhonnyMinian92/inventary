@@ -1,0 +1,10 @@
+# Herramientas de desarrollo: activar con SPRING_PROFILES_ACTIVE=dev.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+app:
+  security:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}

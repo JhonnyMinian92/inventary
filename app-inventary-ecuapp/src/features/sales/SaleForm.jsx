@@ -269,8 +269,10 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
       <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
       <div className="workflow-actions-right">
         {step > 0 && <button type="button" className="button secondary" disabled={loading} onClick={previousStep}><ArrowLeft size={16}/> Atrás</button>}
-        {step < 2 ? <button type="button" className="button primary" disabled={loading || (step === 1 && !activeProducts.length)} onClick={nextStep}>Continuar <ArrowRight size={16}/></button>
-          : <button type="submit" className="button primary" disabled={loading || availabilityLoading}>{loading ? 'Registrando…' : 'Confirmar venta'}</button>}
+        {/* Distinct keys keep React from turning the clicked "Continuar" node into the submit button mid-click,
+            which would register the sale without showing the confirmation step. */}
+        {step < 2 ? <button key="next" type="button" className="button primary" disabled={loading || (step === 1 && !activeProducts.length)} onClick={nextStep}>Continuar <ArrowRight size={16}/></button>
+          : <button key="confirm" type="submit" className="button primary" disabled={loading || availabilityLoading}>{loading ? 'Registrando…' : 'Confirmar venta'}</button>}
       </div>
     </div>
   </form>;

@@ -42,7 +42,8 @@ export default function SalesReturns({ onChanged }) {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  // Reload on open too: sales cancelled or returned elsewhere must not be offered as returnable.
+  useEffect(() => { void refresh(); }, [refresh, formOpen]);
 
   useEffect(() => {
     const syncRoute = () => {

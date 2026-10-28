@@ -20,7 +20,7 @@ export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, 
         const canSubmit = status === 'DRAFT';
         const canApprove = status === 'SUBMITTED';
         const canReceive = ['APPROVED', 'PARTIALLY_RECEIVED'].includes(status);
-        const canCancel = ['DRAFT', 'SUBMITTED'].includes(status);
+        const canCancel = ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(status);
         const tone = status === 'RECEIVED' ? 'active' : status === 'CANCELLED' ? 'inactive' : 'pending';
         return <tr key={idOf(order) || index}>
           <td><strong>{orderNumber}</strong></td>

@@ -190,7 +190,7 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
         <div className="form-grid compact-grid">
           <label className="field">
             <span>Clave técnica<b> *</b></span>
-            <input required maxLength="80" pattern="[A-Za-z][A-Za-z0-9_-]*" title="Empieza con una letra; usa letras, números, guion o guion bajo." value={definition.key} onChange={event => updateDefinition(index, 'key', event.target.value)} placeholder="Ej. talla" />
+            <input required maxLength="80" pattern="[A-Za-z][A-Za-z0-9_\-]*" title="Empieza con una letra; usa letras, números, guion o guion bajo." value={definition.key} onChange={event => updateDefinition(index, 'key', event.target.value)} placeholder="Ej. talla" />
           </label>
           <label className="field">
             <span>Nombre visible<b> *</b></span>

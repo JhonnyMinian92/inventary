@@ -187,8 +187,10 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
       <button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button>
       <div className="workflow-actions-right">
         {step > 0 && <button type="button" className="button secondary" disabled={loading} onClick={previousStep}><ArrowLeft size={16}/> Atrás</button>}
-        {step < 2 ? <button type="button" className="button primary" disabled={loading || (step === 1 && !activeProducts.length)} onClick={nextStep}>Continuar <ArrowRight size={16}/></button>
-          : <button type="submit" className="button primary" disabled={loading}>{loading ? 'Creando orden…' : 'Confirmar compra'}</button>}
+        {/* Distinct keys keep React from turning the clicked "Continuar" node into the submit button mid-click,
+            which would submit the order without showing the confirmation step. */}
+        {step < 2 ? <button key="next" type="button" className="button primary" disabled={loading || (step === 1 && !activeProducts.length)} onClick={nextStep}>Continuar <ArrowRight size={16}/></button>
+          : <button key="confirm" type="submit" className="button primary" disabled={loading}>{loading ? 'Creando orden…' : 'Confirmar compra'}</button>}
       </div>
     </div>
   </form>;

@@ -26,7 +26,7 @@ export default function DataTable({ rows = [], columns = [], moneyKey, empty = '
               (column.key === moneyKey || column.format === 'money') ? money(row[column.key]) :
               (column.format === 'date' || ['createdAt','occurredAt','soldAt','orderedAt'].includes(column.key) || column.key.toLowerCase().includes('date')) ? date(row[column.key]) :
               ['status','movementType','type','referenceType'].includes(column.key) ? titleCase(row[column.key]) :
-              row[column.key] ?? row.productName ?? row.warehouseCode ?? row.supplierName ?? row.customer?.name ?? row.customerName ?? row.product?.name ?? row.warehouse?.name ?? '—';
+              row[column.key] ?? '—';
             return <td key={column.key}>{value === null || value === undefined || value === '' ? '—' : value}</td>;
           })}
         </tr>)}
