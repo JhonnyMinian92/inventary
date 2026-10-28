@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { confirmDialog, toast, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, Boxes, ImagePlus, Star, Trash2, UploadCloud } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
 import { api, resolveApiUrl } from '../../api';
@@ -92,9 +93,11 @@ export default function ProductForm({ initialValue, categories, units = [], load
   const [form, setForm] = useState(() => normalizeProduct(initialValue));
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState('');
+  useEffect(() => { if (schemaError) toast.error(schemaError); }, [schemaError]);
   const [images, setImages] = useState([]);
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
@@ -102,7 +105,9 @@ export default function ProductForm({ initialValue, categories, units = [], load
   const [imageAltText, setImageAltText] = useState('');
   const [imagePrimary, setImagePrimary] = useState(false);
   const [imageError, setImageError] = useState('');
+  useMessageToast(imageError, setImageError);
   const [imageNotice, setImageNotice] = useState('');
+  useMessageToast(imageNotice, setImageNotice, 'success');
 
   useEffect(() => {
     const categoryId = form.categoryId;
@@ -192,7 +197,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
   async function removeImage(image) {
     const imageId = image?.id;
     if (!productId || !imageId || imageBusy) return;
-    if (!window.confirm('¿Quitar esta imagen del catálogo público?')) return;
+    if (!(await confirmDialog({ title: 'Quitar imagen', message: 'La imagen dejará de mostrarse en el catálogo público.', confirmLabel: 'Quitar', tone: 'danger' }))) return;
     setImageError('');
     setImageNotice('');
     setImageBusy(true);
@@ -307,7 +312,6 @@ export default function ProductForm({ initialValue, categories, units = [], load
 
   return <form className="workflow-form" onSubmit={handleSubmit} noValidate>
     <StepProgress steps={['Información', 'Precios y campos', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
-    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
     {step === 0 && <section className="workflow-stage" aria-labelledby="product-basic-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-basic-title">Identifica el producto</h2><p>Primero define cómo se encontrará en el catálogo.</p></div></div>
       <div className="form-grid workflow-fields">
@@ -370,15 +374,13 @@ export default function ProductForm({ initialValue, categories, units = [], load
     {!schemaLoading && !schemaError && form.categoryId && definitions.length === 0 &&
       <p className="form-hint wide">Esta categoría todavía no tiene propiedades definidas. Para capturar campos como talla, color o material, configúralos primero en Categorías; el producto se guardará sin propiedades adicionales.</p>
     }
-    {schemaError && <div className="alert error wide">{schemaError}</div>}
+    {schemaError && <p className="form-hint wide">No se pudieron cargar las propiedades de esta categoría.</p>}
       </div>
       {initialValue && productId ? <section className="product-image-manager wide" aria-labelledby="product-images-title">
         <div className="product-image-manager-heading">
           <span className="workflow-stage-icon"><ImagePlus size={19}/></span>
           <div><h3 id="product-images-title">Imágenes del producto</h3><p>Se aceptan imágenes PNG o JPEG de hasta 5 MB.</p></div>
         </div>
-        {imageError && <div className="alert error" role="alert">{imageError}</div>}
-        {imageNotice && <div className="alert success" role="status">{imageNotice}</div>}
         <div className="product-image-upload-fields">
           <label className="field"><span>Archivo de imagen<b> *</b></span>
             <input ref={imageInputRef} type="file" accept="image/png,image/jpeg" disabled={imageBusy || loading} onChange={event => { setImageFile(event.target.files?.[0] || null); setImageError(''); setImageNotice(''); }} />

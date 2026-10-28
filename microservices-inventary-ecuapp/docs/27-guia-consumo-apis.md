@@ -29,7 +29,7 @@ La base URL se configura en VITE_API_BASE_URL; el valor local predeterminado es 
 
 ## 2. Login y token
 
-1. Enviar POST /api/v1/auth/login con username/password.
+1. Pedir POST /api/v1/auth/login-challenge y enviar POST /api/v1/auth/login con las credenciales cifradas (ver el contrato en 25-referencia-apis.md, sección 1).
 2. Usar accessToken como Bearer en todas las rutas privadas.
 3. Consultar GET /api/v1/auth/me para conocer identidad, rol y permisos.
 4. Manejar expiresAt; al recibir 401, limpiar sesión y volver a login.

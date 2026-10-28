@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useMessageToast } from '../../ui/feedback.js';
 import { api, listFrom } from '../../api';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 
@@ -8,7 +9,9 @@ export default function UnitConversions({ units }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
+  useMessageToast(notice, setNotice, 'success');
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ fromUnitId: '', toUnitId: '', factor: '1' });
   const dialogRef = useAccessibleDialog(modal, () => setModal(false));
@@ -67,8 +70,6 @@ export default function UnitConversions({ units }) {
       <div><h3>Conversiones entre unidades</h3><p>Define el factor para convertir una unidad de origen en una unidad de destino.</p></div>
       <button className="button secondary" onClick={openForm} disabled={activeUnits.length < 2}>+ Nueva conversión</button>
     </div>
-    {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     <div className="table-wrap"><table><thead><tr><th>Desde</th><th>Hacia</th><th>Factor</th></tr></thead><tbody>
       {rows.map((row,index) => <tr key={idOf(row)||index}><td>{row.fromUnitCode || row.fromUnitId || '—'}</td><td>{row.toUnitCode || row.toUnitId || '—'}</td><td><strong>{row.factor}</strong></td></tr>)}
     </tbody></table>{!rows.length && <div className="empty-state">{loading ? 'Cargando conversiones…' : 'No hay conversiones configuradas.'}</div>}</div>

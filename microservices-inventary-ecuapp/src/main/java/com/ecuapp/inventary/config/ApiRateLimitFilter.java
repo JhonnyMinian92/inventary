@@ -44,17 +44,20 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     private final AuditService audit;
 
     private final int loginPerMinute;
+    private final int loginChallengePerMinute;
     private final int whatsappPerMinute;
     private final int publicPerMinute;
 
     public ApiRateLimitFilter(ApiProblemFactory problems, ObjectMapper mapper, AuditService audit,
                               @Value("${app.rate-limit.login-per-minute:10}") int loginPerMinute,
+                              @Value("${app.rate-limit.login-challenge-per-minute:30}") int loginChallengePerMinute,
                               @Value("${app.rate-limit.whatsapp-per-minute:240}") int whatsappPerMinute,
                               @Value("${app.rate-limit.public-per-minute:300}") int publicPerMinute) {
         this.problems = problems;
         this.mapper = mapper;
         this.audit = audit;
         this.loginPerMinute = loginPerMinute;
+        this.loginChallengePerMinute = loginChallengePerMinute;
         this.whatsappPerMinute = whatsappPerMinute;
         this.publicPerMinute = publicPerMinute;
     }
@@ -117,6 +120,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private Policy policy(String path) {
         if ("/api/v1/auth/login".equals(path)) return new Policy("login", loginPerMinute, 60_000);
+        if ("/api/v1/auth/login-challenge".equals(path)) return new Policy("login-challenge", loginChallengePerMinute, 60_000);
         if (path.startsWith("/api/v1/integrations/whatsapp/")) return new Policy("whatsapp", whatsappPerMinute, 60_000);
         if (path.startsWith("/api/v1/public/")) return new Policy("public", publicPerMinute, 60_000);
         if ("/graphql".equals(path)) return new Policy("graphql", publicPerMinute, 60_000);

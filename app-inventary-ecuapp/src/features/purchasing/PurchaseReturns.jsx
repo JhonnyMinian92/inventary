@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
+import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackageMinus, X } from 'lucide-react';
 import { api, listFrom, listAllPages } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
+import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
 
 function idOf(item) { return item?.id ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
 function readPurchaseReturnFromUrl() {
-  if (typeof window === 'undefined') return false;
-  const parts = window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
-  return parts[0] === 'purchases' && parts[1] === 'returns' && parts[2] === 'new';
+  return currentRoute()?.secondary === 'purchase-return';
 }
 
 export default function PurchaseReturns({ onChanged }) {
@@ -17,10 +17,13 @@ export default function PurchaseReturns({ onChanged }) {
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
+  useMessageToast(notice, setNotice, 'success');
   const [formOpen, setFormOpen] = useState(readPurchaseReturnFromUrl);
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const [receiptId, setReceiptId] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [lines, setLines] = useState([]);
@@ -49,18 +52,15 @@ export default function PurchaseReturns({ onChanged }) {
     const syncRoute = () => {
       const nextOpen = readPurchaseReturnFromUrl();
       const hasChanges = Boolean(receiptId || reason.trim() || lines.some(line => Number(line.quantity) > 0));
-      if (!nextOpen && formOpen && hasChanges && !window.confirm('¿Salir de la devolución? Se perderán las cantidades que hayas escrito.')) {
-        window.history.pushState({ workflow: 'purchase-return' }, '', '#/purchases/returns/new');
+      if (!nextOpen && formOpen && hasChanges) {
+        navigate(secondaryPath('purchase-return'), { state: { workflow: 'purchase-return' } });
+        confirmDialog({ title: '¿Salir de la devolución?', message: 'Se perderán las cantidades que hayas escrito.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }).then(leave => { if (leave) { setFormOpen(false); navigate(sectionPath('purchases'), { replace: true }); } });
         return;
       }
       setFormOpen(nextOpen);
     };
     window.addEventListener('popstate', syncRoute);
-    window.addEventListener('hashchange', syncRoute);
-    return () => {
-      window.removeEventListener('popstate', syncRoute);
-      window.removeEventListener('hashchange', syncRoute);
-    };
+    return () => window.removeEventListener('popstate', syncRoute);
   }, [formOpen, receiptId, reason, lines]);
 
   useEffect(() => {
@@ -119,13 +119,13 @@ export default function PurchaseReturns({ onChanged }) {
     setError('');
     setNotice('');
     setFormOpen(true);
-    window.history.pushState({ workflow: 'purchase-return' }, '', '#/purchases/returns/new');
+    navigate(secondaryPath('purchase-return'), { state: { workflow: 'purchase-return' } });
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
-  function closeForm() {
+  async function closeForm() {
     const hasChanges = Boolean(receiptId || reason.trim() || lines.some(line => Number(line.quantity) > 0));
-    if (hasChanges && !window.confirm('¿Salir de la devolución? Se perderán las cantidades que hayas escrito.')) return;
+    if (hasChanges && !(await confirmDialog({ title: '¿Salir de la devolución?', message: 'Se perderán las cantidades que hayas escrito.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }))) return;
     setFormOpen(false);
     setReceiptId('');
     setReceipt(null);
@@ -134,7 +134,7 @@ export default function PurchaseReturns({ onChanged }) {
     setStep(0);
     setValidationMessage('');
     setError('');
-    window.history.replaceState({ section: 'purchases' }, '', '#/purchases');
+    navigate(sectionPath('purchases'), { replace: true });
   }
 
   function updateLine(index, quantity) {
@@ -210,7 +210,7 @@ export default function PurchaseReturns({ onChanged }) {
       setLines([]);
       setReason('');
       setStep(0);
-      window.history.replaceState({ section: 'purchases' }, '', '#/purchases');
+      navigate(sectionPath('purchases'), { replace: true });
       await refresh();
       await onChanged?.();
       setNotice('Devolución registrada. Se actualizó el inventario.');
@@ -229,8 +229,6 @@ export default function PurchaseReturns({ onChanged }) {
       <div><h3>Devoluciones a proveedores</h3><p>Registra mercancía devuelta desde una recepción contabilizada.</p></div>
       <button type="button" className="button primary" onClick={openForm} disabled={formOpen}>+ Nueva devolución</button>
     </div>
-    {error && !formOpen && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     {!formOpen && <div className="table-wrap"><table><thead><tr><th>Devolución</th><th>Orden</th><th>Recepción</th><th>Estado</th><th>Fecha</th><th>Motivo</th><th>Total</th></tr></thead><tbody>
       {returns.map((row,index) => <tr key={idOf(row)||index}>
         <td><strong>{row.returnNumber || idOf(row)}</strong></td><td>{row.purchaseOrderNumber || row.purchaseOrderId || '—'}</td>
@@ -245,8 +243,6 @@ export default function PurchaseReturns({ onChanged }) {
         <button type="button" className="button secondary" disabled={loading} onClick={closeForm}><X size={16}/> Cancelar</button>
       </div>
       <StepProgress steps={['Recepción', 'Cantidades y motivo', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
-      {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
-      {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
       <form className="workflow-form" onSubmit={submit} noValidate>
         {step === 0 && <section className="workflow-stage">
           <div className="workflow-stage-heading"><span className="workflow-stage-icon"><PackageMinus size={20}/></span><div><h2>¿De qué recepción sale la devolución?</h2><p>Solo se muestran recepciones contabilizadas.</p></div></div>

@@ -1,7 +1,7 @@
 import { Ban, CheckCircle2, Eye } from 'lucide-react';
+import { statusLabel, statusTone } from '../../utils/format.js';
 
 function idOf(item) { return item?.id ?? item?.saleId ?? ''; }
-function titleCase(value = '') { return String(value || '—').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
 function date(value) {
   if (!value) return '—';
   const parsed = new Date(value);
@@ -23,10 +23,9 @@ export default function SalesTable({ rows = [], loading = false, onView, onReque
         const number = sale.saleNumber || sale.number || sale.code || String(idOf(sale)).slice(0, 12) || 'Venta';
         const canRequest = status === 'COMPLETED';
         const canApprove = status === 'CANCELLATION_REQUESTED';
-        const tone = status === 'COMPLETED' ? 'active' : status === 'CANCELLED' ? 'inactive' : 'pending';
         return <tr key={idOf(sale) || index}>
           <td><strong>{number}</strong></td>
-          <td><span className={'pill ' + tone}>{titleCase(status)}</span></td>
+          <td><span className={'pill ' + statusTone(status)}>{statusLabel('sale', status)}</span></td>
           <td>{sale.customerName || sale.customer?.name || 'Venta de mostrador'}</td>
           <td>{sale.warehouseCode || sale.warehouseName || sale.warehouse?.name || '—'}</td>
           <td>{date(sale.soldAt || sale.createdAt)}</td>

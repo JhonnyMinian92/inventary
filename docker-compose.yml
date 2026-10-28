@@ -26,12 +26,18 @@ services:
       REPORTS_TIME_ZONE: ${REPORTS_TIME_ZONE:-America/Guayaquil}
       PURCHASING_REQUIRE_DISTINCT_APPROVER: ${PURCHASING_REQUIRE_DISTINCT_APPROVER:-true}
       MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      LOGIN_ENCRYPTION_REQUIRED: ${LOGIN_ENCRYPTION_REQUIRED:-true}
+      LOGIN_LOCKOUT_MAX_FAILURES: ${LOGIN_LOCKOUT_MAX_FAILURES:-5}
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-15}
       MEDIA_STORAGE_PATH: /data/product-images
-      FORWARD_HEADERS_STRATEGY: none
+      # nginx (web) reescribe X-Forwarded-For con la IP real del navegador; sin esto el rate limit y el bloqueo
+      # de login verían a todos los usuarios con la IP del contenedor web.
+      FORWARD_HEADERS_STRATEGY: native
     volumes:
       - inventary-media-data:/data/product-images
     ports:
-      - "${API_PORT:-8080}:8080"
+      # Solo en el equipo local (Swagger/depuración): desde la red se entra por web en /inventary.
+      - "127.0.0.1:${API_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 10s
@@ -48,5 +54,25 @@ services:
     ports:
       - "${WEB_PORT:-3000}:80"
     restart: unless-stopped
+  # Orquestador de flujos WhatsApp. Llama a la API por la red interna: http://api:8080/api/v1/integrations/whatsapp
+  n8n:
+    image: n8nio/n8n:2.45.5
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      # URL pública con la que Meta/WhatsApp alcanza los webhooks (HTTPS en un túnel o dominio propio).
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Define N8N_ENCRYPTION_KEY en .env}
+      N8N_PROXY_HOPS: ${N8N_PROXY_HOPS:-0}
+      GENERIC_TIMEZONE: ${REPORTS_TIME_ZONE:-America/Guayaquil}
+      TZ: ${REPORTS_TIME_ZONE:-America/Guayaquil}
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    volumes:
+      - inventary-n8n-data:/home/node/.n8n
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    restart: unless-stopped
 volumes:
   inventary-media-data:
+  inventary-n8n-data:

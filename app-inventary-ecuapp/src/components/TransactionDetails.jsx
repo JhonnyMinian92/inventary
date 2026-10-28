@@ -1,4 +1,5 @@
 import DataTable from './DataTable.jsx';
+import { statusLabel, statusTone } from '../utils/format.js';
 
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
 function titleCase(value) { return String(value || '—').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
@@ -22,7 +23,7 @@ export function PurchaseOrderDetail({ order }) {
   const items = Array.isArray(order?.items) ? order.items : [];
   const status = String(order?.status || '—').toUpperCase();
   return <div className="transaction-detail">
-    <div className="detail-status-line"><span className={'pill ' + (status === 'RECEIVED' ? 'active' : status === 'CANCELLED' ? 'inactive' : 'pending')}>{titleCase(status)}</span><span className="muted">Creada: {dateTime(order?.orderedAt)}</span></div>
+    <div className="detail-status-line"><span className={'pill ' + statusTone(status)}>{statusLabel('purchase', status)}</span><span className="muted">Creada: {dateTime(order?.orderedAt)}</span></div>
     <DetailGrid>
       <Definition label="Proveedor" value={order?.supplierName}/>
       <Definition label="Almacén de destino" value={order?.warehouseCode}/>
@@ -54,7 +55,7 @@ export function SaleDetail({ sale }) {
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const status = String(sale?.status || '—').toUpperCase();
   return <div className="transaction-detail">
-    <div className="detail-status-line"><span className={'pill ' + (status === 'COMPLETED' ? 'active' : status === 'CANCELLED' ? 'inactive' : 'pending')}>{titleCase(status)}</span><span className="muted">Registrada: {dateTime(sale?.soldAt)}</span></div>
+    <div className="detail-status-line"><span className={'pill ' + statusTone(status)}>{statusLabel('sale', status)}</span><span className="muted">Registrada: {dateTime(sale?.soldAt)}</span></div>
     <DetailGrid>
       <Definition label="Cliente" value={sale?.customerName || 'Venta de mostrador'}/>
       <Definition label="Teléfono" value={sale?.customerPhone}/>

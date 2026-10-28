@@ -1,102 +1,66 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, ChartNoAxesCombined, ChevronRight, CircleAlert, ClipboardList, Layers3, LogOut, PackagePlus, Plus, RefreshCw, Search, Tags, Warehouse } from 'lucide-react';
-import { api, getToken, listFrom, listAllPages, setToken } from './api';
+import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, LogOut, MessageCircle, Plus, RefreshCw, Search, Warehouse } from 'lucide-react';
+import { api, getToken, getTokenExpiry, listFrom, listAllPages, setToken } from './api';
+import { currentRoute, detailPath, documentTitle, HOME_ROUTE, isPlainLeftClick, loginPath, navigate, nextFromSearch, pathFor, sectionPath, workflowPath } from './router.js';
+import LoginPage from './features/auth/LoginPage.jsx';
+import { BrandMark } from './components/BrandLogo.jsx';
+import ecuappLogo from './assets/ecuapp-logo.png';
 import ProductForm from './features/catalog/ProductForm.jsx';
 import CategoryForm from './features/catalog/CategoryForm.jsx';
+import ProductsPage from './features/catalog/ProductsPage.jsx';
 import PurchaseForm from './features/purchasing/PurchaseForm.jsx';
 import ReceiptForm from './features/purchasing/ReceiptForm.jsx';
 import SaleForm from './features/sales/SaleForm.jsx';
 import OperationsCatalogs from './features/operations/OperationsCatalogs.jsx';
 import InventoryOperations from './features/inventory/InventoryOperations.jsx';
 import ReportsCenter from './features/reports/ReportsCenter.jsx';
-import Overview from './features/dashboard/Overview.jsx';
+import Dashboard from './features/dashboard/Dashboard.jsx';
+import WhatsAppOrdersPage from './features/whatsapp/WhatsAppOrdersPage.jsx';
 import DataTable from './components/DataTable.jsx';
 import PurchaseTable from './features/purchasing/PurchaseTable.jsx';
 import SalesTable from './features/sales/SalesTable.jsx';
-import { ProductsTable, CategoriesTable } from './features/catalog/CatalogTables.jsx';
 import useAccessibleDialog from './hooks/useAccessibleDialog.js';
 import PurchaseReturns from './features/purchasing/PurchaseReturns.jsx';
 import SalesReturns from './features/sales/SalesReturns.jsx';
 import { PurchaseOrderDetail, SaleDetail } from './components/TransactionDetails.jsx';
+import FeedbackHost from './ui/FeedbackHost.jsx';
+import { clearToasts, confirmDialog, toast, useMessageToast } from './ui/feedback.js';
+import { SkeletonTable } from './ui/Skeleton.jsx';
+import { compactMoney, isInactive, number, titleCase } from './utils/format.js';
 
-const nav = [
-  { id: 'overview', label: 'Resumen', icon: ChartNoAxesCombined },
-  { id: 'products', label: 'Productos', icon: Boxes },
-  { id: 'categories', label: 'Categorías', icon: Tags },
-  { id: 'partners', label: 'Almacenes y contactos', icon: Warehouse },
-  { id: 'purchases', label: 'Compras', icon: ArrowDownToLine },
-  { id: 'sales', label: 'Ventas', icon: ArrowUpFromLine },
-  { id: 'inventory', label: 'Inventario', icon: Warehouse },
-  { id: 'reports', label: 'Reportes', icon: ClipboardList }
+const NAV_GROUPS = [
+  { label: 'General', items: [{ id: 'overview', label: 'Resumen', icon: LayoutDashboard }] },
+  { label: 'Catálogo', items: [{ id: 'products', label: 'Productos', icon: Boxes, permission: 'catalog:read', sections: ['products', 'categories'] }] },
+  { label: 'Operaciones', items: [
+    { id: 'sales', label: 'Ventas', icon: ArrowUpFromLine, permission: 'sales:read' },
+    { id: 'whatsapp', label: 'Pedidos WhatsApp', icon: MessageCircle, permission: 'sales:read', badge: 'whatsapp' },
+    { id: 'purchases', label: 'Compras', icon: ArrowDownToLine, permission: 'purchasing:read' },
+    { id: 'inventory', label: 'Inventario', icon: Warehouse, permission: 'inventory:read' }
+  ] },
+  { label: 'Gestión', items: [
+    { id: 'partners', label: 'Almacenes y contactos', icon: Building2 },
+    { id: 'reports', label: 'Reportes', icon: ChartNoAxesCombined, permission: 'reports:financial' }
+  ] }
 ];
 
-const VALID_SECTIONS = new Set(nav.map(item => item.id));
+const SECTION_TITLES = { overview: 'Resumen', products: 'Productos', categories: 'Productos', sales: 'Ventas', whatsapp: 'Pedidos WhatsApp', purchases: 'Compras', inventory: 'Inventario', partners: 'Almacenes y contactos', reports: 'Reportes' };
+const VALID_SECTIONS = new Set(Object.keys(SECTION_TITLES));
 const WORKFLOW_MODALS = new Set(['product', 'category', 'purchase', 'sale', 'receive']);
 const WORKFLOW_SECTIONS = { product: 'products', category: 'categories', purchase: 'purchases', sale: 'sales', receive: 'purchases' };
+const WORKFLOW_TITLES = { product: ['Nuevo producto', 'Editar producto'], category: ['Nueva categoría', 'Editar categoría'], purchase: ['Nueva compra'], sale: ['Nueva venta'], receive: ['Registrar recepción'] };
+const DETAIL_SECTIONS = { purchase: 'purchases', sale: 'sales', product: 'products', whatsapp: 'whatsapp' };
+const MODAL_DETAILS = new Set(['purchase', 'sale']);
 
-function routeSegmentsFromUrl() {
-  if (typeof window === 'undefined') return [];
-  return window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
-}
-
-function readSectionFromUrl() {
-  const sectionId = routeSegmentsFromUrl()[0];
-  return VALID_SECTIONS.has(sectionId) ? sectionId : 'overview';
-}
-
-function readWorkflowFromUrl() {
-  const parts = routeSegmentsFromUrl();
-  if (parts[0] === 'products' && parts[1] === 'new') return 'product';
-  if (parts[0] === 'products' && parts.length >= 3 && parts[2] === 'edit') return 'product';
-  if (parts[0] === 'categories' && parts[1] === 'new') return 'category';
-  if (parts[0] === 'categories' && parts.length >= 3 && parts[2] === 'edit') return 'category';
-  if (parts[0] === 'purchases' && parts[1] === 'new') return 'purchase';
-  if (parts[0] === 'sales' && parts[1] === 'new') return 'sale';
-  if (parts[0] === 'purchases' && parts.length >= 3 && parts[2] === 'receive') return 'receive';
-  return '';
-}
-
-function readSecondaryWorkflowFromUrl() {
-  const parts = routeSegmentsFromUrl();
-  if (parts[0] === 'inventory' && parts[2] === 'new' && ['transfer', 'count', 'adjustment', 'reorder'].includes(parts[1])) return `inventory-${parts[1]}`;
-  if (parts[0] === 'purchases' && parts[1] === 'returns' && parts[2] === 'new') return 'purchase-return';
-  if (parts[0] === 'sales' && parts[1] === 'returns' && parts[2] === 'new') return 'sales-return';
-  return '';
-}
-
-function secondaryWorkflowHash(workflow) {
-  const routes = {
-    'inventory-transfer': '#/inventory/transfer/new',
-    'inventory-count': '#/inventory/count/new',
-    'inventory-adjustment': '#/inventory/adjustment/new',
-    'inventory-reorder': '#/inventory/reorder/new',
-    'purchase-return': '#/purchases/returns/new',
-    'sales-return': '#/sales/returns/new'
+function routeState() {
+  const route = currentRoute();
+  return {
+    section: VALID_SECTIONS.has(route?.section) ? route.section : 'overview',
+    workflow: route?.workflow || '',
+    entityId: route?.workflow ? route.params.id || '' : '',
+    detail: route?.detail ? { kind: route.detail, id: route.params.id } : null
   };
-  return routes[workflow] || '#/overview';
 }
 
-function readWorkflowEntityId() {
-  const parts = routeSegmentsFromUrl();
-  const isReceive = parts[0] === 'purchases' && parts.length >= 3 && parts[2] === 'receive';
-  const isProductEdit = parts[0] === 'products' && parts.length >= 3 && parts[2] === 'edit';
-  const isCategoryEdit = parts[0] === 'categories' && parts.length >= 3 && parts[2] === 'edit';
-  if (!isReceive && !isProductEdit && !isCategoryEdit) return '';
-  try { return decodeURIComponent(parts[1]); } catch { return parts[1]; }
-}
-
-function workflowHash(workflow, entityId = '') {
-  if (workflow === 'product') return entityId ? `#/products/${encodeURIComponent(entityId)}/edit` : '#/products/new';
-  if (workflow === 'category') return entityId ? `#/categories/${encodeURIComponent(entityId)}/edit` : '#/categories/new';
-  if (workflow === 'purchase') return '#/purchases/new';
-  if (workflow === 'sale') return '#/sales/new';
-  if (workflow === 'receive' && entityId) return `#/purchases/${encodeURIComponent(entityId)}/receive`;
-  return `#/${WORKFLOW_SECTIONS[workflow] || 'overview'}`;
-}
-
-function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
-function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
-function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
 function pickId(x) { return x?.id ?? x?.productId ?? x?.categoryId ?? x?.warehouseId ?? ''; }
 function pickName(x) { return x?.name ?? x?.description ?? x?.sku ?? String(pickId(x)); }
 function quantity(x) { return x?.onHand ?? x?.quantity ?? x?.available ?? x?.stock ?? 0; }
@@ -104,8 +68,9 @@ function quantity(x) { return x?.onHand ?? x?.quantity ?? x?.available ?? x?.sto
 function App() {
   const [token, setTokenState] = useState(getToken());
   const [user, setUser] = useState(null);
-  const [section, setSection] = useState(readSectionFromUrl);
-  const [routeEntityId, setRouteEntityId] = useState(readWorkflowEntityId);
+  const [section, setSection] = useState(() => routeState().section);
+  const [routeEntityId, setRouteEntityId] = useState(() => routeState().entityId);
+  const [detailRoute, setDetailRoute] = useState(() => routeState().detail);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
@@ -117,40 +82,51 @@ function App() {
   const [purchases, setPurchases] = useState([]);
   const [sales, setSales] = useState([]);
   const [valuation, setValuation] = useState(null);
+  const [whatsappPending, setWhatsappPending] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [purchaseDetail, setPurchaseDetail] = useState(null);
   const [saleDetail, setSaleDetail] = useState(null);
-  const [purchaseToCancel, setPurchaseToCancel] = useState(null);
-  const [statusChangeTarget, setStatusChangeTarget] = useState(null);
   const [saleToCancel, setSaleToCancel] = useState(null);
   const [saleCancelReason, setSaleCancelReason] = useState('');
-  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [apiStatus, setApiStatus] = useState('checking');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [modal, setModal] = useState(readWorkflowFromUrl);
+  const [modal, setModal] = useState(() => routeState().workflow);
   const [editing, setEditing] = useState(null);
   const [inventoryFilter, setInventoryFilter] = useState({ warehouseId: '', productId: '' });
 
+  useMessageToast(error, setError, 'error');
+  useMessageToast(notice, setNotice, 'success');
+
+  // Mientras /auth/me no responde no se ocultan opciones; el backend aplica los permisos en cualquier caso.
+  const can = useCallback(permission => !permission || !user || (user.permissions || []).includes(permission), [user]);
+
+  const expireSession = useCallback((message = 'La sesión expiró o ya no es válida. Inicia sesión nuevamente.') => {
+    setToken('');
+    setTokenState('');
+    setUser(null);
+    setApiStatus('error');
+    toast.info(message);
+  }, []);
+
   const loadData = useCallback(async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setRefreshKey(key => key + 1);
     const tasks = [
       ['products', listAllPages(api.products, { size: 100 })], ['categories', listAllPages(api.categories, { size: 100 })], ['units', api.units()],
       ['warehouses', listAllPages(api.warehouses, { size: 100 })], ['suppliers', listAllPages(api.suppliers, { size: 100 })],
       ['customers', listAllPages(api.customers, { size: 100 })], ['balances', listAllPages(api.balances, { size: 100 })],
-      ['movements', listAllPages(api.movements, { size: 100 })], ['purchases', listAllPages(api.purchaseOrders, { size: 100 })],
-      ['sales', listAllPages(api.sales, { size: 100 })], ['valuation', api.inventoryValuationReport({ size: 100 })]
+      // Solo los movimientos más recientes: el historial completo se consulta con filtros o en el kárdex.
+      ['movements', api.movements({ size: 100 })], ['purchases', listAllPages(api.purchaseOrders, { size: 100 })],
+      ['sales', listAllPages(api.sales, { size: 100 })], ['valuation', api.inventoryValuationReport({ size: 100 })],
+      ['whatsapp', api.whatsappOrders({ status: 'AWAITING_PAYMENT', size: 1 })]
     ];
     const results = await Promise.allSettled(tasks.map(t => t[1]));
-    const unauthorized = results.some(result => result.status === 'rejected' && result.reason?.status === 401);
-    if (unauthorized) {
-      setApiStatus('error');
-      setToken('');
-      setTokenState('');
-      setUser(null);
-      setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+    if (results.some(result => result.status === 'rejected' && result.reason?.status === 401)) {
+      expireSession();
       setHasLoadedData(true);
       setLoading(false);
       return;
@@ -159,77 +135,92 @@ function App() {
     const failed = [];
     results.forEach((result, i) => {
       const [key] = tasks[i];
-      if (key === 'valuation') {
-        setValuation(result.status === 'fulfilled' ? result.value : null);
-        return;
-      }
+      if (key === 'valuation') { setValuation(result.status === 'fulfilled' ? result.value : null); return; }
+      if (key === 'whatsapp') { setWhatsappPending(result.status === 'fulfilled' ? Number(result.value?.page?.totalElements ?? 0) : null); return; }
       if (result.status === 'fulfilled') {
         const value = listFrom(result.value);
         ({ products: setProducts, categories: setCategories, units: setUnits, warehouses: setWarehouses, suppliers: setSuppliers, customers: setCustomers, balances: setBalances, movements: setMovements, purchases: setPurchases, sales: setSales })[key](value);
-      } else if (['products', 'categories', 'warehouses', 'balances'].includes(key)) failed.push(`${key}: ${result.reason?.message || 'error'}`);
+      } else if (['products', 'categories', 'warehouses', 'balances'].includes(key) && result.reason?.status !== 403) failed.push(result.reason?.message || 'error');
     });
-    if (failed.length) setError(`No se pudieron cargar algunos datos. ${failed.join(' · ')}`);
+    if (failed.length) setError(results.every(result => result.status === 'rejected') ? 'No hay conexión con el servidor.' : 'No se pudieron cargar algunos datos: ' + [...new Set(failed)].join(' · '));
     setHasLoadedData(true);
     setLoading(false);
-  }, []);
+  }, [expireSession]);
 
   useEffect(() => {
     if (!token) return;
-    api.me().then(setUser).catch(e => { if (e.status === 401) { setToken(''); setTokenState(''); setUser(null); setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.'); } else setError(e.message); });
+    api.me().then(setUser).catch(e => { if (e.status === 401) expireSession(); else setError(e.message); });
     loadData();
-  }, [token, loadData]);
+  }, [token, loadData, expireSession]);
 
+  // Cierra la sesión en el instante en que vence el token, sin esperar a un 401.
   useEffect(() => {
-    const syncSectionFromUrl = () => {
-      const nextSection = readSectionFromUrl();
-      const nextWorkflow = readWorkflowFromUrl();
-      const nextSecondaryWorkflow = readSecondaryWorkflowFromUrl();
-      const nextEntityId = readWorkflowEntityId();
-      setSection(nextSection);
-      setModal(nextWorkflow);
-      setRouteEntityId(nextEntityId);
-      if (nextWorkflow === 'receive') setSelectedOrder(null);
-      const expectedHash = nextWorkflow ? workflowHash(nextWorkflow, nextEntityId) : nextSecondaryWorkflow ? secondaryWorkflowHash(nextSecondaryWorkflow) : `#/${nextSection}`;
-      if (window.location.hash !== expectedHash) {
-        window.history.replaceState(window.history.state, '', expectedHash);
-      }
-    };
+    if (!token) return undefined;
+    const expiresAt = getTokenExpiry();
+    if (!expiresAt) return undefined;
+    const timer = window.setTimeout(() => expireSession('Tu sesión expiró por seguridad. Inicia sesión nuevamente.'), Math.max(0, expiresAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [token, expireSession]);
 
-    syncSectionFromUrl();
-    window.addEventListener('hashchange', syncSectionFromUrl);
-    window.addEventListener('popstate', syncSectionFromUrl);
-    return () => {
-      window.removeEventListener('hashchange', syncSectionFromUrl);
-      window.removeEventListener('popstate', syncSectionFromUrl);
-    };
+  const syncFromLocation = useCallback(() => {
+    const route = currentRoute();
+    if (!route || route.name === 'login') return;
+    const next = routeState();
+    setSection(next.section);
+    setModal(next.workflow);
+    setRouteEntityId(next.entityId);
+    setDetailRoute(next.detail);
+    if (!next.detail) { setPurchaseDetail(null); setSaleDetail(null); }
+    if (next.workflow === 'receive') setSelectedOrder(null);
+    if (window.location.pathname !== route.path) window.history.replaceState(window.history.state, '', route.path);
   }, []);
 
-  const navigateSection = useCallback(nextSection => {
+  useEffect(() => {
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
+  }, [syncFromLocation]);
+
+  // Sin sesión, toda ruta lleva a /iniciar-sesion?destino=...; con sesión, el login y las rutas desconocidas llevan al destino o al resumen.
+  useEffect(() => {
+    const route = currentRoute();
+    if (!token) {
+      if (route?.name !== 'login') navigate(loginPath(route ? route.path : ''), { replace: true });
+      document.title = documentTitle({ title: 'Iniciar sesión' });
+      return;
+    }
+    if (!route || route.name === 'login') {
+      const target = route?.name === 'login' ? nextFromSearch(window.location.search) : '';
+      navigate(target || pathFor(HOME_ROUTE), { replace: true });
+    }
+    syncFromLocation();
+  }, [token, syncFromLocation]);
+
+  useEffect(() => {
+    if (!token) return;
+    const route = currentRoute();
+    if (route && route.name !== 'login') document.title = documentTitle(route);
+  }, [token, section, modal, detailRoute, routeEntityId]);
+
+  const navigateSection = useCallback(async nextSection => {
     const targetSection = VALID_SECTIONS.has(nextSection) ? nextSection : 'overview';
-    if ((WORKFLOW_MODALS.has(modal) || readSecondaryWorkflowFromUrl()) && !window.confirm('¿Salir de este formulario? Los cambios que no hayas guardado se perderán.')) return;
+    if ((WORKFLOW_MODALS.has(modal) || currentRoute()?.secondary) && !(await confirmDialog({ title: '¿Salir del formulario?', message: 'Los cambios que no hayas guardado se perderán.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }))) return;
     setSection(targetSection);
     setModal('');
     setRouteEntityId('');
+    setDetailRoute(null);
     setEditing(null);
     setSelectedOrder(null);
-    const targetHash = `#/${targetSection}`;
-    if (window.location.hash !== targetHash) {
-      window.history.pushState({ section: targetSection }, '', targetHash);
-    }
+    navigate(sectionPath(targetSection));
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [modal]);
 
   function startWorkflow(workflow, entityId = '') {
     const targetSection = WORKFLOW_SECTIONS[workflow] || 'overview';
-    setError('');
-    setNotice('');
     setSection(targetSection);
     setModal(workflow);
     setRouteEntityId(entityId ? String(entityId) : '');
-    const targetHash = workflowHash(workflow, entityId ? String(entityId) : '');
-    if (window.location.hash !== targetHash) {
-      window.history.pushState({ workflow, entityId: entityId ? String(entityId) : '' }, '', targetHash);
-    }
+    setDetailRoute(null);
+    navigate(workflowPath(workflow, entityId ? String(entityId) : ''), { state: { workflow } });
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -240,10 +231,8 @@ function App() {
     setRouteEntityId('');
     setEditing(null);
     setSelectedOrder(null);
-    setError('');
-    setNotice('');
     setSection(parentSection);
-    window.history.replaceState({ section: parentSection }, '', `#/${parentSection}`);
+    navigate(sectionPath(parentSection), { replace: true });
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -259,59 +248,69 @@ function App() {
     if (modal !== 'receive' || !routeEntityId || String(pickId(selectedOrder)) === String(routeEntityId)) return undefined;
     let active = true;
     setLoading(true);
-    setError('');
     api.purchaseOrder(routeEntityId)
       .then(detail => { if (active) setSelectedOrder(detail); })
-      .catch(error => {
+      .catch(err => {
         if (!active) return;
-        if (error?.status === 401) {
-          setToken('');
-          setTokenState('');
-          setUser(null);
-          setError('La sesión venció. Inicia sesión nuevamente.');
-        } else setError(error?.message || 'No se pudo cargar la orden para recibirla.');
+        if (err?.status === 401) expireSession();
+        else setError(err?.message || 'No se pudo cargar la orden para recibirla.');
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [modal, routeEntityId]);
+  }, [modal, routeEntityId, expireSession]);
 
-  const visibleProducts = useMemo(() => products.filter(p => [p.name, p.sku, p.code, p.description].some(v => String(v || '').toLowerCase().includes(search.toLowerCase()))), [products, search]);
-  const isInitialLoading = loading && !hasLoadedData;
+  // /compras/:id y /ventas/:id abren su detalle en una ventana sobre el listado; productos y pedidos usan paneles propios.
+  useEffect(() => {
+    if (!token || !detailRoute || !MODAL_DETAILS.has(detailRoute.kind)) return undefined;
+    let active = true;
+    const isPurchase = detailRoute.kind === 'purchase';
+    setLoading(true);
+    (isPurchase ? api.purchaseOrder(detailRoute.id) : api.sale(detailRoute.id))
+      .then(detail => {
+        if (!active) return;
+        if (isPurchase) setPurchaseDetail(detail); else setSaleDetail(detail);
+        setModal(isPurchase ? 'purchaseDetail' : 'saleDetail');
+      })
+      .catch(err => {
+        if (!active) return;
+        if (err?.status === 401) { expireSession(); return; }
+        setError(err?.message || (isPurchase ? 'No se pudo cargar el detalle de la orden.' : 'No se pudo cargar el detalle de la venta.'));
+        setDetailRoute(null);
+        navigate(sectionPath(isPurchase ? 'purchases' : 'sales'), { replace: true });
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [token, detailRoute, expireSession]);
+
   const isWorkflow = WORKFLOW_MODALS.has(modal);
+  const refreshing = loading && hasLoadedData;
   const stockTotal = balances.reduce((sum, row) => sum + Number(quantity(row)), 0);
   const valuationTotals = Array.isArray(valuation?.totals) ? valuation.totals : [];
-  const inventoryValueLabel = !valuation ? '—' : valuationTotals.length === 1 ? money(valuationTotals[0].totalValue) : valuationTotals.length > 1 ? 'Varias monedas' : money(0);
+  const inventoryValueLabel = !valuation ? '—' : valuationTotals.length === 1 ? compactMoney(valuationTotals[0].totalValue) : valuationTotals.length > 1 ? 'Varias monedas' : compactMoney(0);
+  const dashboardData = useMemo(() => ({ products, categories, balances, movements, purchases, sales, warehouses, valuation }), [products, categories, balances, movements, purchases, sales, warehouses, valuation]);
 
   async function runAction(action, success) {
     const wasWorkflow = WORKFLOW_MODALS.has(modal);
     const workflowSection = WORKFLOW_SECTIONS[modal] || section;
-    setLoading(true); setError(''); setNotice('');
+    setLoading(true);
     try {
       await action();
       setNotice(success);
-      setModal('');
+      if (!detailRoute || !MODAL_DETAILS.has(detailRoute.kind)) setModal('');
       setEditing(null);
       if (wasWorkflow) {
         setRouteEntityId('');
         setSelectedOrder(null);
         setSection(workflowSection);
-        window.history.replaceState({ section: workflowSection }, '', `#/${workflowSection}`);
+        navigate(sectionPath(workflowSection), { replace: true });
       }
       await loadData();
       return true;
-    }
-    catch (e) {
-      if (e.status === 401) {
-        setToken('');
-        setTokenState('');
-        setUser(null);
-        setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
-      } else {
-        setError(e.message || 'No se pudo completar la operación.');
-      }
+    } catch (e) {
+      if (e.status === 401) expireSession();
+      else setError(e.message || 'No se pudo completar la operación.');
       return false;
-    }
-    finally { setLoading(false); }
+    } finally { setLoading(false); }
   }
 
   async function submitProduct(form) {
@@ -320,7 +319,7 @@ function App() {
       return;
     }
     if (!form.categoryId) {
-      setError('Selecciona una categoría. El backend requiere una categoría para registrar el producto.');
+      setError('Selecciona una categoría.');
       return;
     }
     const data = {
@@ -353,125 +352,83 @@ function App() {
       const categoryId = result?.id ?? result?.categoryId ?? (editing ? pickId(editing) : null);
       if (!categoryId) throw new Error('La API guardó la categoría pero no devolvió su identificador; no se pudo guardar el esquema de propiedades.');
       await api.saveCategoryAttributes(categoryId, { definitions: Array.isArray(form.definitions) ? form.definitions : [] });
-    }, editing ? 'Categoría y propiedades actualizadas.' : 'Categoría creada con sus propiedades.');
+    }, editing ? 'Categoría actualizada.' : 'Categoría creada.');
   }
 
-  function toggleProductStatus(product) {
-    setError('');
-    setNotice('');
-    const inactive = product.active === false || String(product.status || '').toUpperCase() === 'INACTIVE';
-    setStatusChangeTarget({ kind: 'product', item: product, activate: inactive });
-    setModal('confirmStatusChange');
-  }
-
-  function toggleCategoryStatus(category) {
-    setError('');
-    setNotice('');
-    const inactive = category.active === false || String(category.status || '').toUpperCase() === 'INACTIVE';
-    setStatusChangeTarget({ kind: 'category', item: category, activate: inactive });
-    setModal('confirmStatusChange');
-  }
-
-  async function confirmStatusChange(event) {
-    event.preventDefault();
-    if (!statusChangeTarget) return;
-    const { kind, item, activate } = statusChangeTarget;
+  async function toggleStatus(kind, item) {
+    const activate = isInactive(item);
+    const noun = kind === 'product' ? 'producto' : 'categoría';
+    const ok = await confirmDialog({
+      title: `${activate ? 'Activar' : 'Desactivar'} ${noun}`,
+      message: activate ? `${pickName(item)} volverá a estar disponible.` : `${pickName(item)} no podrá usarse en nuevas operaciones. El historial se conserva.`,
+      confirmLabel: activate ? 'Activar' : 'Desactivar',
+      tone: activate ? 'default' : 'danger'
+    });
+    if (!ok) return;
     const id = pickId(item);
-    const action = kind === 'product'
-      ? (activate ? () => api.activateProduct(id) : () => api.deactivateProduct(id))
-      : (activate ? () => api.activateCategory(id) : () => api.deactivateCategory(id));
-    const label = kind === 'product' ? 'producto' : 'categoría';
-    const completed = await runAction(action, (activate ? 'Se activó el ' : 'Se desactivó el ') + label + '.');
-    if (completed) setStatusChangeTarget(null);
+    const action = kind === 'product' ? (activate ? api.activateProduct : api.deactivateProduct) : (activate ? api.activateCategory : api.deactivateCategory);
+    await runAction(() => action(id), `${titleCase(noun)} ${activate ? 'activad' : 'desactivad'}${kind === 'product' ? 'o' : 'a'}.`);
   }
 
-  async function deleteProduct(product) {
-    if (!product || product.active !== false) return;
-    const label = product.name || product.sku || pickId(product);
-    if (!window.confirm('Eliminar físicamente el producto "' + label + '"? Esta acción solo es posible si no tiene existencias, movimientos, variantes, imágenes ni documentos relacionados.')) return;
-    await runAction(() => api.deleteProduct(pickId(product)), 'Producto eliminado físicamente.');
-  }
-
-  async function deleteCategory(category) {
-    if (!category || category.active !== false) return;
-    const label = category.name || pickId(category);
-    if (!window.confirm('Eliminar físicamente la categoría "' + label + '"? Solo se permite si no tiene productos ni referencias históricas.')) return;
-    await runAction(() => api.deleteCategory(pickId(category)), 'Categoría eliminada físicamente.');
+  async function deleteItem(kind, item) {
+    if (!item || item.active !== false) return;
+    const noun = kind === 'product' ? 'producto' : 'categoría';
+    const ok = await confirmDialog({
+      title: `Eliminar ${noun}`,
+      message: `${pickName(item)} se eliminará definitivamente. Solo es posible si no tiene ${kind === 'product' ? 'existencias, movimientos ni documentos' : 'productos ni referencias'} asociados.`,
+      confirmLabel: 'Eliminar', tone: 'danger'
+    });
+    if (!ok) return;
+    if (kind === 'product' && detailRoute?.kind === 'product') closeDetail();
+    await runAction(() => kind === 'product' ? api.deleteProduct(pickId(item)) : api.deleteCategory(pickId(item)), `${titleCase(noun)} eliminad${kind === 'product' ? 'o' : 'a'}.`);
   }
 
   async function logout() {
     try {
       await api.logout();
     } catch (logoutError) {
-      setError('La sesión se cerró localmente, pero el backend no confirmó el cierre: ' + (logoutError?.message || 'error desconocido'));
+      toast.warning('La sesión se cerró en este equipo, pero el servidor no confirmó el cierre: ' + (logoutError?.message || 'error desconocido'));
     } finally {
+      navigate(loginPath(), { replace: true });
       setToken('');
       setTokenState('');
       setUser(null);
     }
   }
+
   async function submitPurchase(data) {
-    await runAction(() => api.createPurchaseOrder(data), 'Orden creada como borrador. Solicita aprobación y contabiliza la recepción para actualizar el stock.');
+    await runAction(() => api.createPurchaseOrder(data), 'Orden creada como borrador.');
   }
 
-  function requestPurchaseCancellation(order) {
-    setPurchaseToCancel(order);
-    setError('');
-    setNotice('');
-    setModal('confirmPurchaseCancel');
+  async function cancelPurchase(order) {
+    const ok = await confirmDialog({
+      title: 'Cancelar orden de compra',
+      message: `${order.orderNumber || pickId(order)} · ${order.supplierName || order.supplier?.name || 'Proveedor'}. No modifica existencias y no se puede deshacer.`,
+      confirmLabel: 'Cancelar orden', cancelLabel: 'Volver', tone: 'danger'
+    });
+    if (ok) await runAction(() => api.cancelPurchaseOrder(pickId(order)), 'Orden cancelada.');
   }
 
-  async function confirmPurchaseCancellation(event) {
-    event.preventDefault();
-    if (!purchaseToCancel) return;
-    const completed = await runAction(() => api.cancelPurchaseOrder(pickId(purchaseToCancel)), 'Orden cancelada. No se modificaron las existencias porque todavía no se había contabilizado la recepción.');
-    if (completed) setPurchaseToCancel(null);
+  function openDetail(kind, itemOrId) {
+    const id = String(typeof itemOrId === 'object' ? pickId(itemOrId) : itemOrId || '');
+    if (!id) return;
+    setSection(DETAIL_SECTIONS[kind]);
+    setModal('');
+    navigate(detailPath(kind, id), { state: { detail: kind } });
+    setDetailRoute({ kind, id });
   }
 
-  async function openPurchaseDetail(order) {
-    setLoading(true);
-    setError('');
-    setNotice('');
-    try {
-      const detail = await api.purchaseOrder(pickId(order));
-      setPurchaseDetail(detail);
-      setModal('purchaseDetail');
-    } catch (err) {
-      if (err?.status === 401) {
-        setToken('');
-        setTokenState('');
-        setUser(null);
-        setError('La sesión expiró. Inicia sesión nuevamente.');
-      } else setError(err?.message || 'No se pudo cargar el detalle de la orden.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function openSaleDetail(sale) {
-    setLoading(true);
-    setError('');
-    setNotice('');
-    try {
-      const detail = await api.sale(pickId(sale));
-      setSaleDetail(detail);
-      setModal('saleDetail');
-    } catch (err) {
-      if (err?.status === 401) {
-        setToken('');
-        setTokenState('');
-        setUser(null);
-        setError('La sesión expiró. Inicia sesión nuevamente.');
-      } else setError(err?.message || 'No se pudo cargar el detalle de la venta.');
-    } finally {
-      setLoading(false);
-    }
+  function closeDetail() {
+    const parent = DETAIL_SECTIONS[detailRoute?.kind] || section;
+    setDetailRoute(null);
+    setPurchaseDetail(null);
+    setSaleDetail(null);
+    setModal(current => current === 'purchaseDetail' || current === 'saleDetail' ? '' : current);
+    navigate(sectionPath(parent), { replace: true });
   }
 
   async function openReceive(order) {
     setLoading(true);
-    setError('');
-    setNotice('');
     try {
       const detail = await api.purchaseOrder(pickId(order));
       setSelectedOrder(detail);
@@ -485,29 +442,27 @@ function App() {
 
   async function submitReceipt(data) {
     if (!selectedOrder) return;
-    const completed = await runAction(() => api.createReceipt(pickId(selectedOrder), data), 'Recepción contabilizada. El inventario se actualizó desde el backend.');
+    const completed = await runAction(() => api.createReceipt(pickId(selectedOrder), data), 'Recepción contabilizada. Existencias actualizadas.');
     if (completed) setSelectedOrder(null);
   }
 
   async function submitSale(data) {
-    await runAction(() => api.createSale(data), 'Venta registrada por el backend.');
+    await runAction(() => api.createSale(data), 'Venta registrada.');
   }
 
   function requestSaleCancellation(sale) {
     setSaleToCancel(sale);
     setSaleCancelReason('');
-    setError('');
-    setNotice('');
     setModal('cancelSale');
   }
 
   async function submitSaleCancellation(event) {
     event.preventDefault();
     if (!saleToCancel || !saleCancelReason.trim()) {
-      setError('Debes indicar el motivo de anulación.');
+      setError('Indica el motivo de la anulación.');
       return;
     }
-    const completed = await runAction(() => api.requestSaleCancellation(pickId(saleToCancel), { reason: saleCancelReason.trim() }), 'Solicitud de anulación enviada. Requiere aprobación de un usuario autorizado distinto.');
+    const completed = await runAction(() => api.requestSaleCancellation(pickId(saleToCancel), { reason: saleCancelReason.trim() }), 'Anulación solicitada. Debe aprobarla otro usuario autorizado.');
     if (completed) {
       setSaleToCancel(null);
       setSaleCancelReason('');
@@ -515,22 +470,20 @@ function App() {
   }
 
   async function approveSaleCancellation(sale) {
-    await runAction(() => api.approveSaleCancellation(pickId(sale)), 'Anulación aprobada por el backend.');
+    const ok = await confirmDialog({ title: 'Aprobar anulación', message: `${sale.saleNumber || pickId(sale)} quedará anulada y sus existencias volverán al inventario.`, confirmLabel: 'Aprobar anulación', tone: 'danger' });
+    if (ok) await runAction(() => api.approveSaleCancellation(pickId(sale)), 'Anulación aprobada.');
   }
 
   async function loadInventoryFilter(event, filterValues = inventoryFilter) {
     event?.preventDefault?.();
     setLoading(true);
-    setError('');
     const params = {};
     if (filterValues.warehouseId) params.warehouseId = filterValues.warehouseId;
     if (filterValues.productId) params.productId = filterValues.productId;
     params.size = '100';
     const [balanceResult, movementResult] = await Promise.allSettled([api.balances(params), api.movements(params)]);
-    const unauthorized = [balanceResult, movementResult].some(result => result.status === 'rejected' && result.reason?.status === 401);
-    if (unauthorized) {
-      setToken(''); setTokenState(''); setUser(null); setApiStatus('error');
-      setError('La sesión expiró o ya no es válida. Inicia sesión nuevamente.');
+    if ([balanceResult, movementResult].some(result => result.status === 'rejected' && result.reason?.status === 401)) {
+      expireSession();
       setLoading(false);
       return;
     }
@@ -538,11 +491,10 @@ function App() {
     if (balanceResult.status === 'fulfilled') setBalances(listFrom(balanceResult.value));
     else failures.push('saldos: ' + (balanceResult.reason?.message || 'error'));
     if (movementResult.status === 'fulfilled') setMovements(listFrom(movementResult.value));
-    else failures.push('movimientos: ' + (movementResult.reason?.message || 'error'));
+    else if (movementResult.reason?.status !== 403) failures.push('movimientos: ' + (movementResult.reason?.message || 'error'));
     if (failures.length) setError('No se pudieron aplicar todos los filtros. ' + failures.join(' · '));
     setLoading(false);
   }
-
 
   function openProduct(product = null) {
     setEditing(product);
@@ -553,114 +505,142 @@ function App() {
     startWorkflow('category', category ? pickId(category) : '');
   }
 
-  if (!token) return <Login onLogin={async (username, password) => {
-    setError('');
-    try { const result = await api.login(username, password); const access = result?.accessToken || result?.access_token || result?.token || result?.jwt; if (!access) throw new Error('La respuesta de login no contiene accessToken/access_token/token. Revisa el contrato de autenticación del backend.'); setToken(access); setTokenState(access); }
-    catch (e) { setError(e.message); }
-  }} error={error} />;
+  if (!token) return <>
+    <LoginPage onLogin={async ({ username, password, remember }) => {
+      const result = await api.login(username, password);
+      const access = result?.accessToken;
+      if (!access) throw new Error('La respuesta de inicio de sesión no contiene accessToken.');
+      setToken(access, { persist: remember, expiresAt: result.expiresAt });
+      clearToasts();
+      setTokenState(access);
+    }} />
+    <FeedbackHost />
+  </>;
+
+  const headerAction = section === 'purchases' && can('purchasing:manage') ? <button type="button" className="button primary" onClick={() => startWorkflow('purchase')}><Plus size={16} />Nueva compra</button>
+    : section === 'sales' && can('sales:manage') ? <button type="button" className="button primary" onClick={() => startWorkflow('sale')}><Plus size={16} />Nueva venta</button>
+    : null;
+  const roleLabel = user?.role ? titleCase(user.role) : 'Sesión activa';
+  const displayName = user?.username || 'Usuario';
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark"><Boxes size={22}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div>
-      <div className="workspace-label">ESPACIO DE TRABAJO</div>
-      <nav aria-label="Navegación principal">{nav.map(item => <button type="button" key={item.id} title={item.label} aria-current={section === item.id ? 'page' : undefined} className={section === item.id ? 'nav-item active' : 'nav-item'} onClick={() => navigateSection(item.id)}><item.icon size={18}/><span>{item.label}</span>{section === item.id && <ChevronRight size={15} className="nav-chevron"/>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="api-status"><span className={'status-dot ' + apiStatus}/><span>{apiStatus === 'connected' ? 'API disponible' : apiStatus === 'checking' ? 'Conectando a la API…' : 'API sin conexión'}</span></div><button className="nav-item logout" onClick={logout}><LogOut size={18}/> Cerrar sesión</button></div>
+      <div className="brand"><BrandMark size={38} className="brand-mark-svg" /><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div>
+      <nav aria-label="Navegación principal" className="side-nav">{NAV_GROUPS.map(group => {
+        const items = group.items.filter(item => can(item.permission));
+        if (!items.length) return null;
+        return <div className="nav-group" key={group.label}>
+          <span className="nav-group-label">{group.label}</span>
+          {items.map(item => {
+            const current = (item.sections || [item.id]).includes(section);
+            const badge = item.badge === 'whatsapp' && whatsappPending > 0 ? whatsappPending : 0;
+            return <a key={item.id} href={sectionPath(item.id)} title={item.label} aria-current={current ? 'page' : undefined} className={current ? 'nav-item active' : 'nav-item'}
+              onClick={event => { if (!isPlainLeftClick(event)) return; event.preventDefault(); navigateSection(item.id); }}>
+              <item.icon size={18} /><span>{item.label}</span>{badge > 0 && <b className="nav-badge" aria-label={`${badge} pendientes`}>{badge > 99 ? '99+' : badge}</b>}
+            </a>;
+          })}
+        </div>;
+      })}</nav>
+      <div className="sidebar-bottom">
+        <div className="sidebar-profile">
+          <span className="avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span>
+          <span className="profile-copy"><strong>{displayName}</strong><small className={apiStatus === 'error' ? 'offline' : ''}>{apiStatus === 'error' ? 'Sin conexión' : roleLabel}</small></span>
+          <button type="button" className="icon-button ghost" onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"><LogOut size={17} /></button>
+        </div>
+        <div className="sidebar-legal"><img src={ecuappLogo} alt="" width="18" height="18" /><span>© {new Date().getFullYear()} EcuApp. Todos los derechos reservados.</span></div>
+      </div>
     </aside>
     <main className="main-content">
-      <header className="topbar"><div><span className="eyebrow">GESTIÓN COMERCIAL</span><h1>{nav.find(n => n.id === section)?.label || 'Resumen'}</h1></div><div className="topbar-actions"><button type="button" className={loading ? "icon-button is-loading" : "icon-button"} onClick={loadData} disabled={loading} aria-busy={loading} title="Actualizar datos" aria-label="Actualizar datos"><RefreshCw size={17}/></button><div className="user-chip"><div className="avatar">{String(user?.name || user?.username || user?.email || 'U').slice(0,1).toUpperCase()}</div><div><strong>{user?.name || user?.username || user?.email || 'Usuario'}</strong><small>{user?.role ? titleCase(user.role) : (user?.roles || user?.authorities || ['Usuario']).map?.(r => r.name || r.authority || r).join(', ') || 'Sesión activa'}</small></div></div></div></header>
-      {error && (!modal || isWorkflow) && <div className="alert error" role="alert" aria-live="assertive"><CircleAlert size={18}/><span>{error}</span><button type="button" aria-label="Cerrar mensaje de error" onClick={() => setError('')}>×</button></div>}
-      {notice && (!modal || isWorkflow) && <div className="alert success" role="status" aria-live="polite"><Activity size={18}/><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
-      {isInitialLoading && <PageSkeleton />}
-      {!isInitialLoading && !isWorkflow && section === 'overview' && <Overview products={products} categories={categories} stockTotal={stockTotal} inventoryValue={inventoryValueLabel} purchases={purchases} sales={sales} movements={movements} setSection={navigateSection} loading={loading} onNewProduct={() => openProduct()} onNewCategory={() => openCategory()} onNewPurchase={() => startWorkflow('purchase')} onNewSale={() => startWorkflow('sale')}/>}
-      {!isInitialLoading && !isWorkflow && section === 'products' && <section className="panel"><PanelHeading title="Catálogo de productos" subtitle="Administra productos, unidades y propiedades dinámicas." action="Nuevo producto" onAction={() => openProduct()} icon={PackagePlus}/><div className="toolbar"><div className="search-box"><Search size={17}/><input aria-label="Buscar productos por nombre o SKU" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nombre o SKU..."/></div><span className="muted">{visibleProducts.length} productos</span></div><ProductsTable products={visibleProducts} categories={categories} onEdit={openProduct} onToggleActive={toggleProductStatus} onDelete={deleteProduct}/></section>}
-      {!isInitialLoading && !isWorkflow && section === 'categories' && <section className="panel"><PanelHeading title="Categorías" subtitle="Organiza el catálogo y define la estructura de tus productos." action="Nueva categoría" onAction={() => openCategory()} icon={Tags}/><CategoriesTable categories={categories} onEdit={openCategory} onToggleActive={toggleCategoryStatus} onDelete={deleteCategory}/></section>}
-      {!isInitialLoading && !isWorkflow && section === 'partners' && <OperationsCatalogs onChanged={loadData}/>}
-      {!isInitialLoading && !isWorkflow && section === 'purchases' && <section className="panel"><PanelHeading title="Compras y entradas" subtitle="Órdenes con varias líneas, aprobación y recepción por almacén." action="Nueva compra" onAction={() => startWorkflow('purchase')} icon={ArrowDownToLine}/><PurchaseTable rows={purchases} loading={loading} onView={openPurchaseDetail} onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')} onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')} onCancel={requestPurchaseCancellation} onReceive={openReceive}/><PurchaseReturns onChanged={loadData}/></section>}
-      {!isInitialLoading && !isWorkflow && section === 'sales' && <section className="panel"><PanelHeading title="Ventas y salidas" subtitle="Registra ventas y consulta su estado." action="Nueva venta" onAction={() => startWorkflow('sale')} icon={ArrowUpFromLine}/><SalesTable rows={sales} loading={loading} onView={openSaleDetail} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation}/><SalesReturns onChanged={loadData}/></section>}
-      {!isInitialLoading && !isWorkflow && section === 'inventory' && <section className="panel"><PanelHeading title="Existencias y movimientos" subtitle="Consulta los saldos y la trazabilidad filtrando por almacén y producto." action="Actualizar" onAction={loadData} icon={Warehouse}/><form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}><Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({...current,warehouseId:event.target.value}))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field><Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({...current,productId:event.target.value}))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field><button className="button primary" disabled={loading}><Search size={16}/> Aplicar filtros</button><button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = {warehouseId:'',productId:''}; setInventoryFilter(reset); void loadInventoryFilter({preventDefault:()=>{}}, reset); }}>Limpiar</button></form><div className="stat-strip"><div><span>Unidades en saldo</span><strong>{stockTotal.toLocaleString('es-EC')}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos cargados</span><strong>{movements.length}</strong></div></div><h3 className="subheading">Saldos por producto</h3><DataTable rows={balances} columns={[['productName','Producto'],['sku','SKU'],['warehouseCode','Almacén'],['onHand','Existencia'],['reserved','Reservado'],['available','Disponible']]} empty="No hay saldos de inventario para mostrar."/><h3 className="subheading">Últimos movimientos</h3><DataTable rows={movements.slice(0, 30)} columns={[['type','Movimiento'],{ key: 'productName', label: 'Producto', render: row => row.productName || products.find(product => String(pickId(product)) === String(row.productId))?.name || row.sku || '—' },['warehouseCode','Almacén'],['quantity','Cantidad'],['occurredAt','Fecha'],['referenceType','Tipo de documento'],['referenceId','Referencia']]} empty="No hay movimientos registrados."/><InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData}/></section>}
-      {!isInitialLoading && !isWorkflow && section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => { setToken(''); setTokenState(''); setUser(null); }} />}
-      {isWorkflow && !isInitialLoading && <WorkflowPage
-        title={{ product: editing ? 'Editar producto' : 'Nuevo producto', category: editing ? 'Editar categoría' : 'Nueva categoría', purchase: 'Nueva compra', sale: 'Nueva venta', receive: 'Registrar recepción' }[modal] || 'Completar operación'}
-        subtitle={{ product: 'Completa los datos por pasos y revisa antes de guardar.', category: 'Organiza los productos y define sus propiedades paso a paso.', purchase: 'Registra la compra, revisa los importes y confirma al final.', sale: 'Selecciona artículos, verifica disponibilidad y revisa antes de registrar.', receive: 'Registra las cantidades que llegaron y confirma la recepción.' }[modal] || ''}
-        onCancel={closeWorkflow}
-      >
-        {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={closeWorkflow} onSubmit={submitProduct} onError={setError}/>}
-        {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={closeWorkflow} onSubmit={submitCategory} onError={setError}/>}
-        {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={closeWorkflow} onSubmit={submitPurchase} onError={setError}/>}
-        {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={closeWorkflow} onSubmit={submitSale} onError={setError}/>}
-        {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={closeWorkflow} onSubmit={submitReceipt}/>}
-        {modal === 'receive' && !selectedOrder && loading && <PageSkeleton />}
-        {modal === 'receive' && !selectedOrder && !loading && <div className="workflow-load-error"><strong>No se pudo abrir la orden.</strong><p>Vuelve a compras y abre la recepción desde la orden que corresponda.</p><button type="button" className="button secondary" onClick={closeWorkflow}>Volver a compras</button></div>}
+      <header className="topbar">
+        <h1>{isWorkflow ? (WORKFLOW_TITLES[modal]?.[editing && WORKFLOW_TITLES[modal][1] ? 1 : 0] || SECTION_TITLES[section]) : SECTION_TITLES[section] || 'Resumen'}</h1>
+        <div className="topbar-actions">
+          {!isWorkflow && headerAction}
+          {!isWorkflow && <button type="button" className={refreshing ? 'icon-button is-loading' : 'icon-button'} onClick={loadData} disabled={loading} aria-busy={loading} title="Actualizar datos" aria-label="Actualizar datos"><RefreshCw size={17} /></button>}
+        </div>
+      </header>
+
+      {!isWorkflow && section === 'overview' && <Dashboard data={dashboardData} ready={hasLoadedData} refreshing={refreshing} refreshKey={refreshKey} whatsappPending={whatsappPending} can={can}
+        onNavigate={navigateSection} onStartWorkflow={workflow => workflow === 'product' ? openProduct() : startWorkflow(workflow)} onOpenProduct={id => openDetail('product', id)} />}
+
+      {!isWorkflow && (section === 'products' || section === 'categories') && <ProductsPage tab={section === 'categories' ? 'categories' : 'products'}
+        products={products} categories={categories} balances={balances} ready={hasLoadedData} refreshing={refreshing} can={can}
+        detailId={detailRoute?.kind === 'product' ? detailRoute.id : ''} onNavigateTab={navigateSection}
+        onOpenDetail={id => openDetail('product', id)} onCloseDetail={closeDetail}
+        product={{ onNew: () => openProduct(), onEdit: openProduct, onToggle: item => toggleStatus('product', item), onDelete: item => deleteItem('product', item) }}
+        category={{ onNew: () => openCategory(), onEdit: openCategory, onToggle: item => toggleStatus('category', item), onDelete: item => deleteItem('category', item) }} />}
+
+      {!isWorkflow && section === 'whatsapp' && <WhatsAppOrdersPage can={can} detailId={detailRoute?.kind === 'whatsapp' ? detailRoute.id : ''}
+        onOpenDetail={id => openDetail('whatsapp', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
+
+      {!isWorkflow && !hasLoadedData && ['purchases', 'sales', 'inventory', 'partners', 'reports'].includes(section) && <section className="panel"><SkeletonTable rows={8} columns={6} /></section>}
+      {hasLoadedData && !isWorkflow && section === 'partners' && <OperationsCatalogs onChanged={loadData} />}
+      {hasLoadedData && !isWorkflow && section === 'purchases' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
+        <PurchaseTable rows={purchases} loading={loading} onView={order => openDetail('purchase', order)}
+          onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')}
+          onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')}
+          onCancel={cancelPurchase} onReceive={openReceive} />
+        <PurchaseReturns onChanged={loadData} />
+      </section>}
+      {hasLoadedData && !isWorkflow && section === 'sales' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
+        <SalesTable rows={sales} loading={loading} onView={sale => openDetail('sale', sale)} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation} />
+        <SalesReturns onChanged={loadData} />
+      </section>}
+      {hasLoadedData && !isWorkflow && section === 'inventory' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
+        <form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}>
+          <Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({ ...current, warehouseId: event.target.value }))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field>
+          <Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({ ...current, productId: event.target.value }))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field>
+          <button className="button primary" disabled={loading}><Search size={16} /> Filtrar</button>
+          <button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = { warehouseId: '', productId: '' }; setInventoryFilter(reset); void loadInventoryFilter({ preventDefault: () => {} }, reset); }}>Limpiar</button>
+        </form>
+        <div className="stat-strip"><div><span>Unidades</span><strong>{number(stockTotal)}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos</span><strong>{number(movements.length)}</strong></div></div>
+        <h3 className="subheading">Saldos por producto</h3>
+        <DataTable rows={balances} columns={[['productName', 'Producto'], ['sku', 'SKU'], ['warehouseCode', 'Almacén'], ['onHand', 'Existencia'], ['reserved', 'Reservado'], ['available', 'Disponible']]} empty="No hay saldos de inventario." />
+        <h3 className="subheading">Últimos movimientos</h3>
+        <DataTable rows={movements.slice(0, 30)} columns={[['type', 'Movimiento'], { key: 'productName', label: 'Producto', render: row => row.productName || products.find(product => String(pickId(product)) === String(row.productId))?.name || row.sku || '—' }, ['warehouseCode', 'Almacén'], ['quantity', 'Cantidad'], ['occurredAt', 'Fecha'], ['referenceType', 'Documento']]} empty="No hay movimientos registrados." />
+        <InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData} />
+      </section>}
+      {hasLoadedData && !isWorkflow && section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => expireSession()} />}
+
+      {isWorkflow && <WorkflowPage onCancel={closeWorkflow}>
+        {!hasLoadedData ? <SkeletonTable rows={5} columns={3} /> : <>
+          {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={closeWorkflow} onSubmit={submitProduct} onError={setError} />}
+          {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={closeWorkflow} onSubmit={submitCategory} onError={setError} />}
+          {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={closeWorkflow} onSubmit={submitPurchase} onError={setError} />}
+          {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={closeWorkflow} onSubmit={submitSale} onError={setError} />}
+          {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={closeWorkflow} onSubmit={submitReceipt} />}
+          {modal === 'receive' && !selectedOrder && loading && <SkeletonTable rows={4} columns={4} />}
+          {modal === 'receive' && !selectedOrder && !loading && <div className="empty-block"><strong>No se pudo abrir la orden.</strong><button type="button" className="button secondary" onClick={closeWorkflow}>Volver a compras</button></div>}
+        </>}
       </WorkflowPage>}
     </main>
-    {modal && !isWorkflow && <Modal title={{product:editing ? 'Editar producto' : 'Crear producto',category:editing ? 'Editar categoría' : 'Crear categoría',purchase:'Registrar compra',receive:'Registrar recepción',sale:'Registrar venta',cancelSale:'Solicitar anulación de venta',confirmPurchaseCancel:'Confirmar cancelación de compra',confirmStatusChange:statusChangeTarget ? (statusChangeTarget.activate ? 'Confirmar activación' : 'Confirmar desactivación') : 'Confirmar cambio de estado',purchaseDetail:'Detalle de orden de compra',saleDetail:'Detalle de venta'}[modal] || 'Operación'} busy={loading} error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} onClose={() => { if (loading) return; setModal(''); setEditing(null); if (modal === 'cancelSale') setSaleToCancel(null); if (modal === 'confirmPurchaseCancel') setPurchaseToCancel(null); if (modal === 'confirmStatusChange') setStatusChangeTarget(null); if (modal === 'purchaseDetail') setPurchaseDetail(null); if (modal === 'saleDetail') setSaleDetail(null); }}><>
-      {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitProduct} onError={setError}/>}
-      {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={() => { setModal(''); setEditing(null); }} onSubmit={submitCategory} onError={setError}/>}
-      {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={() => setModal('')} onSubmit={submitPurchase} onError={setError}/>}
-      {modal === 'purchaseDetail' && purchaseDetail && <PurchaseOrderDetail order={purchaseDetail}/>}
-      {modal === 'saleDetail' && saleDetail && <SaleDetail sale={saleDetail}/>}
-      {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={() => { setModal(''); setSelectedOrder(null); }} onSubmit={submitReceipt}/>}
-      {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={() => setModal('')} onSubmit={submitSale} onError={setError}/>}
-      {modal === 'confirmStatusChange' && statusChangeTarget && <form className="form-grid" onSubmit={confirmStatusChange}>
-        <div className="alert warning wide" role="alert"><CircleAlert size={18}/><span>¿Confirmas que deseas {statusChangeTarget.activate ? 'activar' : 'desactivar'} el {statusChangeTarget.kind === 'product' ? 'producto' : 'categoría'} <strong>{statusChangeTarget.item.name || statusChangeTarget.item.sku || pickId(statusChangeTarget.item)}</strong>?</span></div>
-        <p className="form-hint wide">{statusChangeTarget.activate ? 'El registro volverá a estar disponible según las reglas del backend.' : 'No se borran movimientos ni documentos históricos. Las operaciones futuras que requieran este registro podrán ser rechazadas.'}</p>
-        <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => { setModal(''); setStatusChangeTarget(null); }}>Volver</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : statusChangeTarget.activate ? 'Confirmar activación' : 'Confirmar desactivación'}</button></div>
-      </form>}
-      {modal === 'confirmPurchaseCancel' && purchaseToCancel && <form className="form-grid" onSubmit={confirmPurchaseCancellation}><div className="alert warning wide" role="alert"><CircleAlert size={18}/><span>Vas a cancelar la orden <strong>{purchaseToCancel.orderNumber || purchaseToCancel.number || pickId(purchaseToCancel)}</strong>. Esta acción no se puede deshacer desde el formulario y no aumenta ni reduce existencias.</span></div><p className="form-hint wide">Proveedor: {purchaseToCancel.supplierName || purchaseToCancel.supplier?.name || '—'} · Almacén: {purchaseToCancel.warehouseCode || '—'}.</p><div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => { setModal(''); setPurchaseToCancel(null); }}>Volver</button><button className="button danger" disabled={loading}>{loading ? 'Cancelando…' : 'Confirmar cancelación'}</button></div></form>}
-      {modal === 'cancelSale' && saleToCancel && <form className="form-grid" onSubmit={submitSaleCancellation}><p className="form-hint wide">Venta: <strong>{saleToCancel.number || saleToCancel.code || pickId(saleToCancel)}</strong>. La anulación no devuelve las existencias hasta que el backend la apruebe.</p><Field label="Motivo de anulación" required wide><textarea rows="3" required maxLength="500" value={saleCancelReason} onChange={event => setSaleCancelReason(event.target.value)} placeholder="Describe el motivo de la solicitud"/></Field><FormActions loading={loading} onCancel={() => { setModal(''); setSaleToCancel(null); }}/></form>}
 
-    </></Modal>}
+    {modal === 'purchaseDetail' && purchaseDetail && <Modal title="Orden de compra" busy={loading} onClose={closeDetail}><PurchaseOrderDetail order={purchaseDetail} /></Modal>}
+    {modal === 'saleDetail' && saleDetail && <Modal title="Venta" busy={loading} onClose={closeDetail}><SaleDetail sale={saleDetail} /></Modal>}
+    {modal === 'cancelSale' && saleToCancel && <Modal title="Solicitar anulación" busy={loading} onClose={() => { setModal(''); setSaleToCancel(null); }}>
+      <form className="form-grid" onSubmit={submitSaleCancellation}>
+        <p className="form-hint wide">Venta <strong>{saleToCancel.saleNumber || pickId(saleToCancel)}</strong>. Las existencias vuelven al aprobarse.</p>
+        <Field label="Motivo" required wide><textarea rows="3" required maxLength="500" value={saleCancelReason} onChange={event => setSaleCancelReason(event.target.value)} placeholder="Describe el motivo" /></Field>
+        <FormActions loading={loading} onCancel={() => { setModal(''); setSaleToCancel(null); }} submitLabel="Solicitar anulación" />
+      </form>
+    </Modal>}
+    <FeedbackHost />
   </div>;
 }
 
-function PageSkeleton() {
-  return <section className="page-skeleton" role="status" aria-label="Cargando información">
-    <span className="visually-hidden">Cargando información…</span>
-    <div className="skeleton-metrics">
-      {Array.from({ length: 4 }, (_, index) => <div className="skeleton-card" key={index}>
-        <span className="skeleton-bar short" />
-        <span className="skeleton-bar number" />
-        <span className="skeleton-bar medium" />
-      </div>)}
-    </div>
-    <div className="skeleton-panel">
-      <span className="skeleton-bar heading" />
-      <span className="skeleton-bar long" />
-      <span className="skeleton-bar long" />
-      <span className="skeleton-bar long" />
-      <span className="skeleton-bar medium" />
-    </div>
-  </section>;
-}
-
-function WorkflowPage({ title, subtitle, onCancel, children }) {
-  return <section className="workflow-page" aria-labelledby="workflow-page-title">
-    <header className="workflow-page-heading">
-      <div className="workflow-page-copy">
-        <span className="eyebrow">ASISTENTE PASO A PASO</span>
-        <h2 id="workflow-page-title">{title}</h2>
-        {subtitle && <p>{subtitle}</p>}
-      </div>
-      <button type="button" className="button secondary workflow-exit" onClick={onCancel}><ArrowLeft size={16}/> Volver</button>
-    </header>
+function WorkflowPage({ onCancel, children }) {
+  return <section className="workflow-page">
+    <div className="workflow-page-heading"><button type="button" className="button secondary workflow-exit" onClick={onCancel}><ArrowLeft size={16} /> Volver</button></div>
     <div className="workflow-page-body">{children}</div>
   </section>;
 }
 
-function Login({ onLogin, error }) {
-  const [username,setUsername] = useState(''); const [password,setPassword] = useState(''); const [busy,setBusy] = useState(false);
-  return <div className="login-screen"><div className="login-card"><div className="brand login-brand"><div className="brand-mark"><Boxes size={23}/></div><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div><span className="eyebrow">BIENVENIDO DE NUEVO</span><h1>Controla tu inventario con claridad.</h1><p>Ingresa con tus credenciales para administrar productos, compras y ventas.</p>{error && <div className="alert error" role="alert" aria-live="assertive">{error}</div>}<form onSubmit={async e=>{e.preventDefault();setBusy(true);await onLogin(username,password);setBusy(false);}}><Field label="Usuario o correo"><input autoComplete="username" required value={username} onChange={e=>setUsername(e.target.value)} placeholder="Tu usuario"/></Field><Field label="Contraseña"><input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Tu contraseña"/></Field><button className="button primary full" disabled={busy}>{busy?'Conectando…':'Iniciar sesión'}<ChevronRight size={17}/></button></form><small className="login-foot">Conexión segura al backend Inventary</small></div></div>;
-}
-function PanelHeading({title,subtitle,action,onAction,icon:Icon=Layers3}) { return <div className="panel-heading"><div className="panel-title-icon"><span><Icon size={20}/></span><div><h2>{title}</h2><p>{subtitle}</p></div></div>{action&&<button type="button" className="button primary" onClick={onAction}><Plus size={16}/>{action}</button>}</div>; }
-function Field({label,required,wide,children}) { return <label className={'field'+(wide?' wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>; }
-function FormActions({loading,onCancel}) { return <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading?'Guardando…':'Guardar cambios'}</button></div>; }
-function Modal({title,onClose,children,busy,error,notice,onDismissError,onDismissNotice}) {
+function Field({ label, required, wide, children }) { return <label className={'field' + (wide ? ' wide' : '')}><span>{label}{required && <b> *</b>}</span>{children}</label>; }
+function FormActions({ loading, onCancel, submitLabel = 'Guardar cambios' }) { return <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={onCancel}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : submitLabel}</button></div>; }
+function Modal({ title, onClose, children, busy }) {
   const dialogRef = useAccessibleDialog(true, onClose);
   return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (!busy && event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="global-modal-title" tabIndex={-1}>
       <div className="modal-heading"><h2 id="global-modal-title">{title}</h2><button type="button" className="icon-button" onClick={onClose} disabled={busy} aria-label="Cerrar ventana">×</button></div>
-      {error && <div className="alert error modal-feedback" role="alert" aria-live="assertive"><CircleAlert size={18}/><span>{error}</span><button type="button" aria-label="Cerrar mensaje de error" onClick={onDismissError}>×</button></div>}
-      {notice && <div className="alert success modal-feedback" role="status" aria-live="polite"><Activity size={18}/><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={onDismissNotice}>×</button></div>}
       {children}
     </section>
   </div>;

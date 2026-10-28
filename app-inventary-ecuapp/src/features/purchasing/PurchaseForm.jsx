@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackagePlus, Trash2 } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
 
@@ -10,6 +11,7 @@ function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency
 export default function PurchaseForm({ products, warehouses, suppliers, loading, initialValue, onCancel, onSubmit, onError }) {
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const [warehouseId, setWarehouseId] = useState(initialValue?.warehouseId || warehouses.find(item => item.active !== false && item.status !== 'INACTIVE')?.id || '');
   const [supplierId, setSupplierId] = useState(initialValue?.supplierId || initialValue?.supplier?.id || '');
   const [notes, setNotes] = useState(initialValue?.notes || '');
@@ -101,7 +103,6 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
 
   return <form className="workflow-form" onSubmit={submit} noValidate>
     <StepProgress steps={['Datos básicos', 'Productos', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
-    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
 
     {step === 0 && <section className="workflow-stage" aria-labelledby="purchase-stage-title">
       <div className="workflow-stage-heading">

@@ -1,4 +1,5 @@
 package com.ecuapp.inventary.common;
+import com.ecuapp.inventary.auth.LoginSecurityException;
 import com.ecuapp.inventary.domain.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -17,6 +18,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.firewall.RequestRejectedException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -100,10 +102,19 @@ public class GlobalExceptionHandler {
  ResponseEntity<ProblemDetail> noRoute(NoResourceFoundException ex,HttpServletRequest req){return response(HttpStatus.NOT_FOUND,"Ruta no encontrada","La ruta solicitada no existe.","ROUTE_NOT_FOUND",req);}
  @ExceptionHandler(AccessDeniedException.class)
  ResponseEntity<ProblemDetail> denied(AccessDeniedException ex,HttpServletRequest req){return response(HttpStatus.FORBIDDEN,"Acceso denegado","La sesión no tiene permiso para realizar esta operación.","ACCESS_DENIED",req);}
+ @ExceptionHandler(LoginSecurityException.class)
+ ResponseEntity<ProblemDetail> loginSecurity(LoginSecurityException ex,HttpServletRequest req){
+  ProblemDetail body=response(ex.status(),ex.title(),ex.getMessage(),ex.code(),req).getBody();
+  ResponseEntity.BodyBuilder builder=ResponseEntity.status(ex.status());
+  if(ex.retryAfterSeconds()>0)builder.header("Retry-After",Long.toString(ex.retryAfterSeconds()));
+  return builder.body(body);
+ }
  @ExceptionHandler(BadCredentialsException.class)
  ResponseEntity<ProblemDetail> credentials(BadCredentialsException ex,HttpServletRequest req){return response(HttpStatus.UNAUTHORIZED,"No autorizado","Credenciales inválidas.","INVALID_CREDENTIALS",req);}
  @ExceptionHandler(AuthenticationException.class)
  ResponseEntity<ProblemDetail> authentication(AuthenticationException ex,HttpServletRequest req){return response(HttpStatus.UNAUTHORIZED,"No autenticado","Se requiere una sesión válida para acceder a este recurso.","AUTHENTICATION_REQUIRED",req);}
+ @ExceptionHandler(RequestRejectedException.class)
+ ResponseEntity<ProblemDetail> rejected(RequestRejectedException ex,HttpServletRequest req){return response(HttpStatus.BAD_REQUEST,"Solicitud rechazada","La solicitud contiene caracteres o cabeceras no permitidos.","REQUEST_REJECTED",req);}
  @ExceptionHandler(MaxUploadSizeExceededException.class)
  ResponseEntity<ProblemDetail> uploadTooLarge(MaxUploadSizeExceededException ex,HttpServletRequest req){
   return response(HttpStatus.PAYLOAD_TOO_LARGE,"Archivo demasiado grande","La imagen supera el tamaño máximo de carga permitido.","PAYLOAD_TOO_LARGE",req);

@@ -83,7 +83,7 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.GET,"/actuator/health","/actuator/health/**").permitAll()
     .requestMatchers("/actuator/info").hasAuthority("technical:read")
     .requestMatchers("/actuator/metrics","/actuator/metrics/**").hasAnyAuthority("technical:read","operations:manage")
-    .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
+    .requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/login-challenge").permitAll()
     .requestMatchers("/api/v1/auth/**").authenticated()
     .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
@@ -127,7 +127,7 @@ public class SecurityConfig {
    if(users.count()>0)return;
    if(username.isEmpty())throw new IllegalStateException("No hay usuarios. Configure BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD para el alta inicial.");
    if(!username.matches("^[a-z0-9._-]{3,80}$"))throw new IllegalStateException("BOOTSTRAP_ADMIN_USERNAME debe tener entre 3 y 80 caracteres alfanuméricos, punto, guion o guion bajo.");
-   try{policy.validate(password,16);policy.validateForUser(password,username);}
+   try{policy.validateForUser(password,username);}
    catch(RuntimeException invalid){throw new IllegalStateException("BOOTSTRAP_ADMIN_PASSWORD no cumple la política de contraseña inicial.",invalid);}
    users.saveAndFlush(new AppUser(username,encoder.encode(password),UserRole.SUPER_ADMIN.name()));
   };

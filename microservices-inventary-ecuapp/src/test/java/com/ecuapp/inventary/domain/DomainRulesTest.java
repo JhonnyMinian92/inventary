@@ -27,13 +27,14 @@ class DomainRulesTest {
     @Test
     void passwordPolicyRequiresComplexityAndExcludesUsername() {
         PasswordPolicy policy = new PasswordPolicy();
-        assertDoesNotThrow(() -> policy.validateForUser("Segura-Clave-2026!", "maria"));
-        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("corta1!A", "maria"));
-        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("sin-mayusculas-2026!", "maria"));
-        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("SinNumeros-Clave!", "maria"));
-        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("SinSimbolos2026Clave", "maria"));
-        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("Maria-Clave-2026!", "maria"));
-        assertThrows(BusinessRuleException.class, () -> policy.validate("A".repeat(129) + "a1!", 12));
+        assertDoesNotThrow(() -> policy.validateForUser("Segura-Clave-6!", "maria"));
+        assertDoesNotThrow(() -> policy.validateForUser("Cort-12A", "maria"));
+        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("Cort1!A", "maria"));
+        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("sin-mayus-26!", "maria"));
+        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("SinNumeros-Cla!", "maria"));
+        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("SinSimbolos2026", "maria"));
+        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("Maria-Clave-26!", "maria"));
+        assertThrows(BusinessRuleException.class, () -> policy.validateForUser("Demasiado-Larga-26!", "maria"));
     }
 
     @Test

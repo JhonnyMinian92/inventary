@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, RotateCcw, X } from 'lucide-react';
 import { api, listFrom, listAllPages } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
+import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
 
 function idOf(value) { return value?.id ?? ''; }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
 function readSalesReturnFromUrl() {
-  if (typeof window === 'undefined') return false;
-  const parts = window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
-  return parts[0] === 'sales' && parts[1] === 'returns' && parts[2] === 'new';
+  return currentRoute()?.secondary === 'sales-return';
 }
 
 export default function SalesReturns({ onChanged }) {
@@ -17,10 +17,13 @@ export default function SalesReturns({ onChanged }) {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
+  useMessageToast(notice, setNotice, 'success');
   const [formOpen, setFormOpen] = useState(readSalesReturnFromUrl);
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const [sourceSaleId, setSourceSaleId] = useState('');
   const [sourceSale, setSourceSale] = useState(null);
   const [lines, setLines] = useState([]);
@@ -49,18 +52,15 @@ export default function SalesReturns({ onChanged }) {
     const syncRoute = () => {
       const nextOpen = readSalesReturnFromUrl();
       const hasChanges = Boolean(sourceSaleId || reason.trim() || lines.some(line => Number(line.quantity) > 0));
-      if (!nextOpen && formOpen && hasChanges && !window.confirm('¿Salir de la devolución? Se perderán las cantidades que hayas escrito.')) {
-        window.history.pushState({ workflow: 'sales-return' }, '', '#/sales/returns/new');
+      if (!nextOpen && formOpen && hasChanges) {
+        navigate(secondaryPath('sales-return'), { state: { workflow: 'sales-return' } });
+        confirmDialog({ title: '¿Salir de la devolución?', message: 'Se perderán las cantidades que hayas escrito.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }).then(leave => { if (leave) { setFormOpen(false); navigate(sectionPath('sales'), { replace: true }); } });
         return;
       }
       setFormOpen(nextOpen);
     };
     window.addEventListener('popstate', syncRoute);
-    window.addEventListener('hashchange', syncRoute);
-    return () => {
-      window.removeEventListener('popstate', syncRoute);
-      window.removeEventListener('hashchange', syncRoute);
-    };
+    return () => window.removeEventListener('popstate', syncRoute);
   }, [formOpen, sourceSaleId, reason, lines]);
 
   useEffect(() => {
@@ -121,13 +121,13 @@ export default function SalesReturns({ onChanged }) {
     setError('');
     setNotice('');
     setFormOpen(true);
-    window.history.pushState({ workflow: 'sales-return' }, '', '#/sales/returns/new');
+    navigate(secondaryPath('sales-return'), { state: { workflow: 'sales-return' } });
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
-  function closeForm() {
+  async function closeForm() {
     const hasChanges = Boolean(sourceSaleId || reason.trim() || lines.some(line => Number(line.quantity) > 0));
-    if (hasChanges && !window.confirm('¿Salir de la devolución? Se perderán las cantidades que hayas escrito.')) return;
+    if (hasChanges && !(await confirmDialog({ title: '¿Salir de la devolución?', message: 'Se perderán las cantidades que hayas escrito.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }))) return;
     setFormOpen(false);
     setSourceSaleId('');
     setSourceSale(null);
@@ -136,7 +136,7 @@ export default function SalesReturns({ onChanged }) {
     setStep(0);
     setValidationMessage('');
     setError('');
-    window.history.replaceState({ section: 'sales' }, '', '#/sales');
+    navigate(sectionPath('sales'), { replace: true });
   }
 
   function updateLine(index, field, value) {
@@ -212,7 +212,7 @@ export default function SalesReturns({ onChanged }) {
       setLines([]);
       setReason('');
       setStep(0);
-      window.history.replaceState({ section: 'sales' }, '', '#/sales');
+      navigate(sectionPath('sales'), { replace: true });
       await refresh();
       await onChanged?.();
       setNotice('Devolución registrada. El inventario se actualizó según el destino de cada artículo.');
@@ -228,8 +228,6 @@ export default function SalesReturns({ onChanged }) {
       <div><h3>Devoluciones de clientes</h3><p>Selecciona artículos devueltos y define cuáles vuelven al inventario.</p></div>
       <button type="button" className="button primary" onClick={openForm} disabled={formOpen}>+ Nueva devolución</button>
     </div>
-    {error && !formOpen && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     {!formOpen && <div className="table-wrap"><table><thead><tr><th>Devolución</th><th>Venta original</th><th>Estado</th><th>Fecha</th><th>Motivo</th><th>Total</th></tr></thead><tbody>
       {rows.map((row,index) => <tr key={idOf(row)||index}>
         <td><strong>{row.returnNumber || idOf(row)}</strong></td>
@@ -245,8 +243,6 @@ export default function SalesReturns({ onChanged }) {
         <button type="button" className="button secondary" disabled={loading} onClick={closeForm}><X size={16}/> Cancelar</button>
       </div>
       <StepProgress steps={['Venta original', 'Artículos y motivo', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
-      {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
-      {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
       <form className="workflow-form" onSubmit={submit} noValidate>
         {step === 0 && <section className="workflow-stage">
           <div className="workflow-stage-heading"><span className="workflow-stage-icon"><RotateCcw size={20}/></span><div><h2>¿Qué venta te están devolviendo?</h2><p>Solo se muestran ventas completadas.</p></div></div>

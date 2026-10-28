@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, Tags, Trash2 } from 'lucide-react';
 import { api } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
@@ -41,12 +42,14 @@ function buildDefinitions(rows) {
 export default function CategoryForm({ initialValue, loading, onCancel, onSubmit, onError }) {
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const [name, setName] = useState(initialValue?.name || '');
   const [description, setDescription] = useState(initialValue?.description || '');
   const [definitions, setDefinitions] = useState([]);
   const [schemaLoading, setSchemaLoading] = useState(Boolean(initialValue));
   const [schemaLoaded, setSchemaLoaded] = useState(!initialValue);
   const [schemaError, setSchemaError] = useState('');
+  useEffect(() => { if (schemaError) toast.error(schemaError); }, [schemaError]);
 
   useEffect(() => {
     const categoryId = initialValue?.id || initialValue?.categoryId;
@@ -157,7 +160,6 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
 
   return <form className="workflow-form" onSubmit={handleSubmit} noValidate>
     <StepProgress steps={['Datos básicos', 'Propiedades', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
-    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
     {step === 0 && <section className="workflow-stage" aria-labelledby="category-basic-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Tags size={20}/></span><div><h2 id="category-basic-title">Crea una categoría clara</h2><p>El nombre ayudará a identificar y organizar los productos.</p></div></div>
       <div className="form-grid workflow-fields">
@@ -180,7 +182,6 @@ export default function CategoryForm({ initialValue, loading, onCancel, onSubmit
       <small>Define los campos que estarán disponibles en todos los productos de la categoría.</small>
     </div>
     {schemaLoading && <p className="form-hint wide">Cargando propiedades existentes…</p>}
-    {schemaError && <div className="alert error wide">{schemaError}</div>}
     {!schemaError && definitions.map((definition, index) =>
       <section className="attribute-definition wide" key={index}>
         <div className="attribute-definition-heading">

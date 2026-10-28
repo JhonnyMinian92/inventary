@@ -1,4 +1,8 @@
+import { encryptCredentials } from './security/loginCrypto.js';
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '');
+const TOKEN_KEY = 'inventary.accessToken';
+const TOKEN_EXPIRY_KEY = 'inventary.accessTokenExpiresAt';
 const IDEMPOTENCY_RETRY_WINDOW_MS = 120_000;
 const pendingIdempotencyKeys = new Map();
 
@@ -30,23 +34,63 @@ function getIdempotencyKey(signature) {
 }
 
 export class ApiError extends Error {
-  constructor(message, status = 0, details = null) {
+  constructor(message, status = 0, details = null, retryAfter = 0) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.details = details;
+    this.code = details?.code || '';
+    this.retryAfter = retryAfter;
   }
 }
 
-export function getToken() {
-  return localStorage.getItem('inventary.accessToken') || '';
+// sessionStorage por defecto (la sesión termina al cerrar la pestaña); localStorage solo con "Mantener sesión iniciada".
+function storages() {
+  const available = [];
+  for (const name of ['sessionStorage', 'localStorage']) {
+    try { if (globalThis[name]) available.push(globalThis[name]); } catch { /* almacenamiento bloqueado */ }
+  }
+  return available;
 }
 
-export function setToken(token) {
+function readStoredToken() {
+  for (const storage of storages()) {
+    try {
+      const token = storage.getItem(TOKEN_KEY);
+      if (token) return { token, expiresAt: Number(storage.getItem(TOKEN_EXPIRY_KEY)) || 0 };
+    } catch { /* almacenamiento bloqueado */ }
+  }
+  return null;
+}
+
+export function getToken() {
+  const stored = readStoredToken();
+  if (!stored) return '';
+  if (stored.expiresAt && stored.expiresAt <= Date.now()) {
+    setToken('');
+    return '';
+  }
+  return stored.token;
+}
+
+export function getTokenExpiry() {
+  return readStoredToken()?.expiresAt || 0;
+}
+
+export function setToken(token, { persist = false, expiresAt = null } = {}) {
   const nextToken = token || '';
-  if (getToken() !== nextToken) pendingIdempotencyKeys.clear();
-  if (nextToken) localStorage.setItem('inventary.accessToken', nextToken);
-  else localStorage.removeItem('inventary.accessToken');
+  if (readStoredToken()?.token !== nextToken) pendingIdempotencyKeys.clear();
+  for (const storage of storages()) {
+    try { storage.removeItem(TOKEN_KEY); storage.removeItem(TOKEN_EXPIRY_KEY); } catch { /* almacenamiento bloqueado */ }
+  }
+  if (!nextToken) return;
+  const target = storages().find(storage => storage === (persist ? globalThis.localStorage : globalThis.sessionStorage)) || storages()[0];
+  if (!target) return;
+  const expiry = Date.parse(expiresAt || '');
+  try {
+    target.setItem(TOKEN_KEY, nextToken);
+    if (Number.isFinite(expiry)) target.setItem(TOKEN_EXPIRY_KEY, String(expiry));
+  } catch { /* almacenamiento bloqueado: la sesión dura lo que la pestaña */ }
 }
 
 export async function request(path, options = {}) {
@@ -109,13 +153,13 @@ export async function request(path, options = {}) {
     if (response.status === 401) setToken('');
     const message = payload?.detail || payload?.message || payload?.title ||
       (typeof payload === 'string' ? payload : '') || 'Error HTTP ' + response.status;
-    throw new ApiError(message, response.status, payload);
+    throw new ApiError(message, response.status, payload, Number(response.headers.get('Retry-After')) || 0);
   }
   return payload;
 }
 
 export const api = {
-  login: (username, password) => request('/auth/login', { method: 'POST', body: { username, password } }),
+  login: encryptedLogin,
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
   products: (params = {}) => request(`/catalog/products${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
@@ -217,11 +261,33 @@ export const api = {
   deactivateReorderRule: id => request(`/inventory/reorder-rules/${encodeURIComponent(id)}/deactivate`, { method: 'POST' }),
   replenishmentSuggestions: () => request('/inventory/replenishment-suggestions'),
   availableStock: (params = {}) => request(`/inventory/availability${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
-  createSale: data => request('/sales', { method: 'POST', body: data, idempotent: true })
+  createSale: data => request('/sales', { method: 'POST', body: data, idempotent: true }),
+  whatsappOrders: (params = {}) => request(`/whatsapp-orders${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
+  whatsappOrder: id => request(`/whatsapp-orders/${encodeURIComponent(id)}`),
+  confirmWhatsAppPayment: (id, data) => request(`/whatsapp-orders/${encodeURIComponent(id)}/confirm-payment`, { method: 'POST', body: data, idempotent: true })
 };
+
+// Las credenciales se cifran con un desafío de un solo uso. Si el desafío expiró entre ambas llamadas, se reintenta una vez.
+async function encryptedLogin(username, password) {
+  for (let attempt = 0; ; attempt++) {
+    const challenge = await request('/auth/login-challenge', { method: 'POST' });
+    const encrypted = await encryptCredentials(challenge, { username, password });
+    try {
+      return await request('/auth/login', { method: 'POST', body: { encrypted } });
+    } catch (error) {
+      if (attempt === 0 && error?.code === 'LOGIN_CHALLENGE_INVALID') continue;
+      throw error;
+    }
+  }
+}
 
 export function resolveApiUrl(path) {
   if (!path) return '';
+  // Las imágenes subidas se guardan como /api/v1/...: se resuelven contra la raíz real de la API (p. ej. /inventary/api).
+  if (path.startsWith('/api/')) {
+    const apiRoot = new URL(API_BASE.replace(/\/v\d+$/, '') + '/', window.location.href);
+    return new URL(path.slice('/api/'.length), apiRoot).toString();
+  }
   const base = new URL(API_BASE, window.location.href);
   return new URL(path, base).toString();
 }

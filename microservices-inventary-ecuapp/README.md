@@ -71,7 +71,7 @@ Si la base contiene tablas creadas manualmente o una tabla `flyway_schema_histor
 
 POST /api/v1/auth/login recibe credenciales y devuelve un JWT. Envíalo como Authorization: Bearer <token>. GET /api/v1/auth/me devuelve la identidad autenticada.
 
-No existen credenciales administrativas predeterminadas. Si la base no tiene usuarios, el arranque exige BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD; el primer usuario recibe SUPER_ADMIN. La contraseña inicial debe tener al menos 16 caracteres e incluir mayúscula, minúscula, número y símbolo. El bootstrap solo actúa con la tabla vacía.
+No existen credenciales administrativas predeterminadas. Si la base no tiene usuarios, el arranque exige BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD; el primer usuario recibe SUPER_ADMIN. La contraseña inicial debe tener entre 8 y 15 caracteres e incluir mayúscula, minúscula, número y símbolo. El bootstrap solo actúa con la tabla vacía.
 
 Roles canónicos iniciales: SUPER_ADMIN, AUDITOR, MANAGER_ALMACEN, VENDEDOR y SOPORTE_TI. SUPER_ADMIN puede crear roles personalizados, consultar el catálogo de permisos y asignar permisos existentes. No se pueden modificar los permisos de SUPER_ADMIN desde la API.
 

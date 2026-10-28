@@ -49,7 +49,7 @@ No se crean permisos arbitrarios desde HTTP. El rol SUPER_ADMIN y su matriz est�
 
 - No hay usuario ni contraseña predeterminados en el código.
 - Si la tabla de usuarios está vacía, el arranque exige BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD juntos; si faltan, falla explícitamente.
-- El primer administrador usa SUPER_ADMIN; la contraseña exige al menos 16 caracteres, mayúscula, minúscula, número y símbolo.
+- El primer administrador usa SUPER_ADMIN; la contraseña exige entre 8 y 15 caracteres, mayúscula, minúscula, número y símbolo (misma política que el resto de usuarios).
 - El bootstrap solo crea un usuario con la tabla vacía y nunca crea administradores adicionales en arranques posteriores.
 - La administración valida contraseñas, normaliza nombres, protege al último SUPER_ADMIN activo y audita altas, cambios y restablecimientos.
 - CORS usa CORS_ALLOWED_ORIGINS explícito, sin wildcard ni credenciales de navegador. Se añaden cabeceras de seguridad.

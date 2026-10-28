@@ -27,7 +27,7 @@ public class OpenApiConfig {
  };}
  private List<Operation> operations(PathItem item){return Arrays.asList(item.getGet(),item.getPost(),item.getPut(),item.getPatch(),item.getDelete(),item.getHead(),item.getOptions(),item.getTrace()).stream().filter(Objects::nonNull).toList();}
  private void applySecurity(String path,Operation operation){
-  if(path.startsWith("/api/v1/public/")||path.equals("/api/v1/auth/login"))return;
+  if(path.startsWith("/api/v1/public/")||path.equals("/api/v1/auth/login")||path.equals("/api/v1/auth/login-challenge"))return;
   if(path.startsWith("/api/v1/integrations/whatsapp/"))operation.setSecurity(List.of(new SecurityRequirement().addList("integrationKey")));
   else if(path.startsWith("/api/v1/"))operation.setSecurity(List.of(new SecurityRequirement().addList("bearerAuth")));
  }

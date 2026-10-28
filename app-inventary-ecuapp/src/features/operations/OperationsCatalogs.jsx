@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { api, listFrom, listAllPages } from '../../api';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import UnitConversions from './UnitConversions.jsx';
@@ -88,7 +89,9 @@ export default function OperationsCatalogs({ onChanged }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [error, setError] = useState('');
+  useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
+  useMessageToast(notice, setNotice, 'success');
   const dialogRef = useAccessibleDialog(modal, () => setModal(false));
 
   const refresh = useCallback(async () => {
@@ -187,7 +190,7 @@ export default function OperationsCatalogs({ onChanged }) {
     const config = configs[kind];
     if (!item || !inactive(item) || !config.delete || loading) return;
     const label = item.name || item.code || idOf(item);
-    if (!window.confirm('Eliminar físicamente "' + label + '"? Solo se permite si no tiene existencias, movimientos, documentos ni referencias históricas. Esta acción no se puede deshacer.')) return;
+    if (!(await confirmDialog({ title: 'Eliminar registro', message: label + ' se eliminará definitivamente. Solo es posible si no tiene existencias, movimientos ni documentos asociados.', confirmLabel: 'Eliminar', tone: 'danger' }))) return;
     setLoading(true);
     setError('');
     setNotice('');
@@ -213,8 +216,6 @@ export default function OperationsCatalogs({ onChanged }) {
     <div className="catalog-tabs" role="tablist" aria-label="Catálogos auxiliares">
       {Object.entries(configs).map(([key, entry]) => <button key={key} role="tab" aria-selected={kind === key} className={kind === key ? 'catalog-tab active' : 'catalog-tab'} onClick={() => { setKind(key); setSearch(''); setError(''); setNotice(''); }}>{entry.label}<span>{records[key].length}</span></button>)}
     </div>
-    {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     <div className="toolbar">
       <div className="search-box"><input aria-label={'Buscar en ' + config.label.toLowerCase()} value={search} onChange={event => setSearch(event.target.value)} placeholder={'Buscar ' + config.label.toLowerCase() + '…'} /></div>
       <span className="muted">{loading ? 'Actualizando…' : visible.length + ' registros'}</span>
@@ -239,7 +240,6 @@ export default function OperationsCatalogs({ onChanged }) {
               : <input required={Boolean(field.required)} disabled={Boolean(editing && field.key === 'code')} type={field.type || 'text'} min={field.min} max={field.max} maxLength={field.maxLength} pattern={field.pattern} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />}
           </label>)}
           {kind === 'units' && editing && <label className="field"><span>Estado</span><select value={form.active || 'true'} onChange={event => setForm(current => ({ ...current, active: event.target.value }))}><option value="true">Activa</option><option value="false">Inactiva</option></select></label>}
-          {error && <div className="alert error wide">{error}</div>}
           <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => setModal(false)}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Guardar registro'}</button></div>
         </form>
       </section>

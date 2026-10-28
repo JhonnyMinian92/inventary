@@ -1,6 +1,8 @@
 # Inventary — sistema de inventario
 
-Inventary es una aplicación web para administrar catálogo, compras, recepciones, existencias, ventas, devoluciones, traslados y reportes. El repositorio contiene una SPA React/Vite y una API transaccional Java/Spring Boot/PostgreSQL.
+Inventary es una aplicación de **EcuApp** para administrar catálogo, compras, recepciones, existencias, ventas, devoluciones, traslados y reportes. El repositorio contiene una SPA React/Vite y una API transaccional Java/Spring Boot/PostgreSQL.
+
+> © 2026 EcuApp. Software propietario, todos los derechos reservados. Ver [LICENSE](LICENSE).
 
 > **Estado de entrega al 27-10-2026:** el frontend dispone de pruebas automáticas y build en GitHub Actions; backend ejecuta Maven verify contra PostgreSQL 16 y ahora incluye validación de configuración Compose más un smoke test desde un volumen PostgreSQL vacío. Antes de desplegar, comprueba que el workflow más reciente termina en verde para el último commit de código.
 
@@ -20,11 +22,22 @@ cp .env.example .env   # ajustar DB_USERNAME, DB_PASSWORD, JWT_SECRET y el usuar
 docker compose up --build -d
 ~~~
 
-- Frontend: http://localhost:3000 (nginx sirve la SPA y reenvía `/api/` al backend; no requiere CORS).
-- API: http://localhost:8080/api/v1 — Swagger en http://localhost:8080/swagger-ui.html con `SWAGGER_ENABLED=true`.
+- Frontend: http://localhost:3000/inventary (nginx sirve la SPA bajo `/inventary/` y reenvía `/inventary/api/` al backend; no requiere CORS). La raíz y cualquier ruta fuera del prefijo redirigen a `/inventary/`.
+- Rutas de la SPA: `/inventary/iniciar-sesion`, `/inventary/resumen`, `/inventary/productos[/nuevo|/{id}/editar]`, `/inventary/categorias`, `/inventary/compras[/nueva|/{id}|/{id}/recepcion|/devoluciones/nueva]`, `/inventary/ventas[/nueva|/{id}|/devoluciones/nueva]`, `/inventary/inventario[/traslados|/conteos|/ajustes/nuevo]`, `/inventary/reportes`. Sin sesión, cualquier ruta lleva al login con `?destino=` y vuelve allí tras autenticarse. Los enlaces antiguos `#/...` se convierten automáticamente.
+- API: http://localhost:8080/api/v1 (publicada solo en 127.0.0.1) — Swagger en http://localhost:8080/swagger-ui.html con `SWAGGER_ENABLED=true`.
+- Login: las credenciales se cifran en el navegador (ECDH P-256 + HKDF-SHA256 + AES-256-GCM con desafío de un solo uso) además de TLS; WebCrypto exige HTTPS o `localhost`. Tras 5 fallos la cuenta se bloquea 15 minutos. "Mantener sesión iniciada" guarda el token en `localStorage`; sin marcar, en `sessionStorage`.
 - La API se conecta a `host.docker.internal:5432`; cambiar `SPRING_DATASOURCE_URL` en `.env` si la BD está en otro host.
 - El primer arranque crea `BOOTSTRAP_ADMIN_USERNAME` solo si no existen usuarios. Aprobar compras y anulaciones de venta exige un segundo usuario con rol `SUPER_ADMIN` (`POST /api/v1/admin/users`).
 - Para un PostgreSQL en contenedor usar `microservices-inventary-ecuapp/docker-compose.yml`.
+
+### n8n (ventas por WhatsApp)
+
+El mismo `docker compose up -d` levanta n8n en http://localhost:5678 (datos en el volumen `inventary-n8n-data`). Requiere `N8N_ENCRYPTION_KEY` y `WHATSAPP_INTEGRATION_API_KEY` en `.env` (ver `.env.example`).
+
+- Desde n8n, la API se consume por la red interna: `http://api:8080/api/v1/integrations/whatsapp` (no usar `localhost`, que dentro del contenedor es el propio n8n).
+- En n8n crear una credencial **Header Auth** con nombre `X-Integration-Key` y el valor de `WHATSAPP_INTEGRATION_API_KEY`; usarla en los nodos HTTP Request.
+- Flujo de venta: catálogo → `POST /carts` → `PUT /carts/{id}/items/{productId}` → `POST /carts/{id}/quotes` → `POST /orders` (`consentConfirmed: true`). Cotización y pedido requieren header `Idempotency-Key`. El pago lo confirma el backoffice en `/api/v1/whatsapp-orders/**`, que genera la venta.
+- Meta (WhatsApp Cloud API) solo envía webhooks a HTTPS público: exponer n8n con un túnel (cloudflared/ngrok) o dominio y fijar `N8N_WEBHOOK_URL` y `N8N_PROXY_HOPS=1`.
 
 ## Inicio rápido sin Docker
 
@@ -82,3 +95,7 @@ Fuera del alcance de esta versión: facturación electrónica SRI completa, pasa
 ## CI y release
 
 Los workflows del repositorio automatizan el build/test de frontend y `mvnw verify` con PostgreSQL 16 en push/PR a `master`. Antes de liberar, confirmar checks verdes del SHA exacto y probar el perfil Docker Kafka cuando se habilite; el CI de base de datos no sustituye pruebas de despliegue en el entorno objetivo.
+
+## Licencia
+
+Inventary es una aplicación de EcuApp. Copyright © 2026 EcuApp; titular de los derechos: JhonnyMinian92. Software propietario con todos los derechos reservados: no se permite copiar, modificar, distribuir ni explotar el código sin autorización escrita del titular. Términos completos en [LICENSE](LICENSE). El logotipo de EcuApp (`app-inventary-ecuapp/src/assets/ecuapp-logo.png`) y la marca Inventary forman parte de esos derechos.

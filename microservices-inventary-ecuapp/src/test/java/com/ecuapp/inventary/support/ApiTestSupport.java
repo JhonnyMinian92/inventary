@@ -17,7 +17,16 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import javax.crypto.Cipher;
+import javax.crypto.KeyAgreement;
+import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.*;
+import java.security.spec.ECGenParameterSpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -76,13 +85,73 @@ public abstract class ApiTestSupport {
 
     protected String login(String username, String password) {
         try {
-            MvcResult result = mvc.perform(post("/api/v1/auth/login").with(randomIp()).contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("username", username, "password", password)))).andReturn();
+            MvcResult result = loginAttempt(username, password);
             assertEquals(200, result.getResponse().getStatus(), () -> "login failed: " + body(result));
             return json.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }
+    }
+
+    /** Full browser flow: single-use challenge + encrypted credentials, from a random client address. */
+    protected MvcResult loginAttempt(String username, String password) {
+        return loginAttempt(username, password, randomIp());
+    }
+
+    protected MvcResult loginAttempt(String username, String password, RequestPostProcessor client) {
+        try {
+            Map<String, Object> body = Map.of("encrypted", encryptCredentials(loginChallenge(client), username, password));
+            return mvc.perform(post("/api/v1/auth/login").with(client).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(body))).andReturn();
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    protected JsonNode loginChallenge(RequestPostProcessor client) {
+        try {
+            MvcResult result = mvc.perform(post("/api/v1/auth/login-challenge").with(client)).andReturn();
+            assertEquals(200, result.getResponse().getStatus(), () -> "challenge failed: " + body(result));
+            return json.readTree(result.getResponse().getContentAsString());
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    /**
+     * Client half of ECDH-ES+HKDF-SHA256+A256GCM, written independently of the server class (javax.crypto only)
+     * so the tests check the wire contract that the browser implements with WebCrypto.
+     */
+    protected Map<String, String> encryptCredentials(JsonNode challenge, String username, String password) throws Exception {
+        String challengeId = challenge.get("challengeId").asText();
+        assertEquals("ECDH-ES+HKDF-SHA256+A256GCM", challenge.get("algorithm").asText());
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(new ECGenParameterSpec("secp256r1"));
+        KeyPair client = generator.generateKeyPair();
+        PublicKey server = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(challenge.get("publicKey").asText())));
+        KeyAgreement agreement = KeyAgreement.getInstance("ECDH");
+        agreement.init(client.getPrivate());
+        agreement.doPhase(server, true);
+        byte[] salt = challengeId.getBytes(StandardCharsets.UTF_8);
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(salt, "HmacSHA256"));
+        byte[] prk = mac.doFinal(agreement.generateSecret());
+        mac.init(new SecretKeySpec(prk, "HmacSHA256"));
+        mac.update("inventary/login/v1".getBytes(StandardCharsets.US_ASCII));
+        mac.update((byte) 1);
+        byte[] key = mac.doFinal();
+        byte[] iv = new byte[12];
+        new SecureRandom().nextBytes(iv);
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, iv));
+        cipher.updateAAD(salt);
+        Map<String, String> credentials = new LinkedHashMap<>();
+        credentials.put("username", username);
+        credentials.put("password", password);
+        byte[] ciphertext = cipher.doFinal(json.writeValueAsBytes(credentials));
+        Base64.Encoder b64 = Base64.getEncoder();
+        return Map.of("challengeId", challengeId, "publicKey", b64.encodeToString(client.getPublic().getEncoded()),
+            "iv", b64.encodeToString(iv), "ciphertext", b64.encodeToString(ciphertext));
     }
 
     protected static RequestPostProcessor randomIp() {

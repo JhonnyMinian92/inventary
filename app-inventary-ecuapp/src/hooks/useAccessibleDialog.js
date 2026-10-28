@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+// Diálogos abiertos en orden de apertura: solo el superior atiende Escape y el ciclo de Tab.
+const openDialogs = [];
 
 export default function useAccessibleDialog(open, onClose) {
   const dialogRef = useRef(null);
@@ -14,8 +16,10 @@ export default function useAccessibleDialog(open, onClose) {
     const getFocusables = () => [...dialog.querySelectorAll(FOCUSABLE)].filter(element => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true');
     const first = getFocusables()[0];
     (first || dialog).focus();
+    openDialogs.push(dialog);
 
     function handleKeyDown(event) {
+      if (openDialogs[openDialogs.length - 1] !== dialog) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current?.();
@@ -41,6 +45,7 @@ export default function useAccessibleDialog(open, onClose) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => {
+      openDialogs.splice(openDialogs.indexOf(dialog), 1);
       document.removeEventListener('keydown', handleKeyDown);
       if (previouslyFocused && typeof previouslyFocused.focus === 'function') previouslyFocused.focus();
     };

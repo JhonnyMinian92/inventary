@@ -16,6 +16,18 @@ export function asCsvValue(value) {
   return '"' + safeText.replaceAll('"', '""') + '"';
 }
 
+export function downloadCsv(fileName, columns, rows) {
+  const blob = new Blob(['﻿', buildCsv(columns, rows)], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export function buildCsv(columns, rows) {
   const header = columns.map(column => asCsvValue(column.label)).join(',');
   const records = (rows || []).map(row => columns.map(column =>

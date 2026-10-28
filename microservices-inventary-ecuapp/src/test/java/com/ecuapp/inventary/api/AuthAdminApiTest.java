@@ -24,34 +24,34 @@ class AuthAdminApiTest extends ApiTestSupport {
         assertTrue(permissions.containsAll(List.of("sales:manage", "catalog:read")));
         assertFalse(permissions.contains("security:manage"));
 
-        problem(call(put("/api/v1/auth/me/password"), token, Map.of("currentPassword", "Wrong-Pass-2026!", "newPassword", "Nueva-Clave-2026-Ok!")),
+        problem(call(put("/api/v1/auth/me/password"), token, Map.of("currentPassword", "Wrong-Pass-2026!", "newPassword", "Nueva-Clave-26!")),
             422, "BUSINESS_RULE_VIOLATION");
         problem(call(put("/api/v1/auth/me/password"), token, Map.of("currentPassword", PASSWORD, "newPassword", "debil")), 400, "VALIDATION_FAILED");
-        problem(call(put("/api/v1/auth/me/password"), token, Map.of("currentPassword", PASSWORD, "newPassword", "sinmayusculas-123!")),
+        problem(call(put("/api/v1/auth/me/password"), token, Map.of("currentPassword", PASSWORD, "newPassword", "sinmayus-123!")),
             422, "BUSINESS_RULE_VIOLATION");
-        httpPut(token, "/api/v1/auth/me/password", Map.of("currentPassword", PASSWORD, "newPassword", "Nueva-Clave-2026-Ok!"), 204);
+        httpPut(token, "/api/v1/auth/me/password", Map.of("currentPassword", PASSWORD, "newPassword", "Nueva-Clave-26!"), 204);
         problem(call(get("/api/v1/auth/me"), token, null), 401, null);
-        problem(call(post("/api/v1/auth/login").with(randomIp()), null, Map.of("username", username, "password", PASSWORD)), 401, "INVALID_CREDENTIALS");
-        assertNotNull(login(username, "Nueva-Clave-2026-Ok!"));
+        problem(loginAttempt(username, PASSWORD), 401, "INVALID_CREDENTIALS");
+        assertNotNull(login(username, "Nueva-Clave-26!"));
     }
 
     @Test
     void userAdministrationValidatesPolicyUniquenessAndRoles() {
         String admin = admin();
         String username = "user." + suffix().toLowerCase();
-        JsonNode created = httpPost(admin, "/api/v1/admin/users", Map.of("username", username.toUpperCase(), "password", "Clave-Muy-Segura-2026!", "role", "auditor"), 201);
+        JsonNode created = httpPost(admin, "/api/v1/admin/users", Map.of("username", username.toUpperCase(), "password", "Clave-Muy-26!", "role", "auditor"), 201);
         assertEquals(username, created.get("username").asText(), "username is normalized to lower case");
         assertEquals("AUDITOR", created.get("role").asText());
         assertFalse(created.has("passwordHash"));
         String id = created.get("id").asText();
 
-        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", username, "password", "Clave-Muy-Segura-2026!", "role", "AUDITOR")), 409, "CONFLICT");
-        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", "x" + suffix(), "password", "solominusculas2026", "role", "AUDITOR")),
+        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", username, "password", "Clave-Muy-26!", "role", "AUDITOR")), 409, "CONFLICT");
+        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", "x" + suffix(), "password", "solominus2026", "role", "AUDITOR")),
             422, "BUSINESS_RULE_VIOLATION");
-        String other = "pepe" + suffix().toLowerCase();
-        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", other, "password", "Mi-" + other + "-2026!", "role", "AUDITOR")),
+        String other = "pepe" + suffix().substring(0, 4).toLowerCase();
+        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", other, "password", "Mi-" + other + "-26!", "role", "AUDITOR")),
             422, "BUSINESS_RULE_VIOLATION");
-        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", "y" + suffix(), "password", "Clave-Muy-Segura-2026!", "role", "NO_EXISTE")),
+        problem(call(post("/api/v1/admin/users"), admin, Map.of("username", "y" + suffix(), "password", "Clave-Muy-26!", "role", "NO_EXISTE")),
             422, "BUSINESS_RULE_VIOLATION");
 
         assertEquals(id, httpGet(admin, "/api/v1/admin/users/" + id, 200).get("id").asText());
@@ -86,8 +86,8 @@ class AuthAdminApiTest extends ApiTestSupport {
         assertTrue(httpGet(admin, "/api/v1/admin/permissions", 200).size() >= 20);
 
         String username = "custom." + suffix().toLowerCase();
-        httpPost(admin, "/api/v1/admin/users", Map.of("username", username, "password", "Clave-Rol-Propio-2026!", "role", code), 201);
-        String token = login(username, "Clave-Rol-Propio-2026!");
+        httpPost(admin, "/api/v1/admin/users", Map.of("username", username, "password", "Clave-Rol-26!", "role", code), 201);
+        String token = login(username, "Clave-Rol-26!");
         httpGet(token, "/api/v1/catalog/products", 200);
         problem(call(get("/api/v1/sales"), token, null), 403, "ACCESS_DENIED");
 
@@ -97,7 +97,7 @@ class AuthAdminApiTest extends ApiTestSupport {
 
         httpPatch(admin, "/api/v1/admin/roles/" + code, Map.of("displayName", "Desactivado", "active", false), 200);
         problem(call(get("/api/v1/catalog/products"), token, null), 401, null);
-        problem(call(post("/api/v1/auth/login").with(randomIp()), null, Map.of("username", username, "password", "Clave-Rol-Propio-2026!")), 401, "INVALID_CREDENTIALS");
+        problem(loginAttempt(username, "Clave-Rol-26!"), 401, "INVALID_CREDENTIALS");
         problem(call(patch("/api/v1/admin/roles/SUPER_ADMIN"), admin, Map.of("displayName", "x", "active", false)), 422, "BUSINESS_RULE_VIOLATION");
         problem(call(get("/api/v1/admin/roles/NO_EXISTE_" + suffix()), admin, null), 404, "RESOURCE_NOT_FOUND");
     }

@@ -11,10 +11,13 @@ Usage (API started with SWAGGER_ENABLED=true so /v3/api-docs is reachable):
       --admin-user admin --admin-password '<bootstrap password>' --integration-key '<WHATSAPP_INTEGRATION_API_KEY>'
 
 All data is created with random business keys (prefix SMK); nothing is deleted, as the ledger is append-only.
+Login uses the application-layer encryption the browser uses (requires: pip install cryptography).
 Exit code 0 only when every check passes and coverage is complete.
 """
 import argparse
+import base64
 import json
+import os
 import re
 import sys
 import time
@@ -84,10 +87,35 @@ def key():
     return "smk-" + str(uuid.uuid4())
 
 
+def encrypted_credentials(api, username, password):
+    """Client half of ECDH-ES+HKDF-SHA256+A256GCM over a single-use challenge (same contract as the web client)."""
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+    challenge, _, _ = api.call("POST", "/api/v1/auth/login-challenge", 200)
+    assert challenge["algorithm"] == "ECDH-ES+HKDF-SHA256+A256GCM", challenge
+    server_key = serialization.load_der_public_key(base64.b64decode(challenge["publicKey"]))
+    client_key = ec.generate_private_key(ec.SECP256R1())
+    shared = client_key.exchange(ec.ECDH(), server_key)
+    context = challenge["challengeId"].encode("utf-8")
+    key = HKDF(algorithm=hashes.SHA256(), length=32, salt=context, info=b"inventary/login/v1").derive(shared)
+    iv = os.urandom(12)
+    ciphertext = AESGCM(key).encrypt(iv, json.dumps({"username": username, "password": password}).encode("utf-8"), context)
+    public_der = client_key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return {"challengeId": challenge["challengeId"], "publicKey": base64.b64encode(public_der).decode(),
+            "iv": base64.b64encode(iv).decode(), "ciphertext": base64.b64encode(ciphertext).decode()}
+
+
+def login_call(api, username, password, expect):
+    return api.call("POST", "/api/v1/auth/login", expect, body={"encrypted": encrypted_credentials(api, username, password)})
+
+
 def login(api, username, password):
     """Logs in honoring Retry-After: the login endpoint is rate limited per client address."""
     while True:
-        body, status, headers = api.call("POST", "/api/v1/auth/login", [200, 429], body={"username": username, "password": password})
+        body, status, headers = login_call(api, username, password, [200, 429])
         if status == 200:
             return body["accessToken"]
         wait = int(headers.get("Retry-After", "5"))
@@ -105,7 +133,7 @@ def main():
     args = parser.parse_args()
     api = Api(args.base_url)
     sfx = uuid.uuid4().hex[:8].upper()
-    password = "Smoke-Clave-Segura-2026!"
+    password = "Smoke-Clave-26!"
     today = date.today().isoformat()
 
     # ------------------------------------------------------------------ health and security basics
@@ -114,7 +142,8 @@ def main():
     api.call("GET", "/actuator/info", 401)
     api.call("GET", "/api/v1/sales", 401)
     # 429 is also correct here when a previous run consumed the per-address login window.
-    api.call("POST", "/api/v1/auth/login", [401, 429], body={"username": "nadie-" + sfx, "password": "Mala-Clave-123!"})
+    login_call(api, "nadie-" + sfx, "Mala-Clave-123!", [401, 429])
+    api.call("POST", "/api/v1/auth/login", [400, 429], body={"username": "nadie-" + sfx, "password": "Mala-Clave-123!"})
     admin = login(api, args.admin_user, args.admin_password)
     me, _, _ = api.call("GET", "/api/v1/auth/me", 200, token=admin)
     check(me["role"] == "SUPER_ADMIN" and "security:manage" in me["permissions"], "admin identity and permissions")
@@ -141,10 +170,10 @@ def main():
     throwaway_name = "smk.tmp." + sfx.lower()
     throwaway, _, _ = api.call("POST", "/api/v1/admin/users", 201, token=admin, body={"username": throwaway_name, "password": password, "role": "VENDEDOR"})
     api.call("GET", "/api/v1/admin/users/{id}", 200, token=admin, path={"id": throwaway["id"]})
-    api.call("PUT", "/api/v1/admin/users/{id}/password", 204, token=admin, path={"id": throwaway["id"]}, body={"newPassword": "Reseteada-Clave-2026!"})
-    tmp_token = login(api, throwaway_name, "Reseteada-Clave-2026!")
-    api.call("PUT", "/api/v1/auth/me/password", 204, token=tmp_token, body={"currentPassword": "Reseteada-Clave-2026!", "newPassword": "Propia-Clave-Nueva-2026!"})
-    tmp_token = login(api, throwaway_name, "Propia-Clave-Nueva-2026!")
+    api.call("PUT", "/api/v1/admin/users/{id}/password", 204, token=admin, path={"id": throwaway["id"]}, body={"newPassword": "Reset-Clave-26!"})
+    tmp_token = login(api, throwaway_name, "Reset-Clave-26!")
+    api.call("PUT", "/api/v1/auth/me/password", 204, token=tmp_token, body={"currentPassword": "Reset-Clave-26!", "newPassword": "Propia-Clave26!"})
+    tmp_token = login(api, throwaway_name, "Propia-Clave26!")
     api.call("POST", "/api/v1/auth/logout", 204, token=tmp_token)
     api.call("GET", "/api/v1/auth/me", 401, token=tmp_token)
     api.call("PATCH", "/api/v1/admin/users/{id}", 200, token=admin, path={"id": throwaway["id"]}, body={"role": "VENDEDOR", "active": False})

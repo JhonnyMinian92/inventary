@@ -2,6 +2,9 @@
   "name": "inventary-web",
   "private": true,
   "version": "1.0.0",
+  "description": "Inventary — aplicación de EcuApp. Software propietario, todos los derechos reservados.",
+  "author": "EcuApp",
+  "license": "UNLICENSED",
   "type": "module",
   "engines": {
     "node": ">=22.12.0 <23",

@@ -39,7 +39,8 @@ Las clases citadas proceden del informe de ejecución histórico y deben comprob
 
 | Método | Ruta | Acceso / finalidad |
 |---|---|---|
-| POST | /auth/login | Público y rate-limited; devuelve accessToken, tokenType, expiresAt |
+| POST | /auth/login-challenge | Público y rate-limited; clave ECDH P-256 de un solo uso (challengeId, algorithm, publicKey, expiresAt) |
+| POST | /auth/login | Público y rate-limited; credenciales cifradas (`encrypted`); devuelve accessToken, tokenType, expiresAt. 429 LOGIN_TEMPORARILY_LOCKED tras 5 fallos de la misma cuenta |
 | GET | /auth/me | Token vigente; identidad, rol y permisos efectivos |
 | POST | /auth/logout | Sesión válida; 204 |
 | PUT | /auth/me/password | Contraseña actual y nueva; 204 |
@@ -55,13 +56,13 @@ Las clases citadas proceden del informe de ejecución histórico y deben comprob
 | GET | /admin/permissions | security:manage |
 | PUT | /admin/roles/{code}/permissions | security:manage |
 
-Login:
+Login con cifrado en la capa de aplicación (obligatorio por defecto, `LOGIN_ENCRYPTION_REQUIRED=true`):
 
-~~~bash
-curl -sS -X POST http://localhost:8080/api/v1/auth/login \
-  -H 'Content-Type: application/json' -H 'Accept: application/json' \
-  -d '{"username":"admin","password":"CAMBIAR-ESTE-SECRETO"}'
-~~~
+1. `POST /auth/login-challenge` devuelve `challengeId`, `algorithm` (`ECDH-ES+HKDF-SHA256+A256GCM`), `publicKey` (SPKI P-256 en Base64) y `expiresAt` (120 s).
+2. El cliente genera una clave ECDH P-256 efímera, deriva el secreto compartido, aplica HKDF-SHA256 (salt = `challengeId` en UTF-8, info = `inventary/login/v1`, 32 bytes) y cifra `{"username":"…","password":"…"}` con AES-256-GCM (IV aleatorio de 12 bytes, AAD = `challengeId`).
+3. `POST /auth/login` con `{"encrypted":{"challengeId","publicKey","iv","ciphertext"}}` (Base64 estándar; el ciphertext incluye la etiqueta GCM de 16 bytes).
+
+El desafío se consume en el primer uso: reenviar la misma petición devuelve 400 `LOGIN_CHALLENGE_INVALID`. Un cuerpo `{"username","password"}` en texto plano devuelve 400 `LOGIN_ENCRYPTION_REQUIRED`. Referencias: `src/security/loginCrypto.js` (navegador) y `encrypted_credentials` en `scripts/smoke_test_api.py` (Python).
 
 El controlador actual no expone endpoint de refresh token. El TTL JWT por defecto es 60 minutos, configurable; usar expiresAt y volver a autenticar cuando la sesión expire.
 

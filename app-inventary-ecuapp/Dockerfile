@@ -4,12 +4,15 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY index.html vite.config.js ./
 COPY src ./src
-# The SPA calls the API through the same origin; nginx proxies /api/ to the backend container.
-ARG VITE_API_BASE_URL=/api/v1
+# La SPA se publica en /inventary/ y llama a la API por el mismo origen; nginx reenvía /inventary/api/ al backend.
+ARG VITE_BASE_PATH=/inventary/
+ARG VITE_API_BASE_URL=/inventary/api/v1
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN npm run build
+RUN npm test && npm run build
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /workspace/dist /usr/share/nginx/html
+COPY nginx-security-headers.conf /etc/nginx/security-headers.conf
+COPY --from=build /workspace/dist /usr/share/nginx/html/inventary
 EXPOSE 80

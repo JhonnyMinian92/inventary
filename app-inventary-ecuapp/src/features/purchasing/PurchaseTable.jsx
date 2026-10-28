@@ -1,7 +1,7 @@
 import { CheckCircle2, Eye, Send, XCircle, PackageCheck } from 'lucide-react';
+import { statusLabel, statusTone } from '../../utils/format.js';
 
 function idOf(item) { return item?.id ?? item?.purchaseOrderId ?? ''; }
-function titleCase(value = '') { return String(value || '—').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
 function date(value) {
   if (!value) return '—';
   const parsed = new Date(value);
@@ -21,10 +21,9 @@ export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, 
         const canApprove = status === 'SUBMITTED';
         const canReceive = ['APPROVED', 'PARTIALLY_RECEIVED'].includes(status);
         const canCancel = ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(status);
-        const tone = status === 'RECEIVED' ? 'active' : status === 'CANCELLED' ? 'inactive' : 'pending';
         return <tr key={idOf(order) || index}>
           <td><strong>{orderNumber}</strong></td>
-          <td><span className={'pill ' + tone}>{titleCase(status)}</span></td>
+          <td><span className={'pill ' + statusTone(status)}>{statusLabel('purchase', status)}</span></td>
           <td>{order.supplierName || order.supplier?.name || '—'}</td>
           <td>{order.warehouseCode || order.warehouseName || order.warehouse?.name || '—'}</td>
           <td>{items.length || order.itemCount || '—'}</td>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackageCheck } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
 
@@ -16,6 +17,7 @@ export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
   const [quantities, setQuantities] = useState(() => orderLines.map(() => '0'));
   const [step, setStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const pending = useMemo(() => orderLines.filter((line, index) => Number(quantities[index] || 0) > 0 && idOf(line)), [orderLines, quantities]);
   const totalUnits = pending.reduce((sum, line) => sum + Number(quantities[orderLines.indexOf(line)] || 0), 0);
 
@@ -66,7 +68,6 @@ export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
 
   return <form className="workflow-form" onSubmit={handleSubmit} noValidate>
     <StepProgress steps={['Cantidades recibidas', 'Confirmar recepción']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
-    {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
 
     <section className="workflow-stage" aria-labelledby="receipt-stage-title">
       <div className="workflow-stage-heading">
@@ -82,7 +83,7 @@ export default function ReceiptForm({ order, loading, onCancel, onSubmit }) {
       </div>
 
       {step === 0 && <>
-        {orderLines.length === 0 && <div className="alert error" role="alert">La orden no contiene líneas visibles. No se puede contabilizar una recepción vacía.</div>}
+        {orderLines.length === 0 && <div className="empty-block">La orden no tiene líneas para recibir.</div>}
         <div className="workflow-line-list">
           {orderLines.map((line, index) => {
             const max = remaining(line);

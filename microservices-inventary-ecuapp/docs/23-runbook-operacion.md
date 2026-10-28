@@ -13,7 +13,7 @@ Guía para quien despliega y opera la API. Complementa `README.md` y `docs/RESUL
 | `JWT_SECRET` | **sí** | — | Secreto HS256 de al menos 32 bytes. Cambiarlo invalida todas las sesiones. |
 | `JWT_TTL_MINUTES` | no | 60 | Vida del token (acotada entre 5 y 120). |
 | `CORS_ALLOWED_ORIGINS` | no | vacío | Orígenes permitidos separados por coma; `*` está prohibido. |
-| `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD` | solo con base vacía | — | Crea el primer SUPER_ADMIN. La contraseña requiere 16+ caracteres, mayúscula, minúscula, número y símbolo, y no puede contener el usuario. |
+| `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD` | solo con base vacía | — | Crea el primer SUPER_ADMIN. La contraseña requiere entre 8 y 15 caracteres, mayúscula, minúscula, número y símbolo, y no puede contener el usuario. |
 | `SPRING_PROFILES_ACTIVE` | no | — | `dev` (Swagger) o `prod` (Swagger, OpenAPI y GraphiQL apagados). |
 | `SWAGGER_ENABLED` | no | false | Expone `/v3/api-docs` y `/swagger-ui.html`. |
 | `WHATSAPP_INTEGRATION_API_KEY` | no | vacío | Clave de máquina para n8n (32+ bytes). Vacía = integración deshabilitada (401). |
@@ -22,7 +22,10 @@ Guía para quien despliega y opera la API. Complementa `README.md` y `docs/RESUL
 | `REPORTS_TIME_ZONE` | no | `America/Guayaquil` | Zona IANA para los cortes diarios de reportes. |
 | `PURCHASING_REQUIRE_DISTINCT_APPROVER` | no | true | Quien crea o envía una orden de compra no puede aprobarla. |
 | `MAX_REQUEST_BODY_BYTES` | no | 1048576 | Cuerpos mayores reciben 413. |
-| `FORWARD_HEADERS_STRATEGY` | no | `none` | `native` solo detrás de un proxy confiable que sobrescriba `X-Forwarded-For`. |
+| `FORWARD_HEADERS_STRATEGY` | no | `none` | `native` solo detrás de un proxy confiable que sobrescriba `X-Forwarded-For` (el compose raíz lo activa porque nginx lo hace). |
+| `LOGIN_ENCRYPTION_REQUIRED` | no | true | Exige credenciales cifradas (ECDH P-256 + AES-256-GCM, desafío de un solo uso). `false` solo para clientes heredados. |
+| `LOGIN_CHALLENGE_TTL_SECONDS` | no | 120 | Vigencia del desafío de cifrado (30–600 s). |
+| `LOGIN_LOCKOUT_MAX_FAILURES`, `LOGIN_LOCKOUT_MINUTES` | no | 5 / 15 | Bloqueo temporal por cuenta tras fallos consecutivos (en memoria, por instancia). `0` fallos lo desactiva. |
 | `LOGGING_STRUCTURED_FORMAT_CONSOLE` | no | — | `ecs` o `logstash` para logs JSON. |
 | `DB_POOL_MAX`, `DB_POOL_MIN_IDLE` | no | 10 / 2 | Pool Hikari. |
 

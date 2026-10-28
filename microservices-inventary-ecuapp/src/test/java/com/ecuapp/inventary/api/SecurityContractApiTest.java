@@ -47,30 +47,30 @@ class SecurityContractApiTest extends ApiTestSupport {
         UUID id = users.findByUsername(username).orElseThrow().getId();
         httpGet(first, "/api/v1/auth/me", 200);
 
-        httpPut(admin(), "/api/v1/admin/users/" + id + "/password", Map.of("newPassword", "Otra-Clave-Segura-2026!"), 204);
+        httpPut(admin(), "/api/v1/admin/users/" + id + "/password", Map.of("newPassword", "Otra-Clave-26!"), 204);
         problem(call(get("/api/v1/auth/me"), first, null), 401, null);
 
-        String second = login(username, "Otra-Clave-Segura-2026!");
+        String second = login(username, "Otra-Clave-26!");
         httpPost(second, "/api/v1/auth/logout", null, 204);
         problem(call(get("/api/v1/auth/me"), second, null), 401, null);
 
-        String third = login(username, "Otra-Clave-Segura-2026!");
+        String third = login(username, "Otra-Clave-26!");
         httpPatch(admin(), "/api/v1/admin/users/" + id, Map.of("role", "VENDEDOR", "active", false), 200);
         problem(call(get("/api/v1/auth/me"), third, null), 401, null);
-        problem(call(post("/api/v1/auth/login").with(randomIp()), null, Map.of("username", username, "password", "Otra-Clave-Segura-2026!")),
+        problem(loginAttempt(username, "Otra-Clave-26!"),
             401, "INVALID_CREDENTIALS");
     }
 
     @Test
     void loginFailuresAreGenericAndUsernameIsNormalized() {
         String username = createUser("AUDITOR");
-        JsonNode wrongPassword = problem(call(post("/api/v1/auth/login").with(randomIp()), null, Map.of("username", username, "password", "Wrong-Pass-123!")),
+        JsonNode wrongPassword = problem(loginAttempt(username, "Wrong-Pass-123!"),
             401, "INVALID_CREDENTIALS");
-        JsonNode unknownUser = problem(call(post("/api/v1/auth/login").with(randomIp()), null, Map.of("username", "nobody-" + suffix(), "password", "Wrong-Pass-123!")),
+        JsonNode unknownUser = problem(loginAttempt("nobody-" + suffix(), "Wrong-Pass-123!"),
             401, "INVALID_CREDENTIALS");
         assertEquals(wrongPassword.get("detail").asText(), unknownUser.get("detail").asText());
         assertNotNull(login("  " + username.toUpperCase() + "  ", PASSWORD));
-        problem(call(post("/api/v1/auth/login").with(randomIp()), null, Map.of("username", "", "password", "")), 400, "VALIDATION_FAILED");
+        problem(loginAttempt("", ""), 400, "VALIDATION_FAILED");
     }
 
     @Test
@@ -136,8 +136,7 @@ class SecurityContractApiTest extends ApiTestSupport {
         String ip = "192.0.2." + (int) (Math.random() * 200 + 10);
         MvcResult last = null;
         for (int i = 0; i < 6; i++) {
-            last = mvc.perform(post("/api/v1/auth/login").with(r -> { r.setRemoteAddr(ip); return r; })
-                .contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"nobody\",\"password\":\"Wrong-Pass-1!\"}")).andReturn();
+            last = loginAttempt("nobody", "Wrong-Pass-1!", r -> { r.setRemoteAddr(ip); return r; });
             if (i < 5) assertEquals(401, last.getResponse().getStatus());
         }
         problem(last, 429, "RATE_LIMIT_EXCEEDED");

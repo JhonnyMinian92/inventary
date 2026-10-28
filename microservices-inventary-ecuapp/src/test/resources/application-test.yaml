@@ -22,7 +22,7 @@ app:
       expiry-check-ms: 3600000
   bootstrap-admin:
     username: bootstrap.root
-    password: Test-Only-Bootstrap-Passw0rd!
+    password: Boot-Root-26!
   media:
     storage-path: ${java.io.tmpdir}/inventary-test-product-images
     max-upload-bytes: 5242880

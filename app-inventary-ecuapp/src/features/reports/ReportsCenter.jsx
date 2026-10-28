@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from '../../ui/feedback.js';
 import { Activity, CalendarRange, Download, FileSpreadsheet, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { api, listFrom } from '../../api';
 import { buildCsv } from '../../utils/csv.js';
@@ -122,6 +123,11 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
   const [queried, setQueried] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  useEffect(() => {
+    if (!error) return;
+    toast(error.message, { tone: error.kind === 'permission' ? 'warning' : 'error' });
+    setError(null);
+  }, [error]);
   const [lastRun, setLastRun] = useState({});
   const [balanceSummaryCache, setBalanceSummaryCache] = useState({ signature: '', rows: [] });
   const [valuationExportCache, setValuationExportCache] = useState({ signature: '', rows: null });
@@ -364,7 +370,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         <div className="report-subheading"><div><h3>Ventas diarias</h3><p>Totales brutos por día dentro del periodo.</p></div>{listFrom(data?.daily).length > 0 && <button type="button" className="button secondary" onClick={exportDailySales}><Download size={15}/> Exportar CSV diario</button>}</div>
         <ReportTable rows={listFrom(data?.daily)} columns={[{key:'date',label:'Fecha'},{key:'salesCount',label:'Ventas'},{key:'grossSales',label:'Ventas brutas',format:'money'}]} caption="Resumen diario de ventas" empty="No hubo ventas en el periodo."/>
         <div className="report-subheading"><div><h3>Resultados por producto</h3><p>Las cantidades e importes son netos de anulaciones y devoluciones según la API.</p></div></div>
-        {data?.productsTruncated && <div className="alert warning" role="status"><ShieldAlert size={18}/><span>La tabla y su CSV muestran {rows.length} de {number(data.totalProducts)} productos. Los indicadores de ventas resumen todo el periodo; ajusta las fechas o filtros para consultar los productos restantes.</span></div>}
+        {data?.productsTruncated && <p className="table-note"><ShieldAlert size={14} aria-hidden="true"/><span>La tabla y su CSV muestran {rows.length} de {number(data.totalProducts)} productos. Los indicadores de ventas resumen todo el periodo; ajusta las fechas o filtros para consultar los productos restantes.</span></p>}
         <ReportTable rows={rows} columns={columns} caption="Ventas netas por producto" empty="No hay ventas por producto para este periodo."/>
       </>;
     }
@@ -379,7 +385,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
           { label: 'Importe devuelto', value: money(summary.returnedAmount) },
           { label: 'Compras netas', value: money(summary.netAmount) }
         ]}/>
-        {data?.itemsTruncated && <div className="alert warning" role="status"><ShieldAlert size={18}/><span>La tabla y su CSV muestran {rows.length} de {number(data.totalItems)} combinaciones proveedor-producto. Los totales financieros incluyen todos los registros del periodo; ajusta las fechas o filtros para acotar el detalle.</span></div>}
+        {data?.itemsTruncated && <p className="table-note"><ShieldAlert size={14} aria-hidden="true"/><span>La tabla y su CSV muestran {rows.length} de {number(data.totalItems)} combinaciones proveedor-producto. Los totales financieros incluyen todos los registros del periodo; ajusta las fechas o filtros para acotar el detalle.</span></p>}
         <ReportTable rows={rows} columns={columns} caption="Recepciones y devoluciones por proveedor y producto" empty="No hay recepciones contabilizadas en este periodo."/>
       </>;
     }
@@ -396,7 +402,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         <div className="report-subheading"><div><h3>Valor total por moneda</h3><p>Método de costeo: <strong>{titleCase(data.method)}</strong>. Los importes vienen de la valoración financiera del backend.</p></div><span className="muted">Generado: {dateTime(data.generatedAt)}</span></div>
         <Metrics items={(data?.totals || []).map(item => ({ label: 'Total en ' + item.currency, value: money(item.totalValue, item.currency), detail: 'Existencia: ' + number(item.onHand) }))}/>
         <ReportTable rows={rows} columns={columns} caption="Valoración del inventario por producto y almacén" empty="No hay existencias valoradas que coincidan con los filtros."/>
-        {rows.some(row => row.reconciled === false) && <div className="alert warning" role="status"><ShieldAlert size={18}/><span>Algunas filas no están conciliadas. Revisa los movimientos y el libro de valoración antes de utilizar estos saldos en un cierre financiero.</span></div>}
+        {rows.some(row => row.reconciled === false) && <p className="table-note"><ShieldAlert size={14} aria-hidden="true"/><span>Algunas filas no están conciliadas. Revisa los movimientos y el libro de valoración antes de utilizar estos saldos en un cierre financiero.</span></p>}
       </>;
     }
     const rows = Array.isArray(data) ? data : listFrom(data);
@@ -414,7 +420,6 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     <div className="report-tabs" role="tablist" aria-label="Informes de inventario">
       {REPORT_TABS.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="report-results" id={'report-tab-' + tab.id} className={activeTab === tab.id ? 'report-tab active' : 'report-tab'} onClick={() => { if (!loading) { setActiveTab(tab.id); setError(null); } }} disabled={loading}>{tab.label}</button>)}
     </div>
-    {error && <div className={'alert ' + (error.kind === 'permission' ? 'warning' : 'error')} role="alert" aria-live="assertive"><ShieldAlert size={18}/><span>{error.message}</span><button type="button" aria-label="Cerrar mensaje" onClick={() => setError(null)}>×</button></div>}
     <form className="report-filters report-center-filters" onSubmit={runReport} aria-label="Filtros del informe">
       {renderFilters()}
       <div className="report-filter-actions"><button className="button primary" type="submit" disabled={loading}><Search size={16}/>{loading ? 'Consultando…' : 'Consultar informe'}</button><button className="button secondary" type="button" disabled={loading} onClick={() => { setResults(current => ({ ...current, [activeTab]: undefined })); setQueried(current => ({ ...current, [activeTab]: false })); setError(null); }}><RefreshCw size={16}/> Limpiar resultado</button></div>

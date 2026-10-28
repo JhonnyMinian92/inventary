@@ -92,6 +92,15 @@ app:
     token-ttl-minutes: ${JWT_TTL_MINUTES:60}
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
     max-request-body-bytes: ${MAX_REQUEST_BODY_BYTES:1048576}
+    # Cifrado de credenciales en la capa de aplicación (ECDH P-256 + HKDF-SHA256 + AES-256-GCM, desafío de un solo uso).
+    # Con required=true se rechaza el login en texto plano; desactivar solo para clientes de automatización heredados.
+    login-encryption:
+      required: ${LOGIN_ENCRYPTION_REQUIRED:true}
+      challenge-ttl-seconds: ${LOGIN_CHALLENGE_TTL_SECONDS:120}
+    # Bloqueo temporal por cuenta tras fallos consecutivos (complementa el rate limit por dirección).
+    login-lockout:
+      max-failures: ${LOGIN_LOCKOUT_MAX_FAILURES:5}
+      minutes: ${LOGIN_LOCKOUT_MINUTES:15}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     topic: ${KAFKA_TOPIC:inventary.domain-events}

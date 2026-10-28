@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, Warehouse, Wrench } from 'lucide-react';
 import { api, listFrom, listAllPages } from '../../api';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import StepProgress from '../../components/StepProgress.jsx';
+import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
@@ -10,21 +12,14 @@ function statusOf(item) { return String(item?.status || 'DRAFT').toUpperCase(); 
 function date(value) { if (!value) return '—'; const parsed = new Date(value); return Number.isNaN(parsed.valueOf()) ? value : parsed.toLocaleDateString('es-EC'); }
 function titleCase(value = '') { return String(value).replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, value => value.toUpperCase()); }
 
+// Las rutas inventory-transfer|count|adjustment|rule corresponden a los formularios transfer|count|adjustment|rule.
 function readInventoryWorkflowFromUrl() {
-  if (typeof window === 'undefined') return '';
-  const parts = window.location.hash.slice(1).replace(/^\/+/, '').split(/[?]/)[0].split('/').filter(Boolean);
-  if (parts[0] !== 'inventory' || parts[2] !== 'new') return '';
-  return ['transfer', 'count', 'adjustment', 'reorder'].includes(parts[1]) ? parts[1] : '';
+  const secondary = currentRoute()?.secondary || '';
+  return secondary.startsWith('inventory-') ? secondary.slice('inventory-'.length) : '';
 }
 
-function inventoryWorkflowHash(kind) {
-  const paths = {
-    transfer: '#/inventory/transfer/new',
-    count: '#/inventory/count/new',
-    adjustment: '#/inventory/adjustment/new',
-    rule: '#/inventory/reorder/new'
-  };
-  return paths[kind] || '#/inventory';
+function inventoryWorkflowPath(kind) {
+  return kind ? secondaryPath('inventory-' + kind) : sectionPath('inventory');
 }
 
 export default function InventoryOperations({ products, warehouses, suppliers, onChanged }) {
@@ -35,10 +30,13 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
+  useMessageToast(notice, setNotice, 'success');
   const [modal, setModal] = useState(readInventoryWorkflowFromUrl);
   const [workflowStep, setWorkflowStep] = useState(0);
   const [validationMessage, setValidationMessage] = useState('');
+  useMessageToast(validationMessage, setValidationMessage);
   const [workflowDirty, setWorkflowDirty] = useState(false);
   const [ruleEditing, setRuleEditing] = useState(null);
   const [reasonDialog, setReasonDialog] = useState(null);
@@ -71,8 +69,10 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   useEffect(() => {
     const syncWorkflow = () => {
       const nextWorkflow = readInventoryWorkflowFromUrl();
-      if (!nextWorkflow && modal && workflowDirty && !window.confirm('¿Salir del formulario? Se perderán los cambios sin guardar.')) {
-        window.history.pushState({ inventoryWorkflow: modal }, '', inventoryWorkflowHash(modal));
+      if (!nextWorkflow && modal && workflowDirty) {
+        // Se mantiene el formulario y se pregunta; si confirma, se sale como con el botón.
+        navigate(inventoryWorkflowPath(modal), { state: { inventoryWorkflow: modal } });
+        confirmDialog({ title: '¿Salir del formulario?', message: 'Los cambios que no hayas guardado se perderán.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }).then(leave => { if (leave) { setWorkflowDirty(false); setModal(''); setRuleEditing(null); navigate(sectionPath('inventory'), { replace: true }); } });
         return;
       }
       setModal(nextWorkflow);
@@ -82,11 +82,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       if (!nextWorkflow) setRuleEditing(null);
     };
     window.addEventListener('popstate', syncWorkflow);
-    window.addEventListener('hashchange', syncWorkflow);
-    return () => {
-      window.removeEventListener('popstate', syncWorkflow);
-      window.removeEventListener('hashchange', syncWorkflow);
-    };
+    return () => window.removeEventListener('popstate', syncWorkflow);
   }, [modal, workflowDirty]);
 
   function updateLine(formKind, index, field, value) {
@@ -102,23 +98,20 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     setWorkflowStep(0);
     setWorkflowDirty(false);
     setModal(kind);
-    const targetHash = inventoryWorkflowHash(kind);
-    if (window.location.hash !== targetHash) {
-      window.history.pushState({ inventoryWorkflow: kind }, '', targetHash);
-    }
+    navigate(inventoryWorkflowPath(kind), { state: { inventoryWorkflow: kind } });
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
-  function closeOperation() {
+  async function closeOperation() {
     if (loading) return;
-    if (workflowDirty && !window.confirm('¿Salir de este formulario? Se perderán los cambios que no hayas guardado.')) return;
+    if (workflowDirty && !(await confirmDialog({ title: '¿Salir del formulario?', message: 'Los cambios que no hayas guardado se perderán.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }))) return;
     setModal('');
     setWorkflowStep(0);
     setWorkflowDirty(false);
     setValidationMessage('');
     setRuleEditing(null);
     setError('');
-    window.history.replaceState({ section: 'inventory' }, '', '#/inventory');
+    navigate(sectionPath('inventory'), { replace: true });
   }
 
   function addLine(formKind) {
@@ -145,7 +138,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       setWorkflowDirty(false);
       setValidationMessage('');
       setRuleEditing(null);
-      window.history.replaceState({ section: 'inventory' }, '', '#/inventory');
+      navigate(sectionPath('inventory'), { replace: true });
       await refresh();
       await onChanged?.();
       return true;
@@ -286,8 +279,6 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const transferStatus = statusOf;
   return <section className="panel inventory-operations">
     <div className="panel-heading"><div className="panel-title-icon"><span>⇄</span><div><h2>Operaciones de inventario</h2><p>Traslados entre almacenes, conteos físicos y reposición de existencias.</p></div></div><button className="button secondary" onClick={() => void refresh()} disabled={loading}>Actualizar</button></div>
-    {error && !modal && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
-    {notice && <div className="alert success" role="status" aria-live="polite"><span>{notice}</span><button type="button" aria-label="Cerrar notificación" onClick={() => setNotice('')}>×</button></div>}
     {!modal && <>
     <div className="catalog-tabs" role="tablist" aria-label="Operaciones de inventario">
       <button className={tab === 'transfers' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'transfers'} onClick={() => setTab('transfers')}>Traslados <span>{transfers.length}</span></button>
@@ -362,8 +353,6 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
         activeStep={workflowStep}
         onSelect={index => { setValidationMessage(''); setWorkflowStep(index); }}
       />
-      {validationMessage && <div className="alert error workflow-validation" role="alert"><span>{validationMessage}</span></div>}
-      {error && <div className="alert error" role="alert" aria-live="assertive"><span>{error}</span><button type="button" aria-label="Cerrar error" onClick={() => setError('')}>×</button></div>}
 
       {modal === 'transfer' && <form className="workflow-form" onSubmit={submitTransfer} onChange={() => setWorkflowDirty(true)} noValidate>
         {workflowStep === 0 && <section className="workflow-stage">
