@@ -3,6 +3,31 @@ import { confirmDialog, toast, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, Boxes, ImagePlus, Star, Trash2, UploadCloud } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
 import { api, resolveApiUrl } from '../../api';
+import QuickCreateDialog, { SelectWithCreate } from '../../ui/QuickCreateDialog.jsx';
+
+const DEFAULT_UNIT_ID = '00000000-0000-0000-0000-000000000001';
+const DIMENSIONS = [['COUNT', 'Conteo (piezas)'], ['MASS', 'Peso'], ['VOLUME', 'Volumen'], ['LENGTH', 'Longitud'], ['AREA', 'Área'], ['TIME', 'Tiempo'], ['OTHER', 'Otra']];
+const QUICK_CREATE = {
+  category: {
+    title: 'Nueva categoría',
+    fields: [
+      { key: 'name', label: 'Nombre', required: true, maxLength: 120, placeholder: 'Ej. Bebidas', hint: 'Escribe el nombre de la categoría.' },
+      { key: 'description', label: 'Descripción', type: 'textarea', maxLength: 1000 }
+    ],
+    create: values => api.createCategory({ name: values.name, description: values.description || undefined })
+  },
+  unit: {
+    title: 'Nueva unidad de medida',
+    fields: [
+      { key: 'name', label: 'Nombre', required: true, maxLength: 100, placeholder: 'Ej. Caja x12', hint: 'Escribe el nombre de la unidad.' },
+      { key: 'code', label: 'Código', required: true, maxLength: 24, pattern: '[A-Za-z][A-Za-z0-9_]{0,23}', placeholder: 'Ej. CJ12', transform: value => value.toUpperCase(),
+        hint: 'El código empieza con una letra y solo admite letras, números y guion bajo (máx. 24).' },
+      { key: 'dimension', label: 'Dimensión', type: 'select', required: true, initial: 'COUNT', options: DIMENSIONS },
+      { key: 'decimalScale', label: 'Decimales', type: 'select', required: true, initial: '0', options: [['0', '0 · enteros'], ['1', '1'], ['2', '2'], ['3', '3']], transform: Number }
+    ],
+    create: values => api.createUnit(values)
+  }
+};
 
 function objectValue(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return { ...value };
@@ -87,7 +112,7 @@ function AttributeInput({ definition, value, onChange }) {
   </label>;
 }
 
-export default function ProductForm({ initialValue, categories, units = [], loading, onCancel, onSubmit, onError }) {
+export default function ProductForm({ initialValue, categories, units = [], loading, onCancel, onSubmit, onError, onCategoryCreated, onUnitCreated }) {
   const productId = initialValue?.id || initialValue?.productId || '';
   const imageInputRef = useRef(null);
   const [form, setForm] = useState(() => normalizeProduct(initialValue));
@@ -108,6 +133,21 @@ export default function ProductForm({ initialValue, categories, units = [], load
   useMessageToast(imageError, setImageError);
   const [imageNotice, setImageNotice] = useState('');
   useMessageToast(imageNotice, setImageNotice, 'success');
+  const [quickCreate, setQuickCreate] = useState(null);
+
+  function handleCreated(created) {
+    const kind = quickCreate;
+    setQuickCreate(null);
+    if (kind === 'category') {
+      onCategoryCreated?.(created);
+      changeCategory(created.id);
+      toast.success(`Categoría ${created.name} creada y seleccionada.`);
+    } else {
+      onUnitCreated?.(created);
+      changeField('unitOfMeasureId', created.id);
+      toast.success(`Unidad ${created.name} creada y seleccionada.`);
+    }
+  }
 
   useEffect(() => {
     const categoryId = form.categoryId;
@@ -323,13 +363,12 @@ export default function ProductForm({ initialValue, categories, units = [], load
       <span>SKU / código<b> *</b></span>
       <input required disabled={Boolean(initialValue)} maxLength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" title="Usa hasta 64 caracteres: letras, números, punto, guion o guion bajo." value={form.sku} onChange={event => changeField('sku', event.target.value)} placeholder="Ej. TEC-001" autoComplete="off" />
     </label>
-    <label className="field">
-      <span>Categoría<b> *</b></span>
-      <select required value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
+    <SelectWithCreate label="Categoría" required labelId="product-category-label" createLabel="Crear categoría" onCreate={onCategoryCreated && (() => setQuickCreate('category'))}>
+      <select required aria-labelledby="product-category-label" value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
         <option value="">Seleccionar categoría</option>
         {categories.filter(category => category.active !== false && category.status !== 'INACTIVE').map(category => <option key={category.id || category.categoryId} value={category.id || category.categoryId}>{category.name}</option>)}
       </select>
-    </label>
+    </SelectWithCreate>
     <label className="field">
       <span>Tipo de producto<b> *</b></span>
       <select required value={form.kind} onChange={event => changeField('kind', event.target.value)}>
@@ -338,13 +377,13 @@ export default function ProductForm({ initialValue, categories, units = [], load
         <option value="SERVICE">Servicio</option>
       </select>
     </label>
-    <label className="field">
-      <span>Unidad de medida</span>
-      <select value={form.unitOfMeasureId} onChange={event => changeField('unitOfMeasureId', event.target.value)}>
-        <option value="">Unidad predeterminada del backend</option>
+    <SelectWithCreate label="Unidad de medida" labelId="product-unit-label" createLabel="Crear unidad de medida" onCreate={onUnitCreated && (() => setQuickCreate('unit'))}>
+      {/* Sin selección el backend asigna la unidad base (EA), que ya figura en la lista. */}
+      <select aria-labelledby="product-unit-label" value={form.unitOfMeasureId || (units.some(unit => unit.id === DEFAULT_UNIT_ID) ? DEFAULT_UNIT_ID : '')} onChange={event => changeField('unitOfMeasureId', event.target.value)}>
+        {!units.some(unit => unit.id === DEFAULT_UNIT_ID) && <option value="">Unidad (predeterminada)</option>}
         {units.filter(unit => unit.active !== false && unit.status !== 'INACTIVE').map(unit => <option key={unit.id} value={unit.id}>{unit.name} · {unit.code}</option>)}
       </select>
-    </label>
+    </SelectWithCreate>
       </div>
     </section>}
     {step === 1 && <section className="workflow-stage" aria-labelledby="product-pricing-title">
@@ -431,5 +470,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
           : <button type="submit" className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>}
       </div>
     </div>
+    {quickCreate && <QuickCreateDialog title={QUICK_CREATE[quickCreate].title} fields={QUICK_CREATE[quickCreate].fields} submitLabel="Crear y seleccionar"
+      onCreate={QUICK_CREATE[quickCreate].create} onCreated={handleCreated} onClose={() => setQuickCreate(null)} />}
   </form>;
 }

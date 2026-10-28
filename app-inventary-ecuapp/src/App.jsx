@@ -603,7 +603,9 @@ function App() {
 
       {isWorkflow && <WorkflowPage onCancel={closeWorkflow}>
         {!hasLoadedData ? <SkeletonTable rows={5} columns={3} /> : <>
-          {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={closeWorkflow} onSubmit={submitProduct} onError={setError} />}
+          {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={closeWorkflow} onSubmit={submitProduct} onError={setError}
+            onCategoryCreated={can('catalog:manage') ? category => setCategories(current => [...current, category]) : undefined}
+            onUnitCreated={can('catalog:manage') ? unit => setUnits(current => [...current, unit]) : undefined} />}
           {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={closeWorkflow} onSubmit={submitCategory} onError={setError} />}
           {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={closeWorkflow} onSubmit={submitPurchase} onError={setError} />}
           {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={closeWorkflow} onSubmit={submitSale} onError={setError} />}

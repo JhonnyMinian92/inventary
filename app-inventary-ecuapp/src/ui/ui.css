@@ -111,3 +111,13 @@
 @media (prefers-reduced-motion: reduce) {
   .toast, .drawer, .drawer-backdrop, .skeleton { animation: none; }
 }
+
+/* Selector con botón de alta rápida y diálogo de creación. */
+.select-with-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.select-with-action .select-add { align-self: stretch; height: auto; min-height: 42px; min-width: 44px; border-color: var(--control-border, #d8e0da); border-radius: 8px; color: #1f6b46; }
+.select-with-action .select-add:hover { border-color: #2a8a5c; background: #e6f3eb; color: #1f6b46; }
+.modal-card.quick-create { width: min(480px, 100%); }
+.quick-create input[name=code] { text-transform: uppercase; }
+.quick-create-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 4px; }
+.quick-create-fields .field:first-child, .quick-create-fields .field.wide { grid-column: 1 / -1; }
+@media (max-width: 480px) { .quick-create-fields { grid-template-columns: minmax(0, 1fr); } }
