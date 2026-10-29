@@ -10,8 +10,11 @@ import java.util.UUID;
 
 public final class ProductDtos {
  private ProductDtos(){}
- /** kind, unitOfMeasureId and attributes are optional; on update a null value keeps the current one. */
- public record WriteRequest(@NotBlank @Size(max=64) @Pattern(regexp="^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",message="El SKU solo admite letras, números, punto, guion y guion bajo.") String sku,
+ /**
+  * sku, kind, unitOfMeasureId and attributes are optional; on update a null value keeps the current one.
+  * When sku is omitted on creation the backend generates a unique random code; it is immutable afterwards.
+  */
+ public record WriteRequest(@Size(max=64) @Pattern(regexp="^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",message="El SKU solo admite letras, números, punto, guion y guion bajo.") String sku,
   @NotBlank @Size(max=180) String name,
   @Size(max=2000) String description,@NotNull UUID categoryId,
   @NotNull @DecimalMin("0.00") @Digits(integer=12,fraction=2) BigDecimal costPrice,

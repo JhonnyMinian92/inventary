@@ -60,10 +60,11 @@ const configs = {
     label: 'Unidades',
     singular: 'unidad de medida',
     fields: [
-      { key: 'code', label: 'Código', required: true, maxLength: 24, pattern: '[A-Za-z][A-Za-z0-9_]{0,23}' },
       { key: 'name', label: 'Nombre', required: true, maxLength: 100 },
-      { key: 'dimension', label: 'Dimensión', required: true, options: ['COUNT', 'MASS', 'LENGTH', 'VOLUME', 'AREA', 'TIME', 'OTHER'] },
-      { key: 'decimalScale', label: 'Decimales permitidos', required: true, type: 'number', min: 0, max: 3 }
+      { key: 'code', label: 'Código', maxLength: 24, pattern: '[A-Za-z][A-Za-z0-9_]{0,23}', help: 'Opcional: si lo dejas vacío se genera a partir del nombre.' },
+      // Las opciones y su etiqueta las entrega el backend (GET /catalog/unit-dimensions).
+      { key: 'dimension', label: '¿Cómo se mide?', required: true, optionsFrom: 'dimensions', display: 'dimensionLabel' },
+      { key: 'decimalScale', label: 'Decimales permitidos', required: true, type: 'number', min: 0, max: 3, help: '0 = solo cantidades enteras; 3 = permite medio kilo, 1,25 litros…' }
     ],
     list: api.units,
     create: api.createUnit,
@@ -93,6 +94,15 @@ export default function OperationsCatalogs({ onChanged }) {
   const [notice, setNotice] = useState('');
   useMessageToast(notice, setNotice, 'success');
   const dialogRef = useAccessibleDialog(modal, () => setModal(false));
+  const [optionSources, setOptionSources] = useState({ dimensions: [] });
+
+  useEffect(() => {
+    let active = true;
+    api.unitDimensions()
+      .then(dimensions => { if (active) setOptionSources({ dimensions: (Array.isArray(dimensions) ? dimensions : []).map(item => [item.code, `${item.label} — ${item.examples}`]) }); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -145,7 +155,7 @@ export default function OperationsCatalogs({ onChanged }) {
       }
       payload = editing
         ? { name: String(form.name || '').trim(), decimalScale, active: form.active !== 'false' }
-        : { code: String(form.code || '').trim(), name: String(form.name || '').trim(), dimension: form.dimension, decimalScale };
+        : { code: String(form.code || '').trim() || undefined, name: String(form.name || '').trim(), dimension: form.dimension, decimalScale };
     } else {
       payload = Object.fromEntries(config.fields.map(field => [field.key, String(form[field.key] || '').trim()]).filter(([key, value]) => value !== '' || config.fields.some(field => field.key === key && field.required)));
     }
@@ -222,7 +232,7 @@ export default function OperationsCatalogs({ onChanged }) {
     </div>
     <div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field.key}>{field.label}</th>)}<th>Estado</th><th>Acciones</th></tr></thead><tbody>
       {visible.map((item, index) => <tr key={idOf(item) || index}>
-        {config.fields.map(field => <td key={field.key}>{item?.[field.key] || '—'}</td>)}
+        {config.fields.map(field => <td key={field.key}>{item?.[field.display || field.key] ?? item?.[field.key] ?? '—'}</td>)}
         <td><span className={'pill ' + (inactive(item) ? 'inactive' : 'active')}>{inactive(item) ? 'Inactivo' : 'Activo'}</span></td>
         <td><div className="row-actions"><button className="small-action" disabled={loading} onClick={() => open(item)}>Editar</button>{config.activate && config.deactivate && <button className="small-action" disabled={loading} onClick={() => toggle(item)}>{inactive(item) ? 'Activar' : 'Desactivar'}</button>}{inactive(item) && config.delete && <button type="button" className="small-action danger" disabled={loading} onClick={() => remove(item)}>Eliminar</button>}</div></td>
       </tr>)}
@@ -235,9 +245,10 @@ export default function OperationsCatalogs({ onChanged }) {
         <form className="form-grid" onSubmit={save}>
           {config.fields.map(field => <label className="field" key={field.key}>
             <span>{field.label}{field.required && <b> *</b>}</span>
-            {field.options
-              ? <select required={Boolean(field.required)} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}><option value="">Seleccionar</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select>
+            {field.options || field.optionsFrom
+              ? <select required={Boolean(field.required)} disabled={Boolean(editing && field.optionsFrom)} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))}><option value="">Seleccionar</option>{(field.optionsFrom ? optionSources[field.optionsFrom] : field.options).map(option => { const [value, label] = Array.isArray(option) ? option : [option, option]; return <option key={value} value={value}>{label}</option>; })}</select>
               : <input required={Boolean(field.required)} disabled={Boolean(editing && field.key === 'code')} type={field.type || 'text'} min={field.min} max={field.max} maxLength={field.maxLength} pattern={field.pattern} value={form[field.key] || ''} onChange={event => setForm(current => ({ ...current, [field.key]: event.target.value }))} />}
+            {field.help && !(editing && field.key === 'code') && <small className="field-help">{field.help}</small>}
           </label>)}
           {kind === 'units' && editing && <label className="field"><span>Estado</span><select value={form.active || 'true'} onChange={event => setForm(current => ({ ...current, active: event.target.value }))}><option value="true">Activa</option><option value="false">Inactiva</option></select></label>}
           <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => setModal(false)}>Cancelar</button><button className="button primary" disabled={loading}>{loading ? 'Guardando…' : 'Guardar registro'}</button></div>

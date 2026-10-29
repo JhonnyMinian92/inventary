@@ -15,15 +15,39 @@ import java.util.UUID;
 public class CatalogStructureController {
     private final CatalogStructureService structure;
     private final ProductVariantService variants;
+    private final CategorySuggestionService suggestions;
 
-    public CatalogStructureController(CatalogStructureService structure, ProductVariantService variants) {
+    public CatalogStructureController(CatalogStructureService structure, ProductVariantService variants, CategorySuggestionService suggestions) {
         this.structure = structure;
         this.variants = variants;
+        this.suggestions = suggestions;
     }
 
     @GetMapping("/units")
     public List<CatalogStructureDtos.UnitView> units(@RequestParam(required = false) Boolean active) {
         return structure.listUnits(active);
+    }
+
+    @GetMapping("/unit-dimensions")
+    public List<CatalogStructureDtos.UnitDimensionView> unitDimensions() {
+        return structure.unitDimensions();
+    }
+
+    /** Ready-made properties and category templates; clients render them instead of hardcoding choices. */
+    @GetMapping("/attribute-presets")
+    public CatalogStructureDtos.AttributePresetsView attributePresets() {
+        return structure.attributePresets();
+    }
+
+    /** Suggests a template (and a similar existing category) from what the user typed, e.g. the category or product name. */
+    @GetMapping("/attribute-presets/suggestion")
+    public CatalogStructureDtos.CategorySuggestionView suggestTemplate(@RequestParam(required = false) String text) {
+        return suggestions.suggest(text);
+    }
+
+    @GetMapping("/product-kinds")
+    public List<CatalogStructureDtos.ProductKindView> productKinds() {
+        return java.util.Arrays.stream(ProductKind.values()).map(CatalogStructureDtos.ProductKindView::from).toList();
     }
 
     @PostMapping("/units")

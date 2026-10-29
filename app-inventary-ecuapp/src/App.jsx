@@ -314,16 +314,16 @@ function App() {
   }
 
   async function submitProduct(form) {
-    if (!String(form.name || '').trim() || !String(form.sku || '').trim()) {
-      setError('Escribe el nombre y el SKU del producto.');
+    if (!String(form.name || '').trim()) {
+      setError('Escribe el nombre del producto.');
       return;
     }
     if (!form.categoryId) {
       setError('Selecciona una categoría.');
       return;
     }
+    // El código (SKU) lo genera el backend al crear y es inmutable; nunca se envía desde aquí.
     const data = {
-      sku: form.sku.trim(),
       name: form.name.trim(),
       kind: form.kind || 'STOCKED_GOOD',
       categoryId: form.categoryId,
@@ -347,11 +347,12 @@ function App() {
       return;
     }
     const data = { name: form.name.trim(), description: form.description.trim() };
+    const definitions = Array.isArray(form.definitions) ? form.definitions : [];
     await runAction(async () => {
-      const result = editing ? await api.updateCategory(pickId(editing), data) : await api.createCategory(data);
-      const categoryId = result?.id ?? result?.categoryId ?? (editing ? pickId(editing) : null);
-      if (!categoryId) throw new Error('La API guardó la categoría pero no devolvió su identificador; no se pudo guardar el esquema de propiedades.');
-      await api.saveCategoryAttributes(categoryId, { definitions: Array.isArray(form.definitions) ? form.definitions : [] });
+      // Al crear, categoría y características se guardan en una sola operación del backend.
+      if (!editing) return api.createCategory({ ...data, definitions });
+      await api.updateCategory(pickId(editing), data);
+      await api.saveCategoryAttributes(pickId(editing), { definitions });
     }, editing ? 'Categoría actualizada.' : 'Categoría creada.');
   }
 

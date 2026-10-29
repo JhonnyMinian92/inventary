@@ -11,6 +11,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.util.*;
 
 /** Units of measure, unit conversions and versioned attribute schemas per category. */
@@ -24,10 +25,12 @@ public class CatalogStructureService {
     private final ProductVariantRepository variants;
     private final AttributeSchemaValidator validator;
     private final AuditService audit;
+    private final AttributePresetCatalog presets;
 
     public CatalogStructureService(UnitOfMeasureRepository units, UnitConversionRepository conversions, CategoryRepository categories,
                                    CategoryAttributeDefinitionRepository definitions, ProductRepository products,
-                                   ProductVariantRepository variants, AttributeSchemaValidator validator, AuditService audit) {
+                                   ProductVariantRepository variants, AttributeSchemaValidator validator, AuditService audit,
+                                   AttributePresetCatalog presets) {
         this.units = units;
         this.conversions = conversions;
         this.categories = categories;
@@ -36,6 +39,15 @@ public class CatalogStructureService {
         this.variants = variants;
         this.validator = validator;
         this.audit = audit;
+        this.presets = presets;
+    }
+
+    public List<CatalogStructureDtos.UnitDimensionView> unitDimensions() {
+        return Arrays.stream(UnitDimension.values()).map(CatalogStructureDtos.UnitDimensionView::from).toList();
+    }
+
+    public CatalogStructureDtos.AttributePresetsView attributePresets() {
+        return presets.view();
     }
 
     @Transactional(readOnly = true)
@@ -46,10 +58,19 @@ public class CatalogStructureService {
 
     @Transactional
     public CatalogStructureDtos.UnitView createUnit(CatalogStructureDtos.UnitCreateRequest request, String actor) {
-        String code = request.code().trim().toUpperCase(Locale.ROOT);
-        if (units.existsByCodeIgnoreCase(code)) throw new ConflictException("Ya existe una unidad con ese código.");
+        UnitDimension dimension = UnitDimension.parse(request.dimension())
+            .orElseThrow(() -> new BusinessRuleException("Elija cómo se mide la unidad: cantidad, peso, volumen, largo, superficie, tiempo u otra."));
+        String code;
+        if (request.code() == null || request.code().isBlank()) {
+            code = generateUnitCode(request.name());
+        } else {
+            code = request.code().trim().toUpperCase(Locale.ROOT);
+            if (units.existsByCodeIgnoreCase(code)) throw new ConflictException("Ya existe una unidad con ese código.");
+        }
+        int decimalScale = request.decimalScale() != null ? request.decimalScale()
+            : Boolean.TRUE.equals(request.allowsFractions()) || (request.allowsFractions() == null && dimension.defaultAllowsFractions()) ? 3 : 0;
         UnitOfMeasure unit = units.saveAndFlush(new UnitOfMeasure(UUID.randomUUID(), code, request.name().trim(),
-            request.dimension().trim().toUpperCase(Locale.ROOT), request.decimalScale().shortValue()));
+            dimension.name(), (short) decimalScale));
         audit.record(actor, "UNIT_OF_MEASURE_CREATED", "UNIT_OF_MEASURE", unit.getId(), Map.of("code", code, "dimension", unit.getDimension()));
         return CatalogStructureDtos.UnitView.from(unit);
     }
@@ -128,17 +149,27 @@ public class CatalogStructureService {
     public CatalogStructureDtos.AttributeSchemaView replaceSchema(UUID categoryId, CatalogStructureDtos.AttributeSchemaRequest request, String actor) {
         Category category = categories.findForUpdate(categoryId).orElseThrow(() -> new ResourceNotFoundException("Categoría", categoryId));
         Set<String> keys = new HashSet<>();
+        Set<String> names = new HashSet<>();
         for (CatalogStructureDtos.AttributeDefinitionRequest d : request.definitions()) {
+            if (d.key() == null || d.key().isBlank()) continue;
             String key = d.key().trim();
             if (!keys.add(key)) throw new BusinessRuleException("La clave de atributo " + key + " está repetida.");
+        }
+        List<String> resolvedKeys = new ArrayList<>();
+        for (CatalogStructureDtos.AttributeDefinitionRequest d : request.definitions()) {
+            if (!names.add(d.displayName().trim().toLowerCase(Locale.ROOT)))
+                throw new BusinessRuleException("La propiedad \"" + d.displayName().trim() + "\" está repetida.");
+            String key = d.key() == null || d.key().isBlank() ? uniqueAttributeKey(d.displayName(), keys) : d.key().trim();
             validator.validateDefinition(key, d.valueType(), d.constraints(), d.options());
+            resolvedKeys.add(key);
         }
         definitions.findByCategoryIdAndActiveTrueOrderByAttributeKeyAsc(categoryId).forEach(CategoryAttributeDefinition::retire);
         definitions.flush();
         int version = definitions.maxSchemaVersion(categoryId) + 1;
         List<CategoryAttributeDefinition> created = new ArrayList<>();
-        for (CatalogStructureDtos.AttributeDefinitionRequest d : request.definitions()) {
-            created.add(definitions.save(new CategoryAttributeDefinition(category, d.key().trim(), d.displayName().trim(), d.valueType(),
+        for (int i = 0; i < request.definitions().size(); i++) {
+            CatalogStructureDtos.AttributeDefinitionRequest d = request.definitions().get(i);
+            created.add(definitions.save(new CategoryAttributeDefinition(category, resolvedKeys.get(i), d.displayName().trim(), d.valueType(),
                 d.required(), d.constraints(), d.options(), version)));
         }
         definitions.flush();
@@ -147,6 +178,38 @@ public class CatalogStructureService {
         return new CatalogStructureDtos.AttributeSchemaView(categoryId, version,
             created.stream().sorted(Comparator.comparing(CategoryAttributeDefinition::getAttributeKey))
                 .map(CatalogStructureDtos.AttributeDefinitionView::from).toList());
+    }
+
+    /** Publishes the properties of a ready-made template as the category schema. */
+    @Transactional
+    public CatalogStructureDtos.AttributeSchemaView applyTemplate(UUID categoryId, String templateId, String actor) {
+        return replaceSchema(categoryId, presets.templateSchema(templateId), actor);
+    }
+
+    /** Derives a technical key from the visible name ("Talla de ropa" -> "talla_de_ropa"), unique within the schema. */
+    private String uniqueAttributeKey(String displayName, Set<String> used) {
+        String base = Normalizer.normalize(displayName.trim(), Normalizer.Form.NFD).replaceAll("\\p{M}", "")
+            .toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("(^_+|_+$)", "");
+        if (base.isEmpty()) base = "campo";
+        if (!Character.isLetter(base.charAt(0))) base = "campo_" + base;
+        if (base.length() > 70) base = base.substring(0, 70).replaceAll("_+$", "");
+        String key = base;
+        for (int n = 2; !used.add(key); n++) key = base + "_" + n;
+        return key;
+    }
+
+    /** Derives a unit code from its name ("Caja de 12" -> "CAJA_DE_12"), adding a suffix when it already exists. */
+    private String generateUnitCode(String name) {
+        String base = Normalizer.normalize(name.trim(), Normalizer.Form.NFD).replaceAll("\\p{M}", "")
+            .toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", "_").replaceAll("(^_+|_+$)", "");
+        if (base.isEmpty() || !Character.isLetter(base.charAt(0))) base = "U" + base;
+        if (base.length() > 20) base = base.substring(0, 20).replaceAll("_+$", "");
+        String code = base;
+        for (int n = 2; units.existsByCodeIgnoreCase(code); n++) {
+            if (n > 999) throw new ConflictException("No se pudo generar un código para la unidad. Use otro nombre.");
+            code = base + "_" + n;
+        }
+        return code;
     }
 
     private Category requireCategory(UUID id) {

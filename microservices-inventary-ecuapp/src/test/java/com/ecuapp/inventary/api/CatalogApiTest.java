@@ -416,9 +416,87 @@ class CatalogApiTest extends ApiTestSupport {
         assertFalse(tooComplex.has("data") && tooComplex.get("data").has("a0") && !tooComplex.get("data").get("a0").isNull());
     }
 
+    @Test
+    void productCodeIsGeneratedWhenOmittedAndStaysImmutable() {
+        String admin = admin();
+        String category = httpPost(admin, "/api/v1/catalog/categories", Map.of("name", "Auto SKU " + suffix()), 201).get("id").asText();
+        JsonNode first = httpPost(admin, "/api/v1/catalog/products", productBody(category, null), 201);
+        JsonNode second = httpPost(admin, "/api/v1/catalog/products", productBody(category, null), 201);
+        String sku = first.get("sku").asText();
+        assertTrue(sku.matches("PRD-[2-9A-HJKMNP-Z]{8}"), sku);
+        assertNotEquals(sku, second.get("sku").asText());
+
+        Map<String, Object> update = productBody(category, null);
+        JsonNode updated = httpPut(admin, "/api/v1/catalog/products/" + first.get("id").asText(), update, 200);
+        assertEquals(sku, updated.get("sku").asText());
+        update.put("sku", "OTRO-" + suffix());
+        problem(call(put("/api/v1/catalog/products/" + first.get("id").asText()), admin, update), 409, "CONFLICT");
+    }
+
+    @Test
+    void presetsTemplatesAndFriendlyUnitsComeFromTheBackend() {
+        String admin = admin();
+        JsonNode presets = httpGet(token("VENDEDOR"), "/api/v1/catalog/attribute-presets", 200);
+        assertTrue(presets.get("templates").toString().contains("\"id\":\"ropa\""));
+        assertTrue(presets.get("presets").toString().contains("\"key\":\"talla\""));
+        assertEquals(6, presets.get("valueTypes").size());
+        assertEquals("COUNT", httpGet(admin, "/api/v1/catalog/unit-dimensions", 200).get(0).get("code").asText());
+
+        String category = httpPost(admin, "/api/v1/catalog/categories", Map.of("name", "Ropa " + suffix(), "templateId", "ropa"), 201).get("id").asText();
+        JsonNode schema = httpGet(admin, "/api/v1/catalog/categories/" + category + "/attributes", 200);
+        assertTrue(schema.get("definitions").toString().contains("\"key\":\"talla\""));
+        problem(call(post("/api/v1/catalog/categories"), admin, Map.of("name", "X " + suffix(), "templateId", "no-existe")), 422, "BUSINESS_RULE_VIOLATION");
+
+        // Keys are derived from the visible name, so users never type technical identifiers.
+        List<Map<String, Object>> definitions = List.of(
+            Map.of("key", "talla", "displayName", "Talla", "valueType", "ENUM", "required", true, "options", List.of("S", "M")),
+            Map.of("displayName", "Sabor del Té", "valueType", "STRING", "required", false));
+        JsonNode published = httpPut(admin, "/api/v1/catalog/categories/" + category + "/attributes", Map.of("definitions", definitions), 200);
+        assertTrue(published.get("definitions").toString().contains("\"key\":\"sabor_del_te\""), published.toString());
+        problem(call(put("/api/v1/catalog/categories/" + category + "/attributes"), admin,
+            Map.of("definitions", List.of(Map.of("displayName", "Color", "valueType", "STRING"), Map.of("displayName", "color", "valueType", "STRING")))),
+            422, "BUSINESS_RULE_VIOLATION");
+
+        String name = "Caja de " + suffix();
+        JsonNode unit = httpPost(admin, "/api/v1/catalog/units", Map.of("name", name, "dimension", "COUNT"), 201);
+        assertTrue(unit.get("code").asText().startsWith("CAJA_DE_"), unit.toString());
+        assertEquals(0, unit.get("decimalScale").asInt());
+        assertEquals("Por cantidad (piezas)", unit.get("dimensionLabel").asText());
+        JsonNode same = httpPost(admin, "/api/v1/catalog/units", Map.of("name", name, "dimension", "MASS", "allowsFractions", true), 201);
+        assertNotEquals(unit.get("code").asText(), same.get("code").asText());
+        assertTrue(same.get("allowsFractions").asBoolean());
+        problem(call(post("/api/v1/catalog/units"), admin, Map.of("name", "Rara " + suffix(), "dimension", "COLOR")), 422, "BUSINESS_RULE_VIOLATION");
+    }
+
+    @Test
+    void suggestionsRecognizeTheBusinessAndReuseSimilarCategories() {
+        String admin = admin();
+        String seller = token("VENDEDOR");
+        assertEquals("ropa", httpGet(seller, "/api/v1/catalog/attribute-presets/suggestion?text=Camisetas", 200).get("templateId").asText());
+        assertEquals("calzado", httpGet(seller, "/api/v1/catalog/attribute-presets/suggestion?text=Zapatillas", 200).get("templateId").asText());
+        assertEquals("hogar", httpGet(seller, "/api/v1/catalog/attribute-presets/suggestion?text=Vasos", 200).get("templateId").asText());
+        assertFalse(httpGet(seller, "/api/v1/catalog/attribute-presets/suggestion?text=", 200).hasNonNull("templateId"));
+        assertEquals("SERVICE", httpGet(seller, "/api/v1/catalog/product-kinds", 200).get(2).get("code").asText());
+
+        // Category and properties are created atomically, so no category is left without its characteristics.
+        String marker = "linea" + suffix().toLowerCase();
+        List<Map<String, Object>> definitions = List.of(Map.of("displayName", "Fragancia", "valueType", "ENUM", "options", List.of("Cítrica", "Floral")));
+        String id = httpPost(admin, "/api/v1/catalog/categories", Map.of("name", "Velas " + marker, "templateId", "ropa", "definitions", definitions), 201).get("id").asText();
+        JsonNode schema = httpGet(admin, "/api/v1/catalog/categories/" + id + "/attributes", 200);
+        assertEquals(1, schema.get("definitions").size());
+        assertEquals("fragancia", schema.get("definitions").get(0).get("key").asText());
+        problem(call(post("/api/v1/catalog/categories"), admin, Map.of("name", "Rota " + suffix(),
+            "definitions", List.of(Map.of("displayName", "Lista vacía", "valueType", "ENUM")))), 422, "BUSINESS_RULE_VIOLATION");
+
+        JsonNode similar = httpGet(seller, "/api/v1/catalog/attribute-presets/suggestion?text=" + marker, 200);
+        assertTrue(similar.hasNonNull("similarCategoryId"), similar.toString());
+        assertEquals(id, similar.get("similarCategoryId").asText());
+        assertEquals("Fragancia", similar.get("similarDefinitions").get(0).get("displayName").asText());
+    }
+
     private Map<String, Object> productBody(String categoryId, String sku) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("sku", sku);
+        if (sku != null) body.put("sku", sku);
         body.put("name", "Producto " + suffix());
         body.put("categoryId", categoryId);
         body.put("costPrice", new BigDecimal("3.10"));

@@ -69,13 +69,14 @@ public class AttributeSchemaValidator {
         if (enforceRequired) {
             for (CategoryAttributeDefinition d : definitions)
                 if (d.isRequired() && !result.containsKey(d.getAttributeKey()))
-                    throw new BusinessRuleException("El atributo obligatorio " + d.getAttributeKey() + " no fue informado.");
+                    throw new BusinessRuleException("Complete la propiedad obligatoria " + d.getDisplayName() + ".");
         }
         return result;
     }
 
     private Object validate(CategoryAttributeDefinition d, Object value) {
-        String key = d.getAttributeKey();
+        // Messages use the visible name: end users never see technical keys.
+        String key = d.getDisplayName();
         Map<String, Object> c = d.getConstraints();
         switch (d.getValueType()) {
             case STRING -> {

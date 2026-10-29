@@ -80,15 +80,19 @@ Permisos principales: catalog:read para lecturas y catalog:manage para comandos.
 | POST | /catalog/categories/{id}/deactivate | Desactivar |
 | DELETE | /catalog/categories/{id} | Borrado físico si no hay referencias |
 | GET | /catalog/categories/{id}/attributes | Esquema de propiedades |
-| PUT | /catalog/categories/{id}/attributes | Guardar esquema |
+| PUT | /catalog/categories/{id}/attributes | Guardar esquema; `key` opcional, se deriva de `displayName` |
+| GET | /catalog/attribute-presets | Tipos de dato, propiedades sugeridas y plantillas de categoría |
+| GET | /catalog/attribute-presets/suggestion?text= | Plantilla sugerida por nombre y categoría parecida existente con sus propiedades |
+| GET | /catalog/product-kinds | Tipos de producto con etiqueta, descripción y ejemplos para el usuario |
 | GET | /catalog/products | Listado paginado y filtros implementados en controlador |
 | GET | /catalog/products/{id} | Detalle; campos de costo condicionados por permisos |
-| POST | /catalog/products | Crear |
+| POST | /catalog/products | Crear; `sku` opcional (se genera uno único si se omite) |
 | PUT | /catalog/products/{id} | Actualizar |
 | POST | /catalog/products/{id}/activate | Activar |
 | POST | /catalog/products/{id}/deactivate | Desactivar |
 | DELETE | /catalog/products/{id} | Borrado físico solo si no tiene existencia ni referencias |
-| GET | /catalog/units | Unidades; active opcional |
+| GET | /catalog/units | Unidades; active opcional; incluye `dimensionLabel` y `allowsFractions` |
+| GET | /catalog/unit-dimensions | Formas de medir (cantidad, peso, volumen…) con etiqueta y ejemplos |
 | POST | /catalog/units | Crear |
 | PUT | /catalog/units/{id} | Actualizar |
 | DELETE | /catalog/units/{id} | Borrar si no hay referencias |

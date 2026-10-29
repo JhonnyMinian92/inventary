@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackagePlus, Trash2 } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
+import ProductPicker from '../../components/ProductPicker.jsx';
 
 const emptyLine = () => ({ productId: '', quantity: '1', unitCost: '0' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
@@ -144,16 +145,14 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
           return <section className="line-editor workflow-line" key={index} aria-label={`Producto ${index + 1}`}>
             <div className="line-editor-heading"><strong>Producto {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" disabled={loading} onClick={() => { setLines(current => current.filter((_, lineIndex) => lineIndex !== index)); setValidationMessage(''); }}><Trash2 size={14}/> Quitar</button>}</div>
             <div className="form-grid compact-grid">
-              <label className="field wide"><span>Producto<b> *</b></span>
-                <select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}>
-                  <option value="">Seleccionar producto</option>
-                  {activeProducts.filter(item => !lines.some((otherLine, otherIndex) => otherIndex !== index && String(otherLine.productId) === String(idOf(item)))).map(item => <option key={idOf(item)} value={idOf(item)}>{labelOf(item)} · {item.sku || item.code || idOf(item)}</option>)}
-                </select>
-              </label>
+              <div className="field wide"><span>Producto<b> *</b></span>
+                <ProductPicker products={activeProducts} value={line.productId} onChange={value => updateLine(index, 'productId', value)} ariaLabel={`Producto ${index + 1}`}
+                  excludeIds={lines.filter((_, otherIndex) => otherIndex !== index).map(otherLine => otherLine.productId).filter(Boolean)} />
+              </div>
               <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
               <label className="field"><span>Costo por unidad<b> *</b></span><input type="number" min="0" step="0.01" inputMode="decimal" required value={line.unitCost} onChange={event => updateLine(index, 'unitCost', event.target.value)} /></label>
             </div>
-            <div className="line-editor-foot"><span>{product ? `Código: ${product.sku || product.code || '—'}` : 'Selecciona un producto'}</span><strong>{money(lineTotal)}</strong></div>
+            <div className="line-editor-foot"><span>{product ? `Código: ${product.sku || product.code || '—'}` : 'Busca el producto por su nombre'}</span><strong>{money(lineTotal)}</strong></div>
           </section>;
         })}
       </div>

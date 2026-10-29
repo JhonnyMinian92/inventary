@@ -4,30 +4,27 @@ import { ArrowLeft, ArrowRight, Boxes, ImagePlus, Star, Trash2, UploadCloud } fr
 import StepProgress from '../../components/StepProgress.jsx';
 import { api, resolveApiUrl } from '../../api';
 import QuickCreateDialog, { SelectWithCreate } from '../../ui/QuickCreateDialog.jsx';
+import CategoryQuickCreate from './CategoryQuickCreate.jsx';
 
 const DEFAULT_UNIT_ID = '00000000-0000-0000-0000-000000000001';
-const DIMENSIONS = [['COUNT', 'Conteo (piezas)'], ['MASS', 'Peso'], ['VOLUME', 'Volumen'], ['LENGTH', 'Longitud'], ['AREA', 'Área'], ['TIME', 'Tiempo'], ['OTHER', 'Otra']];
-const QUICK_CREATE = {
-  category: {
-    title: 'Nueva categoría',
+const FRACTION_OPTIONS = [['', 'Según cómo se mide (recomendado)'], ['false', 'No, solo cantidades enteras (1, 2, 3)'], ['true', 'Sí, permite decimales (ej. 1,5)']];
+
+/** El formulario de alta rápida de unidades se arma con las opciones que entrega el backend. */
+function unitQuickCreateConfig(dimensions) {
+  return {
+    title: 'Nueva forma de venta',
+    description: 'Indica cómo cuentas este producto al comprar y vender (por unidad, por kilo, por litro…). Las características como talla, color o peso van en la categoría.',
     fields: [
-      { key: 'name', label: 'Nombre', required: true, maxLength: 120, placeholder: 'Ej. Bebidas', hint: 'Escribe el nombre de la categoría.' },
-      { key: 'description', label: 'Descripción', type: 'textarea', maxLength: 1000 }
-    ],
-    create: values => api.createCategory({ name: values.name, description: values.description || undefined })
-  },
-  unit: {
-    title: 'Nueva unidad de medida',
-    fields: [
-      { key: 'name', label: 'Nombre', required: true, maxLength: 100, placeholder: 'Ej. Caja x12', hint: 'Escribe el nombre de la unidad.' },
-      { key: 'code', label: 'Código', required: true, maxLength: 24, pattern: '[A-Za-z][A-Za-z0-9_]{0,23}', placeholder: 'Ej. CJ12', transform: value => value.toUpperCase(),
-        hint: 'El código empieza con una letra y solo admite letras, números y guion bajo (máx. 24).' },
-      { key: 'dimension', label: 'Dimensión', type: 'select', required: true, initial: 'COUNT', options: DIMENSIONS },
-      { key: 'decimalScale', label: 'Decimales', type: 'select', required: true, initial: '0', options: [['0', '0 · enteros'], ['1', '1'], ['2', '2'], ['3', '3']], transform: Number }
+      { key: 'name', label: 'Nombre', required: true, maxLength: 100, placeholder: 'Ej. Caja de 12, Saco de 50 kg, Galón', hint: 'Escribe el nombre de la unidad.',
+        help: 'Así aparecerá al elegir cómo se vende un producto.' },
+      { key: 'dimension', label: '¿Cómo se mide?', type: 'select', required: true, initial: dimensions[0]?.code || '',
+        options: dimensions.map(item => [item.code, `${item.label} — ${item.examples}`]) },
+      { key: 'allowsFractions', label: '¿Se puede vender en partes?', type: 'select', initial: '', options: FRACTION_OPTIONS,
+        transform: value => value === '' ? undefined : value === 'true', help: 'Por ejemplo, medio kilo o 1,5 metros.' }
     ],
     create: values => api.createUnit(values)
-  }
-};
+  };
+}
 
 function objectValue(value) {
   if (value && typeof value === 'object' && !Array.isArray(value)) return { ...value };
@@ -56,6 +53,17 @@ function normalizeProduct(product) {
   };
 }
 
+/** Agrupa las unidades activas por forma de medir, usando la etiqueta que entrega el backend. */
+function unitGroups(units) {
+  const groups = new Map();
+  for (const unit of units.filter(item => item.active !== false && item.status !== 'INACTIVE')) {
+    const group = unit.dimensionLabel || unit.dimension || 'Otras';
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(unit);
+  }
+  return [...groups.entries()];
+}
+
 function toAttributeValue(value, definition) {
   if (value === '') return '';
   if (definition.valueType === 'NUMBER') return Number(value);
@@ -74,14 +82,31 @@ function AttributeInput({ definition, value, onChange }) {
     'aria-label': label
   };
 
+  const options = Array.isArray(definition.options) ? definition.options.map(String) : [];
+  if (definition.valueType === 'STRING_LIST' || (definition.valueType === 'ENUM' && options.length && options.length <= 12)) {
+    const multiple = definition.valueType === 'STRING_LIST';
+    const current = multiple ? (Array.isArray(value) ? value.map(String) : []) : (value == null ? '' : String(value));
+    const toggle = option => {
+      if (multiple) onChange(definition.key, current.includes(option) ? current.filter(item => item !== option) : [...current, option]);
+      else onChange(definition.key, current === option ? '' : option);
+    };
+    return <div className="field" role="group" aria-labelledby={common.id + '-label'}>
+      <span id={common.id + '-label'}>{label}{definition.required && <b> *</b>}{multiple && <small className="field-note"> · puedes marcar varias</small>}</span>
+      <div className="option-chips">
+        {options.map(option => {
+          const active = multiple ? current.includes(option) : current === option;
+          return <button type="button" key={option} className={'option-chip' + (active ? ' selected' : '')} aria-pressed={active} onClick={() => toggle(option)}>{option}</button>;
+        })}
+      </div>
+    </div>;
+  }
+
   if (definition.valueType === 'ENUM') {
     return <label className="field" htmlFor={common.id}>
       <span>{label}{definition.required && <b> *</b>}</span>
       <select {...common}>
         <option value="">Seleccionar</option>
-        {(Array.isArray(definition.options) ? definition.options : []).map(option =>
-          <option key={String(option)} value={String(option)}>{String(option)}</option>
-        )}
+        {options.map(option => <option key={option} value={option}>{option}</option>)}
       </select>
     </label>;
   }
@@ -134,6 +159,19 @@ export default function ProductForm({ initialValue, categories, units = [], load
   const [imageNotice, setImageNotice] = useState('');
   useMessageToast(imageNotice, setImageNotice, 'success');
   const [quickCreate, setQuickCreate] = useState(null);
+  const [dimensions, setDimensions] = useState(null);
+  const [productKinds, setProductKinds] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    api.productKinds()
+      .then(kinds => { if (active) setProductKinds(Array.isArray(kinds) ? kinds : []); })
+      .catch(() => { if (active) setProductKinds([]); });
+    if (onUnitCreated) api.unitDimensions()
+      .then(result => { if (active) setDimensions(Array.isArray(result) ? result : []); })
+      .catch(() => { if (active) setDimensions(null); });
+    return () => { active = false; };
+  }, []);
 
   function handleCreated(created) {
     const kind = quickCreate;
@@ -141,7 +179,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
     if (kind === 'category') {
       onCategoryCreated?.(created);
       changeCategory(created.id);
-      toast.success(`Categoría ${created.name} creada y seleccionada.`);
+      toast.success(`Categoría ${created.name} creada. Completa sus datos en el siguiente paso.`);
     } else {
       onUnitCreated?.(created);
       changeField('unitOfMeasureId', created.id);
@@ -273,12 +311,8 @@ export default function ProductForm({ initialValue, categories, units = [], load
     setValidationMessage('');
 
     if (step === 0) {
-      if (!String(form.name || '').trim() || !String(form.sku || '').trim()) {
-        setValidationMessage('Escribe el nombre y el código del producto.');
-        return;
-      }
-      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(String(form.sku).trim())) {
-        setValidationMessage('El código debe iniciar con letra o número y usar hasta 64 caracteres: letras, números, punto, guion o guion bajo.');
+      if (!String(form.name || '').trim()) {
+        setValidationMessage('Escribe el nombre del producto.');
         return;
       }
       if (!form.categoryId) {
@@ -308,7 +342,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
     const attributes = definitions.length ? {} : null;
     for (const definition of definitions) {
       const value = form.attributes[definition.key];
-      const isEmpty = value === undefined || value === null || String(value).trim() === '';
+      const isEmpty = value === undefined || value === null || String(value).trim() === '' || (Array.isArray(value) && !value.length);
       const label = definition.displayName || definition.key;
       if (definition.required && isEmpty) {
         setValidationMessage(`Completa el campo "${label}".`);
@@ -341,7 +375,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
       window.scrollTo({ top: 0, behavior: 'auto' });
       return;
     }
-    onSubmit({ ...form, name: form.name.trim(), sku: form.sku.trim(), attributes });
+    onSubmit({ ...form, name: form.name.trim(), attributes });
   }
 
   function previousStep() {
@@ -359,31 +393,38 @@ export default function ProductForm({ initialValue, categories, units = [], load
       <span>Nombre del producto<b> *</b></span>
       <input required maxLength="160" value={form.name} onChange={event => changeField('name', event.target.value)} placeholder="Ej. Teclado mecánico" autoComplete="off" />
     </label>
-    <label className="field">
-      <span>SKU / código<b> *</b></span>
-      <input required disabled={Boolean(initialValue)} maxLength="64" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}" title="Usa hasta 64 caracteres: letras, números, punto, guion o guion bajo." value={form.sku} onChange={event => changeField('sku', event.target.value)} placeholder="Ej. TEC-001" autoComplete="off" />
-    </label>
-    <SelectWithCreate label="Categoría" required labelId="product-category-label" createLabel="Crear categoría" onCreate={onCategoryCreated && (() => setQuickCreate('category'))}>
+    <div className="field">
+      <span>Código del producto</span>
+      <div className="readonly-value">{form.sku ? <code>{form.sku}</code> : <em>Se genera automáticamente al guardar</em>}</div>
+      <small className="field-help">Es único y sirve como referencia. Para vender o comprar solo buscas el producto por su nombre.</small>
+    </div>
+    <SelectWithCreate label="Categoría" required labelId="product-category-label" createLabel="Crear categoría" onCreate={onCategoryCreated && (() => setQuickCreate('category'))}
+      help="Agrupa productos parecidos y define qué datos llenar (talla, color, marca…). Con el + creas una nueva con sus datos.">
       <select required aria-labelledby="product-category-label" value={form.categoryId} onChange={event => changeCategory(event.target.value)}>
         <option value="">Seleccionar categoría</option>
         {categories.filter(category => category.active !== false && category.status !== 'INACTIVE').map(category => <option key={category.id || category.categoryId} value={category.id || category.categoryId}>{category.name}</option>)}
       </select>
     </SelectWithCreate>
-    <label className="field">
-      <span>Tipo de producto<b> *</b></span>
-      <select required value={form.kind} onChange={event => changeField('kind', event.target.value)}>
-        <option value="STOCKED_GOOD">Producto con inventario</option>
-        <option value="NON_STOCKED_GOOD">Producto sin control de stock</option>
-        <option value="SERVICE">Servicio</option>
-      </select>
-    </label>
-    <SelectWithCreate label="Unidad de medida" labelId="product-unit-label" createLabel="Crear unidad de medida" onCreate={onUnitCreated && (() => setQuickCreate('unit'))}>
-      {/* Sin selección el backend asigna la unidad base (EA), que ya figura en la lista. */}
+    <SelectWithCreate label="¿Cómo se vende y se cuenta?" labelId="product-unit-label" createLabel="Crear otra forma de venta" onCreate={onUnitCreated && dimensions && (() => setQuickCreate('unit'))}
+      help="Por unidad, por kilo, por litro, por caja… Así se cuentan las existencias al comprar y vender.">
+      {/* Sin selección el backend asigna la unidad base, que ya figura en la lista. */}
       <select aria-labelledby="product-unit-label" value={form.unitOfMeasureId || (units.some(unit => unit.id === DEFAULT_UNIT_ID) ? DEFAULT_UNIT_ID : '')} onChange={event => changeField('unitOfMeasureId', event.target.value)}>
-        {!units.some(unit => unit.id === DEFAULT_UNIT_ID) && <option value="">Unidad (predeterminada)</option>}
-        {units.filter(unit => unit.active !== false && unit.status !== 'INACTIVE').map(unit => <option key={unit.id} value={unit.id}>{unit.name} · {unit.code}</option>)}
+        {!units.some(unit => unit.id === DEFAULT_UNIT_ID) && <option value="">Por unidad (predeterminado)</option>}
+        {unitGroups(units).map(([group, items]) => <optgroup key={group} label={group}>
+          {items.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+        </optgroup>)}
       </select>
     </SelectWithCreate>
+    <div className="field wide" role="radiogroup" aria-labelledby="product-kind-label">
+      <span id="product-kind-label">¿Qué estás registrando?<b> *</b></span>
+      <small className="field-help">Define si el sistema lleva la cuenta de cuántos tienes.</small>
+      {productKinds.length ? <div className="kind-grid">
+        {productKinds.map(kind => <button type="button" role="radio" key={kind.code} aria-checked={form.kind === kind.code}
+          className={'type-card' + (form.kind === kind.code ? ' selected' : '')} onClick={() => changeField('kind', kind.code)}>
+          <strong>{kind.label}</strong><small>{kind.description}</small><small className="kind-examples">Ej.: {kind.examples}</small>
+        </button>)}
+      </div> : <p className="form-hint">Cargando opciones…</p>}
+    </div>
       </div>
     </section>}
     {step === 1 && <section className="workflow-stage" aria-labelledby="product-pricing-title">
@@ -454,8 +495,10 @@ export default function ProductForm({ initialValue, categories, units = [], load
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-review-title">Confirma los datos</h2><p>Comprueba la información antes de guardar.</p></div></div>
       <div className="workflow-review-grid">
         <div className="workflow-review-card"><small>Nombre</small><strong>{form.name.trim() || '—'}</strong></div>
-        <div className="workflow-review-card"><small>Código / SKU</small><strong>{form.sku.trim() || '—'}</strong></div>
+        <div className="workflow-review-card"><small>Código</small><strong>{form.sku || 'Se asignará al guardar'}</strong></div>
         <div className="workflow-review-card"><small>Categoría</small><strong>{categories.find(item => String(item.id || item.categoryId) === String(form.categoryId))?.name || '—'}</strong></div>
+        <div className="workflow-review-card"><small>Tipo</small><strong>{productKinds.find(kind => kind.code === form.kind)?.label || form.kind}</strong></div>
+        <div className="workflow-review-card"><small>Se vende por</small><strong>{units.find(unit => unit.id === (form.unitOfMeasureId || DEFAULT_UNIT_ID))?.name || 'Unidad'}</strong></div>
         <div className="workflow-review-card"><small>Costo</small><strong>{new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.costPrice || 0))}</strong></div>
         <div className="workflow-review-card"><small>Precio de venta</small><strong>{new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.salePrice || 0))}</strong></div>
         <div className="workflow-review-card"><small>Campos adicionales</small><strong>{Object.values(form.attributes || {}).filter(value => value !== '' && value !== null && value !== undefined).length}</strong></div>
@@ -470,7 +513,11 @@ export default function ProductForm({ initialValue, categories, units = [], load
           : <button type="submit" className="button primary" disabled={loading || schemaLoading || Boolean(schemaError)}>{loading ? 'Guardando…' : 'Guardar producto'}</button>}
       </div>
     </div>
-    {quickCreate && <QuickCreateDialog title={QUICK_CREATE[quickCreate].title} fields={QUICK_CREATE[quickCreate].fields} submitLabel="Crear y seleccionar"
-      onCreate={QUICK_CREATE[quickCreate].create} onCreated={handleCreated} onClose={() => setQuickCreate(null)} />}
+    {quickCreate === 'category' && <CategoryQuickCreate productName={form.name} onCreated={handleCreated} onClose={() => setQuickCreate(null)} />}
+    {quickCreate === 'unit' && dimensions && (() => {
+      const config = unitQuickCreateConfig(dimensions);
+      return <QuickCreateDialog title={config.title} description={config.description} fields={config.fields} submitLabel="Crear y seleccionar"
+        onCreate={config.create} onCreated={handleCreated} onClose={() => setQuickCreate(null)} />;
+    })()}
   </form>;
 }

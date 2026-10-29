@@ -38,11 +38,12 @@ public class ProductService implements ProductUseCases {
  private final UnitOfMeasureRepository units;private final CategoryAttributeDefinitionRepository definitions;private final AttributeSchemaValidator validator;
  private final ProductVariantRepository variants;private final StockMovementRepository movements;private final ProductImageRepository images;
  private final PurchaseOrderRepository purchaseOrders;private final StockTransferRepository transfers;private final InventoryCountRepository counts;
+ private final ProductCodeGenerator codes;
  public ProductService(ProductPersistencePort products,CategoryRepository categories,StockBalanceRepository balances,AuditService audit,UnitOfMeasureRepository units,
   CategoryAttributeDefinitionRepository definitions,AttributeSchemaValidator validator,ProductVariantRepository variants,StockMovementRepository movements,ProductImageRepository images,
-  PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts){
+  PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts,ProductCodeGenerator codes){
   this.products=products;this.categories=categories;this.balances=balances;this.audit=audit;this.units=units;this.definitions=definitions;this.validator=validator;
-  this.variants=variants;this.movements=movements;this.images=images;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;
+  this.variants=variants;this.movements=movements;this.images=images;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;this.codes=codes;
  }
 
  @Cacheable(cacheNames="publicProductList",key="'q=' + #query + '|c=' + #categoryId + '|' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
@@ -82,7 +83,7 @@ public class ProductService implements ProductUseCases {
  public ProductResult getProduct(UUID id){return ProductResultMapper.from(require(id));}
  @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public ProductResult createProduct(ProductCommand command,String actor){
-  String sku=normalizeSku(command.sku());
+  String sku=command.sku()==null||command.sku().isBlank()?codes.next():normalizeSku(command.sku());
   if(products.existsBySku(sku)||variants.existsBySkuIgnoreCase(sku))throw new ConflictException("Ya existe un producto o variante con ese SKU.");
   Category category=requireActiveCategory(command.categoryId());
   ProductKind kind=command.kind()==null?ProductKind.STOCKED_GOOD:command.kind();
@@ -98,7 +99,7 @@ public class ProductService implements ProductUseCases {
  @Override @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)
  public ProductResult updateProduct(UUID id,ProductCommand command,String actor){
   Product product=require(id);
-  if(!product.getSku().equalsIgnoreCase(normalizeSku(command.sku())))throw new ConflictException("El SKU es inmutable para preservar las referencias históricas.");
+  if(command.sku()!=null&&!command.sku().isBlank()&&!product.getSku().equalsIgnoreCase(normalizeSku(command.sku())))throw new ConflictException("El SKU es inmutable para preservar las referencias históricas.");
   Category category=requireActiveCategory(command.categoryId());
   ProductKind kind=command.kind()==null?product.getKind():command.kind();
   if(kind!=product.getKind()&&product.getKind()==ProductKind.STOCKED_GOOD&&balances.hasPhysicalStock(product.getId()))

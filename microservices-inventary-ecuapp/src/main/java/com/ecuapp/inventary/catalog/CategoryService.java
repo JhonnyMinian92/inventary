@@ -21,7 +21,8 @@ public class CategoryService {
  private static final Pattern NON_SLUG=Pattern.compile("[^a-z0-9]+");
  private static final Set<String> SORT=Set.of("name","slug","createdAt","updatedAt","active");
  private final CategoryRepository repository; private final ProductRepository products; private final CategoryAttributeDefinitionRepository definitions; private final AuditService audit;
- public CategoryService(CategoryRepository repository,ProductRepository products,CategoryAttributeDefinitionRepository definitions,AuditService audit){this.repository=repository;this.products=products;this.definitions=definitions;this.audit=audit;}
+ private final CatalogStructureService structure;
+ public CategoryService(CategoryRepository repository,ProductRepository products,CategoryAttributeDefinitionRepository definitions,AuditService audit,CatalogStructureService structure){this.repository=repository;this.products=products;this.definitions=definitions;this.audit=audit;this.structure=structure;}
  @Transactional(readOnly=true) public Page<CategoryDtos.View> list(Boolean active,Pageable pageable){return repository.search(active,Pages.of(pageable,SORT,Sort.by("name"))).map(CategoryDtos.View::from);}
  @Transactional(readOnly=true) public CategoryDtos.View get(UUID id){return CategoryDtos.View.from(require(id));}
  @Transactional public CategoryDtos.View create(CategoryDtos.WriteRequest request,String actor){
@@ -31,6 +32,8 @@ public class CategoryService {
   if(repository.existsBySlug(slug))slug=base+"-"+UUID.randomUUID().toString().substring(0,8);
   Category saved=repository.saveAndFlush(new Category(name,slug,clean(request.description())));
   audit.record(actor,"CATEGORY_CREATED","CATEGORY",saved.getId(),Map.of("name",saved.getName(),"slug",saved.getSlug()));
+  if(request.definitions()!=null)structure.replaceSchema(saved.getId(),new CatalogStructureDtos.AttributeSchemaRequest(request.definitions()),actor);
+  else if(request.templateId()!=null&&!request.templateId().isBlank())structure.applyTemplate(saved.getId(),request.templateId().trim(),actor);
   return CategoryDtos.View.from(saved);
  }
  @Transactional @CacheEvict(cacheNames="publicProductList",allEntries=true)

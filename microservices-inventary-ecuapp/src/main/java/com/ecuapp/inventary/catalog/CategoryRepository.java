@@ -12,6 +12,8 @@ public interface CategoryRepository extends com.ecuapp.inventary.common.Flushabl
  boolean existsByNameIgnoreCase(String name);
  boolean existsBySlug(String slug);
  Page<Category> findByActiveTrue(Pageable pageable);
+ /** The slug is already lowercase and accent-free, so it doubles as a normalized search key. */
+ java.util.List<Category> findTop20ByActiveTrueAndSlugContainingOrderByNameAsc(String fragment);
  @Query("select c from Category c where (:active is null or c.active=:active)")
  Page<Category> search(@Param("active") Boolean active,Pageable pageable);
  @Lock(LockModeType.PESSIMISTIC_WRITE)

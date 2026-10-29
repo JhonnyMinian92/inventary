@@ -3,6 +3,7 @@ import { useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, ShoppingCart, Trash2 } from 'lucide-react';
 import { api } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
+import ProductPicker from '../../components/ProductPicker.jsx';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
@@ -219,12 +220,10 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
           return <section className="line-editor workflow-line" key={index} aria-label={`Artículo ${index + 1}`}>
             <div className="line-editor-heading"><strong>Artículo {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" disabled={loading} onClick={() => { setLines(current => current.filter((_, lineIndex) => lineIndex !== index)); setValidationMessage(''); }}><Trash2 size={14}/> Quitar</button>}</div>
             <div className="form-grid compact-grid">
-              <label className="field wide"><span>Producto<b> *</b></span>
-                <select required value={line.productId} onChange={event => updateLine(index, 'productId', event.target.value)}>
-                  <option value="">Seleccionar producto</option>
-                  {activeProducts.filter(item => !lines.some((otherLine, otherIndex) => otherIndex !== index && String(otherLine.productId) === String(idOf(item)))).map(item => <option key={idOf(item)} value={idOf(item)}>{labelOf(item)} · {item.sku || item.code || idOf(item)}</option>)}
-                </select>
-              </label>
+              <div className="field wide"><span>Producto<b> *</b></span>
+                <ProductPicker products={activeProducts} value={line.productId} onChange={value => updateLine(index, 'productId', value)} ariaLabel={`Producto del artículo ${index + 1}`}
+                  excludeIds={lines.filter((_, otherIndex) => otherIndex !== index).map(otherLine => otherLine.productId).filter(Boolean)} describe={item => money(item.salePrice)} />
+              </div>
               <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
               <div className={qtyValid && stock.value !== null && qty > stock.value ? 'stock-hint stock-hint-warning' : 'stock-hint'}>
                 <small>Disponible {stock.verified ? '(actualizado)' : stock.value === null ? '(por verificar)' : '(último saldo)'}</small>
