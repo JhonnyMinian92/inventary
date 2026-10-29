@@ -761,3 +761,15 @@ Si el RUC está SUSPENDIDO o el establecimiento seleccionado aparece CERRADO, la
 El backend fiscal devuelve los códigos utilizados, el número de comprobante, la clave de acceso y el estado; esta pantalla puede mostrar esa información y la fecha de última sincronización, pero no inventa autorización. La consulta de RUC debe tener una fuente real y documentada; no suponer que el JSON de ejemplo es una API pública estable del SRI.
 
 La resolución NAC-DGERCGC25-00000017 reformó el plazo de anulación y el artículo sobre notas de crédito. El tratamiento fiscal de ventas/devoluciones se implementa en el contrato canónico, no en el CRUD de almacenes/contactos.
+
+---
+
+## Adenda adicional — Proveedor tecnológico de facturación y datos SRI
+
+Contrato de referencia: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+Además del RUC del contribuyente emisor y los establecimientos oficiales, debe considerarse la Resolución NAC-DGERCGC26-00000027 (Registro Oficial No. 335, 28 de julio de 2026). Para emisores que utilicen sistemas/proveedores de facturación comprendidos en su ámbito, el artículo 5 exige incluir el RUC del proveedor en la sección de información adicional del comprobante, conforme a la ficha técnica. La disposición transitoria indica 60 días calendario desde la publicación; debe verificarse el cumplimiento actual.
+
+Este RUC tecnológico **no es** el RUC del dueño del negocio, ni el RUC del cliente, ni el código de establecimiento SRI. Se mantiene como configuración del backend fiscal, con procedencia y control de cambios; no se edita en el registro de almacén ni por transacción de venta. La pantalla de datos maestros debe poder mostrar la identidad del proveedor fiscal si el negocio necesita gestionarla, pero el backend de facturación es responsable de validar su aplicabilidad, condición registral y uso en información adicional.
+
+Antes de configurar este dato, confirmar si el proveedor concreto entra en el artículo 2 (proveedor de sistema/servicio en el sentido definido por la resolución). Fuente: [aviso oficial SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1) y [Quinto Suplemento No. 335](https://www.registroficial.gob.ec/quinto-suplemento-no-335/).
