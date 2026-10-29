@@ -1,5 +1,8 @@
 # Propuesta integral de UX/UI y flujo comercial para Ventas
 
+> Versión revisada: [PROPUESTA_UX_VENTAS_V2.md](PROPUESTA_UX_VENTAS_V2.md). La arquitectura y evidencia transversal están en [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md).
+
+
 **Producto:** Inventary · EcuApp  
 **Base inspeccionada:** master · 23c806d6ed5d06d1ff55e5a72be405167a79150f  
 **Alcance:** pantalla de ventas, proceso de cobro, datos de comprador, devolución, inventario y contratos API necesarios. Documento de propuesta; no se modificó código.
