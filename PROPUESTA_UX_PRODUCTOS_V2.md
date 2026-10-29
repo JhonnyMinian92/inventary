@@ -1,5 +1,8 @@
 # Propuesta UX/UI de Productos — versión revisada
 
+> **Disponibilidad logística:** el stock debe presentarse por local/bodega y diferenciarse de la disponibilidad para retiro o despacho. Ver [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md).
+
+
 **Fecha:** 28 de octubre de 2026  
 **Base:** propuesta original de Productos y estado del repositorio documentado; no se ha modificado código fuente.  
 **Relación:** reemplaza como dirección de diseño las prioridades de la propuesta anterior; conserva sus ideas de búsqueda, variantes, edición masiva y asistencia humana. La arquitectura de API, métricas, modelos y WhatsApp se detalla en [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md).
@@ -142,3 +145,12 @@ No declarar ganador un texto solo porque recibe más clics. Debe conservar exact
 - Experimento de campo sobre recomendaciones y diversidad: https://doi.org/10.1016/j.jretconser.2022.103003
 - Patrones de experimentación confiable, Microsoft Research: https://www.microsoft.com/en-us/research/articles/patterns-of-trustworthy-experimentation-during-experiment-stage/
 - Arquitectura transversal propuesta para modelos y WhatsApp: [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md)
+
+
+## Ampliación: mostrar dónde está el producto
+
+La ficha y los resultados de búsqueda deben diferenciar «hay unidades en Inventary» de «puedes retirar ahora en este local» y «se puede enviar desde esta bodega». El primero es un saldo; los otros dependen del stock reservable, capacidades del punto, horario, cobertura, método de cumplimiento y estado de preparación.
+
+Para cada ubicación, mostrar disponibilidad recibida del backend y evitar afirmaciones que supongan que un producto en Bodega Norte ya puede recogerse en Local Centro. Si se requiere moverlo, etiquetar esa opción como traslado a punto de retiro con tiempo/coste estimado y confirmación futura.
+
+La asignación por ubicación y el flujo de preparación se detallan en [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md). El frontend no debe simular stock por estantería, picking multi-bin o reserva si esas capacidades no están expuestas por las APIs.
