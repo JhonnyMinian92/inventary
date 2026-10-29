@@ -765,3 +765,13 @@ Para el modo dueño/agente:
 - la herramienta fiscal oculta datos sensibles según permisos y devuelve código/estado, evidencia, timestamp, documento origen y correlationId.
 
 La cancelación operativa no debe presentarse como factura anulada. La devolución física no equivale a nota de crédito ni reembolso. La resolución NAC-DGERCGC25-00000017 modifica al día 7 del mes siguiente el plazo de anulación del artículo 3 desde el 1 de enero de 2026; el backend fiscal aplica las reglas consolidadas y las restricciones de consumidor final. No duplicar reglas fiscales en el frontend ni en un agente.
+
+---
+
+## Addendum fiscal adicional — Proveedor tecnológico SRI y emisiones agent-ready
+
+Contrato fiscal canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+Si el sistema de facturación cae dentro del ámbito de la Resolución NAC-DGERCGC26-00000027, el RUC de su proveedor debe aparecer en información adicional del comprobante conforme a la ficha técnica vigente. El backend fiscal gestiona y valida esa configuración central. Los agentes no pueden escoger o cambiar ese RUC en una venta, ni componer textos/atributos fiscales directamente.
+
+El centro de mando puede señalar un fallo de configuración fiscal, una factura rechazada o una emisión en proceso, pero solo con evidencia del backend. Antes de permitir que un agente prepare solicitudes de emisión, comprobar con el proveedor y el responsable tributario el registro que exige la norma y la presencia del RUC tecnológico en la ficha/documento autorizado. Fuente: [SRI, resolución 26-00000027](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
