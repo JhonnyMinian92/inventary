@@ -1016,3 +1016,13 @@ Los pedidos de WhatsApp, WebView y web deben utilizar la misma creación de vent
 La resolución NAC-DGERCGC25-00000017 cambia al día 7 del mes siguiente el plazo del artículo 3 de la resolución de anulación, con vigencia desde el 1 de enero de 2026. Las facturas transmitidas como consumidor final tienen restricciones especiales. El flujo automatizado debe usar la regla consolidada del backend fiscal, no una fórmula o texto desactualizado en el bot.
 
 Pruebas adicionales: pedido WhatsApp/WebView que termina con factura autorizada; emisión pendiente/rechazada; timeout y reintento sin duplicación; establecimiento cerrado/RUC no elegible; devolución parcial con nota de crédito vinculada; notificación que no se envía como autorizada antes del callback/consulta definitivo.
+
+---
+
+## Adenda adicional — Cumplimiento de proveedor fiscal en el checkout
+
+Contrato fiscal canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+El checkout por web, WhatsApp y WebView debe usar la misma configuración fiscal central. No debe solicitar al cliente ni al operador que introduzcan manualmente el RUC del proveedor tecnológico. Cuando aplique la Resolución NAC-DGERCGC26-00000027, el backend fiscal debe insertar el RUC del proveedor del sistema de facturación en la sección de información adicional del comprobante según la ficha técnica vigente. La norma fue publicada en el Registro Oficial No. 335 el 28 de julio de 2026 y fija un plazo de 60 días calendario para implementar ese requisito; debe comprobarse el cumplimiento actual.
+
+El RUC del proveedor es distinto del RUC emisor, del receptor y del número de establecimiento. La aplicación conversacional no construye XML, no agrega esta información al texto comercial y no debe afirmar que la factura cumple si el backend fiscal no confirma el resultado. Fuente: [SRI, norma sobre proveedores de facturación](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
