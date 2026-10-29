@@ -798,3 +798,11 @@ El centro de mando puede presentar:
 Para venta, retiro, recepción y devolución, mantener warehouseId y billingContextId por separado. Si una bodega sirve a varios establecimientos, no seleccionar arbitrariamente el primer establecimiento al emitir; la regla de negocio explícita propone el contexto y el backend fiscal valida el resultado.
 
 Pruebas críticas: N bodegas por establecimiento; N establecimientos por bodega; una bodega compartida por RUC distintos; cambio de asociación dentro de periodo; establecimiento cerrado con stock histórico; pedido multi-bodega; devolución recibida en bodega diferente; agregación que nunca duplica saldos.
+
+---
+
+## Nota normativa transversal — NAC-DGERCGC26-00000027
+
+La resolución publicada contiene, en su disposición transitoria tercera, un plazo de **60 días calendario** para implementar el requisito del RUC del proveedor de facturación en información adicional del comprobante. Sin embargo, la noticia informativa oficial del SRI describe el plazo como **60 días hábiles**. Para evitar que cada módulo interprete la regla de manera distinta, prevalece el texto normativo publicado y debe quedar registrada la discrepancia de la noticia. A la fecha de esta revisión (29 de octubre de 2026), el plazo transitorio habría transcurrido bajo ambas lecturas; verificar inmediatamente el cumplimiento con el proveedor fiscal y el responsable tributario. No modificar XML ni datos de factura desde React/n8n: la inclusión corresponde al backend fiscal conforme a la ficha técnica vigente.
+
+Fuentes: [texto de NAC-DGERCGC26-00000027](https://uqa.com.ec/wp-content/uploads/2026/07/Newsletter-No.-030-SRI-registro-de-proveedores-de-sistemas-informaticos-o-servicios-de-facturacion-electronica-28-JULIO-2026-SRI-NAC-27.pdf) · [aviso oficial del SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1) · [contrato fiscal canónico](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
