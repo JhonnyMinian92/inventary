@@ -342,3 +342,13 @@ Estos materiales son referencia de patrones; no demuestran que estas funciones e
 El diseño está completo cuando cada opción de retiro/envío identifica origen y destino, la disponibilidad se valida en la ubicación elegida, costo y promesa provienen del backend, reserva y picking tienen estados persistidos y el cliente distingue pedido recibido, pago confirmado, preparación, listo para retirar, despacho y entrega.
 
 La primera implementación no necesita todos los escenarios avanzados. Sí necesita evitar confundir existencias por almacén con un pedido logísticamente cumplido o prometer recogida/entrega sin un estado real.
+
+---
+
+## Adenda fiscal — El origen logístico no determina el establecimiento emisor
+
+Contrato de integración: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La bodega que prepara el pedido, el local donde se retira, la dirección de entrega y el establecimiento/punto de emisión de la factura son datos distintos. El flujo logístico conserva warehouseId/location y destino; el flujo fiscal conserva billingContextId, código de establecimiento, punto de emisión y el resultado del backend fiscal. Una asociación configurada puede proponer un contexto por defecto, pero el backend fiscal valida la elegibilidad antes de emitir.
+
+No anunciar un pedido como facturado o autorizado solo porque se preparó o despachó. Las cancelaciones y devoluciones separan la reversión logística/física, la anulación fiscal o nota de crédito y cualquier reembolso. La devolución de mercancía no debe generar una anulación fiscal automática sin comprobar el procedimiento permitido.
