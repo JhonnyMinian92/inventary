@@ -41,11 +41,15 @@ Archivos de referencia:
 
 ### 2.1 Compose del backend
 
-El Compose situado en microservices-inventary-ecuapp/docker-compose.yml incluye un broker bajo el perfil kafka. En un entorno de desarrollo aislado de ese Compose:
+El Compose situado en microservices-inventary-ecuapp/docker-compose.yml incluye un broker bajo el perfil kafka. En un entorno de desarrollo aislado de ese Compose, ejecutar desde la carpeta microservices-inventary-ecuapp estos pasos:
 
-1. Definir localmente todas las variables requeridas por la API.
-2. Activar el perfil kafka para iniciar el broker.
-3. Configurar KAFKA_ENABLED=true y KAFKA_BOOTSTRAP_SERVERS=kafka:9092 para la API que corre dentro de esa misma red Docker.
+1. Crear/configurar el archivo local .env con todas las variables requeridas por la API, sin subirlo a Git.
+2. En .env, fijar KAFKA_ENABLED=true y KAFKA_BOOTSTRAP_SERVERS=kafka:9092 para que la API dentro de Compose use el hostname del broker de la misma red.
+3. Ejecutar **docker compose --profile kafka up -d --build**.
+4. Revisar **docker compose --profile kafka ps** y **docker compose logs -f kafka api**; confirmar readiness de la API y que el broker haya iniciado.
+5. Para apagar el entorno, ejecutar **docker compose --profile kafka down**. Esto detiene los contenedores; no ejecutar down -v salvo que se pretenda eliminar los volúmenes persistentes de desarrollo.
+
+Si KAFKA_ENABLED se deja en false, el broker puede estar encendido pero OutboxPublisher y el consumidor condicional no se activarán. Si se coloca true y el broker no existe/no es accesible, se acumularán eventos pendientes y debe generarse una señal operativa.
 4. Iniciar PostgreSQL, Kafka y la API; esperar a readiness y revisar logs.
 5. Publicar un evento de prueba y comprobar Outbox PENDING → PROCESSING → PUBLISHED, entrega al consumidor y registro en Inbox.
 6. Detener Kafka, ejecutar una prueba controlada que genere Outbox, observar el pendiente y restaurar Kafka; verificar que el evento se publique sin perder la operación.
