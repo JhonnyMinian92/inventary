@@ -1256,3 +1256,309 @@ El ahorro debe ser demostrable: menos mensajes salientes entregados por pedido c
 
 Los formularios no deben convertirse en una barrera. El cliente puede usar el catálogo, elegir el Flow, responder por texto o hablar con una persona. El mejor flujo es el que consigue que el cliente complete la compra rápido y entienda exactamente lo que aceptó.
 
+
+
+
+
+---
+
+# Revisión V2.2 — componentes nativos de WhatsApp y compra con mínimo esfuerzo
+
+**Fecha de revisión:** 28 de octubre de 2026. Esta sección amplía el diseño de compra rápida con un selector adaptativo de componentes; no implica que esas integraciones ya estén habilitadas en Inventary.
+
+## 33. Aclaración: qué podría significar “WhatsApp View”
+
+En la documentación oficial consultada no encontré una función de Meta cuyo nombre formal sea exactamente **WhatsApp View**. Si con ese nombre te refieres a mostrar una experiencia visual dentro del propio WhatsApp, las piezas documentadas relevantes son el catálogo y carrito nativos, mensajes de producto, botones, listas interactivas, WhatsApp Flows, CTA a una página web y mensajes de ubicación/contacto. Debe confirmarse el nombre técnico si “WhatsApp View” se refiere a un componente de un BSP específico.
+
+No confundirlo con **View Once**: eso es contenido multimedia que desaparece después de abrirse, no una interfaz de compra. No utilizarlo para recibos, políticas, confirmaciones o información que el cliente debe poder volver a consultar.
+
+Fuentes:
+- [Meta — características de WhatsApp Business Platform](https://whatsappbusiness.com/products/business-platform-features/)
+- [Meta — WhatsApp Flows](https://whatsappbusiness.com/products/whatsapp-flows/)
+- [SDK de Cloud API — mensajes interactivos](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/messages/interactive/) (documentación del SDK archivada; validar límites contra la versión de Cloud API/BSP desplegada)
+- [WhatsApp Help Center — carrito de compra](https://faq.whatsapp.com/5495780857144067/?cms_platform=android)
+- [WhatsApp Business Calling API](https://whatsappbusiness.com/blog/whatsapp-business-calling-api/)
+- [WhatsApp Help Center — View Once](https://faq.whatsapp.com/578442220724722/?cms_platform=android)
+
+## 34. Biblioteca de componentes: qué usar y cuándo
+
+La regla es **usar el componente más simple que permita completar bien la tarea**. No enviar una secuencia de textos cuando un botón o Flow recoge la elección en una acción; tampoco abrir un formulario cuando basta responder una pregunta puntual.
+
+| Componente | Usarlo para | Beneficio | Condición/límite |
+|---|---|---|---|
+| Botones de respuesta | Sí/no, retirar/enviar, confirmar/cambiar, ayuda/humano | Una acción clara por toque | Los mensajes de botón admiten un conjunto pequeño de opciones; validar soporte y ventana activa |
+| Lista interactiva | Elegir sede, categoría, motivo o una opción entre varias | No pedir que el cliente escriba el nombre exacto | Mostrar solo opciones del backend que realmente se puedan usar |
+| Mensaje de producto único | Pregunta por un artículo exacto | La ficha nativa contiene nombre e imagen del catálogo | Requiere catálogo Meta conectado y mapping estable |
+| Mensaje multi-producto | Mostrar pocas alternativas comparables | Seleccionar artículos dentro del chat con menos mensajes | Precio, variante y stock se vuelven a validar en Inventary |
+| Catálogo + carrito nativos | Explorar y elegir varios productos y cantidades | El cliente prepara y envía el carrito en una acción | Requiere catálogo sincronizado; carrito enviado no equivale a venta ni reserva |
+| WhatsApp Flow estático | Varios datos estructurados relativamente constantes | Agrupa campos en pocas pantallas | No debe usar precio/stock hardcodeados ni ejecutar transacciones intermedias |
+| WhatsApp Flow dinámico | Opciones de sede, disponibilidad, tarifas o datos que cambian en tiempo real | Pantallas ajustadas a los resultados del backend | Requiere un endpoint de Flow rápido, cifrado/autenticado y versionado |
+| CTA URL | Ficha técnica extensa, comparación, mapa o sitio de ayuda | Evita mensajes excesivamente largos | La URL debe ser móvil, HTTPS y conservar el contexto del carrito; el cambio de app puede añadir fricción |
+| Solicitud o envío de ubicación | Ayudar con el destino o compartir el pin de una sede | Menos errores de escritura | Un pin no siempre es una dirección postal completa ni debe guardarse automáticamente |
+| Mensaje de contacto | Compartir el contacto del local o de soporte | Facilita ayuda sin buscar el número manualmente | Enviar solo cuando aporte valor, no como mensaje redundante |
+| Llamada de WhatsApp consentida | Reclamo complejo o cliente que pide hablar | Resuelve casos que por texto consumirían muchos turnos | Solo si la cuenta, el país, el BSP, el horario y el personal admiten la función |
+| Plantilla de utilidad aprobada | Actualización transaccional fuera de la ventana cuando la política la exige | Comunicación consistente y autorizada | No asumir gratuidad; no mezclar con promociones |
+| Plantilla de marketing | Campaña con consentimiento apropiado | Permite iniciativas comerciales autorizadas | Puede tener coste mayor y límites propios; no disfrazar marketing como utilidad |
+| IA en texto/audio | Consulta abierta, búsqueda, resumen, traducción o extracción tentativa | Reduce el esfuerzo de redactar | No autoriza precio, stock, descuentos, pago o consentimiento |
+| Web móvil de Inventary | Comparaciones complejas y muchas especificaciones | Permite una ficha accesible y extensa | Usarla solo cuando ayude más que la vista nativa |
+
+Los límites de filas, botones, productos y plantillas pueden cambiar según versión de Cloud API, región y proveedor. Verificarlos antes de publicar el Flow o workflow. No codificar límites asumidos como reglas comerciales.
+
+## 35. Selector adaptativo de interacción en n8n
+
+Crear un subworkflow reutilizable, por ejemplo N8N-15 Interaction Planner, para escoger una única ruta de interfaz y evitar que el agente mande botones, después una lista idéntica y luego repita lo mismo en texto.
+
+### Entrada
+
+El selector recibe:
+- intención y nivel de certeza;
+- si hay producto/SKU/variante exactos;
+- cantidad de productos y campos necesarios;
+- si el catálogo de Meta está conectado y sincronizado;
+- disponibilidad real de Flows y endpoint dinámico;
+- componentes que el proveedor/BSP y el número de WhatsApp soportan;
+- estado de la ventana de atención y si se requiere una plantilla permitida;
+- datos ya capturados y confirmados, que no deben volverse a preguntar;
+- preferencia explícita del cliente: texto, Flow, ayuda o persona;
+- estado de cotización, precio, disponibilidad y modalidad devueltos por Inventary.
+
+### Salida estructurada
+
+- modo elegido: botones, lista, mensaje de producto, catálogo/carrito, Flow estático, Flow dinámico, texto, URL o atención humana;
+- razón de selección;
+- campos faltantes y ya conocidos;
+- acción de backend que debe ejecutarse;
+- necesidad de confirmación explícita;
+- alternativa en caso de que el componente falle;
+- requisito de plantilla según política vigente;
+- presupuesto interno de mensajes por tarea;
+- responsable/handoff si aplica.
+
+La decisión simple de componente se resuelve con reglas de n8n, no llamando a la IA. El LLM se usa para interpretar lenguaje natural ambiguo, no para decidir la política de mensajes, calcular el costo ni resolver los permisos.
+
+### Reglas por defecto
+
+1. **Producto exacto y cantidad conocida:** consulta al backend, cotización inmediata y resumen compacto. No enviar una tarjeta adicional si no aporta información.
+2. **Exploración de varios artículos:** catálogo/carrito nativos si están sincronizados; de lo contrario, búsqueda con pocas opciones iniciales.
+3. **Dos o tres decisiones pequeñas:** botones de respuesta.
+4. **Varias sedes o motivos:** lista interactiva con solo opciones elegibles del backend.
+5. **Varios campos de entrega/retiro:** Flow si agrupa preguntas útiles sin obligar a completar datos irrelevantes.
+6. **Opciones que cambian en tiempo real:** Flow dinámico únicamente si el endpoint está disponible y responde con la información validada.
+7. **Compatibilidad desconocida o producto ambiguo:** una pregunta concreta o atención humana, no un formulario enorme.
+8. **Pago disputado, reclamación o excepción comercial:** mensaje breve empático y handoff, no más automatización para evitar escuchar al cliente.
+9. **Fuera de la ventana activa:** comprobar si se permite responder y si la política exige plantilla aprobada.
+10. **Flow o catálogo no disponibles:** pasar al texto conservando los datos ya capturados y sin reiniciar la compra.
+
+## 36. Flujos por escenario optimizados
+
+### 36.1 Compra de un artículo conocido
+
+1. Cliente: “Necesito 2 del SKU ABC123”.
+2. n8n consulta catálogo/eligibilidad del backend; si el producto es inequívoco, no pregunta qué producto quiere.
+3. Inventary valida precio, cantidad y modalidad/ubicación disponible.
+4. Se presenta un solo resumen con producto, cantidad, total, retiro/envío disponible y vigencia.
+5. Botones “Confirmar” y “Cambiar” si están soportados.
+6. Al confirmar, Inventary vuelve a validar y crea el pedido idempotente.
+7. n8n envía una confirmación concisa con el número y siguiente paso.
+
+No enviar mensajes distintos para “buscando”, “consultando stock”, “calculando total” y “preparando respuesta”. Son eventos internos del workflow.
+
+### 36.2 Explorar catálogo y comprar varias líneas
+
+1. Mostrar el catálogo nativo o un mensaje multi-producto cuando el cliente desea explorar productos.
+2. El cliente agrega productos y cantidades y envía su carrito.
+3. El webhook de carrito se normaliza y se correlaciona con el remitente verificado.
+4. n8n transforma las referencias públicas del catálogo en IDs internos mediante un mapping estable.
+5. Inventary revalida cada línea, cantidad, precio, estado y variante; devuelve una cotización.
+6. Si el precio o artículo cambió, mostrar solo las diferencias y una alternativa válida si existe.
+7. Cliente confirma el total.
+8. Inventary crea una orden única.
+
+No convertir cada producto del carrito en una pregunta de texto individual. Un carrito nativo es una intención de compra, no una venta ni una reserva.
+
+### 36.3 Retiro, entrega y selección de sede
+
+1. Consultar al backend las modalidades elegibles para el pedido.
+2. Si hay hasta tres opciones, usar botones; si hay más sedes/motivos, lista.
+3. Si faltan varios campos, Flow con el mínimo necesario.
+4. Flow dinámico solo para opciones actuales que dependan de sede, horario, tarifa o cobertura.
+5. Backend calcula o valida tarifa y ventana.
+6. Se presenta un resumen compacto con destino, costo y total; cliente confirma.
+
+No pedir una dirección de envío cuando el cliente eligió retiro. No volver a preguntar la sede elegida. No prometer una hora que el backend no ha confirmado.
+
+### 36.4 “Voy en camino”
+
+- Detectar que se refiere a un pedido existente o a una nueva compra.
+- Si existe pedido, vincular la prioridad a ese pedido; si no, usar el camino rápido para seleccionar/cotizar.
+- Consultar el horario, la reserva y el estado de preparación.
+- Solo afirmar “está listo” si la operación está marcada como lista en backend.
+- De lo contrario, comunicar que se recibió la petición prioritaria y se confirmará cuando esté preparado.
+- No enviar un Flow con dirección o datos de envío si pide retiro.
+
+### 36.5 Consulta amplia o muchas preguntas
+
+- Resolver con atributos reales del catálogo y una comparación concisa.
+- Mostrar 3–5 alternativas iniciales cuando esto facilite la elección, sin limitar el catálogo global.
+- Usar una ficha web o producto nativo para información larga.
+- Mantener “Ver más opciones” y “Hablar con alguien”.
+- No presionar para terminar en menos de un minuto cuando el cliente está explorando, no comprando.
+- No inventar compatibilidad, garantía ni disponibilidad.
+
+### 36.6 Pagos y suscripciones
+
+- Mostrar solo condiciones de pago soportadas por backend.
+- Comprobante: “recibido, pendiente de verificación”; OCR/IA puede extraer referencia, pero no certificar dinero.
+- Pago al retirar, contra entrega o crédito se habilitan solo cuando Inventary los puede representar y auditar.
+- WhatsApp Payments está documentado para algunos mercados concretos, como India; no asumir que está disponible para Ecuador. Elegir una pasarela compatible con Ecuador y validar callbacks.
+- Para suscripciones, consultar los planes y calendario de una API de canal futura, mostrar términos y obtener una única aceptación. Los componentes UI no sustituyen el dominio de contratos, facturas y pagos.
+
+## 37. Catálogo nativo conectado con Inventary
+
+La experiencia nativa solo ayuda si los datos publicados en Meta reflejan lo que Inventary ofrece.
+
+Crear un adaptador de publicación de catálogo y un workflow de sincronización separado del core de venta.
+
+### Datos para sincronizar
+
+- identificador estable de artículo publicado y retailer/product ID;
+- productId interno y variantId cuando el backend tenga soporte completo de variante;
+- título, descripción y atributos publicables;
+- imagen HTTPS autorizada;
+- precio y moneda publicables;
+- estado de publicación/eligibilidad;
+- fecha de última sincronización, versión y último error.
+
+### Reglas
+
+1. Publicar solo fichas activas, elegibles y con datos mínimos correctos.
+2. Usar mapping estable; no emparejar solo por nombre.
+3. Propagar cambios de precio, imagen y desactivaciones; evitar dos sistemas de mantenimiento manual.
+4. Revalidar cada línea cuando se recibe el carrito; el precio/disponibilidad del catálogo Meta puede estar desactualizado.
+5. Mantener disponibilidad global separada de “puede retirarse en este local ahora”.
+6. Si el artículo se desactivó o cambió precio, mostrar la diferencia antes de aceptar la nueva cotización.
+7. Monitorizar mappings ausentes, imágenes fallidas y antigüedad de sincronización.
+8. Publicar por feed/API oficial o mecanismo aprobado por Meta/BSP; si no existe integración automática adecuada, usar una exportación incremental con reconciliación documentada.
+
+La sincronización no debe crear ventas, reservar stock ni modificar la fuente comercial. Inventary sigue siendo el origen de verdad.
+
+## 38. Flow estático, dinámico o mensaje interactivo
+
+| Situación | Componente sugerido | Dependencia backend | No usar cuando |
+|---|---|---|---|
+| Confirmar/cambiar, retiro/envío | Botones | Acción/consulta autorizada | La modalidad aún no está implementada |
+| Elegir entre sedes/motivos | Lista | Opciones válidas y actuales | Se necesita llenar varios campos relacionados |
+| Dos campos constantes y no económicos | Flow estático | Validación al recibir el envío | Las opciones cambian frecuentemente |
+| Elegir horario/sede/tarifa actual | Flow dinámico | Endpoint HTTPS seguro, cifrado/autenticado, rápido | El endpoint no puede validar los datos en tiempo real |
+| Mostrar productos | Catálogo/carrito o mensaje de producto | Catálogo publicado y mapping estable | No hay catálogo sincronizado |
+| Comparar muchas especificaciones | Ficha web móvil | Página pública segura | El cliente solo necesita una respuesta breve |
+| Reclamo/pago no conciliado | Atención humana | Incidencia, estado y permisos | No obligar al usuario a completar formularios para ser escuchado |
+| Inicio desde QR/anuncio | Deep link con contexto | Resolver contexto y volver a cotizar | No confiar en precios/descuentos escritos en URL |
+
+La navegación de un Flow puede recopilar intención y campos, pero el alta económica final ocurre después de cotización válida y aceptación explícita. No crear órdenes en pasos intermedios de navegación.
+
+## 39. Fallback y compatibilidad por dispositivo
+
+- Si Flow no abre, ofrecer los mismos campos por texto; no pedir que empiece de nuevo.
+- Si el catálogo no está conectado, ofrecer una lista corta de productos verificados o una URL móvil.
+- Si se recibe un ID de botón desconocido, recuperar contexto y mostrar una opción válida; no ejecutar un comando arbitrario.
+- Si la ubicación compartida no da una dirección postal suficiente, preguntar solo el dato restante.
+- Si el cliente prefiere texto, dejar de insistir con Flow.
+- Probar componentes en Android, iOS y WhatsApp Web/Desktop según el soporte real de cada uno, además de letra grande y lector de pantalla.
+- Si la ventana está cerrada, seguir las reglas vigentes de plantilla y consentimiento.
+- No mover stock ni confirmar pedido desde un enlace/CTA sin pasar por la API.
+- Si el proveedor/BSP no soporta un componente, desactivarlo por configuración y usar el fallback.
+- Conservar carrito, selección, cotización válida e historial al cambiar de interfaz.
+
+## 40. APIs de backend adicionales para estos componentes
+
+Los siguientes son contratos propuestos, no rutas que se afirmen implementadas hoy.
+
+| Capacidad | Utilidad | Control obligatorio |
+|---|---|---|
+| Publicación de catálogo Meta | Mantener Commerce Manager alineado | mapping, versionado, retries y estado de publicación |
+| Resolución de carrito nativo | Traducir retailer IDs a líneas de Inventary | revalidar ID, variante, estado, precio y cantidad |
+| Catálogo de opciones de interacción | Entregar sedes, modos y horarios válidos | scope de canal, contexto y expiración |
+| Endpoint de datos de Flow | Cargar opciones/cotización actual | autenticidad/cifrado, latencia, rate limit y minimización de datos |
+| Recepción de submission de Flow | Conservar Flow/version y convertirlo en intención | schemaVersion, correlación e idempotencia |
+| Consulta de capacidad logística | Mostrar solo opciones ejecutables | backend autoritativo |
+| Telemetría de mensajes | Medir enviado/entregado/fallido, categoría y coste | messageId, versión de tarifa y retención mínima |
+| Preferencia del modo de atención | Permitir texto, Flow o persona | elección explícita y modificable |
+| Recompra segura | Reutilizar un pedido anterior como borrador | identidad verificada, precio nuevo, stock nuevo y nueva aceptación |
+
+## 41. Cómo llegar a menos de un minuto sin sacrificar fiabilidad
+
+1. Reutilizar contexto ya proporcionado; no preguntar de nuevo producto/cantidad.
+2. Elegir un único componente adecuado, no encadenar botones, listas y texto que contienen la misma elección.
+3. Preguntar solo datos faltantes: no pedir dirección para retiro.
+4. Consultar backend en silencio y mostrar resultados reales.
+5. Agrupar campos estructurados con Flow solo cuando reduce esfuerzo neto.
+6. Mostrar un resumen compacto con artículos, total, cargos, modalidad y condición de pago.
+7. Solicitar aceptación una vez para esa versión de cotización.
+8. Crear un único pedido idempotente.
+9. Enviar una confirmación final con número, total y siguiente paso real.
+10. Ante cambio de precio/stock o duda relevante, aclarar y volver a confirmar.
+11. Si el componente falla, continuar con el contexto preservado.
+12. Si se necesita revisión humana, priorizar exactitud y confianza por encima de la métrica de 60 segundos.
+
+Los 60 segundos son un objetivo para compras sencillas, no una promesa universal. Las excepciones se deben medir aparte.
+
+## 42. Pruebas de aceptación adicionales
+
+1. Botón devuelve un ID esperado y ejecuta una acción una sola vez.
+2. ID de botón obsoleto o de otra conversación no autoriza una operación.
+3. Lista solo muestra ubicaciones/modos válidos del backend.
+4. Un retailer/product ID sin mapping no genera pedido.
+5. Precio desfasado en catálogo Meta exige nueva cotización.
+6. Carrito de Meta recibido dos veces crea una única operación lógica.
+7. Cambio de cantidad produce total recalculado.
+8. Flow estático prellena los datos conocidos y no los pregunta otra vez.
+9. Flow dinámico muestra opciones actualizadas de sede/horario.
+10. El cliente no puede enviar un precio o descuento inventado a través de Flow.
+11. Timeout de Flow tiene fallback sin venta parcial.
+12. Submission duplicada o tardía no crea otro pedido.
+13. Flow antiguo se recupera con texto comprensible.
+14. Dispositivo sin Flow puede terminar por texto/botones.
+15. Preferencia por texto es respetada.
+16. Lector de pantalla y texto grande permiten una ruta equivalente.
+17. Pin de ubicación incompleto no se trata como dirección postal completa.
+18. CTA web es HTTPS, móvil y conserva la referencia del carrito.
+19. Producto solo se muestra como tarjeta nativa si su referencia está publicada.
+20. Llamada no se inicia sin consentimiento, soporte y horario apropiados.
+21. Fuera de ventana se cumple la política de plantillas, sin lista interactiva no permitida.
+22. Se miden mensajes entregados, no solo nodos ejecutados.
+23. Se añade el coste de BSP cuando el proveedor lo cobra.
+24. La ruta rápida se prueba en los dispositivos/versión de WhatsApp soportados por la integración.
+25. Ningún componente omite validar importe ni la clave de idempotencia del pedido.
+
+## 43. Referencias adicionales
+
+- Meta: [WhatsApp Business Platform Features](https://whatsappbusiness.com/products/business-platform-features/)
+- Meta: [WhatsApp Flows](https://whatsappbusiness.com/products/whatsapp-flows/)
+- Meta SDK: [Interactive messages](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/messages/interactive/)
+- WhatsApp Help Center: [carrito del cliente](https://faq.whatsapp.com/5495780857144067/?cms_platform=android)
+- WhatsApp Help Center: [catálogos conectados](https://faq.whatsapp.com/1057141349534704/?cms_platform=web&eea=0&locale=es_MX)
+- CM.com: [catálogo y mensajes de producto](https://developers.cm.com/messaging/docs/whatsapp-catalogue-product-messages)
+- Twilio: [contenido de catálogo](https://www.twilio.com/docs/content/twilio-catalog)
+- WhatsApp: [Business Calling API](https://whatsappbusiness.com/blog/whatsapp-business-calling-api/)
+- AWS: [Flows estáticos y dinámicos](https://docs.aws.amazon.com/social-messaging/latest/userguide/managing-flows.html)
+- Inventary: [Productos V2](PROPUESTA_UX_PRODUCTOS_V2.md), [Pedidos WhatsApp V2](PROPUESTA_UX_PEDIDOS_WHATSAPP_V2.md), [referencia de APIs actuales](microservices-inventary-ecuapp/docs/25-referencia-apis.md).
+
+## 44. Dictamen actualizado
+
+La mejor solución no es escoger un componente único para toda compra: es aplicar una **estrategia de interacción adaptativa**.
+
+- Catálogo/carrito para explorar y seleccionar varios productos.
+- Mensaje de producto para una referencia exacta.
+- Botones para decisiones pequeñas.
+- Listas para alternativas estructuradas.
+- Flows para varios campos de checkout.
+- Flow dinámico solo cuando requiere opciones del backend en tiempo real.
+- CTA web para información larga.
+- Texto/IA para conversación abierta.
+- Atención humana/llamada consentida para casos complejos.
+
+n8n selecciona y coordina el componente. Inventary valida la oferta, cotización, identidad, permisos y pedido. Los costos se miden por mensajes reales entregados y por pedido correcto. La compra rápida se optimiza sin forzar una interfaz que el cliente no entiende ni quitarle información necesaria para aceptar el total.
+
+No se ha identificado una función oficial independiente llamada “WhatsApp View” en la documentación consultada; la necesidad de una vista de compra dentro de WhatsApp se cubre mediante la combinación de componentes oficiales mencionados, previa validación de WABA, Cloud API, proveedor y dispositivos compatibles.
+
