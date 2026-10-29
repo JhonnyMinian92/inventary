@@ -1,4 +1,4 @@
-# Propuesta V1 — Centro de reportes gerencial, operativo, analítico y tributario para Ecuador
+# Propuesta V1 histórica — Centro de reportes gerencial, operativo, analítico y tributario para Ecuador
 
 
 > **Documento sustituido por V2.** La versión vigente y ampliada, con modelo muchos-a-muchos entre establecimientos SRI y bodegas, prevención de doble conteo, escenarios operativos y reglas tributarias actualizadas, está en [PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V2.md](PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V2.md). Para nuevas implementaciones, seguir V2; V1 se conserva como histórico.
