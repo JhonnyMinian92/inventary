@@ -775,3 +775,26 @@ Contrato fiscal canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1
 Si el sistema de facturación cae dentro del ámbito de la Resolución NAC-DGERCGC26-00000027, el RUC de su proveedor debe aparecer en información adicional del comprobante conforme a la ficha técnica vigente. El backend fiscal gestiona y valida esa configuración central. Los agentes no pueden escoger o cambiar ese RUC en una venta, ni componer textos/atributos fiscales directamente.
 
 El centro de mando puede señalar un fallo de configuración fiscal, una factura rechazada o una emisión en proceso, pero solo con evidencia del backend. Antes de permitir que un agente prepare solicitudes de emisión, comprobar con el proveedor y el responsable tributario el registro que exige la norma y la presencia del RUC tecnológico en la ficha/documento autorizado. Fuente: [SRI, resolución 26-00000027](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
+
+---
+
+## Revisión V3.1 — Bodegas relacionadas con varios establecimientos
+
+El dominio de inventario adopta una relación **muchos-a-muchos** entre Warehouse y SriEstablishment a través de WarehouseEstablishmentAssignment. Un establecimiento puede operar con varias bodegas y una bodega puede servir a varios establecimientos; además, las bodegas internas pueden existir sin asociación fiscal.
+
+La asociación se tipa y mantiene por vigencia: STOCK_SERVES, SALES_OPERATIONS, PICKUP, FULFILLMENT, RECEIVING, RETURN_ACCEPTANCE y REPORTING_SCOPE son ejemplos que requieren un contrato explícito. No usar un booleano ni un único establishmentId en Warehouse para expresar todas las relaciones.
+
+**La asociación no es propiedad del stock ni una autorización fiscal.** Saldos, reservas, movimientos y valoración se cuentan por su llave física real de inventario. Una bodega vinculada a tres establecimientos no triplica unidades, coste, valor ni disponibilidad. Un informe de inventario filtrado por establecimiento debe explicar que está mostrando stock físico de las bodegas vinculadas, y deduplicar cada balance por su clave real. Una cifra de stock atribuida a un establecimiento requiere una política explícita de propiedad/asignación, no el puente operacional.
+
+Cuando una ubicación compartida dé servicio a distintos RUC/entidades legales, el modelo debe incluir owner/legalEntity en saldo, movimiento, reserva, compra, venta y valoración, o bloquear ese escenario hasta ofrecer aislamiento. La ubicación compartida no autoriza mezclar la propiedad de mercancía ni los permisos financieros.
+
+El centro de mando puede presentar:
+- incidencias de establecimientos cerrados/Suspendido relacionados con una bodega sin desactivar la bodega ni borrar su historia;
+- stock físico por bodega y un indicador separado de establecimientos atendidos;
+- traslados y reposición entre bodegas;
+- riesgo de abastecimiento por establecimiento solo si la atribución y la demanda están definidas;
+- discrepancias entre el contexto fiscal de una venta y el establecimiento realmente devuelto por el backend fiscal.
+
+Para venta, retiro, recepción y devolución, mantener warehouseId y billingContextId por separado. Si una bodega sirve a varios establecimientos, no seleccionar arbitrariamente el primer establecimiento al emitir; la regla de negocio explícita propone el contexto y el backend fiscal valida el resultado.
+
+Pruebas críticas: N bodegas por establecimiento; N establecimientos por bodega; una bodega compartida por RUC distintos; cambio de asociación dentro de periodo; establecimiento cerrado con stock histórico; pedido multi-bodega; devolución recibida en bodega diferente; agregación que nunca duplica saldos.
