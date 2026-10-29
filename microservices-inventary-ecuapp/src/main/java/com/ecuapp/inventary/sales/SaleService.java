@@ -26,22 +26,23 @@ import java.util.*;
 @Service
 public class SaleService {
  private record CalculatedLine(Product product,StockBalance balance,UnitOfMeasure unit,BigDecimal quantity,BigDecimal unitPrice,BigDecimal lineTotal){}
- private record CanonicalLine(UUID productId,String quantity){}
+ /** unitPrice is null when the client accepts the suggested price; null fields are omitted, so older hashes stay valid. */
+ private record CanonicalLine(UUID productId,String quantity,String unitPrice){}
  private record CanonicalSaleRequest(UUID warehouseId,String customerName,String customerPhone,SaleChannel channel,UUID customerId,List<CanonicalLine> items){}
  private static final String IDEMPOTENCY_SCOPE="SALE_CREATE";
  private final SaleRepository sales;private final ProductRepository products;private final WarehouseRepository warehouses;
  private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
  private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;
  private final BusinessPartnerRepository partners;private final IdempotencyRecordRepository idempotencyRecords;
- private final UnitOfMeasureRepository units;private final InventoryCostingService costing;
+ private final UnitOfMeasureRepository units;private final InventoryCostingService costing;private final SalePricingService pricing;
  private static final Set<String> SORT=Set.of("soldAt","saleNumber","total","status");
  public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,
   SalesReturnLineRepository returnLines,BusinessPartnerRepository partners,IdempotencyRecordRepository idempotencyRecords,
-  UnitOfMeasureRepository units,InventoryCostingService costing){
+  UnitOfMeasureRepository units,InventoryCostingService costing,SalePricingService pricing){
   this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;
   this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;this.partners=partners;
-  this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;
+  this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;this.pricing=pricing;
  }
  @Transactional(readOnly=true) public Page<SaleDtos.View> list(SaleStatus status,UUID warehouseId,UUID customerId,SaleChannel channel,java.time.Instant from,java.time.Instant to,Pageable p){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
@@ -117,8 +118,10 @@ public class SaleService {
     .orElseThrow(()->new BusinessRuleException("La unidad de medida del producto "+product.getSku()+" no existe o está inactiva."));
    balance.decrease(quantity);
 
-   // All price and total values are derived from the active product catalog on the server.
-   BigDecimal unitPrice=product.getSalePrice().setScale(2,RoundingMode.UNNECESSARY);
+   // The seller may adjust the price; without one the server suggests cost plus the product markup.
+   // The no-loss rule is enforced below against the exact valuation of the units that leave stock.
+   BigDecimal unitPrice=line.unitPrice()!=null?line.unitPrice().setScale(2,RoundingMode.UNNECESSARY)
+    :pricing.price(product,balance.getLocation(),quantity).suggestedPrice();
    BigDecimal lineTotal=unitPrice.multiply(quantity).setScale(2,RoundingMode.HALF_UP);
    subtotal=subtotal.add(lineTotal).setScale(2,RoundingMode.HALF_UP);
    lines.add(new CalculatedLine(product,balance,unit,quantity,unitPrice,lineTotal));
@@ -154,6 +157,7 @@ public class SaleService {
    String movementHash=sha256(sale.getId()+"|"+item.getId()+"|"+line.product().getId()+"|"+line.quantity().toPlainString());
    // The cost of goods sold comes from the valuation policy (FIFO layers or moving average), never from the catalog.
    InventoryCostingService.Valuation valuation=costing.outbound(line.product(),line.balance().getLocation(),line.quantity());
+   SalePricingService.requireNoLoss(line.product(),line.unitPrice(),valuation.unitCost());
    StockMovement movement=new StockMovement(line.product(),warehouse,MovementType.SALE,line.quantity(),
     valuation.movementUnitCost(),"SALE",sale.getId(),movementKey,movementHash,
     "Salida por venta "+sale.getSaleNumber(),actor);
@@ -240,7 +244,8 @@ public class SaleService {
    throw new BusinessRuleException("La venta debe contener al menos una línea.");
   try{
    List<CanonicalLine> canonicalLines=request.items().stream()
-    .map(line->new CanonicalLine(line.productId(),line.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString()))
+    .map(line->new CanonicalLine(line.productId(),line.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString(),
+     line.unitPrice()==null?null:line.unitPrice().setScale(2,RoundingMode.UNNECESSARY).toPlainString()))
     .sorted(Comparator.comparing(line->line.productId().toString())).toList();
    CanonicalSaleRequest canonical=new CanonicalSaleRequest(request.warehouseId(),clean(request.customerName()),
     clean(request.customerPhone()),request.channel(),request.customerId(),canonicalLines);

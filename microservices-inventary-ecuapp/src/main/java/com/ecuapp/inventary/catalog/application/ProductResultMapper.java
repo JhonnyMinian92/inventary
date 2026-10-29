@@ -16,6 +16,7 @@ public final class ProductResultMapper {
             product.getCategory().getName(),
             product.getCostPrice(),
             product.getSalePrice(),
+            product.getMarginPercent(),
             product.getCurrency(),
             product.getImageUrl(),
             product.getKind(),

@@ -47,8 +47,12 @@ function normalizeProduct(product) {
     categoryId: product?.categoryId || product?.category?.id || '',
     unitOfMeasureId: product?.unitOfMeasureId || product?.unitOfMeasure?.id || '',
     description: product?.description || '',
-    costPrice: String(product?.costPrice ?? 0),
-    salePrice: String(product?.salePrice ?? 0),
+    // Solo lectura: el costo sale de la última compra recibida y el precio de venta suma la ganancia.
+    costPrice: product?.costPrice ?? null,
+    salePrice: product?.salePrice ?? null,
+    marginPercent: String(product?.marginPercent ?? 25),
+    // Servicios y productos sin existencias no se compran: su precio se escribe a mano.
+    manualPrice: product?.kind && product.kind !== 'STOCKED_GOOD' ? String(product?.salePrice ?? '') : '',
     attributes: objectValue(product?.attributes)
   };
 }
@@ -332,10 +336,16 @@ export default function ProductForm({ initialValue, categories, units = [], load
       setValidationMessage('No se puede continuar hasta cargar correctamente los campos de la categoría.');
       return;
     }
-    if (String(form.costPrice ?? '').trim() === '' || String(form.salePrice ?? '').trim() === '' ||
-        !Number.isFinite(Number(form.costPrice)) || Number(form.costPrice) < 0 ||
-        !Number.isFinite(Number(form.salePrice)) || Number(form.salePrice) < 0) {
-      setValidationMessage('El costo y el precio deben ser números válidos iguales o mayores que cero.');
+    if (form.kind !== 'STOCKED_GOOD') {
+      const price = Number(form.manualPrice);
+      if (String(form.manualPrice).trim() === '' || !Number.isFinite(price) || price < 0 || Math.abs(Math.round(price * 100) - price * 100) > 1e-6) {
+        setValidationMessage('Escribe el precio de venta (hasta 2 decimales).');
+        return;
+      }
+    }
+    const margin = Number(form.marginPercent);
+    if (String(form.marginPercent).trim() === '' || !Number.isFinite(margin) || margin < 0 || margin > 1000) {
+      setValidationMessage('La ganancia sugerida debe ser un porcentaje entre 0 y 1000.');
       return;
     }
 
@@ -385,7 +395,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
   }
 
   return <form className="workflow-form" onSubmit={handleSubmit} noValidate>
-    <StepProgress steps={['Información', 'Precios y campos', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
+    <StepProgress steps={['Información', 'Ganancia y datos', 'Confirmar']} activeStep={step} onSelect={index => { setValidationMessage(''); setStep(index); }} />
     {step === 0 && <section className="workflow-stage" aria-labelledby="product-basic-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-basic-title">Identifica el producto</h2><p>Primero define cómo se encontrará en el catálogo.</p></div></div>
       <div className="form-grid workflow-fields">
@@ -428,16 +438,24 @@ export default function ProductForm({ initialValue, categories, units = [], load
       </div>
     </section>}
     {step === 1 && <section className="workflow-stage" aria-labelledby="product-pricing-title">
-      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-pricing-title">Precios y detalles</h2><p>Revisa los precios y completa solo los campos que correspondan.</p></div></div>
+      <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-pricing-title">{form.kind === 'STOCKED_GOOD' ? 'Ganancia y detalles' : 'Precio y detalles'}</h2><p>{form.kind === 'STOCKED_GOOD' ? 'No necesitas escribir precios: se calculan solos con cada compra.' : 'Como no se compra para revender, indica cuánto cobras.'}</p></div></div>
       <div className="form-grid workflow-fields">
-    <label className="field">
-      <span>Costo de compra<b> *</b></span>
-      <input type="number" min="0" step="0.01" required value={form.costPrice} onChange={event => changeField('costPrice', event.target.value)} />
-    </label>
-    <label className="field">
+    {form.kind !== 'STOCKED_GOOD' && <label className="field">
       <span>Precio de venta<b> *</b></span>
-      <input type="number" min="0" step="0.01" required value={form.salePrice} onChange={event => changeField('salePrice', event.target.value)} />
+      <input type="number" min="0" step="0.01" inputMode="decimal" required value={form.manualPrice} onChange={event => changeField('manualPrice', event.target.value)} placeholder="0.00" />
+      <small className="field-help">Al vender podrás ajustarlo.</small>
+    </label>}
+    {form.kind === 'STOCKED_GOOD' && <>
+    <label className="field">
+      <span>Ganancia sugerida (%)<b> *</b></span>
+      <input type="number" min="0" max="1000" step="0.01" inputMode="decimal" required value={form.marginPercent} onChange={event => changeField('marginPercent', event.target.value)} />
+      <small className="field-help">Se suma al costo de compra para sugerir el precio. Ej.: costo $8 + 25 % = $10. Al vender puedes cambiar el precio, pero nunca por debajo del costo.</small>
     </label>
+    <div className="pricing-summary">
+      <div><small>Costo (última compra)</small><strong>{Number(form.costPrice) > 0 ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.costPrice)) : 'Aún sin compras'}</strong></div>
+      <div><small>Precio sugerido</small><strong>{Number(form.costPrice) > 0 ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Math.ceil(Number(form.costPrice) * (1 + Number(form.marginPercent || 0) / 100) * 100 - 1e-9) / 100) : 'Se calculará con la primera compra'}</strong></div>
+    </div>
+    </>}
     <label className="field wide">
       <span>Descripción</span>
       <textarea rows="2" maxLength="2000" value={form.description} onChange={event => changeField('description', event.target.value)} />
@@ -499,8 +517,8 @@ export default function ProductForm({ initialValue, categories, units = [], load
         <div className="workflow-review-card"><small>Categoría</small><strong>{categories.find(item => String(item.id || item.categoryId) === String(form.categoryId))?.name || '—'}</strong></div>
         <div className="workflow-review-card"><small>Tipo</small><strong>{productKinds.find(kind => kind.code === form.kind)?.label || form.kind}</strong></div>
         <div className="workflow-review-card"><small>Se vende por</small><strong>{units.find(unit => unit.id === (form.unitOfMeasureId || DEFAULT_UNIT_ID))?.name || 'Unidad'}</strong></div>
-        <div className="workflow-review-card"><small>Costo</small><strong>{new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.costPrice || 0))}</strong></div>
-        <div className="workflow-review-card"><small>Precio de venta</small><strong>{new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.salePrice || 0))}</strong></div>
+        {form.kind === 'STOCKED_GOOD' && <div className="workflow-review-card"><small>Ganancia sugerida</small><strong>{Number(form.marginPercent || 0)} %</strong></div>}
+        <div className="workflow-review-card"><small>Precio de venta</small><strong>{form.kind !== 'STOCKED_GOOD' ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.manualPrice || 0)) : Number(form.costPrice) > 0 ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Math.ceil(Number(form.costPrice) * (1 + Number(form.marginPercent || 0) / 100) * 100 - 1e-9) / 100) : 'Con la primera compra'}</strong></div>
         <div className="workflow-review-card"><small>Campos adicionales</small><strong>{Object.values(form.attributes || {}).filter(value => value !== '' && value !== null && value !== undefined).length}</strong></div>
       </div>
       {form.description.trim() && <p className="workflow-review-note"><strong>Descripción:</strong> {form.description.trim()}</p>}

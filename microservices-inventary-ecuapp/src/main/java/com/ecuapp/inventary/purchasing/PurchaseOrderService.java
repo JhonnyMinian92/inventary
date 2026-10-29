@@ -129,6 +129,9 @@ public class PurchaseOrderService {
    if(poLine==null)throw new BusinessRuleException("La línea indicada no pertenece a la orden de compra.");
    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
    if(poLine.remaining().compareTo(quantity)<0)throw new BusinessRuleException("La cantidad recibida supera la cantidad pendiente para "+poLine.getSkuSnapshot()+".");
+   // The last received purchase becomes the product cost and reprices it with its markup (lock product, then balance, like sales).
+   products.findForUpdate(poLine.getProduct().getId()).orElseThrow(()->new ResourceNotFoundException("Producto",poLine.getProduct().getId()))
+    .applyPurchaseCost(poLine.getUnitCost());
    StockBalance balance=balanceLocks.lockOrCreate(poLine.getProduct(),order.getWarehouse());
    balance.increase(quantity);poLine.receive(quantity);calculated.add(new ReceiptCalc(poLine,quantity,balance));
   }

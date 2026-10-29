@@ -28,7 +28,9 @@ class ReportsApiTest extends ApiTestSupport {
 
         JsonNode first = approvedOrder(supplierId, warehouseId, List.of(Map.of("productId", productId, "quantity", 10, "unitCost", 4)));
         receive(first.get("id").asText(), List.of(line("purchaseOrderLineId", first.get("items").get(0).get("id").asText(), "10")));
-        JsonNode sale = sale(token("VENDEDOR"), warehouseId, productId, "10");
+        // The receipt repriced the product to 5.00 (4.00 + 25 %); the seller raises it to 10.00 for this sale.
+        JsonNode sale = httpPost(token("VENDEDOR"), "/api/v1/sales", Map.of("warehouseId", warehouseId, "channel", "POS",
+            "items", List.of(Map.of("productId", productId, "quantity", 10, "unitPrice", new java.math.BigDecimal("10.00")))), 201, "Idempotency-Key", key());
         assertAmount("0", onHand(productId, warehouseId));
         JsonNode second = approvedOrder(supplierId, warehouseId, List.of(Map.of("productId", productId, "quantity", 15, "unitCost", 5)));
         receive(second.get("id").asText(), List.of(line("purchaseOrderLineId", second.get("items").get(0).get("id").asText(), "15")));

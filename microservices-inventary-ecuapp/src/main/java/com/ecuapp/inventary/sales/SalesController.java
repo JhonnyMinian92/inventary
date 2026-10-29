@@ -12,8 +12,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 @RestController @RequestMapping("/api/v1/sales")
 public class SalesController {
- private final SaleService service;
- public SalesController(SaleService service){this.service=service;}
+ private final SaleService service;private final SalePricingService pricing;
+ public SalesController(SaleService service,SalePricingService pricing){this.service=service;this.pricing=pricing;}
+ /** Read-only: suggested and minimum (no-loss) prices for the lines of a sale being prepared. */
+ @PostMapping("/pricing") @PreAuthorize("hasAuthority('sales:manage')")
+ public java.util.List<SaleDtos.PriceView> pricing(@Valid @RequestBody SaleDtos.PricingRequest request){return pricing.quote(request);}
  @GetMapping @PreAuthorize("hasAuthority('sales:read')")
  public Page<SaleDtos.View> list(@RequestParam(required=false) SaleStatus status,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) UUID customerId,@RequestParam(required=false) SaleChannel channel,

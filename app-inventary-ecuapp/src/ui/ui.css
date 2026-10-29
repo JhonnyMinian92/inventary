@@ -197,3 +197,11 @@
 .kind-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 4px; }
 .kind-examples { color: #44544a !important; font-style: italic; }
 @media (max-width: 720px) { .kind-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Precios derivados de compras. */
+.pricing-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-self: end; }
+.pricing-summary > div { display: grid; gap: 4px; padding: 10px 12px; border: 1px dashed #d8e0da; border-radius: 9px; background: #f7faf8; }
+.pricing-summary small { color: #6b7a70; font-size: 11px; }
+.pricing-summary strong { color: #13241a; font-size: 13px; }
+.price-help { line-height: 1.5; }
+.field input[aria-invalid="true"] { border-color: #e0a3a8; background: #fff7f7; }

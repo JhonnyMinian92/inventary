@@ -73,8 +73,8 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
       <div><dt>Disponible</dt><dd>{number(available)}</dd></div>
       <div><dt>Reservado</dt><dd>{number(reserved)}</dd></div>
       <div><dt>Precio de venta</dt><dd>{money(product.salePrice)}</dd></div>
-      {product.costPrice !== undefined && product.costPrice !== null && <div><dt>Costo</dt><dd>{money(product.costPrice)}</dd></div>}
-      {product.costPrice > 0 && product.salePrice > 0 && <div><dt>Margen</dt><dd>{Math.round((product.salePrice - product.costPrice) / product.salePrice * 100)} %</dd></div>}
+      {product.costPrice !== undefined && product.costPrice !== null && <div><dt>Costo (última compra)</dt><dd>{money(product.costPrice)}</dd></div>}
+      {product.marginPercent !== undefined && product.marginPercent !== null && <div><dt>Ganancia sugerida</dt><dd>{Number(product.marginPercent)} %</dd></div>}
     </dl>
     {product.description && <p className="drawer-text">{product.description}</p>}
     <h3 className="drawer-subtitle">Existencias por almacén</h3>

@@ -52,5 +52,5 @@ public class ProductController {
   var terms=pageable.getSort().stream().map(order->new PageQuery.SortTerm(order.getProperty(),order.isDescending()?PageQuery.Direction.DESC:PageQuery.Direction.ASC)).toList();
   return new PageQuery(pageable.getPageNumber(),pageable.getPageSize(),terms);
  }
- private ProductCommand command(ProductDtos.WriteRequest r){return new ProductCommand(r.sku(),r.name(),r.description(),r.categoryId(),r.costPrice(),r.salePrice(),r.currency(),r.imageUrl(),r.kind(),r.unitOfMeasureId(),r.attributes());}
+ private ProductCommand command(ProductDtos.WriteRequest r){return new ProductCommand(r.sku(),r.name(),r.description(),r.categoryId(),r.costPrice(),r.salePrice(),r.currency(),r.imageUrl(),r.kind(),r.unitOfMeasureId(),r.attributes(),r.marginPercent());}
 }

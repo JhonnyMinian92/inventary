@@ -90,7 +90,12 @@ public class ProductService implements ProductUseCases {
   UnitOfMeasure unit=requireActiveUnit(command.unitOfMeasureId()==null?UnitOfMeasure.DEFAULT_UNIT_ID:command.unitOfMeasureId());
   List<CategoryAttributeDefinition> schema=definitions.findByCategoryIdAndActiveTrueOrderByAttributeKeyAsc(category.getId());
   Map<String,Object> attributes=validator.validateValues(command.attributes(),schema,true);
-  Product product=new Product(sku,command.name().trim(),clean(command.description()),category,money(command.costPrice()),money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
+  // Prices are optional: the cost comes from received purchases and the sale price adds the markup to it.
+  BigDecimal cost=command.costPrice()==null?BigDecimal.ZERO.setScale(2):money(command.costPrice());
+  BigDecimal margin=command.marginPercent()==null?Product.DEFAULT_MARGIN_PERCENT:command.marginPercent();
+  BigDecimal price=command.salePrice()==null?Product.priceWithMargin(cost,margin):money(command.salePrice());
+  Product product=new Product(sku,command.name().trim(),clean(command.description()),category,cost,price,currency(command.currency()),clean(command.imageUrl()));
+  product.changeMarginPercent(margin,false);
   product.configureClassification(kind,unit.getId(),attributes,schemaVersion(category.getId(),schema));
   Product saved=products.save(product);
   audit.record(actor,"PRODUCT_CREATED","PRODUCT",saved.getId(),Map.of("sku",saved.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
@@ -110,7 +115,11 @@ public class ProductService implements ProductUseCases {
   requireActiveUnit(unitId);
   List<CategoryAttributeDefinition> schema=definitions.findByCategoryIdAndActiveTrueOrderByAttributeKeyAsc(category.getId());
   Map<String,Object> attributes=validator.validateValues(command.attributes()==null?product.getAttributes():command.attributes(),schema,true);
-  product.update(command.name().trim(),clean(command.description()),category,money(command.costPrice()),money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
+  product.update(command.name().trim(),clean(command.description()),category,
+   command.costPrice()==null?product.getCostPrice():money(command.costPrice()),
+   command.salePrice()==null?product.getSalePrice():money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
+  // A new markup without an explicit price reprices from the last purchase cost.
+  product.changeMarginPercent(command.marginPercent(),command.salePrice()==null);
   product.configureClassification(kind,unitId,attributes,schemaVersion(category.getId(),schema));
   audit.record(actor,"PRODUCT_UPDATED","PRODUCT",id,Map.of("sku",product.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
   return ProductResultMapper.from(product);

@@ -209,6 +209,58 @@ class SalesApiTest extends ApiTestSupport {
         return warehouseId;
     }
 
+    @Test
+    void pricesComeFromPurchasesWithMarginAndSalesNeverLoseMoney() {
+        String seller = token("VENDEDOR");
+        String warehouseId = warehouse().get("id").asText();
+        String supplierId = supplier().get("id").asText();
+        // No prices are typed when creating the product.
+        JsonNode created = httpPost(admin(), "/api/v1/catalog/products",
+            Map.of("name", "Vaso " + suffix(), "categoryId", category().get("id").asText()), 201);
+        String productId = created.get("id").asText();
+        assertAmount("0.00", created.get("salePrice"));
+        assertAmount("25.00", created.get("marginPercent"));
+
+        // Invoice line: 12 units for 96.00 -> 8.00 each; suggested price 8.00 + 25 % = 10.00.
+        JsonNode order = approvedOrder(supplierId, warehouseId, List.of(Map.of("productId", productId, "quantity", 12, "unitCost", new BigDecimal("8.00"))));
+        receive(order.get("id").asText(), List.of(line("purchaseOrderLineId", order.get("items").get(0).get("id").asText(), "12")));
+        JsonNode repriced = httpGet(admin(), "/api/v1/catalog/products/" + productId, 200);
+        assertAmount("8.00", repriced.get("costPrice"));
+        assertAmount("10.00", repriced.get("salePrice"));
+
+        JsonNode quote = httpPost(seller, "/api/v1/sales/pricing", Map.of("warehouseId", warehouseId,
+            "items", List.of(Map.of("productId", productId, "quantity", 2))), 200).get(0);
+        assertAmount("8.00", quote.get("minimumPrice"));
+        assertAmount("10.00", quote.get("suggestedPrice"));
+
+        // Without a price the suggested one is used; the seller may go up or down, but never below cost.
+        assertAmount("20.00", sale(seller, warehouseId, productId, "2").get("total"));
+        Map<String, Object> discounted = Map.of("warehouseId", warehouseId, "channel", "POS",
+            "items", List.of(Map.of("productId", productId, "quantity", 1, "unitPrice", new BigDecimal("8.50"))));
+        assertAmount("8.50", httpPost(seller, "/api/v1/sales", discounted, 201, "Idempotency-Key", key()).get("total"));
+        Map<String, Object> loss = Map.of("warehouseId", warehouseId, "channel", "POS",
+            "items", List.of(Map.of("productId", productId, "quantity", 1, "unitPrice", new BigDecimal("7.99"))));
+        JsonNode rejected = problem(call(post("/api/v1/sales"), seller, loss, "Idempotency-Key", key()), 422, "BUSINESS_RULE_VIOLATION");
+        assertTrue(rejected.toString().contains("pérdida"), rejected.toString());
+        assertAmount("9", onHand(productId, warehouseId));
+
+        // A cheaper invoice lowers the catalog price, but older, more expensive units are still protected.
+        JsonNode cheaper = approvedOrder(supplierId, warehouseId, List.of(Map.of("productId", productId, "quantity", 10, "unitCost", new BigDecimal("4.00"))));
+        receive(cheaper.get("id").asText(), List.of(line("purchaseOrderLineId", cheaper.get("items").get(0).get("id").asText(), "10")));
+        assertAmount("5.00", httpGet(admin(), "/api/v1/catalog/products/" + productId, 200).get("salePrice"));
+        JsonNode next = httpPost(seller, "/api/v1/sales/pricing", Map.of("warehouseId", warehouseId,
+            "items", List.of(Map.of("productId", productId, "quantity", 1))), 200).get(0);
+        assertTrue(dec(next.get("minimumPrice")).compareTo(new BigDecimal("4.00")) > 0, next.toString());
+        assertTrue(dec(next.get("suggestedPrice")).compareTo(dec(next.get("minimumPrice"))) > 0, next.toString());
+
+        // Changing the markup reprices from the last purchase cost.
+        Map<String, Object> update = new LinkedHashMap<>();
+        update.put("name", repriced.get("name").asText());
+        update.put("categoryId", repriced.get("categoryId").asText());
+        update.put("marginPercent", new BigDecimal("50"));
+        assertAmount("6.00", httpPut(admin(), "/api/v1/catalog/products/" + productId, update, 200).get("salePrice"));
+    }
+
     private static void assertAmount(String expected, BigDecimal actual, String message) {
         assertEquals(0, new BigDecimal(expected).compareTo(actual), message + " (was " + actual + ")");
     }

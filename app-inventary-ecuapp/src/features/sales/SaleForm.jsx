@@ -5,10 +5,12 @@ import { api } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
 import ProductPicker from '../../components/ProductPicker.jsx';
 
-const emptyLine = () => ({ productId: '', quantity: '1' });
+// priceEdited: el vendedor cambió el precio; mientras sea false se usa el sugerido por el backend.
+const emptyLine = () => ({ productId: '', quantity: '1', unitPrice: '', priceEdited: false });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }
 function labelOf(item) { return item?.name || item?.description || item?.code || idOf(item); }
 function money(value) { return new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value || 0)); }
+function percent(value) { return new Intl.NumberFormat('es-EC', { maximumFractionDigits: 1 }).format(value) + ' %'; }
 
 export default function SaleForm({ products, warehouses, customers, balances, loading, onCancel, onSubmit, onError }) {
   const [step, setStep] = useState(0);
@@ -23,6 +25,8 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const [availabilityWarning, setAvailabilityWarning] = useState('');
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [availabilityRetry, setAvailabilityRetry] = useState(0);
+  const [pricingByProduct, setPricingByProduct] = useState({});
+  const [pricingLoading, setPricingLoading] = useState(false);
   const selectedProductIds = useMemo(() => [...new Set(lines.map(line => line.productId).filter(Boolean))].sort().join(','), [lines]);
   const activeProducts = useMemo(() => products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD'), [products]);
   const activeWarehouses = useMemo(() => warehouses.filter(item => item.active !== false && item.status !== 'INACTIVE'), [warehouses]);
@@ -30,12 +34,42 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const selectedWarehouse = activeWarehouses.find(item => String(idOf(item)) === String(warehouseId));
   const selectedCustomer = activeCustomers.find(item => String(idOf(item)) === String(customerId));
   const totals = useMemo(() => lines.reduce((result, line) => {
-    const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
     const qty = Number(line.quantity);
     result.quantity += Number.isFinite(qty) && qty > 0 ? qty : 0;
-    result.amount += Number.isFinite(qty) && qty > 0 ? qty * Number(product?.salePrice || 0) : 0;
+    result.amount += Number.isFinite(qty) && qty > 0 ? qty * priceOf(line) : 0;
     return result;
-  }, { quantity: 0, amount: 0 }), [lines, activeProducts]);
+  }, { quantity: 0, amount: 0 }), [lines, pricingByProduct]);
+  const pricingKey = useMemo(() => lines.filter(line => line.productId && Number(line.quantity) > 0)
+    .map(line => `${line.productId}:${Number(line.quantity)}`).sort().join(','), [lines]);
+
+  // Precio sugerido (costo de compra + ganancia) y mínimo sin pérdida; ambos los calcula el backend.
+  useEffect(() => {
+    if (!warehouseId || !pricingKey) { setPricingByProduct({}); setPricingLoading(false); return undefined; }
+    let active = true;
+    setPricingLoading(true);
+    const timer = setTimeout(() => {
+      const items = pricingKey.split(',').map(entry => { const [productId, quantity] = entry.split(':'); return { productId, quantity: Number(quantity) }; });
+      api.salePricing({ warehouseId, items })
+        .then(result => {
+          if (!active) return;
+          const next = Object.fromEntries((Array.isArray(result) ? result : []).map(item => [String(item.productId), item]));
+          setPricingByProduct(next);
+          setLines(current => current.map(line => {
+            const price = next[String(line.productId)];
+            return price && !line.priceEdited ? { ...line, unitPrice: String(price.suggestedPrice) } : line;
+          }));
+        })
+        .catch(() => { if (active) setPricingByProduct({}); })
+        .finally(() => { if (active) setPricingLoading(false); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [warehouseId, pricingKey]);
+
+  function priceOf(line) {
+    const typed = Number(line.unitPrice);
+    if (String(line.unitPrice).trim() !== '' && Number.isFinite(typed)) return typed;
+    return Number(pricingByProduct[String(line.productId)]?.suggestedPrice || 0);
+  }
 
   useEffect(() => {
     if (!warehouseId || !selectedProductIds) {
@@ -68,8 +102,20 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   }, [warehouseId, selectedProductIds, availabilityRetry]);
 
   function updateLine(index, field, value) {
-    setLines(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
+    setLines(current => current.map((line, lineIndex) => {
+      if (lineIndex !== index) return line;
+      if (field === 'productId') return { ...line, productId: value, unitPrice: '', priceEdited: false };
+      if (field === 'unitPrice') return { ...line, unitPrice: value, priceEdited: true };
+      return { ...line, [field]: value };
+    }));
     setValidationMessage('');
+  }
+
+  function applySuggestedPrice(index) {
+    const line = lines[index];
+    const price = pricingByProduct[String(line?.productId)];
+    if (!price) return;
+    setLines(current => current.map((item, lineIndex) => lineIndex === index ? { ...item, unitPrice: String(price.suggestedPrice), priceEdited: false } : item));
   }
 
   function stockFor(productId) {
@@ -121,6 +167,19 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
       setValidationMessage(`No hay existencias suficientes de "${product?.name || 'este producto'}". Disponible: ${stock.value}.`);
       return false;
     }
+    for (const line of lines) {
+      const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
+      const price = Number(line.unitPrice);
+      if (String(line.unitPrice).trim() === '' || !Number.isFinite(price) || price < 0 || Math.abs(Math.round(price * 100) - price * 100) > 1e-6) {
+        setValidationMessage(`Escribe un precio válido (hasta 2 decimales) para "${product?.name || 'el producto'}".`);
+        return false;
+      }
+      const minimum = Number(pricingByProduct[String(line.productId)]?.minimumPrice);
+      if (Number.isFinite(minimum) && price < minimum) {
+        setValidationMessage(`Vender "${product?.name || 'el producto'}" a ${money(price)} genera pérdida. El precio mínimo es ${money(minimum)}.`);
+        return false;
+      }
+    }
     return true;
   }
 
@@ -128,8 +187,8 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     setValidationMessage('');
     if (step === 0 && !validateBasics()) return;
     if (step === 1 && !validateLines()) return;
-    if (step === 1 && availabilityLoading) {
-      setValidationMessage('Espera un momento mientras comprobamos las existencias.');
+    if (step === 1 && (availabilityLoading || pricingLoading)) {
+      setValidationMessage('Espera un momento mientras comprobamos existencias y precios.');
       return;
     }
     setStep(current => Math.min(2, current + 1));
@@ -167,7 +226,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
       setStep(1);
       return;
     }
-    const data = { warehouseId, channel: 'POS', items: lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity) })) };
+    const data = { warehouseId, channel: 'POS', items: lines.map(line => ({ productId: line.productId, quantity: Number(line.quantity), unitPrice: Number(line.unitPrice) })) };
     if (customerId) data.customerId = customerId;
     else {
       if (customerName.trim()) data.customerName = customerName.trim();
@@ -208,7 +267,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     {step === 1 && <section className="workflow-stage" aria-labelledby="sale-products-title">
       <div className="workflow-stage-heading">
         <span className="workflow-stage-icon"><ShoppingCart size={20}/></span>
-        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Solo aparecen productos de inventario activos. Revisa el stock antes de continuar.</p></div>
+        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Busca el producto por su nombre. El precio se sugiere con la ganancia configurada y puedes ajustarlo, sin bajar del costo.</p></div>
       </div>
       {!activeProducts.length && <div className="empty-state workflow-empty">No hay productos de inventario activos para vender.</div>}
       <div className="workflow-line-list">
@@ -217,6 +276,12 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
           const stock = line.productId && warehouseId ? stockFor(line.productId) : { value: null, verified: false };
           const qty = Number(line.quantity);
           const qtyValid = Number.isFinite(qty) && qty > 0;
+          const pricing = pricingByProduct[String(line.productId)];
+          const price = Number(line.unitPrice);
+          const priceValid = String(line.unitPrice).trim() !== '' && Number.isFinite(price);
+          const minimum = Number(pricing?.minimumPrice);
+          const loss = Boolean(pricing) && priceValid && price < minimum;
+          const gain = pricing && priceValid && minimum > 0 ? (price - minimum) / minimum * 100 : null;
           return <section className="line-editor workflow-line" key={index} aria-label={`Artículo ${index + 1}`}>
             <div className="line-editor-heading"><strong>Artículo {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" disabled={loading} onClick={() => { setLines(current => current.filter((_, lineIndex) => lineIndex !== index)); setValidationMessage(''); }}><Trash2 size={14}/> Quitar</button>}</div>
             <div className="form-grid compact-grid">
@@ -225,13 +290,22 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
                   excludeIds={lines.filter((_, otherIndex) => otherIndex !== index).map(otherLine => otherLine.productId).filter(Boolean)} describe={item => money(item.salePrice)} />
               </div>
               <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
+              <label className="field"><span>Precio de venta (c/u)<b> *</b></span>
+                <input type="number" min={pricing ? pricing.minimumPrice : 0} step="0.01" inputMode="decimal" required disabled={!line.productId} aria-invalid={loss}
+                  value={line.unitPrice} placeholder={pricingLoading ? 'Calculando…' : '0.00'} onChange={event => updateLine(index, 'unitPrice', event.target.value)} />
+                {pricing && <small className="field-help price-help">
+                  Sugerido {money(pricing.suggestedPrice)} (+{percent(Number(pricing.marginPercent || 0))}) · Mínimo sin pérdida {money(pricing.minimumPrice)}
+                  {line.priceEdited && Number(line.unitPrice) !== Number(pricing.suggestedPrice) && <> · <button type="button" className="text-button inline" onClick={() => applySuggestedPrice(index)}>Usar sugerido</button></>}
+                </small>}
+              </label>
               <div className={qtyValid && stock.value !== null && qty > stock.value ? 'stock-hint stock-hint-warning' : 'stock-hint'}>
                 <small>Disponible {stock.verified ? '(actualizado)' : stock.value === null ? '(por verificar)' : '(último saldo)'}</small>
                 <strong>{stock.value === null ? (availabilityLoading ? 'Comprobando…' : '—') : stock.value.toLocaleString('es-EC')}</strong>
-                <small>Precio de catálogo: {product ? money(product.salePrice) : '—'}</small>
+                <small>{gain === null ? 'Ganancia: —' : `Ganancia: ${percent(gain)} · ${money((price - minimum) * (qtyValid ? qty : 0))} en total`}</small>
               </div>
             </div>
             {qtyValid && stock.value !== null && qty > stock.value && <p className="inline-warning">La cantidad supera las existencias mostradas. Reduce la cantidad para continuar.</p>}
+            {loss && <p className="inline-warning">Con este precio vendes por debajo del costo. El precio mínimo sin pérdida es {money(minimum)}.</p>}
           </section>;
         })}
       </div>
@@ -256,13 +330,13 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
           const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
           const qty = Number(line.quantity);
           return <div className="workflow-review-line" key={index}>
-            <div><strong>{product?.name || 'Producto no seleccionado'}</strong><small>{line.quantity} × {money(product?.salePrice)}</small></div>
-            <strong>{money((Number.isFinite(qty) ? qty : 0) * Number(product?.salePrice || 0))}</strong>
+            <div><strong>{product?.name || 'Producto no seleccionado'}</strong><small>{line.quantity} × {money(priceOf(line))}</small></div>
+            <strong>{money((Number.isFinite(qty) ? qty : 0) * priceOf(line))}</strong>
           </div>;
         })}
       </div>
       {availabilityWarning && <p className="inline-warning">{availabilityWarning}</p>}
-      <p className="form-hint">El total es una estimación. El precio final y la disponibilidad se vuelven a validar al registrar.</p>
+      <p className="form-hint">Al registrar, el sistema vuelve a validar existencias y que ningún precio quede por debajo del costo.</p>
     </section>}
 
     <div className="form-actions workflow-actions">
@@ -272,7 +346,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
         {/* Distinct keys keep React from turning the clicked "Continuar" node into the submit button mid-click,
             which would register the sale without showing the confirmation step. */}
         {step < 2 ? <button key="next" type="button" className="button primary" disabled={loading || (step === 1 && !activeProducts.length)} onClick={nextStep}>Continuar <ArrowRight size={16}/></button>
-          : <button key="confirm" type="submit" className="button primary" disabled={loading || availabilityLoading}>{loading ? 'Registrando…' : 'Confirmar venta'}</button>}
+          : <button key="confirm" type="submit" className="button primary" disabled={loading || availabilityLoading || pricingLoading}>{loading ? 'Registrando…' : 'Confirmar venta'}</button>}
       </div>
     </div>
   </form>;

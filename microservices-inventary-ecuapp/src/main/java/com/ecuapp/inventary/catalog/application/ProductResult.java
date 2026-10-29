@@ -17,6 +17,7 @@ public record ProductResult(
     String categoryName,
     BigDecimal costPrice,
     BigDecimal salePrice,
+    BigDecimal marginPercent,
     String currency,
     String imageUrl,
     ProductKind kind,

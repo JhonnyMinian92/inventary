@@ -266,6 +266,7 @@ export const api = {
   replenishmentSuggestions: () => request('/inventory/replenishment-suggestions'),
   availableStock: (params = {}) => request(`/inventory/availability${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   createSale: data => request('/sales', { method: 'POST', body: data, idempotent: true }),
+  salePricing: data => request('/sales/pricing', { method: 'POST', body: data }),
   whatsappOrders: (params = {}) => request(`/whatsapp-orders${new URLSearchParams(params).size ? `?${new URLSearchParams(params)}` : ''}`),
   whatsappOrder: id => request(`/whatsapp-orders/${encodeURIComponent(id)}`),
   confirmWhatsAppPayment: (id, data) => request(`/whatsapp-orders/${encodeURIComponent(id)}/confirm-payment`, { method: 'POST', body: data, idempotent: true })

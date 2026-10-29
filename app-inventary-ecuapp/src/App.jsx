@@ -327,15 +327,15 @@ function App() {
       name: form.name.trim(),
       kind: form.kind || 'STOCKED_GOOD',
       categoryId: form.categoryId,
-      costPrice: Number(form.costPrice),
-      salePrice: Number(form.salePrice),
+      // Costo y precio no se envían: el backend los deriva de las compras con la ganancia indicada.
+      marginPercent: Number(form.marginPercent),
       description: form.description.trim()
     };
     if (form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes)) data.attributes = form.attributes;
     if (form.unitOfMeasureId) data.unitOfMeasureId = form.unitOfMeasureId;
-    if (String(form.costPrice ?? '').trim() === '' || String(form.salePrice ?? '').trim() === '' ||
-        !Number.isFinite(data.costPrice) || data.costPrice < 0 || !Number.isFinite(data.salePrice) || data.salePrice < 0) {
-      setError('El costo y el precio de venta deben ser números válidos no negativos.');
+    if (data.kind !== 'STOCKED_GOOD') data.salePrice = Number(form.manualPrice);
+    if (!Number.isFinite(data.marginPercent) || data.marginPercent < 0 || data.marginPercent > 1000) {
+      setError('La ganancia sugerida debe ser un porcentaje entre 0 y 1000.');
       return;
     }
     await runAction(() => editing ? api.updateProduct(pickId(editing), data) : api.createProduct(data), editing ? 'Producto actualizado.' : 'Producto creado.');

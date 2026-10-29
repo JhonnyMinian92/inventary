@@ -11,6 +11,13 @@ import java.util.UUID;
 @Entity
 @Table(name="product", uniqueConstraints=@UniqueConstraint(name="uk_product_sku",columnNames="sku"))
 public class Product {
+ public static final BigDecimal DEFAULT_MARGIN_PERCENT=new BigDecimal("25.00");
+ /** Price that adds the markup to the cost, rounded up to the cent so it never falls below cost plus margin. */
+ public static BigDecimal priceWithMargin(BigDecimal cost,BigDecimal marginPercent){
+  BigDecimal base=cost==null?BigDecimal.ZERO:cost;
+  BigDecimal margin=marginPercent==null?DEFAULT_MARGIN_PERCENT:marginPercent;
+  return base.multiply(BigDecimal.ONE.add(margin.movePointLeft(2))).setScale(2,java.math.RoundingMode.CEILING);
+ }
  @Id @GeneratedValue(strategy=GenerationType.UUID) private UUID id;
  @Column(nullable=false,length=64) private String sku;
  @Column(nullable=false,length=180) private String name;
@@ -18,6 +25,8 @@ public class Product {
  @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="category_id",nullable=false,foreignKey=@ForeignKey(name="fk_product_category")) private Category category;
  @Column(name="cost_price",nullable=false,precision=14,scale=2) private BigDecimal costPrice;
  @Column(name="sale_price",nullable=false,precision=14,scale=2) private BigDecimal salePrice;
+ /** Markup over cost used to suggest the sale price (25 means cost x 1.25). */
+ @Column(name="margin_percent",nullable=false,precision=5,scale=2) private BigDecimal marginPercent=DEFAULT_MARGIN_PERCENT;
  @Column(nullable=false,length=3) private String currency;
  @Column(name="image_url",length=2048) private String imageUrl;
  @Enumerated(EnumType.STRING) @Column(name="product_kind",nullable=false,length=24) private ProductKind kind=ProductKind.STOCKED_GOOD;
@@ -37,6 +46,19 @@ public class Product {
  public void update(String name,String description,Category category,BigDecimal costPrice,BigDecimal salePrice,String currency,String imageUrl){
   this.name=name;this.description=description;this.category=category;this.costPrice=costPrice;this.salePrice=salePrice;this.currency=currency;this.imageUrl=imageUrl;
  }
+ /** A received purchase sets the reference cost and recalculates the suggested sale price with the product markup. */
+ public void applyPurchaseCost(BigDecimal unitCost){
+  if(unitCost==null||unitCost.signum()<0)return;
+  this.costPrice=unitCost.setScale(2,java.math.RoundingMode.HALF_UP);
+  this.salePrice=priceWithMargin(this.costPrice,marginPercent);
+ }
+ public void changeMarginPercent(BigDecimal marginPercent,boolean repriceFromCost){
+  if(marginPercent==null)return;
+  if(marginPercent.signum()<0)throw new IllegalArgumentException("La ganancia no puede ser negativa.");
+  this.marginPercent=marginPercent.setScale(2,java.math.RoundingMode.HALF_UP);
+  if(repriceFromCost&&costPrice!=null&&costPrice.signum()>0)this.salePrice=priceWithMargin(costPrice,this.marginPercent);
+ }
+ public BigDecimal getMarginPercent(){return marginPercent;}
  public void deactivate(){active=false;}
  public void activate(){active=true;}
  public ProductKind getKind(){return kind;} public UUID getUnitOfMeasureId(){return unitOfMeasureId;} public Map<String,Object> getAttributes(){return attributes;} public int getAttributeSchemaVersion(){return attributeSchemaVersion;}

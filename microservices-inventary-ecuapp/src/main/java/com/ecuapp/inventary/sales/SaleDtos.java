@@ -9,7 +9,15 @@ import java.util.UUID;
 
 public final class SaleDtos {
  private SaleDtos(){}
- public record LineRequest(@NotNull UUID productId,@NotNull @DecimalMin(value="0.001") @Digits(integer=11,fraction=3) BigDecimal quantity){}
+ /** unitPrice is optional: when omitted the suggested price (cost plus product markup) is used; it can never be below cost. */
+ public record LineRequest(@NotNull UUID productId,@NotNull @DecimalMin(value="0.001") @Digits(integer=11,fraction=3) BigDecimal quantity,
+  @DecimalMin("0.00") @Digits(integer=12,fraction=2) BigDecimal unitPrice){
+  public LineRequest(UUID productId,BigDecimal quantity){this(productId,quantity,null);}
+ }
+ public record PricingLine(@NotNull UUID productId,@NotNull @DecimalMin(value="0.001") @Digits(integer=11,fraction=3) BigDecimal quantity){}
+ public record PricingRequest(@NotNull UUID warehouseId,@NotEmpty @Size(max=100) List<@Valid PricingLine> items){}
+ /** minimumPrice is the cost of the units that would be sold; suggestedPrice adds the product markup. */
+ public record PriceView(UUID productId,BigDecimal quantity,BigDecimal minimumPrice,BigDecimal suggestedPrice,BigDecimal marginPercent,String currency){}
  public record CreateRequest(@NotNull UUID warehouseId,@Size(max=160) String customerName,@Size(max=40) String customerPhone,
   @NotNull SaleChannel channel,@NotEmpty @Size(max=100) List<@Valid LineRequest> items,UUID customerId){
   public CreateRequest(UUID warehouseId,String customerName,String customerPhone,SaleChannel channel,List<LineRequest> items){

@@ -30,7 +30,22 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
   const selectedSupplier = activeSuppliers.find(item => String(idOf(item)) === String(supplierId));
 
   function updateLine(index, field, value) {
-    setLines(current => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line));
+    setLines(current => current.map((line, lineIndex) => {
+      if (lineIndex !== index) return line;
+      // Si se escribe el total de la factura, el costo por unidad se calcula como total ÷ cantidad.
+      if (field === 'totalInput') {
+        const quantity = Number(line.quantity);
+        const lineTotal = Number(value);
+        const unitCost = quantity > 0 && Number.isFinite(lineTotal) && lineTotal >= 0 ? (Math.round(lineTotal / quantity * 100) / 100).toFixed(2) : line.unitCost;
+        return { ...line, totalInput: value, unitCost };
+      }
+      if (field === 'quantity' && line.totalInput !== undefined && Number(value) > 0) {
+        const lineTotal = Number(line.totalInput);
+        return { ...line, quantity: value, unitCost: Number.isFinite(lineTotal) ? (Math.round(lineTotal / Number(value) * 100) / 100).toFixed(2) : line.unitCost };
+      }
+      if (field === 'unitCost') return { ...line, unitCost: value, totalInput: undefined };
+      return { ...line, [field]: value };
+    }));
     setValidationMessage('');
   }
 
@@ -150,7 +165,14 @@ export default function PurchaseForm({ products, warehouses, suppliers, loading,
                   excludeIds={lines.filter((_, otherIndex) => otherIndex !== index).map(otherLine => otherLine.productId).filter(Boolean)} />
               </div>
               <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
-              <label className="field"><span>Costo por unidad<b> *</b></span><input type="number" min="0" step="0.01" inputMode="decimal" required value={line.unitCost} onChange={event => updateLine(index, 'unitCost', event.target.value)} /></label>
+              <label className="field"><span>Total de la línea (factura)</span>
+                <input type="number" min="0" step="0.01" inputMode="decimal" value={line.totalInput ?? (Number.isFinite(quantityValue * costValue) ? (quantityValue * costValue).toFixed(2) : '')} onChange={event => updateLine(index, 'totalInput', event.target.value)} />
+                <small className="field-help">Escribe el total que dice la factura y calculamos el costo por unidad.</small>
+              </label>
+              <label className="field"><span>Costo por unidad<b> *</b></span><input type="number" min="0" step="0.01" inputMode="decimal" required value={line.unitCost} onChange={event => updateLine(index, 'unitCost', event.target.value)} />
+                {line.totalInput !== undefined && Math.abs(quantityValue * costValue - Number(line.totalInput)) >= 0.005 && <small className="field-help">Redondeado a centavos: se registrará {money(quantityValue * costValue)}.</small>}
+                <small className="field-help">Al recibir la compra, este costo actualiza el producto y su precio de venta sugerido.</small>
+              </label>
             </div>
             <div className="line-editor-foot"><span>{product ? `Código: ${product.sku || product.code || '—'}` : 'Busca el producto por su nombre'}</span><strong>{money(lineTotal)}</strong></div>
           </section>;

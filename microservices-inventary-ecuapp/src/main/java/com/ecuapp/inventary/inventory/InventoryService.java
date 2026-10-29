@@ -94,6 +94,8 @@ public class InventoryService {
   if(r.direction()==InventoryDtos.Direction.INCREASE){
    balance.increase(quantity);type=MovementType.ADJUSTMENT_IN;
    BigDecimal cost=requestedCost!=null?requestedCost:costing.currentUnitCost(product,balance.getLocation());
+   // The first entry with an explicit cost (initial stock load) sets the price base of a product never purchased.
+   if(requestedCost!=null&&product.getCostPrice().signum()==0)product.applyPurchaseCost(requestedCost);
    valuation=costing.inbound(product,balance.getLocation(),quantity,cost);
   }else{
    balance.decrease(quantity);type=MovementType.ADJUSTMENT_OUT;

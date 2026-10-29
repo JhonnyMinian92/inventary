@@ -202,6 +202,28 @@ public class InventoryCostingService {
         return total.divide(quantity, 4, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Read-only estimate of the unit cost an outbound movement of {@code quantity} would get right now
+     * (same rules as {@link #outbound} but without consuming layers). Used to price sales without losses.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal estimateOutboundUnitCost(Product product, WarehouseLocation location, BigDecimal quantity) {
+        requirePositive(quantity);
+        BigDecimal average = location == null ? null : states.find(product.getId(), location.getId()).map(InventoryCostState::averageCost).orElse(null);
+        BigDecimal fallback = average != null ? average : normalizeCost(product.getCostPrice());
+        if (location == null || policy().getMethod() != CostingMethod.FIFO) return fallback;
+        BigDecimal pending = quantity;
+        BigDecimal total = BigDecimal.ZERO;
+        for (InventoryCostLayer layer : layers.findOpen(product.getId(), location.getId())) {
+            if (pending.signum() == 0) break;
+            BigDecimal taken = layer.getRemainingQuantity().min(pending);
+            total = total.add(total(taken, layer.getUnitCost()));
+            pending = pending.subtract(taken);
+        }
+        if (pending.signum() > 0) total = total.add(total(pending, fallback));
+        return total.divide(quantity, 4, RoundingMode.HALF_UP);
+    }
+
     /** Best estimate of the current replacement cost: running average, last layer cost or catalog cost. */
     @Transactional(readOnly = true)
     public BigDecimal currentUnitCost(Product product, WarehouseLocation location) {

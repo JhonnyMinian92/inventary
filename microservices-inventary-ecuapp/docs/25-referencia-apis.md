@@ -86,7 +86,7 @@ Permisos principales: catalog:read para lecturas y catalog:manage para comandos.
 | GET | /catalog/product-kinds | Tipos de producto con etiqueta, descripción y ejemplos para el usuario |
 | GET | /catalog/products | Listado paginado y filtros implementados en controlador |
 | GET | /catalog/products/{id} | Detalle; campos de costo condicionados por permisos |
-| POST | /catalog/products | Crear; `sku` opcional (se genera uno único si se omite) |
+| POST | /catalog/products | Crear; `sku`, `costPrice` y `salePrice` opcionales; `marginPercent` (25 por defecto) define el precio sugerido sobre el costo de compra |
 | PUT | /catalog/products/{id} | Actualizar |
 | POST | /catalog/products/{id}/activate | Activar |
 | POST | /catalog/products/{id}/deactivate | Desactivar |
@@ -258,7 +258,8 @@ Permisos: sales:read, sales:manage y sales:cancel para aprobar cancelaciones.
 |---|---|---|
 | GET | /sales | Lista |
 | GET | /sales/{id} | Detalle |
-| POST | /sales | Venta transaccional multítem |
+| POST | /sales | Venta transaccional multítem; `unitPrice` opcional por línea (sin él se usa el sugerido) y nunca menor al costo de las unidades vendidas |
+| POST | /sales/pricing | Precio sugerido (costo + ganancia) y mínimo sin pérdida por línea, según almacén y cantidad |
 | POST | /sales/{id}/request-cancellation | Solicitar anulación con motivo |
 | POST | /sales/{id}/approve-cancellation | Aprobar; aprobador distinto del solicitante |
 | GET | /sales-returns | Lista |
