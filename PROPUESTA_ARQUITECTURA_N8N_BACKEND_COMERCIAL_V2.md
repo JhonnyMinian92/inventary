@@ -739,3 +739,520 @@ La alineación se considera completa cuando:
 - [Gemini: Function calling](https://ai.google.dev/gemini-api/docs/function-calling)
 
 Las fuentes externas describen patrones de producto y herramientas; no prueban que esas integraciones estén desplegadas en Inventary. Toda capacidad futura exige contratos, permisos, pruebas y despliegue real antes de anunciarse como disponible.
+
+
+
+
+---
+
+# Revisión prioritaria V2.1 — coste de mensajería Meta, WhatsApp Flows y compra en menos de un minuto
+
+**Fecha de revisión:** 28 de octubre de 2026  
+**Motivo:** diseñar el recorrido de compra de modo que requiera pocas intervenciones del negocio, evite conversaciones innecesariamente largas y sea fácil de completar por usuarios con edades, experiencia digital, capacidades y preferencias distintas.  
+**Importancia:** esta sección complementa y prevalece sobre cualquier parte general de este documento que trate la mensajería de WhatsApp como si todas las respuestas fueran gratuitas o como si el chatbot debiera hacer cada pregunta en un mensaje separado.
+
+## 19. La economía real del canal: optimizar mensajes entregados, no solamente los tokens de IA
+
+El diseño debe tratar el costo de mensajería como una métrica de producto y arquitectura. El objetivo es que el cliente compre rápido, con claridad y sin errores, reduciendo los mensajes salientes redundantes. No se debe sacrificar una confirmación económica esencial para ahorrar un mensaje ni automatizar una decisión arriesgada.
+
+### 19.1 Aclaración sobre el modelo de cobro de Meta
+
+El modelo moderno de WhatsApp Business Platform es **por mensaje entregado**, con tarifas que dependen del país del destinatario y de la categoría (marketing, utility, authentication y service), no un cobro universal idéntico por cada interacción de usuario. El modelo pasó a cobrar por mensaje de plantilla entregado el 1 de julio de 2025. Para octubre de 2026, fuentes de tarifas que refieren al rate card de Meta describen que los mensajes de servicio también pasan a tener tarifa por mensaje tras un tramo mensual gratuito; una página pública de precios de Meta todavía presenta texto general que indica que los mensajes de servicio no se cobran. Esta divergencia obliga a verificar la tarifa y las condiciones vigentes directamente en la tarjeta de precios de la cuenta/WABA antes de desplegar y cada vez que cambien las reglas. No asumir como contrato estable una tabla copiada en un blog.
+
+Referencias que se deben comprobar antes de la puesta en producción:
+- [Página oficial de precios de WhatsApp Business Platform](https://whatsappbusiness.com/products/platform-pricing/)
+- [Política de categorías de mensajes de utilidad](https://whatsappbusiness.com/products/conversation-categories/utility/)
+- [Política de mensajes de servicio](https://whatsappbusiness.com/products/conversation-categories/service/)
+- [Tarifas por mensaje en Latinoamérica consultadas para octubre de 2026](https://contactship.ai/en/blog/whatsapp-business-api-pricing-latin-america-2026)
+- [Tarifas de WhatsApp Business API en Ecuador/resto de Latinoamérica para octubre de 2026](https://contactship.ai/blog/precios-whatsapp-business-api-resto-latinoamerica-2026)
+
+Como referencia presupuestaria —no como precio contractual—, las tablas secundarias que dicen basarse en el tarifario Meta vigente desde el 1 de octubre de 2026 muestran para Ecuador, agrupado en “Resto de Latinoamérica”, alrededor de USD 0,0113 por mensaje de servicio, utility o authentication y USD 0,074 por mensaje de marketing. También describen 1.000 respuestas de servicio gratuitas mensuales por número, con cobro de las siguientes. Estas cantidades deben verificarse en el WABA y la moneda de facturación real; no codificarlas como constantes en Java, React ni n8n.
+
+Reglas prácticas:
+- Meta cobra el mensaje cuando se entrega, según categoría y mercado; los envíos fallidos no equivalen automáticamente a un cargo por entrega.
+- Un mensaje entrante del cliente, una respuesta saliente libre, una plantilla utility, una plantilla marketing y un mensaje de Flow no son categorías intercambiables.
+- Si se utiliza un BSP/proveedor intermediario, puede añadir sus propias tarifas por mensaje, por número o por plataforma, aparte de Meta. n8n, hosting, base de datos y llamadas al modelo también tienen costos aparte.
+- La ventana de servicio, los puntos de entrada gratuitos y las excepciones cambian según las políticas vigentes. Los anuncios click-to-WhatsApp tienen reglas especiales de entrada; confirmar duración y elegibilidad con el sistema actual, sin basar la economía en una ventana gratuita que no se haya validado.
+- No clasificar artificialmente como utility un mensaje promocional. La categoría la determinan el contenido, el propósito y las reglas vigentes de Meta.
+- Los mensajes de seguridad, entrega, pago y actualizaciones pedidas por el usuario deben ser concisos y específicos; no añadir ofertas promocionales a mensajes transaccionales.
+
+### 19.2 Costo medible por compra terminada
+
+Instrumentar el canal para medir el número de mensajes salientes entregados y su costo estimado, no solo el número de ejecuciones n8n. Por operación lógica, registrar como mínimo:
+
+- conversation/message correlation, número de mensajes entrantes y salientes;
+- proveedor, messageId, timestamp, categoría/plantilla, país de destino y estado final entregado/fallido;
+- tarifa aplicada/versión de tarifario disponible, moneda y cargo de BSP si existe;
+- mensajes de entrada a Flow, envío de Flow y respuesta de Flow, sin asumir que el resultado de Flow es gratis para el negocio o que equivale a un único mensaje facturable en cualquier circunstancia;
+- llamadas de IA/tokens/costo del proveedor, separados del cobro de Meta;
+- compra aceptada, pedido creado, venta vinculada, cancelación, conversión o abandono;
+- motivo por el que se envió un mensaje adicional: información obligatoria, cambio de precio, aclaración de producto, error, recordatorio autorizado o seguimiento solicitado.
+
+No guardar el contenido completo del chat para la telemetría de costos si bastan IDs y categorías. El detalle sensible queda bajo sus permisos/retención correspondientes.
+
+Definir indicadores:
+- costo Meta + proveedor por pedido aceptado;
+- mensajes salientes entregados por pedido aceptado/completado;
+- porcentaje de pedidos que necesitan corrección por producto/cantidad/dirección;
+- tasa de completitud del Flow y abandono por pantalla/campo;
+- mediana y percentil 90 del tiempo desde la primera intención accionable hasta pedido aceptado;
+- porcentaje resuelto sin intervención humana, segmentado por tipo de operación;
+- devoluciones/reclamaciones relacionadas con confirmación insuficiente;
+- porcentaje de mensajes enviados como plantillas de marketing cuando no se produjo una compra: vigilar y evitar presión innecesaria.
+
+**Función objetivo:** minimizar el costo total por pedido correcto y cumplible, no minimizar mensajes a cualquier precio. Una compra incorrecta, un descuento no autorizado o un envío al domicilio equivocado puede costar mucho más que un mensaje adicional bien utilizado.
+
+## 20. Qué es WhatsApp Flows y cómo debe utilizarse
+
+“WhatsApp Flows” es el nombre de la funcionalidad nativa de formularios y pantallas interactivas dentro de WhatsApp. No debe confundirse con Webflow, que es un producto distinto para crear sitios web. Para esta propuesta se entiende que la opción solicitada es WhatsApp Flows.
+
+Meta describe Flows como una experiencia de pantallas y campos que el cliente completa sin salir del chat. Puede agrupar desplegables, opciones, texto, casillas y selectores de fecha. Las respuestas pueden regresar al negocio mediante webhooks y, para interacciones dinámicas, a través de un endpoint de Flow.
+
+Referencias:
+- [WhatsApp Flows — página oficial de Meta](https://whatsappbusiness.com/es-la/products/whatsapp-flows/)
+- [Meta: experiencias de negocio dentro de WhatsApp](https://about.fb.com/news/2023/09/whatsapp-new-experiences-for-people-and-businesses/)
+- [Referencia técnica de WhatsApp Flows y sus componentes](https://www.360dialog.com/docs/messaging/flows.md)
+- [Referencia del formato de envío/recepción de Flows](https://www.twilio.com/docs/content/whatsapp-flows)
+
+### 20.1 Qué mejora un Flow
+
+- Agrupa varias preguntas en una interfaz estructurada, en vez de requerir una respuesta por pregunta.
+- Ofrece opciones claras para retiro/envío, punto de retiro, rango/fecha, cantidades o preferencias admitidas.
+- Reduce errores de escritura en campos que se pueden elegir de una lista.
+- Permite mostrar un resumen antes de enviar.
+- Puede pedir solamente los campos faltantes para una operación.
+- Es útil para personas que no conocen los comandos del bot o no desean redactar mensajes largos.
+- Puede ser más rápido en procesos estructurados y repetibles como elección de entrega o configuración de una compra.
+
+### 20.2 Qué no hace un Flow
+
+- No vuelve gratis los mensajes que lo abren o lo acompañan.
+- No garantiza que cada cliente tarde menos de un minuto.
+- No sustituye las APIs transaccionales, la cotización del backend ni la reserva.
+- No debe contener una lista completa de catálogo si la selección nativa de productos/cart ya resuelve mejor esa tarea.
+- No es la solución ideal para toda pregunta abierta, reclamo o excepción.
+- No convierte automáticamente sus campos en consentimiento válido para una obligación económica si el resumen y el acto de confirmación no son explícitos.
+- No debe recoger tarjetas bancarias ni información de pago sensible que la modalidad/canal no esté diseñado para procesar con seguridad.
+- No se debe confiar en campos enviados por el cliente/Flow sin validar identificadores, importes, disponibilidad, tiempos y permisos en Inventary.
+
+**Regla de selección:** utilizar WhatsApp Flows para datos estructurados; usar catálogo/carrito nativo para elegir productos cuando esté disponible; usar texto libre para aclaraciones excepcionales y para atención humana. La combinación adecuada reduce fricción sin forzar todos los casos en un formulario único.
+
+## 21. Estrategia de compra en menos de un minuto
+
+“Comprar en menos de un minuto” se define como **objetivo de experiencia para el camino sencillo**, no como garantía para todos los pedidos. El tiempo se medirá desde que el cliente expresa una intención de compra clara hasta que el backend ha aceptado el pedido y devuelve el número/estado definitivo.
+
+Excluir del objetivo los casos que, por su propia naturaleza, requieren revisión: dirección ambigua, excepción de descuento, crédito, transferencia sin verificar, producto no identificable, stock cambiado, multiubicación, documento fiscal especial o atención humana. Estos escenarios deben resolverse de forma transparente, no apresurando al cliente a aceptar algo incorrecto.
+
+### 21.1 El camino rápido ideal
+
+**Caso A — El cliente ya sabe qué quiere**
+1. El cliente envía SKU/nombre conocido o abre un producto del catálogo.
+2. El sistema obtiene la ficha vigente de Inventary; si la intención identifica exactamente el producto, no pregunta “¿qué producto buscas?” otra vez.
+3. El cliente elige cantidad en el catálogo/carrito nativo o en un Flow corto.
+4. Se muestra una única opción claramente seleccionable para retiro/envío según disponibilidad y los campos realmente necesarios.
+5. El backend cotiza precio/stock y calcula el total real.
+6. El cliente revisa el resumen final y confirma explícitamente.
+7. Inventary crea un pedido idempotente y devuelve el número.
+8. n8n envía una confirmación breve con número, total, modo de recepción y siguiente paso.
+
+El objetivo es eliminar mensajes de cortesía vacíos, preguntar una sola cosa por turno en texto libre y agrupar datos predecibles, sin eliminar la confirmación final del pedido y del importe.
+
+### 21.2 Ruta con catálogo de WhatsApp
+
+Si la empresa tiene conectado el catálogo de Commerce Manager a WhatsApp:
+1. Ofrecer “Ver catálogo” o un mensaje de producto/lista; limitar la recomendación conversacional a pocas opciones cuando el usuario pide ayuda, en vez de enviar todo el catálogo.
+2. Dejar que el cliente elija artículos y cantidades y remita el carrito nativo en una sola acción.
+3. Recibir el evento de carrito/orden del canal y convertirlo en una solicitud de cotización de Inventary.
+4. Volver a validar cada producto, variante, precio y stock; el carrito de Meta es una intención, no una venta ni una reserva.
+5. Pedir el mínimo de datos que aún falten para cumplir el pedido y presentar una cotización de servidor.
+6. Obtener aceptación explícita del total/modalidad y crear el pedido.
+
+**Dependencia de backend:** debe existir una sincronización segura entre el catálogo maestra de Inventary y el catálogo de Meta. No mantener nombres/precios/imagenes de forma manual en dos sistemas. Inventary es fuente de verdad; Meta Commerce Manager es una proyección/publicación del catálogo. Cada elemento debe tener un mapping estable, normalmente SKU/retailer ID y el ID interno de producto/variante cuando corresponda.
+
+La sincronización debe:
+- publicar solo productos elegibles y datos aprobados;
+- propagar bajas/cambios de precio/imágenes;
+- preservar el vínculo SKU/variant/product;
+- registrar errores de sincronización;
+- tratar stock de Meta como informativo y validar el inventario real al cotizar;
+- no publicar precios/costos internos ni atributos privados;
+- detectar que un artículo del carrito nativo se volvió inactivo o cambió de precio.
+
+Referencia de patrón de compra nativa:
+- [WhatsApp: cómo el cliente agrega productos al carrito y envía el pedido](https://faq.whatsapp.com/5495780857144067/?cms_platform=android)
+- [Mensajes de catálogo, producto y lista de productos](https://developers.cm.com/messaging/docs/whatsapp-catalogue-product-messages)
+
+### 21.3 Ruta con WhatsApp Flow de checkout
+
+Usar el Flow para recopilar todos los datos que puedan elegirse sin una conversación separada. Una primera versión podría tener dos o tres pantallas cortas:
+
+**Pantalla 1 — Cómo recibirás el pedido**
+- Retirar en un punto disponible o solicitar envío.
+- Para retiro, elegir punto de retiro habilitado.
+- Para envío, elegir o capturar dirección solo si no existe una dirección elegida/verificada previamente.
+- Mostrar únicamente opciones que la API sabe servir.
+
+**Pantalla 2 — Datos faltantes y pago**
+- Presentar los datos conocidos para confirmar/corregir, no volver a pedirlos todos.
+- Elegir condición de pago entre las permitidas para ese pedido. Si el backend solo soporta prepago/confirmación de pago manual, no mostrar contra entrega o crédito como si ya existieran.
+- Seleccionar una fecha/ventana solo cuando el backend exponga opciones reales; no aceptar fechas libres como promesa de entrega.
+- Opción explícita “Necesito ayuda” para salir del Flow y pasar a una persona.
+
+**Pantalla 3 — Resumen/confirmación (si la integración dinámica lo permite)**
+- Resumen de artículos y cantidades.
+- Precio y total devueltos por Inventary, descuento/envío/impuestos aplicables.
+- Punto/dirección, modalidad y condición de pago.
+- Condiciones necesarias para aceptar y acción explícita de confirmar el pedido.
+
+Después del envío, el backend debe volver a validar la cotización y la disponibilidad. Si el monto ha cambiado, no ejecutar un alta silenciosa: mostrar el cambio y requerir aceptación nueva.
+
+Para ofrecer el total autoritativo dentro del Flow antes de confirmarlo, se necesita un endpoint de datos de Flow seguro y de baja latencia, integrado con el servicio de cotización de Inventary. No se debe confiar en que una pantalla estática con valores hardcodeados refleje precio y stock. Si ese endpoint no está disponible en la primera versión, el Flow recogerá las opciones y el backend devolverá la cotización; el cliente confirmará el resumen final mediante el mecanismo interactivo aprobado.
+
+**No forzar tres pantallas para todos:** una compra sencilla de un único producto puede usar una confirmación/resumen más corto; pedidos complejos usan el Flow con más campos, pero solo los necesarios.
+
+## 22. Diseño para distintas edades y experiencias digitales
+
+No tratar la edad como predicción de capacidad. Diseñar un camino accesible y corto para todos, con una alternativa en texto para quien no quiera usar un formulario.
+
+### 22.1 Principios de interacción universal
+
+- Un objetivo principal por pantalla.
+- Botones con verbos concretos: “Ver productos”, “Elegir retiro”, “Enviar pedido”, “Confirmar compra”.
+- Frases breves, palabras de uso común y montos con moneda explícita.
+- Mostrar imágenes y nombre de producto, pero nunca depender solo de la imagen para identificarlo.
+- Mostrar variantes, cantidades y precios con etiquetas completas, no solo códigos.
+- Limitar las alternativas simultáneas a un número que ayude a elegir; ofrecer “Ver más opciones” en vez de saturar.
+- Mantener “Atrás”, “Cambiar” y “Hablar con una persona” visibles donde corresponda.
+- No borrar el carrito si el cliente vuelve atrás o necesita ayuda.
+- Prefill de datos ya verificados, con oportunidad de corregirlos.
+- No usar jerga como “SKU”, “fulfillment”, “token” o “webhook” en el mensaje al cliente.
+- No usar un temporizador de cuenta regresiva agresivo; comunicar la vigencia real de la cotización sin presión artificial.
+- Confirmar el pedido y el total con claridad; no ocultar cargos en una pantalla anterior.
+
+### 22.2 Tres perfiles de experiencia que deben probarse
+
+| Perfil de tarea | Preferencia de interfaz | Camino recomendado |
+|---|---|---|
+| Compra rápida/repetida | Ya conoce producto y cantidad, quiere terminar rápido | Atajo a producto frecuente/SKU, carrito pequeño, retiro predeterminado si sigue vigente, resumen y confirmación. |
+| Compra asistida | No conoce SKU, compara opciones o necesita recomendación | Texto libre asistido por búsqueda, máximo 3–5 opciones iniciales basadas en datos, detalle del producto, opción de ayuda y checkout Flow opcional. |
+| Compra cuidadosa o de baja familiaridad digital | Quiere revisar detalles, no sabe usar catálogo o prefiere escribir | Instrucciones paso a paso, una pregunta por vez, Flow con etiquetas simples o alternativa en texto, resumen legible y posibilidad de regresar/consultar a una persona. |
+
+No asumir que todos los adultos mayores necesitan un flujo lento ni que todos los jóvenes prefieren un bot autónomo. La UI debe permitir seleccionar el modo, no inferirlo ni etiquetar al usuario.
+
+### 22.3 Accesibilidad funcional
+
+- Compatibilidad con TalkBack/VoiceOver y lectores de pantalla en el cliente móvil.
+- Navegación predecible, labels descriptivos, contraste y foco visibles.
+- Evitar microtexto, códigos crípticos, opciones que solo se distinguen por color o acciones escondidas.
+- Si el Flow no está disponible o falla en un dispositivo/cuenta, fallback inmediato al mismo formulario por chat con opciones y mensajes compactos.
+- No dar por hecho que todos usan WhatsApp Web/desktop para completar Flows; comprobar la compatibilidad del cliente y ofrecer alternativa.
+- Probar en Android/iOS de gama media/baja, distintos tamaños de letra, mala conexión y usuario que interrumpe/retoma la compra.
+
+## 23. Estrategia de mensajes: menos mensajes, sin quitar información esencial
+
+### 23.1 Guion de referencia para una compra simple
+
+El sistema debe evitar enviar automáticamente “Hola”, “¿en qué puedo ayudarte?”, “perfecto”, “un momento”, “gracias”, cada uno como mensaje separado, si el cliente ya dio una instrucción clara. Concatenar en un único mensaje lo que sea útil y no resulte un párrafo difícil de leer.
+
+Ejemplo de entrada de cliente:
+“Necesito 2 unidades del cargador X, para retirar hoy.”
+
+Respuesta agrupada del sistema:
+- Producto validado y cantidad interpretada.
+- Si hay stock y puntos habilitados, presentar una selección simple de retiro.
+- Si hay una sola opción válida, no preguntar algo que la API ya determina.
+- Generar cotización real.
+- Mostrar total y condición de pago.
+- Pedir confirmación del resumen.
+
+No se deben enviar mensajes separados para declarar “buscando producto”, “encontrado”, “revisando precio”, “stock revisado” o “calculando total”. Son pasos técnicos que n8n registra internamente, no contenido para el cliente.
+
+### 23.2 Qué preguntas agrupar y cuáles mantener separadas
+
+**Agrupar en Flow cuando sean campos estructurados y conocidos:**
+- retiro o envío;
+- ubicación de retiro disponible;
+- dirección/entrega cuando sea necesaria;
+- preferencia de ventana real, si se soporta;
+- datos faltantes de contacto/entrega;
+- condición de pago que esté habilitada.
+
+**Mantener una pregunta breve de texto cuando:**
+- el producto o variante no se identifica;
+- hay conflicto entre mensajes previos;
+- el cliente solicita otra cosa o explica una excepción;
+- el artículo exige compatibilidad no registrada;
+- hay una reclamación que requiere empatía, contextualización y persona.
+
+**No agrupar por comodidad datos sensibles o económicos** si el Flow/proveedor no es adecuado para ellos. No pedir en el mismo formulario más datos personales de los que el pedido necesita.
+
+### 23.3 Respuesta consolidada de cotización
+
+El mensaje/resumen de cotización debe incluir todo lo que pueda cambiar la decisión del cliente:
+- nombre corto e identificador del producto, cantidad y variante;
+- precio/descuento autorizado;
+- tarifa de envío y cargo adicional si aplica;
+- impuestos/cargos calculados por backend;
+- total y moneda;
+- punto/destino;
+- condición de pago;
+- validez de cotización y siguiente paso.
+
+La confirmación se solicita una sola vez sobre esa versión del resumen. Si el cliente modifica una línea o modalidad, vuelve a cotizarse solo lo que cambió y se muestra el nuevo total. No reenviar el catálogo entero ni la misma dirección varias veces.
+
+## 24. Selección de canal según caso: Flow, catálogo, texto o sitio web
+
+| Necesidad | Opción preferida | Motivo y límite |
+|---|---|---|
+| Buscar un artículo exacto | Consulta del catálogo de Inventary y respuesta breve | Evita un formulario innecesario; la respuesta debe usar datos actuales. |
+| Explorar productos físicamente en WhatsApp | Catálogo y carrito nativos, si la sincronización Meta está implementada | El cliente elige artículos y cantidades dentro de WhatsApp. El carrito recibido aún debe cotizarse/validarse en Inventary. |
+| Elegir retiro/envío, sede o información estructurada | WhatsApp Flow | Agrupa campos en pocas pantallas y evita varios mensajes de pregunta/respuesta. |
+| Repetir una compra conocida | Atajo de recompra o artículo conocido con revisión de total | Reduce pasos, pero no omite validar precio/stock/confirmación. |
+| Pedir recomendación abierta | Texto + búsqueda semántica/reglas; Flow solo después de identificar opciones | No convertir una conversación exploratoria en un formulario rígido demasiado pronto. |
+| Reclamo, error de pago, excepción o producto no identificable | Mensaje breve y handoff humano | Evita respuestas de IA que podrían agravar el problema o generar cargos indebidos. |
+| Producto con gran cantidad de atributos técnicos | Detalle estructurado o página web accesible, más resumen WhatsApp | Un Flow no sustituye una ficha técnica larga. Enlazar solo a una URL segura y móvil. |
+| Selección logística o dirección extensa | Flow con lista de ubicaciones/validación en backend | Evita texto libre ambiguo; la promesa/selección final sigue validándose en API. |
+
+WhatsApp Flows no debe ser el único camino; el checkout debe tener fallback por chat y, si la ficha requiere mucha información, la posibilidad de abrir una web móvil. Un sitio externo puede mejorar la comparación, pero también introduce salida de WhatsApp y no garantiza menor costo; la decisión se mide.
+
+## 25. Arquitectura técnica necesaria para Flows
+
+### 25.1 Backend Flow endpoint
+
+Los Flows dinámicos pueden consultar datos y enviar respuestas entre pantallas. El endpoint de datos debe ser un adaptador dedicado, seguro y de latencia predecible que aplique las reglas de negocio en Inventary.
+
+Debe:
+- validar autenticidad/cifrado del payload conforme al protocolo Flow vigente;
+- resolver el contexto de la sesión y Flow token sin confiar en valores del cliente;
+- devolver solo el catálogo/opciones que esa pantalla necesita;
+- consultar disponibilidad/precio a servicios de dominio, no leer o modificar stock desde n8n;
+- validar cada productId/variantId contra los elegibles;
+- generar una cotización de servidor y un ID de versión;
+- rechazar entradas inválidas y expiraciones con mensajes que permitan al cliente corregir;
+- evitar operaciones no idempotentes durante eventos intermedios de navegación;
+- registrar correlationId/flowId sin persistir campos personales innecesarios;
+- aplicar timeout, rate limit, versionado y pruebas del formato de cifrado.
+
+No construir lógica comercial crítica en el JSON del Flow. El JSON presenta campos y pantallas; el backend decide los resultados.
+
+### 25.2 Papel de n8n en el Flow
+
+n8n debe:
+- enviar el mensaje/CTA que abre el Flow;
+- conservar el correlativo del mensaje enviado y la relación con conversación/carrito;
+- recibir el webhook de envío/completado;
+- validar que la finalización corresponde al Flow/pedido esperado;
+- normalizar los campos con versión de esquema;
+- llamar al backend con una solicitud idempotente para guardar/actualizar la intención/cotización;
+- recibir el resultado real y enviar una única confirmación/resumen final;
+- derivar a una persona si el Flow fue abandonado, la API falla o los datos no se pueden validar.
+
+Para intercambios de datos en tiempo real, no hacer que el endpoint de Flow dependa de una cadena larga de nodos n8n con LLM en el camino crítico. El endpoint dedicado de backend debe responder rápido; n8n coordina la operación asíncrona posterior.
+
+### 25.3 Versionado y despliegue
+
+- Versionar los JSON de Flow, templates/CTA, versiones de API y workflow n8n que consumen sus respuestas.
+- Separar Flow de pruebas y Flow de producción.
+- Mantener una tabla de compatibilidad: flowId/name, version, backend schema, workflow, estado de publicación y fecha de salida.
+- Probar Flow antiguo con webhook tardío; si una versión queda retirada, devolver un mensaje claro y un fallback a chat, no aceptar un formulario incompatible.
+- Nunca guardar tokens/keys en el JSON exportado.
+- Medir tasa de apertura, finalización, abandono y errores por versión y pantalla.
+- Actualizar el catálogo o tarifas siempre a través de APIs, no editando JSON del Flow con precios constantes.
+
+## 26. Diseño de checkout con cotización viva y confirmación segura
+
+Para una experiencia rápida no es necesario convertir cada pantalla en una conversación, pero sí separar “capturar preferencias” de “aceptar un importe concreto”.
+
+### Fase A — Recopilar
+
+Flow/catálogo reúne producto(s), cantidad(es) y los datos operativos mínimos. Las selecciones se consideran intención, no venta.
+
+### Fase B — Cotizar
+
+Backend valida:
+- producto activo y elegible;
+- precio vigente y moneda;
+- cantidad disponible;
+- descuentos autorizados;
+- impuestos/cargos aplicables;
+- modalidad y destino;
+- coste/ventana logística, si están implementados;
+- condición de pago habilitada;
+- vigencia del precio.
+
+Backend guarda la versión de cotización y devuelve el resumen. No reservar stock a largo plazo solo por abrir el Flow.
+
+### Fase C — Aceptar
+
+El resumen final, ya con datos del servidor, debe pedir aceptación explícita del total y condiciones. Guardar la versión de cotización, timestamp e ID verificado de la respuesta/Flow cuando el proveedor lo permita.
+
+Si la cotización cambia entre la pantalla del Flow y la creación del pedido, el backend devuelve conflicto/cambio; se informa al cliente y se solicita nueva aceptación. No se acepta una casilla o texto generado por IA como consentimiento de un total que no se presentó al cliente.
+
+### Fase D — Crear una sola orden
+
+Crear el pedido con Idempotency-Key por intento lógico y relacionarlo con:
+- messageId de entrada;
+- flowId/version y submissionId si existen;
+- quoteId/version;
+- customerRef derivado de la identidad verificada;
+- modalidad seleccionada;
+- respuesta final del backend.
+
+Un webhook duplicado o un timeout devuelve el mismo pedido; no crea otra orden ni otra reserva.
+
+### Fase E — Confirmar resultado
+
+Enviar un mensaje compacto con número de pedido, total, modo de recepción y siguiente paso. La respuesta no dice “pagado”, “listo” o “despachado” salvo que el backend tenga esos estados.
+
+## 27. Recompra, preguntas frecuentes y compradores recurrentes
+
+La recompra ofrece gran potencial de reducir pasos, siempre que sea segura y el artículo no haya cambiado:
+
+- Detectar que el cliente se refiere a una compra previa por historial verificable y permisos, no por inferencia libre.
+- Proponer “Repetir el pedido anterior” con resumen; nunca ejecutar automáticamente por una frase ambigua.
+- Volver a consultar precio, activo, variantes y disponibilidad.
+- Volver a preguntar únicamente el dato que probablemente cambió (p. ej., modalidad/dirección), prellenando lo que sigue válido.
+- Mostrar nuevo total y pedir confirmación.
+- Si se ha cambiado el producto, el precio, la modalidad o la dirección, abandonar el atajo y usar el flujo normal.
+
+No usar historial de compras para enviar campañas de marketing sin consentimiento apropiado. La recompra debe ser una función iniciada/esperada por el cliente.
+
+## 28. Ajustes al modelo de datos y telemetría para medir la experiencia rápida
+
+Añadir o consolidar un registro de interacción que vincule:
+- conversationId, wa_id/customerRef protegido y messageId;
+- tipo de entrada: texto, producto, carrito, Flow, catálogo o humano;
+- flowId/version/screenId y evento de submit/cancel;
+- quoteId/version y duración de validez;
+- orden creada y su resultado;
+- mensajes de salida, categoría, delivery status y costo/tarifa estimados;
+- latencia de backend y n8n;
+- punto de abandono y motivo conocido;
+- aclaraciones, modificaciones y handoff humano.
+
+Mantener los eventos de producto (impresión, clic, selección) diferenciados de la compra. No inferir que se mostró una lista completa si no hay evidencia de que el mensaje llegó. Evitar almacenar texto completo y dirección en telemetría analítica cuando bastan referencias opacas.
+
+Definir un baseline de dos semanas de uso o una prueba con usuarios simulados antes de fijar metas de reducción de costos. Si aún no hay tráfico suficiente, medir con una batería de tareas representativas y etiquetar el resultado como baseline técnico, no como evidencia comercial.
+
+## 29. Metas y criterios de aceptación del flujo rápido
+
+Los valores siguientes son objetivos a validar, no resultados ya medidos:
+
+- En una compra simple de producto conocido, objetivo mediano de **menos de 60 segundos** desde la intención accionable hasta pedido aceptado por backend.
+- No más de 2 mensajes salientes de negocio antes de la aceptación en la ruta rápida, salvo que se necesite una pantalla Flow/CTA independiente, haya cambio de cotización o exista una pregunta obligatoria.
+- Una respuesta consolidada de cotización/resumen que presente los datos esenciales antes de aceptar.
+- Cero duplicados de pedido/venta/reserva en pruebas de reintento.
+- Cero pedidos creados con producto/cantidad/total distinto del resumen aceptado.
+- Cero falsos mensajes de “pagado”, “listo”, “despachado” o “entregado”.
+- Un camino accesible alternativo al Flow que permite completar la operación o solicitar atención humana.
+- Separar abandono por elección (cliente deja de responder) de errores del sistema y de la pérdida de ventana de mensajería.
+- Medir p50 y p90; no optimizar únicamente la mediana mientras un grupo de usuarios quede bloqueado.
+- Medir costo de Meta y proveedor por pedido completado, separado del coste de IA/hosting.
+
+### Escenarios que deben probarse
+
+1. Cliente escribe el SKU/nombre exacto y cantidad.
+2. Cliente escribe una descripción vaga; la IA ofrece hasta 3–5 alternativas verificadas.
+3. Cliente usa catálogo nativo y manda carrito.
+4. Cliente abre Flow, completa una pantalla y abandona; puede volver sin perder todo.
+5. Cliente mayor o poco familiarizado con formularios prefiere responder por texto; el fallback funciona.
+6. Cliente usa lector de pantalla o tamaño de fuente grande.
+7. Cliente modifica cantidad en Flow y el precio cambia.
+8. Un producto quedó inactivo entre abrir el catálogo y enviar el carrito.
+9. Variante que el carrito actual no soporta: no se vende como producto padre por equivocación.
+10. Cotización vencida justo antes de confirmar.
+11. Cliente selecciona envío pero falta dirección; solo se pregunta ese dato.
+12. Cliente selecciona una sede cerrada o no elegible; la API elimina esa opción y solicita alternativa.
+13. Cliente escribe que va en camino, pero la preparación no está lista.
+14. Pedido nocturno sin capacidad inmediata; no se promete entrega/retirada.
+15. Contra entrega o pago al retirar no está soportado: no mostrarlo como opción viable.
+16. Dos envíos de Flow/webhook para la misma submission; solo una operación.
+17. Flow responde con un campo inesperado/versión antigua.
+18. Webhook de proveedor falla tras creación; el workflow consulta el resultado antes de repetir.
+19. Un mensaje de utilidad o marketing se clasifica mal; alertar/no enviar hasta resolver.
+20. Precio o stock cambió después de que el cliente revisó el resumen: exige nueva aceptación.
+21. Servicio Meta, BSP o IA tiene un fallo; la experiencia recurre a un camino alternativo sin duplicar.
+22. Cliente desea comparar productos con explicación larga; el sistema no lo obliga a terminar en 60 segundos.
+23. Cliente pide un humano durante cualquier pantalla.
+24. Medir costo de mensajes y tiempo total, además de conversión y errores.
+
+## 30. Plan de implementación actualizado por prioridad
+
+### P0 — Medir y definir el modelo de precios de mensajería
+
+- Confirmar el tarifario, la moneda y las categorías en la cuenta WABA que se desplegará; documentar la fecha de verificación.
+- Confirmar la tarifa del proveedor/BSP, si existe.
+- Añadir instrumentación de mensajes enviados/entregados/categoría y cálculo de costo estimado.
+- Definir quién aprueba campañas y plantillas marketing para evitar envíos caros e innecesarios.
+
+**Razón:** sin una base real no se puede afirmar cuánto ahorra un Flow ni estimar costo por pedido.
+
+### P1 — Checkout rápido sin Flow complejo
+
+- Evitar mensajes de “progreso” que no aportan información.
+- Soportar la intención de producto conocido y búsqueda de máximo 3–5 alternativas útiles.
+- Reutilizar carrito, cotización y pedido actuales con idempotencia.
+- Consolidar resumen/aceptación.
+- Añadir pruebas de timeout, producto inactivo y cambio de precio.
+
+**Razón:** mejora la velocidad sin esperar primero una integración dinámica de Flows.
+
+### P1 — Integración de catálogo/carrito nativo de WhatsApp (si es conveniente para el negocio)
+
+- Diseñar el vínculo fuente de verdad Inventary → Meta Catalog, sincronización y mapping de SKU/variantes.
+- Recibir el carrito del proveedor como una solicitud; volver a validar y cotizar en Inventary.
+- No tomar el stock/precio cacheado por Meta como un compromiso transaccional.
+- Medir mensajes, tiempo, abandono y errores frente a la ruta de texto.
+
+**Dependencia:** cuenta WABA, catálogo Commerce Manager conectado, claves/product IDs y la integración de webhooks correspondientes.
+
+### P1 — WhatsApp Flow de retiro/envío y datos estructurados
+
+- Diseñar la primera versión con pocos campos y dos o tres pantallas cortas.
+- Crear un endpoint dinámico seguro y de baja latencia cuando el precio/opciones deban cambiar en tiempo real.
+- Enviar el Flow por el mecanismo permitido para la ventana/política vigente.
+- Recibir submission, validar, cotizar y pedir/registrar aceptación de la versión real.
+- Implementar fallback por texto y métrica de finalización/abandono.
+
+**Dependencia:** Flows publicados/aprobados, protocolo de cifrado del endpoint, payloads de prueba y contrato backend de fulfillment/cotización.
+
+### P2 — Checkout con condiciones avanzadas
+
+Habilitar solo después de que backend soporte realmente descuentos en cotización, pagos por modalidad, crédito autorizado, direcciones, tarifas, preparación/entrega y suscripciones. No colocar opciones en el Flow antes de que exista su regla de servidor.
+
+### P2 — Optimización continua
+
+- Experimentar por separado con Flow versus texto y catálogo nativo versus búsqueda conversacional.
+- Comparar tasa de pedido correcto/completado, tiempo p50/p90, mensajes por compra, coste, error de stock/pago, reclamaciones y accesibilidad.
+- Segmentar por tarea, dispositivo y modo de entrada, no crear perfiles psicológicos.
+- Mantener control de versión y rollback del Flow/plantillas/workflows.
+
+## 31. Referencias para esta revisión
+
+### Meta y WhatsApp
+- [WhatsApp Business Platform — precios oficiales](https://whatsappbusiness.com/products/platform-pricing/)
+- [WhatsApp Flows — producto oficial](https://whatsappbusiness.com/es-la/products/whatsapp-flows/)
+- [Meta Newsroom — Flows para compras y servicios dentro de WhatsApp](https://about.fb.com/news/2023/09/whatsapp-new-experiences-for-people-and-businesses/)
+- [WhatsApp — cómo utilizar el carrito de compra](https://faq.whatsapp.com/5495780857144067/?cms_platform=android)
+- [WhatsApp Flows: especificación de referencia](https://www.360dialog.com/docs/messaging/flows.md)
+- [WhatsApp Flows: envío/recepción técnica](https://www.twilio.com/docs/content/whatsapp-flows)
+- [WhatsApp precios en Latinoamérica, rate card referido para octubre de 2026](https://contactship.ai/en/blog/whatsapp-business-api-pricing-latin-america-2026)
+- [Precios WhatsApp API para Ecuador y el resto de Latinoamérica](https://contactship.ai/blog/precios-whatsapp-business-api-resto-latinoamerica-2026)
+
+### Inventary
+- [Arquitectura n8n/backend V2](PROPUESTA_ARQUITECTURA_N8N_BACKEND_COMERCIAL_V2.md)
+- [Propuesta UX/UI de Pedidos WhatsApp V2](PROPUESTA_UX_PEDIDOS_WHATSAPP_V2.md)
+- [Propuesta UX/UI de Productos V2](PROPUESTA_UX_PRODUCTOS_V2.md)
+- [Propuesta UX/UI de Ventas V2](PROPUESTA_UX_VENTAS_V2.md)
+- [Propuesta de Suscripciones](PROPUESTA_UX_SUSCRIPCIONES.md)
+- [Propuesta logística de retiro y envío](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md)
+- [Referencia actual de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md)
+
+## 32. Dictamen
+
+Inventary debe diseñar WhatsApp como un canal de compra optimizado, no como un chat que hace una pregunta por cada campo. El camino de referencia es catálogo/carrito nativo cuando el cliente quiere explorar productos, Flow para capturar en pocas pantallas los datos estructurados de cumplimiento y pago permitidos, y texto/IA para las dudas que de verdad necesitan conversación. n8n coordina; el endpoint de datos de Flow y la API de Inventary entregan opciones/precios seguros; el backend valida la cotización, registra la aceptación y crea el pedido una sola vez.
+
+El ahorro debe ser demostrable: menos mensajes salientes entregados por pedido correcto, menor costo total por venta, menor tiempo de finalización y sin aumento de errores, quejas, pedidos duplicados o pagos incorrectos. La compra en menos de un minuto se valida con usuarios y métricas reales; no se promete para excepciones, productos ambiguos ni operaciones que requieran aprobación.
+
+Los formularios no deben convertirse en una barrera. El cliente puede usar el catálogo, elegir el Flow, responder por texto o hablar con una persona. El mejor flujo es el que consigue que el cliente complete la compra rápido y entienda exactamente lo que aceptó.
+
