@@ -1835,3 +1835,15 @@ Contrato de referencia: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md
 La Resolución SRI NAC-DGERCGC26-00000027, publicada en el Quinto Suplemento del Registro Oficial No. 335 el 28 de julio de 2026, regula el registro de ciertas categorías de proveedores de sistemas/servicios de facturación electrónica. Su artículo 5 requiere, cuando el proveedor esté comprendido en el ámbito, incluir su RUC en la sección de información adicional de los comprobantes conforme a la ficha técnica; la transitoria tercera indica 60 días calendario desde publicación.
 
 n8n no debe construir el XML ni añadir este dato manualmente. El backend fiscal debe validar la aplicabilidad, mantener la identidad fiscal del proveedor tecnológico y escribir el dato en el XML/RIDE a través del procedimiento correcto. La integración de Inventary debe poder comprobar en configuración/health check que el proveedor está configurado antes de emitir. No confundir proveedor tecnológico con contribuyente emisor o receptor. No asumir que el servicio externo está exento ni que necesariamente pertenece al artículo 2: confirmarlo con el proveedor/responsable tributario. Fuente: [SRI, aviso oficial](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
+
+---
+
+## Revisión de n8n — Las asociaciones de bodegas no autorizan al agente a elegir emisor
+
+Contrato de referencia: [Facturación electrónica SRI](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md) y [Centro de reportes V2](PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V2.md).
+
+La relación bodega-establecimiento es muchos-a-muchos y debe resolverse por una herramienta de backend autorizada. n8n/LLM no puede elegir el primer registro, asumir que una bodega pertenece a un único establecimiento ni decidir el punto de emisión usando un nombre, código interno o texto del cliente.
+
+La herramienta debe devolver opciones permitidas, tipo de vínculo, vigencia, RUC, estado actualizado y razón de la sugerencia. Si la asignación no es unívoca conforme a la política, el workflow debe pedir la selección autorizada o entregar a una persona. La API fiscal externa vuelve a validar el billingContextId antes de emitir.
+
+Para reportes y alertas, los eventos deben incluir warehouseId, establishmentId cuando proceda, legalEntity/owner, sourceOperationId y contexto fiscal real. Los flujos deduplican por identidad del hecho y no agregan stock o ventas una vez por cada asociación. Las relaciones cambiadas no reasignan eventos históricos.
