@@ -738,3 +738,26 @@ Propuestas relacionadas:
 ## 14. Límites de esta entrega
 
 Esta entrega añade el diseño en Markdown. No agrega todavía entidades, migraciones, endpoints de consulta SRI, adaptadores externos, permisos, CRUD contextual, paginación React ni nuevos contratos de unidad por línea. Las reglas tributarias definitivas, selección del punto de emisión y autorización de comprobantes corresponden al backend de facturación y deben contrastarse con la especificación oficial vigente del SRI. La consulta automática del RUC debe implementarse solo después de confirmar fuente autorizada y contrato real.
+
+---
+
+## Adenda obligatoria — Contexto emisor y contrato con el backend fiscal
+
+Documento de referencia: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La gestión de datos del RUC y establecimientos sirve para conservar información tributaria y asociarla de forma explícita con los almacenes. **No convierte esta pantalla en el configurador de secuenciales o el emisor de facturas.** El backend fiscal externo mantiene la configuración operativa de emisión, certificado, punto de emisión, secuenciales, XML, firma y autorización.
+
+La implementación debe separar:
+- contribuyente/RUC y su estado;
+- establecimientos SRI y estado ABIERTO/CERRADO recibido;
+- almacenes de inventario y ubicaciones internas;
+- asociación entre un almacén y un contexto de emisión, cuando el negocio la configure;
+- punto de emisión fiscal y estado de habilitación administrados/confirmados por el backend fiscal.
+
+La operación de Venta debe enviar un billingContextId válido y que el backend fiscal pueda resolver a un RUC, establecimiento y punto de emisión concretos. Los códigos se conservan como texto, con ceros iniciales. No se deriva el establecimiento por el nombre o código del almacén ni se deja a la persona escribir un número secuencial libremente.
+
+Si el RUC está SUSPENDIDO o el establecimiento seleccionado aparece CERRADO, la UI muestra la condición y no lo ofrece como emisor utilizable; la validación final siempre corresponde al backend fiscal, en el momento de emitir. Un snapshot local antiguo no autoriza la emisión. La existencia de stock en un almacén no da derecho a facturar desde un establecimiento tributario cerrado.
+
+El backend fiscal devuelve los códigos utilizados, el número de comprobante, la clave de acceso y el estado; esta pantalla puede mostrar esa información y la fecha de última sincronización, pero no inventa autorización. La consulta de RUC debe tener una fuente real y documentada; no suponer que el JSON de ejemplo es una API pública estable del SRI.
+
+La resolución NAC-DGERCGC25-00000017 reformó el plazo de anulación y el artículo sobre notas de crédito. El tratamiento fiscal de ventas/devoluciones se implementa en el contrato canónico, no en el CRUD de almacenes/contactos.
