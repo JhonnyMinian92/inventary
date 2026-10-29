@@ -1,5 +1,8 @@
 # Propuesta de rediseño UX/UI para Productos
 
+> Versión revisada: [PROPUESTA_UX_PRODUCTOS_V2.md](PROPUESTA_UX_PRODUCTOS_V2.md). La investigación de algoritmos, medición, APIs y WhatsApp está en [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md).
+
+
 **Producto:** Inventary · EcuApp  
 **Base inspeccionada:** master · 23c806d6ed5d06d1ff55e5a72be405167a79150f  
 **Alcance:** exclusivamente la pantalla y los flujos de Catálogo/Productos, incluidas búsqueda, ficha, creación/edición, atributos, imágenes, variantes y asistencia de IA. No se modificó código.
