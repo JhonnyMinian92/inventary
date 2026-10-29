@@ -799,3 +799,24 @@ Estas referencias orientan decisiones de diseño y dominio; no sustituyen las re
 Suscripciones debe quedar alineada con Ventas en la experiencia comercial y en la integridad de los registros, sin convertir cada contrato en una línea de venta ordinaria. La entrada comercial puede compartirse; la contratación, la cuota, la factura, el pago y la habilitación del beneficio son efectos relacionados pero distintos.
 
 El objetivo de la primera versión es concreto: **contratar un plan desde el flujo comercial existente, usar el endpoint de suscripciones, generar la factura correcta una sola vez, mostrarla vinculada en Ventas, distinguir factura de pago y garantizar que anulaciones/cancelaciones no dejen el calendario incoherente**. Renovaciones, pagos recurrentes automáticos y derechos de acceso deben llegar después de definir sus reglas.
+
+---
+
+## Adenda obligatoria — Facturas SRI asociadas a cuotas y cancelaciones
+
+Contrato canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+Hoy SubscriptionBillingJob crea ventas internas de canal SUBSCRIPTION. La integración futura debe pasar esas ventas por el mismo backend fiscal que las demás operaciones; no debe crear una ruta paralela ni permitir que n8n facture la misma cuota.
+
+- Cada cuota debe quedar relacionada con su subscriptionId, installmentId y saleId, y con el documento fiscal externo/operación de emisión cuando exista.
+- Si una suscripción genera una factura consolidada por prepago, la solicitud fiscal representa esa venta consolidada y se vincula a todas las cuotas incluidas; no se genera otra factura por cada cuota.
+- El estado de una cuota facturada no significa pago recibido. «Factura autorizada», «pagada» y «suscripción activa» son estados diferentes.
+- Si falla la integración, la cuota mantiene su venta relacionada y un estado fiscal pendiente/error recuperable; nunca se crea otra venta solo para reintentar el documento.
+- Cancelar una suscripción deja de generar cuotas futuras según las reglas del contrato, pero no anula automáticamente los comprobantes ya autorizados.
+- Para cancelar/anular una factura ya emitida o corregir una operación de una suscripción, se debe solicitar el procedimiento fiscal correspondiente al backend externo y reflejar el estado confirmado. Si el caso es una operación válida con devolución/descuento, evaluar nota de crédito según las reglas fiscales; no ejecutar una anulación genérica.
+- Si la factura se encuentra en proceso, rechazada o pendiente de conciliación, la vista previa de cancelación de suscripción debe distinguir qué cuotas son futuras, qué ventas internas existen y qué documentos fiscales están autorizados/pedientes.
+- La identidad fiscal del emisor, establecimiento y punto de emisión debe ser explícita y validada; el almacén de prestación/operación no se convierte automáticamente en el establecimiento emisor.
+
+La resolución NAC-DGERCGC25-00000017 reformó el plazo de anulación del artículo 3 al día 7 del mes siguiente desde el 1 de enero de 2026 y modificó el artículo 5 de la resolución original. El backend fiscal debe aplicar la normativa consolidada y considerar las restricciones de consumidor final y las demás condiciones relevantes. No hardcodear la antigua regla del día 10 ni el plazo fijo de 12 meses de la redacción inicial.
+
+Pruebas adicionales: cuota facturada una sola vez; emisión autorizada/pending/rejected; cancelación de suscripción sin anular las facturas históricas de forma automática; nota de crédito vinculada; estado de pago independiente; fallo y retry sin duplicar venta/factura/cuota; coherencia de factura consolidada y sus cuotas.
