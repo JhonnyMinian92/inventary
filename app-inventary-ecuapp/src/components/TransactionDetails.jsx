@@ -60,7 +60,7 @@ export function SaleDetail({ sale }) {
       <Definition label="Cliente" value={sale?.customerName || 'Venta de mostrador'}/>
       <Definition label="Teléfono" value={sale?.customerPhone}/>
       <Definition label="Almacén" value={sale?.warehouseCode}/>
-      <Definition label="Canal" value={titleCase(sale?.channel)}/>
+      <Definition label="Canal" value={({ POS: 'Punto de venta', WHATSAPP: 'WhatsApp', WEB: 'Web', MANUAL: 'Manual', SUBSCRIPTION: 'Suscripción' })[sale?.channel] || titleCase(sale?.channel)}/>
       <Definition label="Registrada por" value={sale?.createdBy}/>
       <Definition label="Moneda" value={currency}/>
       <Definition label="Subtotal" value={money(sale?.subtotal, currency)}/>

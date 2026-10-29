@@ -1,6 +1,8 @@
 package com.ecuapp.inventary.catalog.application;
 
+import com.ecuapp.inventary.catalog.BillingFrequency;
 import com.ecuapp.inventary.catalog.ProductKind;
+import com.ecuapp.inventary.catalog.ServiceBilling;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -24,6 +26,9 @@ public record ProductResult(
     UUID unitOfMeasureId,
     Map<String, Object> attributes,
     int attributeSchemaVersion,
+    ServiceBilling serviceBilling,
+    BillingFrequency billingFrequency,
+    Integer termMonths,
     boolean active,
     Instant createdAt,
     Instant updatedAt

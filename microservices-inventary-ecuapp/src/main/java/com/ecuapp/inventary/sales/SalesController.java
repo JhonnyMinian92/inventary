@@ -26,7 +26,10 @@ public class SalesController {
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
  public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
- public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
+ public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){
+  if(request.channel()==SaleChannel.SUBSCRIPTION)throw new com.ecuapp.inventary.common.BusinessRuleException("Las facturas de suscripción las genera el sistema; registre la suscripción en Suscripciones.");
+  return service.create(key,request,auth.getName());
+ }
  @PostMapping("/{id}/request-cancellation") @PreAuthorize("hasAuthority('sales:manage')")
  public SaleDtos.View requestCancellation(@PathVariable UUID id,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody CancelRequest request,Authentication auth){return service.requestCancellation(id,key,request.reason(),auth.getName());}
  @PostMapping("/{id}/approve-cancellation") @PreAuthorize("hasAuthority('sales:cancel')")

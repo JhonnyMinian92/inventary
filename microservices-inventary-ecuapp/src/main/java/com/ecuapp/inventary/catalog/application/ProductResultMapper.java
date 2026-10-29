@@ -23,6 +23,9 @@ public final class ProductResultMapper {
             product.getUnitOfMeasureId(),
             product.getAttributes(),
             product.getAttributeSchemaVersion(),
+            product.getServiceBilling(),
+            product.getBillingFrequency(),
+            product.getTermMonths(),
             product.isActive(),
             product.getCreatedAt(),
             product.getUpdatedAt()

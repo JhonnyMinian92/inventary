@@ -97,6 +97,7 @@ public class ProductService implements ProductUseCases {
   Product product=new Product(sku,command.name().trim(),clean(command.description()),category,cost,price,currency(command.currency()),clean(command.imageUrl()));
   product.changeMarginPercent(margin,false);
   product.configureClassification(kind,unit.getId(),attributes,schemaVersion(category.getId(),schema));
+  configureService(product,command,true);
   Product saved=products.save(product);
   audit.record(actor,"PRODUCT_CREATED","PRODUCT",saved.getId(),Map.of("sku",saved.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
   return ProductResultMapper.from(saved);
@@ -120,6 +121,7 @@ public class ProductService implements ProductUseCases {
    command.salePrice()==null?product.getSalePrice():money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
   // A new markup without an explicit price reprices from the last purchase cost.
   product.changeMarginPercent(command.marginPercent(),command.salePrice()==null);
+  configureService(product,command,false);
   product.configureClassification(kind,unitId,attributes,schemaVersion(category.getId(),schema));
   audit.record(actor,"PRODUCT_UPDATED","PRODUCT",id,Map.of("sku",product.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
   return ProductResultMapper.from(product);
@@ -174,6 +176,14 @@ public class ProductService implements ProductUseCases {
   Product found=product.orElseThrow(()->new ResourceNotFoundException("Producto",value));
   if(!found.isActive()||!found.getCategory().isActive())throw new ResourceNotFoundException("Producto público",value);
   return found;
+ }
+ /** On update a null billing mode keeps the current plan; plan errors are reported as business rule violations. */
+ private void configureService(Product product,ProductCommand command,boolean creating){
+  ServiceBilling billing=command.serviceBilling();
+  BillingFrequency frequency=command.billingFrequency();Integer term=command.termMonths();
+  if(!creating&&billing==null){billing=product.getServiceBilling();frequency=product.getBillingFrequency();term=product.getTermMonths();}
+  try{product.configureService(billing,frequency,term);}
+  catch(IllegalArgumentException ex){throw new BusinessRuleException(ex.getMessage());}
  }
  private int schemaVersion(UUID categoryId,List<CategoryAttributeDefinition> schema){
   if(!schema.isEmpty())return schema.get(0).getSchemaVersion();

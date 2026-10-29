@@ -100,15 +100,26 @@ public class SaleService {
     throw new BusinessRuleException("No repita el mismo producto en varias líneas de una venta; consolide las cantidades.");
    Product product=products.findForUpdate(line.productId())
     .orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
-   if(!product.isActive()||!product.getCategory().isActive())
+   boolean subscriptionInvoice=request.channel()==SaleChannel.SUBSCRIPTION;
+   // A contracted subscription keeps billing even if the service is later withdrawn from the catalog.
+   if(!subscriptionInvoice&&(!product.isActive()||!product.getCategory().isActive()))
     throw new BusinessRuleException("El producto "+product.getSku()+" está inactivo o su categoría no está publicada.");
-   if(product.getKind()!=ProductKind.STOCKED_GOOD)
-    throw new BusinessRuleException("Solo se pueden vender físicamente productos con control de stock.");
+   if(product.isSubscription()!=subscriptionInvoice)
+    throw new BusinessRuleException(subscriptionInvoice?"Solo los servicios por suscripción se facturan por este canal."
+     :"El servicio "+product.getName()+" se cobra por suscripción; regístrelo en Suscripciones.");
    if(saleCurrency==null)saleCurrency=product.getCurrency();
    else if(!saleCurrency.equals(product.getCurrency()))
     throw new BusinessRuleException("No se pueden combinar productos con monedas diferentes en una venta.");
 
    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
+   if(product.getKind()!=ProductKind.STOCKED_GOOD){
+    // Services and goods without stock control are invoiced without touching inventory or cost layers.
+    BigDecimal unitPrice=line.unitPrice()!=null?line.unitPrice().setScale(2,RoundingMode.UNNECESSARY):product.getSalePrice().setScale(2,RoundingMode.HALF_UP);
+    BigDecimal lineTotal=unitPrice.multiply(quantity).setScale(2,RoundingMode.HALF_UP);
+    subtotal=subtotal.add(lineTotal).setScale(2,RoundingMode.HALF_UP);
+    lines.add(new CalculatedLine(product,null,null,quantity,unitPrice,lineTotal));
+    continue;
+   }
    StockBalance balance=balances.findForUpdate(product.getId(),warehouse.getId())
     .orElseThrow(()->new BusinessRuleException("No existe saldo de inventario para "+product.getSku()+" en el almacén."));
    if(!balance.getLocation().isActive())
@@ -152,6 +163,7 @@ public class SaleService {
   sales.flush();
 
   for(CalculatedLine line:lines){
+   if(line.balance()==null)continue;
    SaleItem item=itemsByProduct.get(line.product().getId());
    String movementKey="SALE-"+sha256(key).substring(0,32)+"-"+line.product().getId();
    String movementHash=sha256(sale.getId()+"|"+item.getId()+"|"+line.product().getId()+"|"+line.quantity().toPlainString());
@@ -204,6 +216,8 @@ public class SaleService {
   if(returnLines.existsForSale(id))throw new ConflictException("No se puede cancelar una venta que ya tiene devoluciones; registre una devolución o un ajuste separado.");
   List<SaleItem> items=new ArrayList<>(sale.getItems());items.sort(Comparator.comparing(i->i.getProduct().getId().toString()));
   for(SaleItem item:items){
+   // Lines without a stock exit (services, goods without stock control) have nothing to put back.
+   if(movements.findFirstByReferenceTypeAndReferenceIdAndSourceLineIdAndMovementType("SALE",sale.getId(),item.getId(),MovementType.SALE).isEmpty())continue;
    StockBalance balance=balances.findForUpdate(item.getProduct().getId(),sale.getWarehouse().getId()).orElseThrow(()->new BusinessRuleException("No existe saldo para reponer "+item.getSkuSnapshot()+"."));
    balance.increase(item.getQuantity());
    UnitOfMeasure unit=units.findById(item.getProduct().getUnitOfMeasureId()).orElseThrow(()->new BusinessRuleException("No existe unidad de medida para "+item.getSkuSnapshot()+"."));

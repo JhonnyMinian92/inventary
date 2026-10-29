@@ -32,6 +32,8 @@ test('construye rutas bajo /inventary', () => {
   assert.equal(detailPath('sale', 'abc', BASE), '/inventary/ventas/abc');
   assert.equal(detailPath('product', 'p-1', BASE), '/inventary/productos/p-1');
   assert.equal(detailPath('whatsapp', 'w-1', BASE), '/inventary/pedidos-whatsapp/w-1');
+  assert.equal(detailPath('subscription', 's-1', BASE), '/inventary/suscripciones/s-1');
+  assert.equal(sectionPath('subscriptions', BASE), '/inventary/suscripciones');
   assert.equal(sectionPath('categories', BASE), '/inventary/productos/categorias');
   assert.equal(workflowPath('category', 'c 1', BASE), '/inventary/productos/categorias/c%201/editar');
 });
@@ -41,6 +43,7 @@ test('categorías vive dentro de productos y conserva las URL anteriores', () =>
   assert.equal(matchRoute('/productos/categorias/nueva', BASE).workflow, 'category');
   assert.equal(matchRoute('/productos/nuevo', BASE).name, 'product-new');
   assert.equal(matchRoute('/productos/abc', BASE).detail, 'product');
+  assert.equal(matchRoute('/suscripciones/abc', BASE).detail, 'subscription');
   assert.equal(matchRoute('/pedidos-whatsapp/abc', BASE).detail, 'whatsapp');
   const legacy = matchRoute('/categorias/c-9/editar', BASE);
   assert.equal(legacy.name, 'category-edit');

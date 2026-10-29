@@ -16,6 +16,12 @@ function parse(value) {
   return Number.isNaN(parsed.valueOf()) ? null : parsed;
 }
 export function date(value) { return parse(value)?.toLocaleDateString('es-EC') || '—'; }
+/** Fecha de calendario 'YYYY-MM-DD' del backend; se interpreta en hora local para no correrse un día. */
+export function calendarDate(value, options) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!match) return date(value);
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).toLocaleDateString('es-EC', options);
+}
 export function dateTime(value) { return parse(value)?.toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' }) || '—'; }
 export function shortDate(value) { return parse(value)?.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' }) || '—'; }
 
@@ -42,11 +48,14 @@ export function titleCase(value = '') {
 const STATUS_LABELS = {
   purchase: { DRAFT: 'Borrador', SUBMITTED: 'Por aprobar', APPROVED: 'Aprobada', PARTIALLY_RECEIVED: 'Recepción parcial', RECEIVED: 'Recibida', CANCELLED: 'Cancelada' },
   sale: { COMPLETED: 'Completada', CANCELLATION_REQUESTED: 'Anulación solicitada', CANCELLED: 'Anulada' },
-  whatsapp: { AWAITING_PAYMENT: 'Por cobrar', CONFIRMED: 'Confirmado', CANCELLED: 'Cancelado', EXPIRED: 'Expirado' }
+  whatsapp: { AWAITING_PAYMENT: 'Por cobrar', CONFIRMED: 'Confirmado', CANCELLED: 'Cancelado', EXPIRED: 'Expirado' },
+  subscription: { ACTIVE: 'Activa', CANCELLED: 'Cancelada', COMPLETED: 'Finalizada' },
+  installment: { SCHEDULED: 'Programado', INVOICED: 'Facturado', CANCELLED: 'Anulado' }
 };
 const STATUS_TONES = {
   DRAFT: 'neutral', SUBMITTED: 'pending', APPROVED: 'info', PARTIALLY_RECEIVED: 'pending', RECEIVED: 'active', CANCELLED: 'inactive',
-  COMPLETED: 'active', CANCELLATION_REQUESTED: 'pending', AWAITING_PAYMENT: 'pending', CONFIRMED: 'active', EXPIRED: 'inactive'
+  COMPLETED: 'active', CANCELLATION_REQUESTED: 'pending', AWAITING_PAYMENT: 'pending', CONFIRMED: 'active', EXPIRED: 'inactive',
+  ACTIVE: 'active', SCHEDULED: 'pending', INVOICED: 'active'
 };
 export function statusLabel(kind, status) { return STATUS_LABELS[kind]?.[String(status || '').toUpperCase()] || titleCase(status); }
 export function statusTone(status) { return STATUS_TONES[String(status || '').toUpperCase()] || 'neutral'; }

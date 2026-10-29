@@ -120,6 +120,9 @@ app:
     require-distinct-approver: ${PURCHASING_REQUIRE_DISTINCT_APPROVER:true}
   reports:
     time-zone: ${REPORTS_TIME_ZONE:America/Guayaquil}
+  subscriptions:
+    # Generates subscription invoices whose billing date arrived (hourly by default, report time zone).
+    billing-cron: ${SUBSCRIPTIONS_BILLING_CRON:0 5 * * * *}
   bootstrap-admin:
     username: ${BOOTSTRAP_ADMIN_USERNAME:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}

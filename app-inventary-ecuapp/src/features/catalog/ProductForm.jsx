@@ -53,6 +53,10 @@ function normalizeProduct(product) {
     marginPercent: String(product?.marginPercent ?? 25),
     // Servicios y productos sin existencias no se compran: su precio se escribe a mano.
     manualPrice: product?.kind && product.kind !== 'STOCKED_GOOD' ? String(product?.salePrice ?? '') : '',
+    // Solo servicios: una sola vez o por suscripción con su plan por defecto.
+    serviceBilling: product?.serviceBilling || 'ONE_TIME',
+    billingFrequency: product?.billingFrequency || 'MONTHLY',
+    termMonths: String(product?.termMonths || 1),
     attributes: objectValue(product?.attributes)
   };
 }
@@ -165,17 +169,36 @@ export default function ProductForm({ initialValue, categories, units = [], load
   const [quickCreate, setQuickCreate] = useState(null);
   const [dimensions, setDimensions] = useState(null);
   const [productKinds, setProductKinds] = useState([]);
+  const [billingOptions, setBillingOptions] = useState(null);
+  const [planPreview, setPlanPreview] = useState(null);
+  const isSubscription = form.kind === 'SERVICE' && form.serviceBilling === 'SUBSCRIPTION';
 
   useEffect(() => {
     let active = true;
     api.productKinds()
       .then(kinds => { if (active) setProductKinds(Array.isArray(kinds) ? kinds : []); })
       .catch(() => { if (active) setProductKinds([]); });
+    api.subscriptionOptions()
+      .then(result => { if (active) setBillingOptions(result); })
+      .catch(() => { if (active) setBillingOptions(null); });
     if (onUnitCreated) api.unitDimensions()
       .then(result => { if (active) setDimensions(Array.isArray(result) ? result : []); })
       .catch(() => { if (active) setDimensions(null); });
     return () => { active = false; };
   }, []);
+
+  // Resumen del plan calculado por el backend, p. ej. "3 cobros de $20,00 cada 30 días · total $60,00".
+  useEffect(() => {
+    const price = Number(form.manualPrice);
+    if (!isSubscription || String(form.manualPrice).trim() === '' || !Number.isFinite(price) || price < 0) { setPlanPreview(null); return undefined; }
+    let active = true;
+    const timer = setTimeout(() => {
+      api.subscriptionPreview({ billingFrequency: form.billingFrequency, termMonths: Number(form.termMonths), monthlyPrice: price })
+        .then(result => { if (active) setPlanPreview(result); })
+        .catch(() => { if (active) setPlanPreview(null); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [isSubscription, form.billingFrequency, form.termMonths, form.manualPrice]);
 
   function handleCreated(created) {
     const kind = quickCreate;
@@ -440,11 +463,29 @@ export default function ProductForm({ initialValue, categories, units = [], load
     {step === 1 && <section className="workflow-stage" aria-labelledby="product-pricing-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-pricing-title">{form.kind === 'STOCKED_GOOD' ? 'Ganancia y detalles' : 'Precio y detalles'}</h2><p>{form.kind === 'STOCKED_GOOD' ? 'No necesitas escribir precios: se calculan solos con cada compra.' : 'Como no se compra para revender, indica cuánto cobras.'}</p></div></div>
       <div className="form-grid workflow-fields">
+    {form.kind === 'SERVICE' && <div className="field wide" role="radiogroup" aria-labelledby="service-billing-label">
+      <span id="service-billing-label">¿Cómo se cobra este servicio?<b> *</b></span>
+      <div className="kind-grid two">{(billingOptions?.billingModes || []).map(mode => <button type="button" role="radio" key={mode.code} aria-checked={form.serviceBilling === mode.code}
+        className={'type-card' + (form.serviceBilling === mode.code ? ' selected' : '')} onClick={() => changeField('serviceBilling', mode.code)}>
+        <strong>{mode.label}</strong><small>{mode.description}</small></button>)}</div>
+    </div>}
     {form.kind !== 'STOCKED_GOOD' && <label className="field">
-      <span>Precio de venta<b> *</b></span>
+      <span>{isSubscription ? 'Precio por mes' : 'Precio de venta'}<b> *</b></span>
       <input type="number" min="0" step="0.01" inputMode="decimal" required value={form.manualPrice} onChange={event => changeField('manualPrice', event.target.value)} placeholder="0.00" />
-      <small className="field-help">Al vender podrás ajustarlo.</small>
+      <small className="field-help">{isSubscription ? 'Con este valor se calcula cada cobro. Al crear la suscripción de un cliente podrás ajustarlo.' : 'Al vender podrás ajustarlo.'}</small>
     </label>}
+    {isSubscription && <>
+      <div className="field wide"><span>¿Cada cuánto se cobra?<b> *</b></span>
+        <div className="type-grid">{(billingOptions?.frequencies || []).map(item => <button type="button" key={item.code} aria-pressed={form.billingFrequency === item.code}
+          className={'type-card' + (form.billingFrequency === item.code ? ' selected' : '')} onClick={() => changeField('billingFrequency', item.code)}>
+          <strong>{item.label}</strong><small>{item.description}</small></button>)}</div>
+      </div>
+      <div className="field wide"><span>¿Cuánto dura el plan?<b> *</b></span>
+        <div className="option-chips">{(billingOptions?.terms || []).map(term => <button type="button" key={term.months} aria-pressed={Number(form.termMonths) === term.months}
+          className={'option-chip' + (Number(form.termMonths) === term.months ? ' selected' : '')} onClick={() => changeField('termMonths', String(term.months))}>{term.label}</button>)}</div>
+        {planPreview && <small className="field-help plan-summary">{planPreview.summary}</small>}
+      </div>
+    </>}
     {form.kind === 'STOCKED_GOOD' && <>
     <label className="field">
       <span>Ganancia sugerida (%)<b> *</b></span>
@@ -518,7 +559,8 @@ export default function ProductForm({ initialValue, categories, units = [], load
         <div className="workflow-review-card"><small>Tipo</small><strong>{productKinds.find(kind => kind.code === form.kind)?.label || form.kind}</strong></div>
         <div className="workflow-review-card"><small>Se vende por</small><strong>{units.find(unit => unit.id === (form.unitOfMeasureId || DEFAULT_UNIT_ID))?.name || 'Unidad'}</strong></div>
         {form.kind === 'STOCKED_GOOD' && <div className="workflow-review-card"><small>Ganancia sugerida</small><strong>{Number(form.marginPercent || 0)} %</strong></div>}
-        <div className="workflow-review-card"><small>Precio de venta</small><strong>{form.kind !== 'STOCKED_GOOD' ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.manualPrice || 0)) : Number(form.costPrice) > 0 ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Math.ceil(Number(form.costPrice) * (1 + Number(form.marginPercent || 0) / 100) * 100 - 1e-9) / 100) : 'Con la primera compra'}</strong></div>
+        {isSubscription && <div className="workflow-review-card"><small>Plan</small><strong>{planPreview?.summary || '—'}</strong></div>}
+        <div className="workflow-review-card"><small>{isSubscription ? 'Precio por mes' : 'Precio de venta'}</small><strong>{form.kind !== 'STOCKED_GOOD' ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(form.manualPrice || 0)) : Number(form.costPrice) > 0 ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Math.ceil(Number(form.costPrice) * (1 + Number(form.marginPercent || 0) / 100) * 100 - 1e-9) / 100) : 'Con la primera compra'}</strong></div>
         <div className="workflow-review-card"><small>Campos adicionales</small><strong>{Object.values(form.attributes || {}).filter(value => value !== '' && value !== null && value !== undefined).length}</strong></div>
       </div>
       {form.description.trim() && <p className="workflow-review-note"><strong>Descripción:</strong> {form.description.trim()}</p>}

@@ -259,6 +259,14 @@ Permisos: sales:read, sales:manage y sales:cancel para aprobar cancelaciones.
 | GET | /sales | Lista |
 | GET | /sales/{id} | Detalle |
 | POST | /sales | Venta transaccional multítem; `unitPrice` opcional por línea (sin él se usa el sugerido) y nunca menor al costo de las unidades vendidas |
+| GET | /subscriptions | Suscripciones paginadas; filtros `status`, `customerId` |
+| POST | /subscriptions | Crear (Idempotency-Key); plan por defecto del servicio, `prepay` y `discountPercent` (requiere `sales:discount`) |
+| GET | /subscriptions/{id} | Detalle con calendario de cobros y facturas |
+| GET | /subscriptions/options | Modos de cobro, frecuencias, duraciones y si el usuario puede dar descuentos |
+| POST | /subscriptions/preview | Calendario y total de un plan sin guardarlo |
+| GET | /subscriptions/{id}/cancellation-preview | Qué se facturaría y qué se anularía al cancelar hoy |
+| POST | /subscriptions/{id}/cancel | Cancelar: factura el periodo vigente y anula los cobros futuros |
+| POST | /subscriptions/{id}/prepay | Facturar ahora todos los cobros pendientes en una sola venta |
 | POST | /sales/pricing | Precio sugerido (costo + ganancia) y mínimo sin pérdida por línea, según almacén y cantidad |
 | POST | /sales/{id}/request-cancellation | Solicitar anulación con motivo |
 | POST | /sales/{id}/approve-cancellation | Aprobar; aprobador distinto del solicitante |

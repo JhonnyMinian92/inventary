@@ -205,3 +205,21 @@
 .pricing-summary strong { color: #13241a; font-size: 13px; }
 .price-help { line-height: 1.5; }
 .field input[aria-invalid="true"] { border-color: #e0a3a8; background: #fff7f7; }
+
+/* Suscripciones. */
+.modal-card.subscription-modal { width: min(560px, 100%); }
+.modal-card.subscription-modal.wide { width: min(760px, 100%); }
+.subscription-modal .form-grid { margin-bottom: 4px; }
+.subscription-preview { display: grid; gap: 6px; margin-top: 14px; padding: 12px 14px; border: 1px solid #cfe8d9; border-radius: 10px; background: #f0f8f3; }
+.subscription-preview strong { color: #1f6b46; font-size: 13px; }
+.subscription-preview small { color: #5d6d63; font-size: 11.5px; }
+.subscription-preview ol { display: grid; gap: 4px; margin: 4px 0 0; padding: 0; list-style: none; }
+.subscription-preview li { display: flex; justify-content: space-between; gap: 10px; color: #33443a; font-size: 12px; }
+.subscription-preview li strong { color: #13241a; font-size: 12px; }
+.subscription-preview .muted-row { color: #6b7a70; }
+.prepay-box { display: grid; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line, #e7ebf1); }
+.prepay-box .property-required { padding-top: 0; }
+.installment-amount { display: inline-flex; align-items: center; gap: 8px; }
+.kind-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.plan-summary { color: #1f6b46 !important; font-weight: 600; }
+@media (max-width: 720px) { .kind-grid.two { grid-template-columns: minmax(0, 1fr); } }

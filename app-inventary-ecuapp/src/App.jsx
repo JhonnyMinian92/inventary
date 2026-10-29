@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, LogOut, MessageCircle, Plus, RefreshCw, Search, Warehouse } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, LogOut, MessageCircle, Plus, RefreshCw, Repeat, Search, Warehouse } from 'lucide-react';
 import { api, getToken, getTokenExpiry, listFrom, listAllPages, setToken } from './api';
 import { currentRoute, detailPath, documentTitle, HOME_ROUTE, isPlainLeftClick, loginPath, navigate, nextFromSearch, pathFor, sectionPath, workflowPath } from './router.js';
 import LoginPage from './features/auth/LoginPage.jsx';
@@ -16,6 +16,7 @@ import InventoryOperations from './features/inventory/InventoryOperations.jsx';
 import ReportsCenter from './features/reports/ReportsCenter.jsx';
 import Dashboard from './features/dashboard/Dashboard.jsx';
 import WhatsAppOrdersPage from './features/whatsapp/WhatsAppOrdersPage.jsx';
+import SubscriptionsPage from './features/subscriptions/SubscriptionsPage.jsx';
 import DataTable from './components/DataTable.jsx';
 import PurchaseTable from './features/purchasing/PurchaseTable.jsx';
 import SalesTable from './features/sales/SalesTable.jsx';
@@ -33,6 +34,7 @@ const NAV_GROUPS = [
   { label: 'Catálogo', items: [{ id: 'products', label: 'Productos', icon: Boxes, permission: 'catalog:read', sections: ['products', 'categories'] }] },
   { label: 'Operaciones', items: [
     { id: 'sales', label: 'Ventas', icon: ArrowUpFromLine, permission: 'sales:read' },
+    { id: 'subscriptions', label: 'Suscripciones', icon: Repeat, permission: 'sales:read' },
     { id: 'whatsapp', label: 'Pedidos WhatsApp', icon: MessageCircle, permission: 'sales:read', badge: 'whatsapp' },
     { id: 'purchases', label: 'Compras', icon: ArrowDownToLine, permission: 'purchasing:read' },
     { id: 'inventory', label: 'Inventario', icon: Warehouse, permission: 'inventory:read' }
@@ -43,12 +45,12 @@ const NAV_GROUPS = [
   ] }
 ];
 
-const SECTION_TITLES = { overview: 'Resumen', products: 'Productos', categories: 'Productos', sales: 'Ventas', whatsapp: 'Pedidos WhatsApp', purchases: 'Compras', inventory: 'Inventario', partners: 'Almacenes y contactos', reports: 'Reportes' };
+const SECTION_TITLES = { overview: 'Resumen', products: 'Productos', categories: 'Productos', sales: 'Ventas', subscriptions: 'Suscripciones', whatsapp: 'Pedidos WhatsApp', purchases: 'Compras', inventory: 'Inventario', partners: 'Almacenes y contactos', reports: 'Reportes' };
 const VALID_SECTIONS = new Set(Object.keys(SECTION_TITLES));
 const WORKFLOW_MODALS = new Set(['product', 'category', 'purchase', 'sale', 'receive']);
 const WORKFLOW_SECTIONS = { product: 'products', category: 'categories', purchase: 'purchases', sale: 'sales', receive: 'purchases' };
 const WORKFLOW_TITLES = { product: ['Nuevo producto', 'Editar producto'], category: ['Nueva categoría', 'Editar categoría'], purchase: ['Nueva compra'], sale: ['Nueva venta'], receive: ['Registrar recepción'] };
-const DETAIL_SECTIONS = { purchase: 'purchases', sale: 'sales', product: 'products', whatsapp: 'whatsapp' };
+const DETAIL_SECTIONS = { purchase: 'purchases', sale: 'sales', product: 'products', whatsapp: 'whatsapp', subscription: 'subscriptions' };
 const MODAL_DETAILS = new Set(['purchase', 'sale']);
 
 function routeState() {
@@ -334,6 +336,10 @@ function App() {
     if (form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes)) data.attributes = form.attributes;
     if (form.unitOfMeasureId) data.unitOfMeasureId = form.unitOfMeasureId;
     if (data.kind !== 'STOCKED_GOOD') data.salePrice = Number(form.manualPrice);
+    if (data.kind === 'SERVICE') {
+      data.serviceBilling = form.serviceBilling || 'ONE_TIME';
+      if (data.serviceBilling === 'SUBSCRIPTION') { data.billingFrequency = form.billingFrequency; data.termMonths = Number(form.termMonths); }
+    }
     if (!Number.isFinite(data.marginPercent) || data.marginPercent < 0 || data.marginPercent > 1000) {
       setError('La ganancia sugerida debe ser un porcentaje entre 0 y 1000.');
       return;
@@ -570,6 +576,8 @@ function App() {
         product={{ onNew: () => openProduct(), onEdit: openProduct, onToggle: item => toggleStatus('product', item), onDelete: item => deleteItem('product', item) }}
         category={{ onNew: () => openCategory(), onEdit: openCategory, onToggle: item => toggleStatus('category', item), onDelete: item => deleteItem('category', item) }} />}
 
+      {!isWorkflow && section === 'subscriptions' && <SubscriptionsPage can={can} products={products} customers={customers} warehouses={warehouses}
+        detailId={detailRoute?.kind === 'subscription' ? detailRoute.id : ''} onOpenDetail={id => openDetail('subscription', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
       {!isWorkflow && section === 'whatsapp' && <WhatsAppOrdersPage can={can} detailId={detailRoute?.kind === 'whatsapp' ? detailRoute.id : ''}
         onOpenDetail={id => openDetail('whatsapp', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
 

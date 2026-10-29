@@ -62,6 +62,8 @@ public class SalesReturnService {
    if(!seen.add(line.saleItemId()))throw new BusinessRuleException("No repita una línea de venta en la misma devolución.");
    SaleItem item=saleItems.get(line.saleItemId());
    if(item==null)throw new BusinessRuleException("La línea indicada no pertenece a la venta original.");
+   if(item.getProduct().getKind()!=com.ecuapp.inventary.catalog.ProductKind.STOCKED_GOOD)
+    throw new BusinessRuleException("Los servicios y productos sin existencias no se devuelven al inventario; solicite la anulación de la venta.");
    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY);
    BigDecimal returned=returnLines.sumReturnedQuantity(item.getId(),ReturnStatus.POSTED);
    if(returned.add(quantity).compareTo(item.getQuantity())>0)throw new BusinessRuleException("La cantidad devuelta supera la cantidad vendida disponible.");

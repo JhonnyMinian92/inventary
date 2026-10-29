@@ -27,8 +27,11 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const [availabilityRetry, setAvailabilityRetry] = useState(0);
   const [pricingByProduct, setPricingByProduct] = useState({});
   const [pricingLoading, setPricingLoading] = useState(false);
-  const selectedProductIds = useMemo(() => [...new Set(lines.map(line => line.productId).filter(Boolean))].sort().join(','), [lines]);
-  const activeProducts = useMemo(() => products.filter(item => item.active !== false && item.status !== 'INACTIVE' && (item.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD'), [products]);
+  // Se venden productos con y sin inventario y servicios de una sola vez; las suscripciones se registran en Suscripciones.
+  const activeProducts = useMemo(() => products.filter(item => item.active !== false && item.status !== 'INACTIVE' &&
+    !(item.kind === 'SERVICE' && item.serviceBilling === 'SUBSCRIPTION')), [products]);
+  const tracksStock = productId => (activeProducts.find(item => String(idOf(item)) === String(productId))?.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD';
+  const selectedProductIds = useMemo(() => [...new Set(lines.map(line => line.productId).filter(Boolean).filter(tracksStock))].sort().join(','), [lines, activeProducts]);
   const activeWarehouses = useMemo(() => warehouses.filter(item => item.active !== false && item.status !== 'INACTIVE'), [warehouses]);
   const activeCustomers = useMemo(() => customers.filter(item => item.active !== false && item.status !== 'INACTIVE'), [customers]);
   const selectedWarehouse = activeWarehouses.find(item => String(idOf(item)) === String(warehouseId));
@@ -119,6 +122,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   }
 
   function stockFor(productId) {
+    if (productId && !tracksStock(productId)) return { value: null, verified: true, untracked: true };
     if (Object.prototype.hasOwnProperty.call(availabilityByProduct, String(productId))) {
       return { value: availabilityByProduct[String(productId)], verified: true };
     }
@@ -267,9 +271,9 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     {step === 1 && <section className="workflow-stage" aria-labelledby="sale-products-title">
       <div className="workflow-stage-heading">
         <span className="workflow-stage-icon"><ShoppingCart size={20}/></span>
-        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Busca el producto por su nombre. El precio se sugiere con la ganancia configurada y puedes ajustarlo, sin bajar del costo.</p></div>
+        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Busca el producto o servicio por su nombre. El precio se sugiere con la ganancia configurada y puedes ajustarlo, sin bajar del costo. Las suscripciones se registran en Suscripciones.</p></div>
       </div>
-      {!activeProducts.length && <div className="empty-state workflow-empty">No hay productos de inventario activos para vender.</div>}
+      {!activeProducts.length && <div className="empty-state workflow-empty">No hay productos ni servicios activos para vender.</div>}
       <div className="workflow-line-list">
         {lines.map((line, index) => {
           const product = activeProducts.find(item => String(idOf(item)) === String(line.productId));
@@ -299,8 +303,8 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
                 </small>}
               </label>
               <div className={qtyValid && stock.value !== null && qty > stock.value ? 'stock-hint stock-hint-warning' : 'stock-hint'}>
-                <small>Disponible {stock.verified ? '(actualizado)' : stock.value === null ? '(por verificar)' : '(último saldo)'}</small>
-                <strong>{stock.value === null ? (availabilityLoading ? 'Comprobando…' : '—') : stock.value.toLocaleString('es-EC')}</strong>
+                <small>{stock.untracked ? 'Existencias' : `Disponible ${stock.verified ? '(actualizado)' : stock.value === null ? '(por verificar)' : '(último saldo)'}`}</small>
+                <strong>{stock.untracked ? 'No usa inventario' : stock.value === null ? (availabilityLoading ? 'Comprobando…' : '—') : stock.value.toLocaleString('es-EC')}</strong>
                 <small>{gain === null ? 'Ganancia: —' : `Ganancia: ${percent(gain)} · ${money((price - minimum) * (qtyValid ? qty : 0))} en total`}</small>
               </div>
             </div>

@@ -33,6 +33,10 @@ public class Product {
  @Column(name="unit_of_measure_id",nullable=false) private UUID unitOfMeasureId=UUID.fromString("00000000-0000-0000-0000-000000000001");
  @JdbcTypeCode(SqlTypes.JSON) @Column(nullable=false,columnDefinition="jsonb") private Map<String,Object> attributes=java.util.Map.of();
  @Column(name="attribute_schema_version",nullable=false) private int attributeSchemaVersion=1;
+ /** Only for services: one-time sale or subscription with its default plan (frequency and length in months). */
+ @Enumerated(EnumType.STRING) @Column(name="service_billing",length=16) private ServiceBilling serviceBilling;
+ @Enumerated(EnumType.STRING) @Column(name="billing_frequency",length=16) private BillingFrequency billingFrequency;
+ @Column(name="term_months") private Integer termMonths;
  @Column(nullable=false) private boolean active=true;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
  @Column(name="updated_at",nullable=false) private Instant updatedAt;
@@ -59,6 +63,18 @@ public class Product {
   if(repriceFromCost&&costPrice!=null&&costPrice.signum()>0)this.salePrice=priceWithMargin(costPrice,this.marginPercent);
  }
  public BigDecimal getMarginPercent(){return marginPercent;}
+ /** Services default to one-time billing; subscriptions need a frequency and one of the offered lengths. Other kinds carry no billing plan. */
+ public void configureService(ServiceBilling billing,BillingFrequency frequency,Integer termMonths){
+  if(kind!=ProductKind.SERVICE){serviceBilling=null;billingFrequency=null;this.termMonths=null;return;}
+  ServiceBilling mode=billing==null?ServiceBilling.ONE_TIME:billing;
+  if(mode==ServiceBilling.SUBSCRIPTION){
+   if(frequency==null)throw new IllegalArgumentException("Indique cada cuánto se cobra la suscripción.");
+   if(termMonths==null||!BillingFrequency.TERMS.contains(termMonths))throw new IllegalArgumentException("La duración de la suscripción debe ser de 1, 3, 6 o 12 meses.");
+   serviceBilling=mode;billingFrequency=frequency;this.termMonths=termMonths;
+  }else{serviceBilling=mode;billingFrequency=null;this.termMonths=null;}
+ }
+ public boolean isSubscription(){return serviceBilling==ServiceBilling.SUBSCRIPTION;}
+ public ServiceBilling getServiceBilling(){return serviceBilling;} public BillingFrequency getBillingFrequency(){return billingFrequency;} public Integer getTermMonths(){return termMonths;}
  public void deactivate(){active=false;}
  public void activate(){active=true;}
  public ProductKind getKind(){return kind;} public UUID getUnitOfMeasureId(){return unitOfMeasureId;} public Map<String,Object> getAttributes(){return attributes;} public int getAttributeSchemaVersion(){return attributeSchemaVersion;}

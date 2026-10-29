@@ -36,6 +36,8 @@ const ROUTE_DEFINITIONS = [
   { name: 'sale-new', path: '/ventas/nueva', section: 'sales', workflow: 'sale', title: 'Nueva venta' },
   { name: 'sales-return-new', path: '/ventas/devoluciones/nueva', section: 'sales', secondary: 'sales-return', title: 'Nueva devolución de cliente' },
   { name: 'sale-detail', path: '/ventas/:id', section: 'sales', detail: 'sale', title: 'Detalle de venta' },
+  { name: 'subscriptions', path: '/suscripciones', section: 'subscriptions', title: 'Suscripciones' },
+  { name: 'subscription-detail', path: '/suscripciones/:id', section: 'subscriptions', detail: 'subscription', title: 'Detalle de suscripción' },
   { name: 'whatsapp', path: '/pedidos-whatsapp', section: 'whatsapp', title: 'Pedidos WhatsApp' },
   { name: 'whatsapp-detail', path: '/pedidos-whatsapp/:id', section: 'whatsapp', detail: 'whatsapp', title: 'Pedido WhatsApp' },
   { name: 'inventory', path: '/inventario', section: 'inventory', title: 'Inventario' },
@@ -58,7 +60,7 @@ const SECONDARY_ROUTES = {
   'inventory-adjustment': 'inventory-adjustment-new',
   'inventory-rule': 'inventory-rule-new'
 };
-const DETAIL_ROUTES = { purchase: 'purchase-detail', sale: 'sale-detail', product: 'product-detail', whatsapp: 'whatsapp-detail' };
+const DETAIL_ROUTES = { purchase: 'purchase-detail', sale: 'sale-detail', product: 'product-detail', whatsapp: 'whatsapp-detail', subscription: 'subscription-detail' };
 
 export const HOME_ROUTE = 'overview';
 
