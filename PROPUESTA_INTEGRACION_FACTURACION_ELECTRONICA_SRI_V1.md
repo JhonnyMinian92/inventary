@@ -114,6 +114,25 @@ Una venta correcta que sí ocurrió y luego tiene devolución física normalment
 
 Una nota de crédito tampoco prueba un reembolso de dinero. El registro de un reembolso exige evidencia financiera correspondiente, separada de los movimientos de inventario y de la emisión de un documento fiscal.
 
+### 3.3 Nueva obligación sobre proveedores de sistemas de facturación: Resolución NAC-DGERCGC26-00000027
+
+El SRI publicó la Resolución NAC-DGERCGC26-00000027 en el **Quinto Suplemento del Registro Oficial No. 335, el 28 de julio de 2026**. Regula el registro de ciertos proveedores de sistemas o servicios de facturación electrónica. Según su artículo 2, el ámbito incluye, en los términos definidos en la norma, a desarrolladores/dueños del código fuente de sistemas para emitir, firmar, transmitir y conservar comprobantes con fines de comercialización, y a propietarios de licencias/código fuente de sistemas desarrollados por terceros para comercialización. El artículo 3 establece el registro de un establecimiento exclusivo y las actividades económicas correspondientes. La aplicabilidad al proveedor concreto debe comprobarse contra el texto oficial y su modelo comercial; no se debe asumir que todo microservicio interno es automáticamente un proveedor sujeto a ese registro.
+
+El artículo 5 requiere que el emisor de comprobantes electrónicos incluya, en la **sección de información adicional del comprobante**, el RUC del proveedor del sistema informático o servicio de facturación electrónica, conforme a la ficha técnica. La disposición transitoria tercera concede **60 días calendario** desde la publicación para implementar ese requisito. A la fecha de esta revisión (29 de octubre de 2026), el plazo indicado ya habría transcurrido; el equipo fiscal debe comprobar el cumplimiento efectivo antes de emitir en producción.
+
+Esto introduce un dato distinto de los anteriores:
+- **RUC del emisor:** contribuyente que vende y emite la factura;
+- **RUC del proveedor del sistema de facturación:** proveedor tecnológico del sistema que cae dentro del ámbito de la Resolución 26-00000027;
+- **RUC del comprador/receptor:** persona/entidad a la que se emite el comprobante.
+
+No confundir ni reemplazar uno con otro. El backend fiscal debe conocer, mantener y aplicar el RUC del proveedor cuando corresponda y colocarlo en el campo/sección que defina la ficha técnica vigente; no debe pedir a Inventary que concatene manualmente texto tributario libre. El contrato entre backends debe incluir un `billingProviderRuc` configurado por servidor o un identificador de configuración de proveedor, de manera que no pueda alterarse desde una venta individual. El servicio fiscal es responsable de verificarlo y producir el XML/representación conforme a la versión vigente de la ficha técnica.
+
+Fuentes:
+- SRI, aviso oficial de 28 de julio de 2026: https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1
+- Quinto Suplemento No. 335, Registro Oficial, 28 de julio de 2026: https://www.registroficial.gob.ec/quinto-suplemento-no-335/
+- Texto de NAC-DGERCGC26-00000027 (reproducción de la resolución): https://uqa.com.ec/wp-content/uploads/2026/07/Newsletter-No.-030-SRI-registro-de-proveedores-de-sistemas-informaticos-o-servicios-de-facturacion-electronica-28-JULIO-2026-SRI-NAC-27.pdf
+- SRI, ficha técnica vigente consultada: https://www.sri.gob.ec/web/intersri/facturacion-electronica
+
 ## 4. Datos del emisor: RUC, establecimiento y punto de emisión
 
 ### 4.1 Identidad tributaria del emisor
