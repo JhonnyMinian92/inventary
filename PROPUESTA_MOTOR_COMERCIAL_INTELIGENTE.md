@@ -1,5 +1,8 @@
 # Propuesta de motor comercial inteligente para Inventary
 
+> **Dependencia logística:** las recomendaciones deben respetar el origen real del stock y las opciones de recepción. Ver [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md) para retiro en bodega/local, envío desde origen, retiro tras traslado y preparación del pedido.
+
+
 **Fecha de investigación:** 28 de octubre de 2026  
 **Producto:** Inventary · EcuApp  
 **Ámbito:** backend Spring Boot, frontend React y canal de ventas por WhatsApp/n8n.  
@@ -363,3 +366,35 @@ No se aprueba un modelo porque tenga AUC alto o porque aumente clics. Se aprueba
 - Superintendencia de Protección de Datos Personales (Ecuador). Guías de gestión de riesgos y privacidad desde el diseño. https://www.spdp.gob.ec/docs/guias/2025-2/guia-de-gestion-de-riesgos-y-evaluacion-de-impacto-del-tratamiento-de-datos-personales/
 
 La evidencia citada guía hipótesis y controles; no sustituye validación en Inventary, pruebas con usuarios, revisión legal local ni análisis estadístico de los datos reales.
+
+
+---
+
+## 14. Fulfillment es parte de la promesa comercial, no un detalle de checkout
+
+La probabilidad de que el comprador acepte un producto depende también de si puede recibirlo de una manera conveniente, cuándo y desde dónde. Por ello, el motor de recomendaciones no debe rankear únicamente productos y precio: debe aplicar primero la elegibilidad logística de cada opción.
+
+Las opciones comerciales deben ser compatibles con las capacidades reales del sistema:
+
+- retirar en la bodega/local que tiene stock;
+- enviar al domicilio desde una ubicación de origen válida;
+- retirar en otro local solamente si existe un proceso de transferencia y recepción;
+- fulfillment dividido en varios grupos solamente si el backend lo soporta y el cliente acepta costes/plazos por grupo.
+
+La API debe separar origen del inventario, destino del cliente, método de cumplimiento, disponibilidad reservable, coste logístico y ventana estimada. No asumir que el almacén de origen es el local de retiro o que la dirección de facturación es la dirección de entrega.
+
+### Cómo afecta al ranking y a los modelos
+
+1. Aplicar restricciones duras antes de ordenar: producto publicado, permiso, cantidad disponible, ubicación activa y modalidad posible.
+2. Después ordenar por coincidencia con la necesidad expresada, compatibilidad, coste total transparente y promesa de entrega validada.
+3. No favorecer una opción por una estimación de entrega que no tenga datos fiables; no prometer distancia/tiempo si faltan cobertura, tarifa o capacidad.
+4. Registrar el origen mostrado, modalidad, tarifa, promesa y resultado, para detectar cuándo una recomendación prometió un modo de recepción que luego no podía cumplirse.
+5. Medir conversión, margen, devolución, entrega a tiempo, retiro no completado, coste de envío y cancelaciones por separado, segmentados por modalidad y ubicación.
+
+### Datos y eventos de fulfillment
+
+El esquema de eventos debe incorporar el modo y grupo de cumplimiento: opciones mostradas, origen seleccionado, dirección/punto elegido, cotización logística, reserva, preparación, listo para retiro, despacho, evento en tránsito, recogida, entrega, excepción, cancelación y expiración/liberación. No registrar dirección completa, códigos de retiro ni teléfono directamente en la telemetría analítica.
+
+El inventario y la asignación final son autoridad del backend. Un modelo predictivo puede sugerir una opción logística, pero no puede anular restricciones de stock, permisos, cobertura, capacidad o autorización del usuario. El resultado debe persistir como una decisión validada o como una sugerencia que requiera confirmación, según el riesgo.
+
+El detalle de flujos, modelo de FulfillmentGroup/FulfillmentLine, contratos, fases y pruebas está en [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md).
