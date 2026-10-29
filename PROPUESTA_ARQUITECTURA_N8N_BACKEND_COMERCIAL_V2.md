@@ -1803,4 +1803,25 @@ La estrategia recomendada de Inventary pasa a ser:
 
 n8n elige y coordina; la web/Flow llama APIs de alcance limitado; Inventary valida oferta, cotización, consentimiento, stock y pedido. La compra rápida se optimiza sin sacrificar exactitud.
 
+---
 
+## Addendum obligatorio — Inventary solicita la facturación; el backend fiscal la emite
+
+Contrato canónico y estados: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+**No delegar la emisión del comprobante al workflow de n8n.** El flujo de negocio confirma la venta en Inventary y solicita inmediatamente la emisión al backend fiscal externo. Ese backend es quien calcula/valida los datos tributarios conforme al contrato, genera el XML, firma, transmite al SRI y devuelve el resultado real.
+
+Responsabilidades:
+- Inventary conserva la venta, snapshots, contexto fiscal, movimientos de stock, idempotencia y estado de la solicitud.
+- El backend fiscal administra certificados, XML, firma, numeración/series, transmisión, respuestas de SRI, anulación y notas de crédito.
+- n8n notifica eventos confirmados como FISCAL_DOCUMENT_AUTHORIZED, FISCAL_DOCUMENT_REJECTED, FISCAL_CANCELLATION_COMPLETED, CREDIT_NOTE_AUTHORIZED o NEEDS_FISCAL_REVIEW; esos nombres son eventos propuestos y deben acordarse con el contrato real.
+- n8n no fabrica números fiscales, no modifica estados en base de datos, no intenta anular la factura por su cuenta y no vuelve a enviar un comando fiscal con una clave nueva para “solucionar” un timeout.
+- Cada entrega lleva eventId, schemaVersion, sourceOperationId y correlationId. Los consumidores deduplican y consultan el estado en caso de duda.
+
+Una venta o cuota no puede ser anunciada como fiscalmente autorizada hasta que Inventary haya persistido la respuesta confirmada del backend fiscal. Si el evento llega tarde, la notificación se retrasa o se marca pendiente; no se inventa un número de factura.
+
+**Devoluciones y cancelaciones:** una anulación fiscal no es lo mismo que una devolución de mercadería. La venta cancelada por error/no realización puede dar lugar a una solicitud de anulación si la normativa lo permite. Una devolución de una operación válida debe enviar sus líneas al backend fiscal para que este resuelva el tratamiento permitido, normalmente una nota de crédito en los casos aplicables. El reembolso de dinero es otro proceso y no se deduce de la nota de crédito.
+
+La Resolución NAC-DGERCGC25-00000017 sustituyó el plazo del artículo 3 por el día 7 del mes siguiente, con vigencia desde el 1 de enero de 2026, y reformó el artículo 5 de la resolución inicial. El backend fiscal, no un workflow estático, mantiene la normativa consolidada y el tratamiento de consumidor final/otras excepciones.
+
+Pruebas n8n: evento duplicado no duplica notificación ni documento; evento fuera de orden consulta estado actual; timeout fiscal no crea factura nueva; ningún mensaje dice “autorizada” sin estado confirmado; la devolución notifica el estado de nota de crédito separado del estado de stock y del reembolso.
