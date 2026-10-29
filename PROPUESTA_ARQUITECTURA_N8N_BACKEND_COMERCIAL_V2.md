@@ -1562,3 +1562,245 @@ n8n selecciona y coordina el componente. Inventary valida la oferta, cotización
 
 No se ha identificado una función oficial independiente llamada “WhatsApp View” en la documentación consultada; la necesidad de una vista de compra dentro de WhatsApp se cubre mediante la combinación de componentes oficiales mencionados, previa validación de WABA, Cloud API, proveedor y dispositivos compatibles.
 
+
+
+
+
+---
+
+# Revisión V2.3 — WhatsApp WebView / In-App Browser para recorrer una categoría y comprar dentro de WhatsApp
+
+**Fecha de revisión:** 28 de octubre de 2026  
+**Importancia:** esta sección concreta la capacidad que el negocio describe como “WhatsApp View”. Aunque ese no parece ser el nombre formal de la función, **la capacidad sí existe**: WhatsApp Business WebView / In-App Browser (IAB). Permite que un CTA compatible abra una página web dentro de WhatsApp y que el cliente navegue por ella sin cambiar inmediatamente a Chrome o Safari. No es lo mismo que WhatsApp Flows ni que el catálogo nativo.
+
+## 45. Confirmación de la función y sus límites
+
+La documentación de proveedores de WhatsApp Business Platform describe el WebView/IAB: una persona pulsa un botón CTA de un mensaje compatible y la URL abre en el navegador integrado de WhatsApp. Puede explorar una página móvil, llenar datos y continuar un checkout sin cambiar de aplicación. Puede cerrar esa vista y volver al chat.
+
+Fuentes consultadas:
+- [Infobip — Webview para botones CTA](https://www.infobip.com/docs/whatsapp/manage-integration/additional-functionalities): describe la apertura dentro de WhatsApp y una condición de elegibilidad asociada al límite de mensajería.
+- [WATI — In-app Browser de WhatsApp](https://support.wati.io/en/articles/12867737-meta-introduces-in-app-browser-iab-experience-for-whatsapp): indica que la experiencia se aplica a CTA de plantillas marketing/utility y a cuentas con límite de al menos 1.000 conversaciones iniciadas por el negocio al día por número.
+- [Sprinklr — WebView / In-App Browser](https://www.sprinklr.com/help/articles/whatsapp-webview-support/whatsapp-business-webview-support-inapp-browser-iab/691304747e4ef1475ff48386): documenta la misma condición de elegibilidad y uso de CTA.
+- [WhatsApp Flows — experiencia alternativa dentro de la app](https://www.twilio.com/docs/content/whatsapp-flows).
+
+### 45.1 Condición de lanzamiento obligatoria
+
+Los proveedores no describen de forma idéntica todos los tipos de mensaje compatibles: algunas guías mencionan también mensajes interactivos libres; otras describen solamente plantillas de marketing o utility. Por eso **no se debe asumir que cualquier URL de cualquier mensaje se abrirá en WebView**.
+
+Antes de habilitar esta ruta:
+1. Comprobar en WhatsApp Manager el límite y elegibilidad del WABA/número concreto.
+2. Confirmar con el BSP o la integración Cloud API qué tipo de CTA abre WebView para esa cuenta.
+3. Probar en staging el mismo tipo de mensaje/plantilla que se usará en producción.
+4. Validar el comportamiento en Android e iOS, el retorno a la conversación y la URL de fallback.
+5. Si la cuenta no es elegible o la URL abre un navegador externo, usar catálogo/carrito nativo, Flow o texto como alternativa.
+
+Meta controla la elegibilidad y el comportamiento del navegador integrado; n8n no puede forzarlo desde un payload. Tampoco debe clasificarse un mensaje artificialmente como utility para obtener WebView: la categoría debe corresponder al propósito real y a las políticas vigentes.
+
+## 46. Ruta propuesta para Inventary: categoría → WebView → carrito → cotización → pedido
+
+Esta ruta es especialmente útil cuando el catálogo tiene varias categorías, variantes, imágenes, filtros y comparaciones que son incómodas en una conversación.
+
+### Paso 1 — Entender la categoría
+
+El cliente dice, por ejemplo, “quiero ver herramientas” o “necesito artículos de limpieza”. n8n consulta las categorías publicables del backend y responde con una lista breve de categorías válidas.
+
+- Si existe una categoría única y clara, no hacer una pregunta redundante.
+- Si hay varias categorías posibles, mostrar una lista o botones para elegir con un toque.
+- Si la petición es ambigua, aclarar la categoría; no inventar categorías mediante IA.
+- No crear aún una sesión de compra hasta que se haya determinado una categoría o intención suficientemente precisa.
+
+### Paso 2 — Crear una sesión web de compra segura
+
+Al elegir la categoría, Inventary debe crear una sesión de checkout/catálogo acotada, con:
+- identificador opaco de sesión;
+- categoría resuelta por Inventary;
+- referencia protegida al remitente/canal y al carrito si ya existe;
+- estado, expiración y correlación;
+- permisos limitados a explorar catálogo, construir carrito, cotizar y enviar una compra desde esa sesión;
+- ninguna credencial administrativa ni datos personales legibles dentro de la URL.
+
+Una ruta ilustrativa sería una dirección web de sesión que abra directamente la categoría seleccionada. El token debe expirar, poder revocarse y limitarse a esa sesión. No debe permitir consultar pedidos arbitrarios ni cambiar el identificador para entrar en datos de otra persona.
+
+**Nunca incrustar X-Integration-Key, tokens de Meta, secretos de n8n ni JWT administrativos en el JavaScript del navegador.** La web llama a una API de checkout limitada; las credenciales servidor-servidor permanecen en backend.
+
+### Paso 3 — Abrir la categoría específica dentro de WhatsApp
+
+n8n envía un CTA claro, por ejemplo “Ver productos de Herramientas”. Cuando la cuenta y el tipo de mensaje son elegibles, el usuario pulsa el botón y WebView abre directamente la página de esa categoría, no la página principal desde la que debería buscarla otra vez.
+
+El cliente puede filtrar y ordenar artículos, abrir fichas e imágenes, elegir las variantes que el backend soporte y añadir varios productos al carrito.
+
+WebView es especialmente útil para:
+- catálogo amplio con múltiples categorías;
+- filtros por marca, tamaño, uso o características;
+- varias imágenes y fichas técnicas;
+- múltiples productos en una compra;
+- comparar opciones antes de decidir;
+- usuarios que prefieren tocar una interfaz gráfica en lugar de escribir nombres o SKU.
+
+### Paso 4 — Carrito web respaldado por Inventary
+
+La web utiliza los productos, unidades, atributos, variantes y precios de Inventary. El carrito es un borrador de intención, no una venta ni una reserva indefinida.
+
+Al añadir/modificar un artículo:
+1. la página envía la selección al endpoint de checkout;
+2. el backend verifica producto activo/publicable, variante vendible y cantidad;
+3. el backend devuelve datos actuales permitidos;
+4. la web muestra importes recalculados por servidor;
+5. si el artículo ya no existe o cambió, la web lo explica y presenta alternativas válidas.
+
+La disponibilidad mostrada al abrir la categoría es informativa. La reserva real se hace en la etapa de pedido que defina la política comercial. No reservar stock únicamente porque el cliente abrió una página.
+
+### Paso 5 — Checkout corto y condicional
+
+**A. Carrito:** productos, variantes, cantidades, imágenes y total provisional; permitir quitar/cambiar líneas.
+
+**B. Cómo recibirlo:** retiro en una sede habilitada o envío solo si la modalidad ya está implementada. Si elige retiro, no pedir dirección. Si elige envío, solicitar exclusivamente los datos que falten. Las fechas/ventanas se presentan solo si backend devuelve opciones factibles.
+
+**C. Pago:** mostrar únicamente las condiciones de pago habilitadas para ese pedido. Prepago, pago al retirar, contra entrega o crédito no se deben presentar como disponibles si el backend no puede ejecutarlos y auditarlos.
+
+**D. Resumen y aceptación:** líneas, cantidades, descuentos autorizados, impuestos/cargos, envío, total, moneda, punto/dirección, condición de pago, validez y condiciones esenciales. CTA inequívoco como “Confirmar pedido por [total]” y alternativa “Volver a cambiar”.
+
+No exigir un inicio de sesión completo si el diseño permite una sesión invitada segura. Sin embargo, la URL de categoría no puede ser una llave para exponer un pedido ya existente o datos personales.
+
+### Paso 6 — Cotización viva y aceptación exacta
+
+Antes de aceptar, el backend emite una cotización vigente con importe y expiración. Si la página estuvo abierta mucho tiempo, cambió el precio o cambió una tarifa, se muestra la diferencia y se pide nueva aceptación.
+
+La operación final referencia quoteId y versión, modalidad y evidencia de la acción del usuario. El contrato actual de WhatsApp debe ampliarse si no conserva toda la evidencia necesaria para aceptación desde la web.
+
+### Paso 7 — Crear el pedido una sola vez
+
+Después de pulsar confirmar:
+1. el endpoint/BFF valida sesión y cotización;
+2. consulta el estado actual y valida productos, stock, total, modalidad y consentimiento;
+3. crea el pedido con Idempotency-Key estable;
+4. registra la reserva según política;
+5. devuelve número y estado;
+6. la web presenta el resultado real; n8n puede enviar al chat una confirmación breve si aporta valor y no duplica innecesariamente el mensaje.
+
+Si la petición termina en timeout después de la creación, la web consulta el resultado de la misma operación antes de reintentar. Dos clics o reabrir el CTA no crean otro pedido.
+
+**La compra puede completarse dentro de WebView; el registro de negocio continúa en Inventary.** El navegador nunca escribe directamente en la base de datos ni utiliza un endpoint administrativo con credencial privilegiada.
+
+## 47. Por qué WebView puede ser mejor que un Flow
+
+| Característica | WebView de tienda Inventary | WhatsApp Flow | Catálogo/carrito nativo |
+|---|---|---|---|
+| Ver una categoría completa | Excelente: página con filtros, scroll y tarjetas | Limitado a las pantallas/campos del Flow | Bueno si las categorías están configuradas en Meta |
+| Filtros complejos y búsqueda | Sí, en la web propia | No es su objetivo principal | Limitado por la UI nativa |
+| Muchas imágenes/fichas técnicas | Sí | Más limitado | Adecuado para el contenido de producto publicado |
+| Elegir varios productos | Carrito web flexible | Flow no es un carrito comercial por sí solo | Nativo y cómodo |
+| Datos de entrega estructurados | Sí | Muy bueno | Normalmente requiere otro componente |
+| Control de interfaz | Alto | Limitado a componentes de Flow | Limitado al catálogo Meta |
+| Depende de elegibilidad IAB | Sí, para asegurar la apertura dentro de WhatsApp | No depende de la apertura de URLs | Depende de catálogo conectado |
+| Opciones dinámicas de backend | Sí, con API web/BFF | Sí, con endpoint dinámico de Flow | El carrito se recalcula en Inventary al recibirse |
+| Mejor uso | Catálogo extenso y checkout web completo | Formulario breve dentro del chat | Explorar y enviar carrito nativo |
+
+Conclusión: WebView es el mejor candidato para navegar una categoría completa y finalizar compra en una web propia, cuando la cuenta sea elegible. Flow sirve para recoger datos puntuales. Catálogo/carrito nativo sirve para selección directa si la publicación Meta está sincronizada. La arquitectura puede usar los tres.
+
+## 48. Requisitos técnicos del checkout WebView
+
+### 48.1 Sitio móvil
+- Diseño mobile-first, carga rápida y botones grandes.
+- Página inicial de la sesión abre directamente la categoría seleccionada.
+- Filtros sencillos, imágenes optimizadas, fichas claras y total visible.
+- Carrito persistido en backend para cerrar/reabrir la vista sin comenzar de cero.
+- Estados de error, vacío, espera y alternativa humana claros.
+- HTTPS, dominio propio de confianza y sin redirecciones abiertas a sitios inesperados.
+- Volver al chat no cancela ni borra el carrito.
+- No depender de un evento de “vista abierta” si el navegador no lo proporciona de forma fiable.
+
+### 48.2 Seguridad de sesión
+- Token opaco, limitado a una sesión y de vida corta.
+- La sesión no otorga acceso a clientes/pedidos ajenos.
+- Expiración y revocación seguras; límites de uso y protección ante replay.
+- Validar productId, quoteId, cantidad y modalidad en cada operación.
+- No guardar teléfono/dirección o datos financieros en texto legible en la URL.
+- No registrar tokens completos en logs.
+- Nunca exponer la clave X-Integration-Key ni cualquier credencial de proveedor.
+- El retorno del navegador no prueba que se haya creado un pedido ni que se haya pagado; se consulta el resultado real de la API.
+
+### 48.3 APIs/BFF propuestas
+
+Las siguientes capacidades son futuras; no son rutas que se afirme que ya existen.
+
+- Crear una sesión web acotada para remitente/categoría/carrito.
+- Validar sesión y devolver contexto público permitido.
+- Listar categorías y productos publicables dentro de esa sesión.
+- Consultar ficha y variantes soportadas.
+- Agregar, modificar y quitar líneas del carrito.
+- Solicitar cotización viva con precio, descuentos permitidos, cargos y expiración.
+- Confirmar pedido con aceptación y clave idempotente.
+- Consultar el resultado de una operación después de un timeout.
+- Solicitar ayuda humana conservando carrito/contexto.
+
+La implementación debe seguir la convención real de Inventary, aplicar scopes/DTOs mínimos y evitar una API administrativa abierta. El BFF puede residir en Spring Boot o separarse solo si existe una razón de operación/seguridad clara.
+
+## 49. Workflow n8n propuesto: N8N-25-WEBVIEW-CATEGORY-CHECKOUT
+
+1. Recibir la intención y el contexto del mensaje entrante.
+2. Consultar las categorías/productos publicables de Inventary.
+3. Si hay varias categorías, enviar lista/botones; no crear sesión hasta que el cliente elija.
+4. Validar que la selección corresponde al mensaje/conversación esperada.
+5. Consultar configuración probada de elegibilidad IAB para WABA/BSP y tipo de CTA.
+6. Pedir a Inventary una sesión web limitada a la categoría y contexto necesarios.
+7. Enviar el CTA compatible con texto claro: “Ver productos de [categoría]”. Utilizar la plantilla aprobada que corresponda si la política/ventana lo exige.
+8. El navegador abre la categoría concreta y usa la API BFF para carrito/cotización.
+9. Al confirmar, backend crea pedido y publica evento/outbox.
+10. n8n consume/consulta el estado real y solo envía confirmación si aporta valor.
+11. Si el usuario abandona, el borrador persiste conforme a política. No enviar recordatorios promocionales sin consentimiento.
+12. Si IAB no está disponible, ofrecer catálogo/carrito nativo, Flow o texto con la categoría preservada.
+
+n8n no debe ejecutar una llamada por cada clic de filtro o cada vista de producto. La web llama directamente a la API limitada; n8n inicia la sesión, recibe eventos de negocio y coordina comunicaciones. Así se reducen latencia, ejecuciones y puntos de fallo.
+
+## 50. Medición específica de WebView
+
+Medir por categoría, tipo de CTA, WABA, dispositivo y versión:
+- CTA enviado/entregado/clicado cuando esos datos existan;
+- apertura WebView verificada, o primer request web etiquetado como aproximación;
+- fallback a navegador externo, Flow o catálogo nativo;
+- productos vistos/añadidos/quitaron y cantidades cambiadas;
+- inicio de checkout, cotización y aceptación;
+- p50/p90 desde apertura de categoría hasta pedido creado;
+- abandono por sección, error de sesión o API;
+- mensajes entregados por pedido completado;
+- costo Meta + BSP por pedido completado;
+- cambios de precio/stock entre catálogo y cotización;
+- duplicados evitados, sesión expirada y errores de idempotencia;
+- solicitudes de ayuda y reclamaciones por precio/destino.
+
+No afirmar que un usuario vio la página solo porque el CTA se entregó. No acumular PII en analítica si basta con IDs opacos.
+
+## 51. Pruebas de aceptación WebView
+
+1. CTA abre la categoría elegida dentro de WhatsApp cuando la cuenta/tipo de mensaje son elegibles.
+2. Si WebView no abre, el fallback sigue funcionando y conserva la selección.
+3. Se abre exactamente la categoría seleccionada, no la página principal.
+4. El cliente puede filtrar, ver detalles, cambiar cantidades y construir un carrito.
+5. Ninguna clave de integración queda expuesta en código o tráfico del navegador.
+6. Cada producto/variante/cantidad se revalida en backend.
+7. El sistema recotiza antes de confirmar; cualquier cambio requiere nueva aceptación.
+8. Dos clics en confirmar crean una sola orden/reserva.
+9. El timeout consulta el resultado original, no crea otra operación.
+10. Cerrar/reabrir WebView conserva la sesión segura hasta expiración.
+11. Modificar token/categoría/ID no permite ver datos de otra persona.
+12. CTA y plantilla respetan ventana, opt-in y categoría real.
+13. n8n no afirma pedido confirmado antes de la respuesta backend.
+14. Hay alternativa de texto, Flow o persona para quien no pueda/quiera usar WebView.
+15. El costo se calcula a partir de mensajes reales entregados y distingue Meta/BSP/IA/hosting.
+16. La ruta se prueba con Android/iOS y el WABA/proveedor reales antes de activarla en producción.
+
+## 52. Decisión de producto actualizada
+
+La estrategia recomendada de Inventary pasa a ser:
+
+- **WebView/IAB:** mejor ruta para abrir una página web de la categoría elegida y completar un carrito/checkout completo en la web móvil dentro de WhatsApp, si el número y tipo de CTA son elegibles.
+- **Catálogo/carrito nativo:** mejor para descubrir y seleccionar rápidamente artículos publicados en Meta.
+- **WhatsApp Flow:** mejor para recoger varios campos estructurados en pocas pantallas.
+- **Botones/listas:** mejor para decisiones pequeñas, categorías y ubicaciones.
+- **Texto/IA:** mejor para búsqueda abierta y dudas.
+- **Atención humana:** mejor para reclamaciones, pagos en disputa, excepciones y clientes que la solicitan.
+
+n8n elige y coordina; la web/Flow llama APIs de alcance limitado; Inventary valida oferta, cotización, consentimiento, stock y pedido. La compra rápida se optimiza sin sacrificar exactitud.
+
+
