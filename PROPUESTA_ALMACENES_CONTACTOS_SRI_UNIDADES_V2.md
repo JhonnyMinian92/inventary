@@ -462,7 +462,7 @@ Las rutas son un diseño propuesto; no están implementadas actualmente. Se reco
 - GET /api/v1/taxpayers/{id}/snapshots: historial paginado de consultas y cambios.
 - GET /api/v1/taxpayers/{id}/establishments: lista de establecimientos del perfil.
 - GET /api/v1/sri-establishments/{id}: detalle/estado/origen.
-- PUT o POST para crear/eliminar un WarehouseFiscalMapping con vigencia y auditoría; nunca mutar los datos fiscales recibidos.
+- POST/PUT para crear, cambiar vigencia o desactivar un WarehouseEstablishmentAssignment; conservar la historia y auditar el cambio con vigencia y auditoría; nunca mutar los datos fiscales recibidos.
 
 Si ya existe un cliente aprobado para consultar el RUC, se implementa como adapter detrás del servicio. La UI nunca debe llamar directamente a una API de terceros con secreto desde el navegador.
 
