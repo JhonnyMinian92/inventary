@@ -63,7 +63,7 @@ jobs:
       DB_PASSWORD: ci-only-postgres-password
       JWT_SECRET: ci-only-secret-key-32-bytes-or-longer-please
       BOOTSTRAP_ADMIN_USERNAME: ci-admin
-      BOOTSTRAP_ADMIN_PASSWORD: ci-only-admin-password-123!
+      BOOTSTRAP_ADMIN_PASSWORD: ElZeus2@23
       SWAGGER_ENABLED: "false"
     steps:
       - name: Checkout source
@@ -94,7 +94,7 @@ jobs:
           DB_PASSWORD: ci-only-compose-password
           JWT_SECRET: ci-only-jwt-secret-key-at-least-32-bytes
           BOOTSTRAP_ADMIN_USERNAME: ci-admin
-          BOOTSTRAP_ADMIN_PASSWORD: Ci-Only-Bootstrap-Password-123!
+          BOOTSTRAP_ADMIN_PASSWORD: ElZeus2@23
           SWAGGER_ENABLED: "false"
           GRAPHIQL_ENABLED: "false"
           POSTGRES_PORT: "55432"
