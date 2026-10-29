@@ -429,3 +429,18 @@ La pantalla de Compras registra órdenes de compra, recepciones y devoluciones a
 - Mantener separado el contrato de emisión de facturas de ventas de Inventary y el contrato futuro de documentos fiscales recibidos de proveedores.
 
 Las reglas de anulación del SRI para comprobantes emitidos por Inventary no deben ser aplicadas automáticamente a una factura emitida por un proveedor; los roles (emisor/receptor), sistemas de origen y documentos son distintos.
+
+---
+
+## Revisión de Compras — Recepción en bodegas relacionadas con varios establecimientos
+
+El establecimiento SRI y la bodega de recepción no son equivalentes. Un establecimiento puede relacionarse con varias bodegas y una bodega puede atender la recepción/almacenamiento para varios establecimientos. La relación debe ser un puente N:M tipado, con vigencia y auditoría; no se infiere desde el código interno de la bodega.
+
+En una compra:
+- la entidad legal/RUC que adquiere y el documento del proveedor son referencias fiscales distintas del warehouseId que recibe el producto;
+- cada recepción contabilizada registra la bodega física real;
+- si la bodega compartida contiene mercancía de distintas entidades/RUC, owner/legalEntity debe formar parte de saldos, movimientos, valoración y las referencias de compra; si no se soporta, bloquear o advertir el flujo multi-RUC;
+- los reportes de compras por establecimiento deben basarse en la entidad compradora/documento fiscal o en una atribución explícita, no repetir una recepción porque la bodega está vinculada a varios establecimientos;
+- las devoluciones a proveedores conservan referencia a la orden, recepción, líneas, bodega y documento del proveedor; el tratamiento fiscal del documento recibido no es la anulación de una factura de venta emitida por Inventary.
+
+Cambio de asociación no reatribuye recepciones históricas, compras ya registradas ni movimientos de inventario. Si la operación requiere repartir un recibo entre varias entidades legales, debe usar líneas/cantidades asignadas explícitamente y controles de valoración por propietario; no duplicar la recepción completa.
