@@ -280,3 +280,20 @@ La Resolución NAC-DGERCGC25-00000017 reformó el plazo del artículo 3 de la re
 6. La interfaz muestra al usuario si la operación comercial está registrada pero la situación fiscal requiere atención.
 
 Consulta el contrato canónico para endpoints propuestos, payloads, estados, auditoría, outbox y escenarios completos.
+
+---
+
+## Adenda adicional — RUC del proveedor del sistema de facturación (Resolución 26-00000027)
+
+El contrato fiscal canónico es [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md). Además de seleccionar el RUC emisor, establecimiento y punto de emisión, la integración debe verificar la aplicación de la Resolución SRI NAC-DGERCGC26-00000027, publicada el 28 de julio de 2026 en el Quinto Suplemento del Registro Oficial No. 335.
+
+El artículo 5 exige, para los emisores que usan un sistema/proveedor dentro del ámbito de la resolución, incluir el RUC de ese proveedor en la sección de información adicional del comprobante conforme a la ficha técnica. La disposición transitoria tercera fija 60 días calendario desde la publicación; el plazo indicado ya habría transcurrido a la fecha de esta propuesta, por lo que el equipo debe comprobar cumplimiento antes de emisión productiva.
+
+No confundir:
+- RUC del contribuyente que vende (emisor);
+- RUC del comprador (receptor);
+- RUC del proveedor tecnológico del sistema de facturación, cuando aplique.
+
+Este dato no se captura libremente por cada vendedor ni se concatena en la descripción de la venta. Debe configurarse y validarse en el backend fiscal, y este lo incluye en el XML según la ficha técnica vigente. Confirmar si el backend externo/empresa proveedora cae en las categorías del artículo 2 y si debe registrar la actividad/establecimiento exclusivo; no asumir que cualquier microservicio interno es automáticamente proveedor a estos efectos.
+
+Fuentes: [aviso oficial SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1) · [Registro Oficial No. 335](https://www.registroficial.gob.ec/quinto-suplemento-no-335/) · [Contrato fiscal](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
