@@ -749,3 +749,19 @@ Documentos de dirección:
 
 Este commit crea la propuesta V3. No implementa todavía el rediseño, los endpoints, la proyección del command center, la persistencia de propuestas de agente, el adaptador MCP, las migraciones de lotes/ubicaciones ni los workflows n8n. Todo elemento nuevo se considera propuesto hasta que exista código y pruebas de aceptación.
 
+---
+
+## Addendum fiscal — El inventario debe enlazarse con el estado real de facturación
+
+Contrato canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La venta, el movimiento de salida del inventario, la factura fiscal, la anulación fiscal, la devolución de mercadería, la nota de crédito y el reembolso no son una única transacción en estado. Inventario debe mantener sus movimientos idempotentes y permitir seguir el documento origen, pero mostrar por separado el estado fiscal confirmado por el backend externo.
+
+Para el modo dueño/agente:
+- el command center puede alertar de ventas con fiscalización pendiente/rechazada, establecimiento emisor no elegible, anulación solicitada pendiente o nota de crédito de devolución por resolver;
+- esas alertas se basan en estados/eventos confirmados, no en una inferencia del LLM;
+- los datos de establecimiento/punto de emisión se obtienen de la configuración fiscal válida; warehouseId sigue representando dónde está el stock;
+- una herramienta de agente solo puede consultar estado y preparar una propuesta. No puede emitir, anular ni generar un secuencial por SQL o por acciones arbitrarias.
+- la herramienta fiscal oculta datos sensibles según permisos y devuelve código/estado, evidencia, timestamp, documento origen y correlationId.
+
+La cancelación operativa no debe presentarse como factura anulada. La devolución física no equivale a nota de crédito ni reembolso. La resolución NAC-DGERCGC25-00000017 modifica al día 7 del mes siguiente el plazo de anulación del artículo 3 desde el 1 de enero de 2026; el backend fiscal aplica las reglas consolidadas y las restricciones de consumidor final. No duplicar reglas fiscales en el frontend ni en un agente.
