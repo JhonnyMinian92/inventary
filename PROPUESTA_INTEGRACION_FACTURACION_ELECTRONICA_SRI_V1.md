@@ -624,6 +624,7 @@ Propuestas relacionadas que deben coordinarse:
 - PROPUESTA_ALMACENES_CONTACTOS_SRI_UNIDADES_V2.md
 - PROPUESTA_COMPRAS_FRONTEND_BACKEND_V2.md
 - PROPUESTA_INVENTARIO_AGENT_READY_V3.md
+- PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V1.md: centro de mando, reconciliación fiscal y preparación de papeles de trabajo.
 - PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md
 
 **Límite:** este documento define el contrato recomendado, no una integración ya conectada. No se ha probado el backend fiscal externo porque su URL, OpenAPI, autenticación y entorno de pruebas no forman parte del código inspeccionado. El responsable tributario debe validar la interpretación de las normas consolidadas del SRI antes de llevar los controles legales a producción.
