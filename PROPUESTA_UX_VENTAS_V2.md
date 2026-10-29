@@ -228,3 +228,18 @@ El sistema actual de pedidos WhatsApp cotiza con un solo warehouseId y reserva l
 **UX operativa adicional:** bandeja de pedidos por preparar para el personal de cada local, picking/empaque con confirmación por línea, incidencias de faltante/daño, despacho, validación segura del código de retiro y prueba de entrega. Todas las acciones deben ser autorizadas por ubicación y auditables.
 
 Este es alcance nuevo propuesto, no una afirmación de que el sistema actual ya tenga esos endpoints, estados o integraciones.
+
+
+---
+
+## Integración con Suscripciones: misma entrada comercial, comando de dominio distinto
+
+La pantalla actual de Ventas y el backend excluyen deliberadamente servicios de tipo SUBSCRIPTION del formulario ordinario: SaleForm.jsx no los incluye en su selector y SalesController rechaza su creación mediante POST /sales cuando el canal es SUBSCRIPTION. El alta pertenece a POST /subscriptions, que crea el contrato y genera las facturas correspondientes.
+
+Por tanto, el rediseño de Ventas debe ofrecer dos entradas claras: **Venta única** y **Contratar suscripción**. La segunda reutiliza la selección de producto/cliente, el stepper y el resumen visual, pero confirma el plan mediante el caso de uso de suscripciones, no enviándolo como una venta convencional.
+
+La tabla de Ventas debe identificar las facturas cuyo canal es SUBSCRIPTION y enlazarlas con el contrato de origen. Una anulación genérica de una de esas facturas no puede dejar la cuota como INVOICED ni el contrato como ACTIVE sin sincronización. Hasta que haya pagos reales integrados, una factura creada no se presenta como dinero cobrado. El detalle de las brechas, estados, APIs y pruebas está en [PROPUESTA_UX_SUSCRIPCIONES.md](PROPUESTA_UX_SUSCRIPCIONES.md).
+
+Para la primera fase, no mezclar en una sola llamada los artículos de venta única y el contrato recurrente. Si se necesita comprar ambos, se deben confirmar como operaciones diferenciadas y relacionadas; una experiencia de pedido unificado requiere coordinación atómica en backend y debe implementarse como una fase posterior.
+
+**Pruebas de aceptación compartidas:** un plan no debe entrar en POST /sales; contratarlo desde Ventas crea un solo contrato y su primera factura según el calendario; esa factura enlaza al contrato; cancelación/anulación mantiene consistentes cuota, factura y suscripción; y los estados de contratación, facturación, pago y acceso no se confunden.
