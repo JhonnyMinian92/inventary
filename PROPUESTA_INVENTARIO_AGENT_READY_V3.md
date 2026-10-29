@@ -743,6 +743,7 @@ Documentos de dirección:
 - PROPUESTA_ARQUITECTURA_N8N_BACKEND_COMERCIAL_V2.md
 - PROPUESTA_COMPRAS_FRONTEND_BACKEND_V2.md
 - PROPUESTA_INVENTARIO_CENTRO_CONTROL_Y_AUDITORIA_V2.md
+- PROPUESTA_ALMACENES_CONTACTOS_SRI_UNIDADES_V2.md: datos SRI, separación de almacén físico/establecimiento tributario, CRUD de proveedores/clientes y unidades.
 
 ## 16. Límite de esta entrega
 
