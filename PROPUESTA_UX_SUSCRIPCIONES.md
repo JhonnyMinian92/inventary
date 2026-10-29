@@ -604,3 +604,198 @@ Priorizar un sector según casos reales del negocio: membresías de servicios, e
 No convertir la pantalla actual en un configurador inmenso con opciones que nadie utiliza. Primero consolidar su propósito actual —contratos de servicios con calendario de facturación— y corregir las diferencias entre factura y pago, las fechas de cobro, los errores y la búsqueda.
 
 Después introducir una capa de planes versionados, lifecycle y beneficios. Las suscripciones de entretenimiento, videojuegos, deporte, medicina, SaaS, mantenimiento o consumibles podrán compartir identidad, fechas y auditoría, pero deberán definir por separado sus derechos, límites, prestación y pagos. Así Inventary podrá ampliar su alcance sin perder claridad funcional ni mezclar un contrato de servicio, una factura, un pago y el acceso que recibe el cliente.
+
+
+---
+
+# Revisión v2: integración obligatoria con la pantalla de Ventas
+
+**Revisión cruzada:** 28 de octubre de 2026. Este apartado concreta la propuesta después de contrastar las pantallas de Ventas y Suscripciones, el controlador/servicio de ventas, el servicio de suscripciones y las pruebas de integración existentes.
+
+## A. Hallazgo crítico: hoy Suscripciones no se vende desde el flujo de Ventas
+
+El código del repositorio define dos rutas distintas:
+
+- En app-inventary-ecuapp/src/features/sales/SaleForm.jsx, el selector excluye los productos SERVICE cuyo serviceBilling sea SUBSCRIPTION.
+- En SalesController.java, POST /api/v1/sales rechaza el canal SUBSCRIPTION y orienta al usuario a registrar la suscripción por el módulo dedicado.
+- La contratación se hace desde SubscriptionsPage.jsx mediante POST /api/v1/subscriptions.
+- SubscriptionService.create() crea la suscripción y, según fecha de inicio y calendario, genera en la misma operación la factura de las cuotas que corresponde facturar, a través de SaleService con canal SUBSCRIPTION.
+- SubscriptionBillingJob genera las siguientes facturas del calendario a través del mismo flujo de ventas.
+
+**Resultado:** la pantalla de Ventas vende productos y servicios de una sola vez; la pantalla de Suscripciones crea un contrato y programa sus facturas. No existe todavía una experiencia unificada que permita iniciar en Ventas, elegir un plan, revisar sus condiciones y contratarlo desde un flujo comercial guiado.
+
+No se debe permitir que el formulario ordinario envíe la suscripción a POST /sales. La solución correcta es integrar la experiencia de contratación con Ventas, manteniendo el comando de dominio de suscripciones.
+
+## B. Segundo hallazgo crítico: la factura de suscripción puede confundirse con una venta normal
+
+SalesTable.jsx muestra documento, estado, cliente, almacén, fecha, total y acciones, pero no enseña el canal ni un enlace explícito a la suscripción que originó la factura. Las facturas generadas por SubscriptionService pueden aparecer como ventas ordinarias. Además, Ventas ofrece acciones genéricas de solicitud/aprobación de anulación.
+
+El flujo de anulación de SaleService no sincroniza automáticamente el calendario de SubscriptionInstallment con la suscripción de origen. Una factura del canal SUBSCRIPTION no debe anularse por una vía genérica que deje la cuota marcada como INVOICED.
+
+**Requisito de backend P0:** bloquear la anulación ordinaria de una factura de suscripción o exigir que se ejecute mediante un caso de uso que sincronice atómicamente factura, cuota, contrato y auditoría. Una corrección de factura, una cancelación del contrato, un documento correctivo fiscal y un reembolso real son operaciones diferentes.
+
+**Requisito de frontend:** identificar el documento como «Factura de suscripción» y enlazarlo con «Ver suscripción». La acción debe llevar al procedimiento permitido, no ofrecer una anulación genérica que pueda dejar datos incoherentes.
+
+## C. Flujo comercial de extremo a extremo recomendado
+
+La entrada comercial debe permitir dos tipos de operación sin mezclar sus efectos:
+
+1. **Venta única:** conserva el flujo actual para mercancía, productos sin stock y servicios ONE_TIME; el registro se hace por POST /sales.
+2. **Contratar un plan:** al seleccionar un servicio SUBSCRIPTION, el frontend abre un flujo guiado de contratación. No envía el plan a POST /sales; usa POST /subscriptions, ampliado si hace falta para guardar las condiciones y la aceptación del cliente.
+
+La página Suscripciones sigue siendo el módulo administrativo para buscar, consultar, cancelar y revisar la facturación de los contratos. No debe ser el único lugar desde el que se puede vender un plan cuando el empleado está atendiendo una compra desde Ventas.
+
+### Paso 1 — Elegir qué se ofrece
+
+Mostrar la ficha del plan tal como se define en Productos: nombre, descripción confirmada, precio base, frecuencia, plazo, moneda y beneficios/condiciones disponibles. Indicar si es servicio de una sola vez o suscripción.
+
+Para la primera versión, no permitir mezclar bienes ordinarios y una contratación recurrente en una sola llamada a POST /sales. Si el cliente desea ambos, registrar el plan mediante su caso de uso y la venta única mediante el otro, con resúmenes relacionados y resultados independientes. Una transacción comercial unificada puede añadirse después mediante un coordinador backend; no se resuelve con dos llamadas independientes desde React que puedan dejar medio proceso completado.
+
+### Paso 2 — Titular y condiciones
+
+Seleccionar al cliente y, cuando el dominio lo requiera, distinguir pagador y beneficiario. Mostrar las condiciones conocidas por backend:
+- nombre y versión del plan/servicio;
+- precio y moneda acordados;
+- frecuencia y duración;
+- fechas de inicio y fin;
+- renovación automática, manual o finalización, según la regla vigente;
+- beneficios, exclusiones y límites configurados;
+- política de cancelación y efecto sobre cargos futuros;
+- si se emitirá una factura inmediata o futura;
+- requisitos para activar el servicio, cuando aplique.
+
+No afirmar que existe renovación automática, prueba gratis, acceso digital, créditos o derecho a citas si el plan no lo define. El modelo actual tiene plazo fijo y estado COMPLETED al terminar; no se debe representar como renovación continua.
+
+### Paso 3 — Revisar el calendario e importe
+
+Usar la API de previsualización, pero validarla contra el contrato/plan seleccionado. Mostrar primer cargo, fecha, cargos posteriores, total, regla del calendario y si la primera cuota se factura hoy o más adelante. Si el precio/frecuencia/plazo difiere del plan base, explicar quién lo autorizó.
+
+El preview actual recibe frecuencia, plazo, precio y fecha, pero no una versión inmutable del plan con todas sus condiciones. La evolución recomendada es que la cotización/preview acepte el plan y devuelva reglas exactas para confirmar, evitando discrepancias entre el texto mostrado y el comando final.
+
+### Paso 4 — Confirmar contratación, factura y pago por separado
+
+La primera iteración puede crear el contrato y emitir la factura que corresponda con la lógica actual. El resultado debe mostrar campos separados:
+- **Contratación:** creada, pendiente o activa según la política del servicio.
+- **Factura:** no generada/generada con documento vinculado.
+- **Pago:** no integrado, pendiente, confirmado, fallido o reembolsado, solo cuando exista una fuente de verdad financiera.
+- **Beneficio/acceso:** no aplica, pendiente de activación, activo, suspendido o finalizado, si el tipo de servicio requiere provisión.
+
+Actualmente, POST /subscriptions devuelve el contrato, las cuotas y las referencias de venta/factura; no representa una transacción de pasarela o un pago confirmado. No mostrar «Pago recibido» ni «Suscripción pagada» por el solo hecho de crear la factura.
+
+El alta y la factura inicial deben permanecer bajo un límite transaccional con idempotencia para evitar contratos y facturas duplicados por reintentos. Si posteriormente se integra una pasarela, el pago se registra por separado y se relaciona con la factura/contrato; la activación se decide según la política del plan, no mediante lógica inventada en React.
+
+## D. Precio: el plan debe ser la fuente de verdad
+
+Product ya guarda salePrice, serviceBilling, billingFrequency y termMonths. La pantalla preselecciona estos datos, pero permite editar precio, frecuencia y plazo; CreateRequest también admite valores sobrescritos.
+
+Separar:
+- **Precio base del plan:** valor definido en Productos.
+- **Excepción comercial:** precio/periodo distinto aprobado por regla y auditado.
+- **Descuento por facturación anticipada:** excepción distinta del precio base.
+- **Importe de cuota:** resultado del calendario, que no necesariamente es igual al precio mensual de referencia.
+
+En la primera fase, el vendedor no debe cambiar arbitrariamente el precio de una suscripción editando un campo. El backend debe usar el precio base y rechazar sobrescrituras salvo permiso explícito. Toda excepción registra actor, valor anterior/nuevo, motivo y versión de regla. El permiso para descontar por prepago no equivale automáticamente a permiso para cambiar cualquier precio recurrente.
+
+Las suscripciones existentes deben conservar el precio y las condiciones aceptadas aunque cambie el producto maestro. Las nuevas altas usan la versión vigente. Antes de permitir cambios comerciales en producción, añadir un identificador/versión o snapshot contractual que preserve nombre, condiciones, precio, frecuencia y plazo. Recurly documenta este patrón: cambiar la oferta afecta a nuevas altas mientras las existentes conservan los términos contratados (referencia al final).
+
+## E. Riesgo actual: cancelación con frecuencia AT_END
+
+SubscriptionSchedule representa AT_END con una sola cuota que cubre todo el plazo y vence al final. SubscriptionService.chargedOnCancel() considera facturable cualquier cuota cuyo periodo cubra la fecha actual. Como esa cuota cubre todo el contrato, cancelar antes del vencimiento puede generar inmediatamente el importe total del plan. Las pruebas actuales reflejan ese comportamiento.
+
+Sin embargo, la interfaz describe de forma general la cancelación como «solo paga el periodo vigente». En AT_END, el periodo vigente puede ser el contrato completo. Esta consecuencia comercial es importante y puede no ser la intención de negocio.
+
+**Antes de modificar el código, decidir la regla comercial.** Para cada modalidad, definir si cancelar:
+- conserva el cargo del periodo actual;
+- hace exigible el importe total contratado;
+- anula cargos futuros sin penalidad;
+- cobra una terminación expresamente acordada;
+- genera un reembolso o documento correctivo cuando corresponda.
+
+No convertir el comportamiento actual en una política universal. La vista previa y los términos aceptados deben reflejar la regla aprobada. No facturar el plazo completo por accidente de una condición covers(today).
+
+## F. Conectar la tabla de Ventas con Suscripciones
+
+### En Ventas
+- Mostrar tipo/canal de documento y separar estado de factura del estado de pago cuando exista.
+- Una factura del canal SUBSCRIPTION debe tener una acción «Ver suscripción vinculada».
+- Bloquear la anulación genérica si puede dejar incoherente el contrato o su calendario.
+- La cancelación del contrato se gestiona en Suscripciones; la corrección de una factura usa su flujo coordinado.
+- Importe facturado no equivale a importe recaudado.
+
+### En el detalle de Suscripciones
+- Cada cuota enlaza a su venta/factura, número y estado.
+- Mostrar actividad del contrato y quién autorizó descuentos/cambios.
+- Mantener separados estados de factura y pago.
+- Si se permite reembolso, enlazarlo a una transacción de pago y su documento correctivo.
+
+La pantalla Suscripciones mantiene la administración actual y añade una acción clara «Vender/contratar plan» accesible desde Ventas. Ambos canales comparten el mismo wizard y el mismo backend para no duplicar el cálculo del calendario.
+
+## G. WhatsApp y futuros canales
+
+La integración actual de WhatsApp tiene flujo para carrito/cotización/pedido de productos, pero no un equivalente de contratación de suscripciones. No basta con añadir instrucciones a n8n.
+
+Fase inicial: contratar el plan mediante el mismo caso de uso de suscripciones después de confirmar condiciones y consentimiento. Antes de extender a WhatsApp, definir cómo comunica un contrato pendiente, qué responde si se ha creado factura pero no pago, qué datos necesita y cómo verifica consentimiento/identidad.
+
+Fase posterior: web y WhatsApp comparten cotización/alta; los canales no mantienen reglas comerciales divergentes. La API devuelve contratación, facturación, pago y acceso como estados diferentes.
+
+## H. Prioridades revisadas
+
+### P0 — Integridad contrato/factura
+1. Bloquear anulaciones genéricas de facturas SUBSCRIPTION sin coordinación de contrato/cuota.
+2. Resolver la regla AT_END al cancelar y alinear textos y vista previa.
+3. Cambiar «pago por adelantado» por «facturación anticipada» hasta tener pagos confirmados.
+4. Corregir «Pagada por adelantado» y «solo paga el periodo vigente» si no reflejan estado/regla.
+5. Probar que reintentos del alta y del job no duplican contrato, factura o cuota.
+
+### P1 — Venta desde Ventas
+1. Permitir elegir «Venta única» o «Contratar suscripción» en la entrada comercial.
+2. Para un servicio SUBSCRIPTION, abrir el wizard de contratación; no enviarlo a POST /sales.
+3. Reutilizar selección de producto/cliente y resumen cuando aplique, sin aplicar controles de stock a servicios.
+4. Tras contratar, mostrar estado y detalle; la factura aparece enlazada en Ventas.
+5. Mantener SubscriptionsPage como centro administrativo.
+
+### P1 — Precio/contrato inmutable
+1. Validar en servidor que precio/frecuencia/plazo pertenecen al plan vigente o son excepciones autorizadas.
+2. Añadir versión/snapshot del plan y condiciones aceptadas.
+3. Registrar actor y motivo para excepciones.
+4. Crear preview que el servidor pueda validar al confirmar.
+
+### P2 — Capacidades por sector
+1. Renovación y prueba gratuita solo tras definir consentimiento, cargos, notificaciones y cancelación.
+2. Pago real y conciliación antes de introducir estado «pagado», deuda o recuperación de cobros.
+3. Beneficios, acceso, cupos, licencias o créditos según el servicio.
+4. WhatsApp y otros canales después de consolidar el contrato común.
+
+## I. Pruebas adicionales de aceptación
+
+1. Venta única sigue excluyendo SUBSCRIPTION de POST /sales.
+2. Desde Ventas se puede escoger un plan y acceder al wizard que usa el caso de uso correcto.
+3. Contrato y factura inicial se crean una sola vez tras reintento de red.
+4. La factura se presenta en Ventas con canal de suscripción y enlace al contrato.
+5. Una factura de suscripción no puede anularse por la ruta común si deja cuota incoherente.
+6. Cancelar aplica la regla aprobada sobre las cuotas y actualiza factura/contrato de forma consistente.
+7. Cancelar AT_END antes de finalizar prueba la política comercial elegida; no asume que la regla actual sea deseada.
+8. Preview y factura coinciden en fechas, importes, redondeo y periodos.
+9. Un vendedor no puede modificar arbitrariamente precio/frecuencia/plazo manipulando el HTTP.
+10. Cambiar el precio del producto no altera contratos existentes.
+11. El panel distingue contratado, facturado, cobrado y acceso concedido.
+12. Un servicio ONE_TIME sigue vendiéndose sin crear contrato.
+13. Descuento, cancelación y cambios están auditados.
+14. El CTA explica compromiso, primer cargo, frecuencia, fin/renovación y cancelación.
+15. La cancelación no añade fricción artificial para evitar bajas.
+
+## J. Referencias adicionales para esta revisión
+
+- Recurly documenta que el plan define precio/frecuencia, que periodo de facturación y plazo son conceptos separados y que los contratos existentes conservan sus términos cuando cambia la oferta: https://docs.recurly.com/recurly-subscriptions/docs/plans
+- Recurly describe los entitlements como derechos de acceso ligados a planes y separados del proceso de cobro: https://docs.recurly.com/recurly-subscriptions/docs/entitlements
+- Einav, Klopack y Mahoney (2025), *Selling Subscriptions*, American Economic Review: con datos de pagos documentan cómo la fricción de cancelación puede mantener pagos de clientes que ya no valoran la suscripción. Esto respalda la transparencia y una baja clara: https://doi.org/10.1257/aer.20231612
+- Stripe documenta comportamientos distintos para pausar la cobranza, pausar una suscripción y cancelar al final de un periodo: https://support.stripe.com/questions/how-to-pause-or-cancel-subscriptions
+- El análisis de supervivencia/churn mide el momento de cancelación y trata contratos aún activos al cierre del estudio: https://doi.org/10.1016/j.ijresmar.2025.03.005
+
+Estas referencias orientan decisiones de diseño y dominio; no sustituyen las reglas comerciales acordadas ni la validación legal para Ecuador.
+
+## Dictamen final
+
+Suscripciones debe quedar alineada con Ventas en la experiencia comercial y en la integridad de los registros, sin convertir cada contrato en una línea de venta ordinaria. La entrada comercial puede compartirse; la contratación, la cuota, la factura, el pago y la habilitación del beneficio son efectos relacionados pero distintos.
+
+El objetivo de la primera versión es concreto: **contratar un plan desde el flujo comercial existente, usar el endpoint de suscripciones, generar la factura correcta una sola vez, mostrarla vinculada en Ventas, distinguir factura de pago y garantizar que anulaciones/cancelaciones no dejen el calendario incoherente**. Renovaciones, pagos recurrentes automáticos y derechos de acceso deben llegar después de definir sus reglas.
