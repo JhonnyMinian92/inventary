@@ -188,7 +188,7 @@ No se recomienda depender de scraping no documentado del portal del SRI ni simul
 | SriEstablishment | Establecimiento oficial en el RUC | perfil tributario, código de tres dígitos, nombre comercial opcional, dirección/ubicación, estado oficial, fuente y última verificación. |
 | SriEstablishmentSnapshot | Histórico del estado/dirección y datos observados | establecimiento, timestamp, código normalizado, estado recibido y hash del snapshot. |
 | Warehouse | Lugar operativo de inventario actual | código interno, nombre, dirección operativa, active y ubicaciones del almacén. |
-| WarehouseFiscalMapping | Asociación entre un almacén operativo y un establecimiento SRI | warehouseId, sriEstablishmentId, propósito, vigencia desde/hasta, preferencia y auditoría. |
+| WarehouseEstablishmentAssignment | Puente de asociación muchos-a-muchos entre bodega y establecimiento SRI | warehouseId, sriEstablishmentId, tipo de relación, vigencia, prioridad contextual, responsable y auditoría; no define dueño de stock ni emisor de factura. |
 | BusinessPartner | Contacto comercial común | código, identificación y datos de contacto; un registro con roles de proveedor, cliente o ambos. |
 | PartnerRole | Rol comercial vigente del contacto | SUPPLIER, CUSTOMER u otros roles futuros; debe evitar entidades duplicadas por la misma identificación. |
 | UnitOfMeasure | Unidad de medida usada por productos y movimientos | código, nombre, dimensión, escala decimal, estado y regla de compatibilidad. |
@@ -207,11 +207,19 @@ El perfil actual debe separar, como mínimo, cuatro estados:
 
 Los estados no deben fusionarse en un solo booleano active. Un contacto puede seguir siendo histórico y un almacén puede tener existencias aunque el RUC esté suspendido o un establecimiento esté cerrado. Esto no significa que se deba emitir una factura desde él. La decisión fiscal la impone el backend de facturación; la operación de inventario sigue sus propias reglas.
 
-### 4.3 Mapeo de almacenes a establecimientos
+### 4.3 Relación muchos-a-muchos entre almacenes y establecimientos
 
-La relación entre un almacén y un establecimiento SRI debe ser opcional y explícita. Puede haber varios almacenes internos asociados a un mismo establecimiento tributario. Un almacén central de distribución que no emite comprobantes puede permanecer sin asociación fiscal. Si una operación futura requiere asignar un origen fiscal diferente, se deberá especificar la política y una asociación con vigencia, no reutilizar un código arbitrario.
+La asociación operativa es N:M: un establecimiento SRI puede vincularse a varias bodegas y una bodega puede vincularse a varios establecimientos. Esta relación se guarda en una tabla puente (WarehouseEstablishmentAssignment), no como una sola FK en Warehouse o SriEstablishment.
 
-El mapeo es una referencia útil para el sistema de facturación, no una orden automática de emitir desde ese establecimiento. El backend de facturación es responsable de seleccionar un establecimiento elegible y punto de emisión válido con las reglas pertinentes. Si un establecimiento vinculado pasa a cerrado o el contribuyente pasa a suspendido, la pantalla debe señalizar la inconsistencia y pedir revisar el mapeo; no debe desactivar ni borrar el almacén automáticamente.
+La asociación debe incluir un tipo explícito —por ejemplo STOCK_SERVES, SALES_OPERATIONS, PICKUP, FULFILLMENT, RECEIVING, RETURN_ACCEPTANCE o REPORTING_SCOPE— y vigencia desde/hasta. Es posible que un mismo par bodega/establecimiento tenga funciones operativas diferentes; cada función debe tener definición de negocio y permisos propios. Si se configura una opción predeterminada, debe ser única únicamente para el contexto concreto de canal/función/vigencia donde se necesita, no como única asociación global.
+
+**La relación no decide la propiedad del inventario, no transforma una bodega en un establecimiento oficial y no autoriza emitir factura desde ese establecimiento.** El establecimiento pertenece a un perfil RUC; una bodega es un lugar físico/lógico de operación. El almacén puede servir a una, varias o ninguna sucursal fiscal. Una misma ubicación física puede ser compartida por negocios/RUC distintos; si el sistema admite ese escenario, requiere owner/legalEntity en stock, movimientos, reservas, compras, ventas y valoración. Sin ese aislamiento, se bloquea o declara no soportada la configuración multi-RUC para evitar que una entidad consulte o facture existencias de otra.
+
+El saldo físico se mantiene por la clave real de inventario (propietario, producto y bodega, más el corte temporal donde aplique), no por la cantidad de filas del puente. En un reporte de stock por establecimiento, filtrar bodegas relacionadas solo incluye las existencias físicas correspondientes una vez; no se replica el saldo completo para cada establecimiento. Si el dueño necesita asignar financieramente stock a un establecimiento, necesita una regla explícita de asignación/propiedad y su ledger; no basta con la relación operativa.
+
+La selección fiscal se resuelve aparte mediante billingContextId/establecimiento/punto que el backend de facturación valida. Una bodega asociada a varios establecimientos no permite escoger el primer resultado automáticamente. Ante ambigüedad, el servidor aplica una regla autorizada visible o solicita una elección permitida; el backend fiscal confirma la elegibilidad en la emisión.
+
+La asociación se conserva con vigencia e historial. Cambiarla hoy no reescribe movimientos, compras, ventas, inventarios ni facturas históricas. Si el establecimiento se cierra o el RUC cambia de estado, se señala la incidencia fiscal; no se desactiva la bodega ni se elimina stock. Un almacén sin asociación fiscal sigue siendo válido para stock/logística siempre que las reglas operativas lo permitan.
 
 ### 4.4 Fuente y trazabilidad de cada campo
 
@@ -773,3 +781,23 @@ Además del RUC del contribuyente emisor y los establecimientos oficiales, debe 
 Este RUC tecnológico **no es** el RUC del dueño del negocio, ni el RUC del cliente, ni el código de establecimiento SRI. Se mantiene como configuración del backend fiscal, con procedencia y control de cambios; no se edita en el registro de almacén ni por transacción de venta. La pantalla de datos maestros debe poder mostrar la identidad del proveedor fiscal si el negocio necesita gestionarla, pero el backend de facturación es responsable de validar su aplicabilidad, condición registral y uso en información adicional.
 
 Antes de configurar este dato, confirmar si el proveedor concreto entra en el artículo 2 (proveedor de sistema/servicio en el sentido definido por la resolución). Fuente: [aviso oficial SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1) y [Quinto Suplemento No. 335](https://www.registroficial.gob.ec/quinto-suplemento-no-335/).
+
+---
+
+## Revisión V2.1 — Escenarios N:M obligatorios para almacenes y SRI
+
+Esta revisión precisa que la relación entre establecimiento y bodega es de muchos-a-muchos y prevalece sobre cualquier mapeo simplificado en este documento.
+
+Escenarios a validar en frontend/backend:
+1. Un establecimiento asociado con varias bodegas —mostrar todos los enlaces y permitir filtros por tipo de relación.
+2. Una bodega vinculada con varios establecimientos —mostrar cada relación; nunca duplicar balances/valoración al agrupar por establecimiento.
+3. Bodega central que sirve varias tiendas —distinguir stock físico central del stock de la sucursal y del volumen que la abastece.
+4. Bodega compartida por dos RUC —exigir propietario/entidad legal en las cantidades o bloquear el escenario mientras no exista segregación.
+5. Establecimiento cerrado o contribuyente suspendido —mantener historia y stock; impedir que la asociación se trate como autorización de emisión.
+6. Cambio de asociación dentro de un periodo —las operaciones históricas conservan el ámbito registrado al ocurrir.
+7. Venta, retiro, recepción o devolución —el tipo de relación indica uso logístico, pero no determina facturación ni propiedad del bien.
+8. Una venta servida por varias bodegas —la factura conserva el contexto fiscal explícito y el inventario documenta cada salida; no se genera una factura por bodega automáticamente.
+9. Una devolución recibida en una bodega diferente —registrar ubicación física de retorno, venta/factura de origen y tratamiento fiscal por separado.
+10. Usuario con permisos sobre solo parte de los RUC/establecimientos —aplicar el filtro antes de las agregaciones.
+
+El alta/edición de la asociación requiere validación de periodos, tipo de relación, ámbito RUC, permisos, duplicados y auditoría. El endpoint fiscal no puede usar este puente como sustituto de sus propias reglas para RUC, establecimiento, punto de emisión y numeración.
