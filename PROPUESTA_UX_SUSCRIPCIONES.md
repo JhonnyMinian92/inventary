@@ -830,3 +830,18 @@ Contrato fiscal canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1
 Las facturas generadas por SubscriptionBillingJob o por una operación de prepago consolidado deben pasar por la misma configuración fiscal que las demás ventas. Cuando resulte aplicable la Resolución NAC-DGERCGC26-00000027, el RUC del proveedor del sistema/servicio de facturación debe incluirse en la sección de información adicional según la ficha técnica vigente. No es el RUC del emisor ni del suscriptor y no se debe repetir manualmente por cuota.
 
 La resolución fue publicada el 28 de julio de 2026 en el Registro Oficial No. 335 y da 60 días calendario para implementar el requisito. Verificar que el backend fiscal tenga la configuración y la inclusión técnica antes de activar emisión en producción. El mismo RUC tecnológico y la misma política deben aplicarse a facturas por cuota y facturas consolidadas; el reintento idempotente no debe cambiar el contexto fiscal. Fuente: [aviso oficial SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
+
+---
+
+## Revisión de Suscripciones — Servicio por múltiples establecimientos y emisión fiscal
+
+Una suscripción puede ser atendida o recogida en una o varias ubicaciones operativas. El hecho de que una bodega esté vinculada a varios establecimientos, o un establecimiento a varias bodegas, no define por sí solo el RUC emisor ni el punto de emisión.
+
+- La suscripción conserva una entidad legal/contribuyente vendedor y la relación fiscal de cada factura realmente emitida.
+- Si la prestación requiere almacén o entrega física, se registra esa ubicación en la operación de cumplimiento; no se usa para elegir automáticamente el emisor fiscal.
+- Las cuotas y ventas internas conservan subscriptionId/installmentId/saleId, además del fiscalDocumentId devuelto por el backend externo.
+- Los informes por establecimiento usan el contexto fiscal realmente utilizado; los informes de prestación por ubicación usan la referencia logística; no se suman por ambos mapas a la vez.
+- Un cambio de asociación entre bodega y establecimiento no cambia el plan, las cuotas pasadas, facturas ni periodos históricos.
+- Las facturas consolidadas por prepago mantienen su identidad comercial y su contexto fiscal, sin replicar el importe por cada cuota ni por cada ubicación relacionada.
+
+Si una suscripción se sirve desde una bodega compartida entre RUC diferentes, debe existir owner/legalEntity y control de acceso; no permitir facturar mercancía/servicio bajo un RUC solo porque el lugar físico esté relacionado con ese establecimiento.
