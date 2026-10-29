@@ -297,3 +297,19 @@ No confundir:
 Este dato no se captura libremente por cada vendedor ni se concatena en la descripción de la venta. Debe configurarse y validarse en el backend fiscal, y este lo incluye en el XML según la ficha técnica vigente. Confirmar si el backend externo/empresa proveedora cae en las categorías del artículo 2 y si debe registrar la actividad/establecimiento exclusivo; no asumir que cualquier microservicio interno es automáticamente proveedor a estos efectos.
 
 Fuentes: [aviso oficial SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1) · [Registro Oficial No. 335](https://www.registroficial.gob.ec/quinto-suplemento-no-335/) · [Contrato fiscal](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+---
+
+## Revisión de Ventas — Selección de establecimiento fiscal con asociaciones N:M
+
+La selección de la bodega de stock y la selección del establecimiento/punto de emisión son decisiones diferentes. La relación de referencia es muchos-a-muchos: una bodega puede dar servicio a varios establecimientos y un establecimiento puede relacionarse con varias bodegas.
+
+- El formulario muestra la bodega de salida/reserva y, por separado, el contexto fiscal que utilizará el backend externo.
+- La bodega sirve como criterio para proponer contextos fiscales configurados, no como una prueba de elegibilidad.
+- Si existe una sola opción predeterminada validada, mostrarla explícitamente; si existen varias, pedir una elección autorizada conforme al canal/regla; si no existe una opción válida, bloquear la emisión y explicar el problema.
+- Nunca seleccionar el primer establecimiento del array ni asumir que el código de Warehouse equivale al código SRI.
+- La venta conserva el contexto fiscal concreto que utilizó el backend al emitir; cambios futuros del mapa N:M no reescriben la venta ni la factura.
+- Si las líneas se reservan desde varias bodegas, persistir el origen por línea de fulfillment/movimiento sin duplicar el importe de venta. El contrato fiscal debe definir si el pedido admite una sola factura o un tratamiento especial; no generar una factura por bodega por defecto.
+- Una bodega compartida por varios RUC requiere segregación del propietario de inventario y de la entidad legal vendedora; en caso contrario, el sistema debe bloquear ese cruce.
+
+La conciliación debe comprobar bodega real, establecimiento/punto devueltos por el facturador, venta, factura autorizada, documento correctivo y estado de devolución por separado.
