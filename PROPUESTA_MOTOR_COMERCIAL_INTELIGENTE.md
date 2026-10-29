@@ -398,3 +398,23 @@ El esquema de eventos debe incorporar el modo y grupo de cumplimiento: opciones 
 El inventario y la asignación final son autoridad del backend. Un modelo predictivo puede sugerir una opción logística, pero no puede anular restricciones de stock, permisos, cobertura, capacidad o autorización del usuario. El resultado debe persistir como una decisión validada o como una sugerencia que requiera confirmación, según el riesgo.
 
 El detalle de flujos, modelo de FulfillmentGroup/FulfillmentLine, contratos, fases y pruebas está en [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md).
+
+---
+
+## Adenda fiscal — La conversión comercial termina solo con estados verificables
+
+Contrato canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+El motor comercial puede optimizar búsqueda, cotización, experiencia y conversión; no puede inventar datos tributarios ni considerar que una venta interna equivale a una factura autorizada. Los eventos de analítica deben separar como mínimo:
+- sale_created / venta interna registrada;
+- fiscal_issue_requested;
+- fiscal_document_authorized;
+- fiscal_document_rejected o fiscal_issue_retryable_error;
+- cancellation_requested / cancellation_confirmed;
+- sales_return_posted;
+- credit_note_requested / credit_note_authorized;
+- refund_requested / refund_confirmed, solo cuando exista un sistema de pagos.
+
+Los nombres anteriores son conceptos y no implican que los eventos estén ya implementados. Los eventos reales deberán salir del contrato de backend y llevar eventId/correlationId. No contar factura solicitada como factura autorizada, ni nota de crédito como dinero reembolsado. Los informes deben incluir el estado fiscal cuando mida facturación/ventas y deben evitar duplicar una operación al reintentar.
+
+La anulación y las notas de crédito deben seguir el contrato fiscal. La norma reformada por NAC-DGERCGC25-00000017 cambia al día 7 del mes siguiente el plazo del artículo 3 desde el 1 de enero de 2026 y reformó el artículo 5; no basar campañas, experimentos o automatizaciones en la regla desactualizada del día 10.
