@@ -1,3 +1,6 @@
+> **Documento sustituido:** esta V2 conserva la revisión anterior como histórico. La propuesta vigente, ampliada con benchmark de ERP/WMS, experiencia del dueño y arquitectura preparada para agentes, es [PROPUESTA_INVENTARIO_AGENT_READY_V3.md](PROPUESTA_INVENTARIO_AGENT_READY_V3.md).  
+> No implementar el roadmap de V2 de forma aislada; utilizar V3 como referencia estratégica vigente.
+
 # Propuesta de Inventario como centro de control, gestión y auditoría
 
 **Versión:** 2.0  
