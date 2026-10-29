@@ -624,7 +624,23 @@ Propuestas relacionadas que deben coordinarse:
 - PROPUESTA_ALMACENES_CONTACTOS_SRI_UNIDADES_V2.md
 - PROPUESTA_COMPRAS_FRONTEND_BACKEND_V2.md
 - PROPUESTA_INVENTARIO_AGENT_READY_V3.md
-- PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V1.md: centro de mando, reconciliación fiscal y preparación de papeles de trabajo.
+- PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V2.md: centro de mando, correlación multidominio, reconciliación fiscal y preparación de papeles de trabajo.
 - PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md
 
 **Límite:** este documento define el contrato recomendado, no una integración ya conectada. No se ha probado el backend fiscal externo porque su URL, OpenAPI, autenticación y entorno de pruebas no forman parte del código inspeccionado. El responsable tributario debe validar la interpretación de las normas consolidadas del SRI antes de llevar los controles legales a producción.
+
+---
+
+## Revisión V1.1 — Contexto fiscal separado de la asignación N:M de bodegas
+
+La propuesta de Almacenes/Contactos define una relación muchos-a-muchos entre Warehouse y SriEstablishment mediante una entidad puente con vigencia. El backend fiscal no debe derivar la factura desde una simple asociación de bodega:
+
+- Una bodega puede estar relacionada con varios establecimientos; un establecimiento puede relacionarse con varias bodegas.
+- Esa relación significa ámbito operativo (abastece, venta, retiro, recepción, devolución o reporte) según un tipo explícito; no asigna propiedad legal de inventario ni autoriza al establecimiento a emitir.
+- El request de emisión debe incluir un billingContextId específico o una referencia equivalente acordada, y el backend fiscal devuelve/valida el RUC, establecimiento, punto y numeración realmente usados.
+- Si una bodega está asociada a varios establecimientos y no existe regla válida para elegir el billingContext, se detiene la emisión y se solicita resolución autorizada; nunca se selecciona el primer establecimiento del arreglo.
+- Si la venta consume stock de dos bodegas, la operación conserva cada warehouse movement y una identidad comercial inequívoca; el contrato fiscal determina si corresponde un documento o algún tratamiento legal diferente. No crear una factura por bodega automáticamente.
+- Las facturas y notas de crédito históricas conservan los códigos devueltos por el backend fiscal, aunque más adelante cambie la asociación de la bodega.
+- Un almacén compartido entre RUC distintos requiere owner/legalEntity segregation en stock/ventas/compras/valoración, o una limitación explícita mientras no se soporte multi-entidad.
+
+La relación N:M solo propone candidatos/alcance a la interfaz. La validación fiscal final siempre corresponde al backend de facturación y a la configuración vigente.
