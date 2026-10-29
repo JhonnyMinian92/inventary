@@ -352,3 +352,32 @@ Contrato de integración: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.
 La bodega que prepara el pedido, el local donde se retira, la dirección de entrega y el establecimiento/punto de emisión de la factura son datos distintos. El flujo logístico conserva warehouseId/location y destino; el flujo fiscal conserva billingContextId, código de establecimiento, punto de emisión y el resultado del backend fiscal. Una asociación configurada puede proponer un contexto por defecto, pero el backend fiscal valida la elegibilidad antes de emitir.
 
 No anunciar un pedido como facturado o autorizado solo porque se preparó o despachó. Las cancelaciones y devoluciones separan la reversión logística/física, la anulación fiscal o nota de crédito y cualquier reembolso. La devolución de mercancía no debe generar una anulación fiscal automática sin comprobar el procedimiento permitido.
+
+---
+
+## Revisión logística — Relación N:M de bodega y establecimiento
+
+Modelo común: [PROPUESTA_ALMACENES_CONTACTOS_SRI_UNIDADES_V2.md](PROPUESTA_ALMACENES_CONTACTOS_SRI_UNIDADES_V2.md) y [Centro de reportes V2](PROPUESTA_CENTRO_REPORTES_GERENCIAL_OPERATIVO_TRIBUTARIO_V2.md).
+
+Una bodega puede atender a varios establecimientos SRI y un establecimiento puede operar con varias bodegas. Para logística, esta relación se usa con tipos explícitos y vigencias: abastecimiento, fulfillment, retiro, recepción o devolución. No debe interpretarse como que el stock está ubicado en el establecimiento ni como asignación automática de propiedad.
+
+Conservar, por cada orden/pedido:
+- bodega(s) de origen que realmente separaron/consumieron mercancía;
+- ubicación o establecimiento de retiro que eligió el cliente;
+- destino de envío;
+- relación bodega-establecimiento aplicable al momento de la operación;
+- owner/legalEntity cuando exista mercancía de varias entidades;
+- billingContextId y respuesta real del backend fiscal, como contexto distinto.
+
+El backend actual de pedido WhatsApp/quote trabaja con una única warehouseId. Mientras no exista soporte de split fulfillment, no permitir que la UI prometa que un pedido podrá surtirse desde varias bodegas por el simple hecho de que estén asociadas al mismo establecimiento. La ampliación futura debe definir líneas de cumplimiento por bodega, reservas atómicas, cambios de stock, disponibilidad y tratamiento ante entrega parcial.
+
+Escenarios requeridos:
+1. Un local recibe de un centro de distribución y mantiene además una bodega de sala.
+2. Un almacén central sirve a varios locales, sin repartir su stock completo entre ellos en reportes.
+3. Varias bodegas surten un pedido, pero existe una sola identidad de venta y una política explícita de documento fiscal.
+4. La recogida ocurre en una sucursal diferente a la bodega que preparó el pedido.
+5. La devolución se acepta en una bodega distinta de donde salió la mercancía y conserva la venta/factura originales.
+6. Una bodega se asocia a establecimientos de más de un RUC; sin owner/legalEntity y permisos segregados, debe bloquearse ese caso.
+7. La asociación se cierra o cambia de vigencia; no se reescriben órdenes, movimientos ni documentos ya confirmados.
+
+El contexto fiscal no se deriva automáticamente del lugar de retiro o del almacén que prepara la orden. Una asociación puede sugerirlo, pero backend fiscal debe validar RUC, establecimiento, punto y elegibilidad.
