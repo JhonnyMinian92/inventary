@@ -166,3 +166,13 @@ La ficha de Producto debe diferenciar datos comerciales (SKU, descripción, unid
 Antes de añadir códigos tributarios al catálogo, se debe acordar una única fuente de verdad: el backend fiscal puede mantener el mapeo de SKU/producto a códigos fiscales, o Inventary puede mantener una clasificación versionada que el facturador valida. No duplicar tarifas/códigos manualmente en React y en el otro backend, ni hardcodear una tarifa de impuesto que pueda cambiar. Los productos y sus líneas de venta deben conservar snapshot de descripción/unidad/cantidades/precio usados en el documento histórico.
 
 El estado tributario de un producto/servicio, el tipo de producto para inventario y la tasa fiscal no son el mismo atributo. Un servicio puede generar factura sin movimiento físico; un producto stockeable puede generar movimientos y, por separado, una factura fiscal autorizada. El detalle y las propuestas de producto deben mantenerse coordinados con el contrato de facturación.
+
+---
+
+## Adenda adicional — Configuración fiscal del proveedor tecnológico
+
+Contrato canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La clasificación tributaria del producto y el RUC del proveedor tecnológico son conceptos diferentes. La Resolución NAC-DGERCGC26-00000027 exige, a los emisores que usen un proveedor dentro del ámbito, incluir el RUC de ese proveedor en la sección de información adicional del comprobante. Este dato no pertenece al SKU y no se duplica en cada artículo; es configuración central del backend fiscal. El proveedor debe aplicar la ficha técnica SRI vigente (actualmente publicada como esquema Off-line 2.34, actualización julio de 2026) y mantener el dato independiente de códigos de producto/impuesto.
+
+La aplicabilidad de registro del proveedor debe verificarse conforme al artículo 2 de la resolución y no suponerse por el simple hecho de que exista un endpoint remoto. Fuente: [aviso SRI sobre NAC-DGERCGC26-00000027](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
