@@ -820,3 +820,13 @@ Hoy SubscriptionBillingJob crea ventas internas de canal SUBSCRIPTION. La integr
 La resolución NAC-DGERCGC25-00000017 reformó el plazo de anulación del artículo 3 al día 7 del mes siguiente desde el 1 de enero de 2026 y modificó el artículo 5 de la resolución original. El backend fiscal debe aplicar la normativa consolidada y considerar las restricciones de consumidor final y las demás condiciones relevantes. No hardcodear la antigua regla del día 10 ni el plazo fijo de 12 meses de la redacción inicial.
 
 Pruebas adicionales: cuota facturada una sola vez; emisión autorizada/pending/rejected; cancelación de suscripción sin anular las facturas históricas de forma automática; nota de crédito vinculada; estado de pago independiente; fallo y retry sin duplicar venta/factura/cuota; coherencia de factura consolidada y sus cuotas.
+
+---
+
+## Adenda adicional — RUC del proveedor de facturación en cuotas y prepagos
+
+Contrato fiscal canónico: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+Las facturas generadas por SubscriptionBillingJob o por una operación de prepago consolidado deben pasar por la misma configuración fiscal que las demás ventas. Cuando resulte aplicable la Resolución NAC-DGERCGC26-00000027, el RUC del proveedor del sistema/servicio de facturación debe incluirse en la sección de información adicional según la ficha técnica vigente. No es el RUC del emisor ni del suscriptor y no se debe repetir manualmente por cuota.
+
+La resolución fue publicada el 28 de julio de 2026 en el Registro Oficial No. 335 y da 60 días calendario para implementar el requisito. Verificar que el backend fiscal tenga la configuración y la inclusión técnica antes de activar emisión en producción. El mismo RUC tecnológico y la misma política deben aplicarse a facturas por cuota y facturas consolidadas; el reintento idempotente no debe cambiar el contexto fiscal. Fuente: [aviso oficial SRI](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
