@@ -154,3 +154,15 @@ La ficha y los resultados de búsqueda deben diferenciar «hay unidades en Inven
 Para cada ubicación, mostrar disponibilidad recibida del backend y evitar afirmaciones que supongan que un producto en Bodega Norte ya puede recogerse en Local Centro. Si se requiere moverlo, etiquetar esa opción como traslado a punto de retiro con tiempo/coste estimado y confirmación futura.
 
 La asignación por ubicación y el flujo de preparación se detallan en [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md). El frontend no debe simular stock por estantería, picking multi-bin o reserva si esas capacidades no están expuestas por las APIs.
+
+---
+
+## Adenda fiscal — Datos de producto que necesita el backend de facturación
+
+Contrato de integración: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La ficha de Producto debe diferenciar datos comerciales (SKU, descripción, unidad, precio) de la clasificación y tratamiento tributario que el backend fiscal necesite para emitir. El backend de facturación debe recibir una línea de venta coherente, con código/descripción, unidad, cantidad, precio, descuento y clasificación fiscal aplicable.
+
+Antes de añadir códigos tributarios al catálogo, se debe acordar una única fuente de verdad: el backend fiscal puede mantener el mapeo de SKU/producto a códigos fiscales, o Inventary puede mantener una clasificación versionada que el facturador valida. No duplicar tarifas/códigos manualmente en React y en el otro backend, ni hardcodear una tarifa de impuesto que pueda cambiar. Los productos y sus líneas de venta deben conservar snapshot de descripción/unidad/cantidades/precio usados en el documento histórico.
+
+El estado tributario de un producto/servicio, el tipo de producto para inventario y la tasa fiscal no son el mismo atributo. Un servicio puede generar factura sin movimiento físico; un producto stockeable puede generar movimientos y, por separado, una factura fiscal autorizada. El detalle y las propuestas de producto deben mantenerse coordinados con el contrato de facturación.
