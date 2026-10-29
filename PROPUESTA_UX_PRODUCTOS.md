@@ -296,3 +296,10 @@ No basta medir clicks o visitas: priorizar exactitud, tiempo de tarea y tasa de 
 - [Estudio de presentación de información de producto e intención de compra (Journal of Retailing and Consumer Services, 2024)](https://www.sciencedirect.com/science/article/pii/S0969698923003454)\n- [W3C: WCAG 2.2](https://www.w3.org/TR/wcag/)
 
 La investigación orienta el diseño; la selección final de patrones debe validarse con pruebas de tareas de las personas que usan Inventary.
+
+
+---
+
+## Ampliación 2026-10-28: catálogo y recomendaciones
+
+La propuesta transversal de algoritmos, medición, APIs y WhatsApp está en [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md). Para preparar el catálogo, priorizar atributos estructurados y verificables por categoría, reglas de publicación claras, estado de borrador y revisión humana para contenido generado. El backend debe devolver la disponibilidad, el estado comercial y la razón de una recomendación; React no debe duplicar esas reglas. La completitud de ficha puede calcularse por campos ponderados según categoría, pero ese indicador mide calidad de datos, no probabilidad de compra.
