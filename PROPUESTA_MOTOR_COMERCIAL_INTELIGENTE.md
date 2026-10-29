@@ -418,3 +418,15 @@ El motor comercial puede optimizar búsqueda, cotización, experiencia y convers
 Los nombres anteriores son conceptos y no implican que los eventos estén ya implementados. Los eventos reales deberán salir del contrato de backend y llevar eventId/correlationId. No contar factura solicitada como factura autorizada, ni nota de crédito como dinero reembolsado. Los informes deben incluir el estado fiscal cuando mida facturación/ventas y deben evitar duplicar una operación al reintentar.
 
 La anulación y las notas de crédito deben seguir el contrato fiscal. La norma reformada por NAC-DGERCGC25-00000017 cambia al día 7 del mes siguiente el plazo del artículo 3 desde el 1 de enero de 2026 y reformó el artículo 5; no basar campañas, experimentos o automatizaciones en la regla desactualizada del día 10.
+
+---
+
+## Revisión analítica — No multiplicar la venta por cada establecimiento que sirve una bodega
+
+Los informes y recomendaciones deben respetar la relación muchos-a-muchos entre bodegas y establecimientos SRI. Una bodega puede estar relacionada con varios establecimientos; un establecimiento puede recibir servicio de varias bodegas. Esta relación describe el ámbito operacional, no una clave de propiedad ni la identidad del emisor fiscal.
+
+- Las ventas se atribuyen por la venta/fulfillment/contexto fiscal realmente registrados, no por todos los establecimientos asociados a cada bodega.
+- El stock se cuenta por propietario, producto y bodega, y no se replica al agrupar por establecimientos sin una regla explícita de atribución.
+- Las métricas que comparan establecimiento con inventario diferencian stock físico, stock asignado y abastecimiento.
+- Si una bodega está compartida entre RUC diferentes, el sistema debe disponer de owner/legalEntity segregado o impedir recomendaciones y agregados que mezclen el stock.
+- Los agentes explican la fuente y la regla de unión de cada métrica; no calculan join por parecido de nombre ni seleccionan un establecimiento arbitrario.
