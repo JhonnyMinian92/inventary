@@ -415,3 +415,17 @@ Metas iniciales sugeridas, a validar con el entorno real: primera página visibl
 - [PurchasingAndCostingApiTest.java](microservices-inventary-ecuapp/src/test/java/com/ecuapp/inventary/api/PurchasingAndCostingApiTest.java): ciclo de vida, recepciones parciales, idempotencia, valoración y concurrencia.
 - [Migración V2 de compras y recepciones](microservices-inventary-ecuapp/src/main/resources/db/migration/V2__partners_and_procurement.sql) y [Migración V4 de devoluciones](microservices-inventary-ecuapp/src/main/resources/db/migration/V4__purchase_returns_and_reorder_rules.sql): índices y restricciones actuales.
 
+---
+
+## Adenda — Devoluciones a proveedores no son anulaciones de facturas de venta de Inventary
+
+Contrato fiscal de ventas: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La pantalla de Compras registra órdenes de compra, recepciones y devoluciones a proveedores. Esos documentos son distintos de las facturas de venta que Inventary emite a sus clientes. Una devolución a proveedor no debe llamar a la anulación de una factura de venta emitida por Inventary.
+
+- Si en el futuro se integra un backend para registrar la factura de compra del proveedor y sus notas de crédito, esa integración debe identificar el documento del proveedor como documento recibido, con su propio flujo de validación y conciliación.
+- La devolución de inventario a proveedor registra cantidad, coste/movimiento, motivo y referencia a recepción/orden; no acredita automáticamente una nota de crédito del proveedor ni el reembolso/compensación financiera.
+- La anulación de una orden de compra, reversión de recepción, devolución de productos, nota de crédito del proveedor y pago/reembolso del proveedor son operaciones diferentes.
+- Mantener separado el contrato de emisión de facturas de ventas de Inventary y el contrato futuro de documentos fiscales recibidos de proveedores.
+
+Las reglas de anulación del SRI para comprobantes emitidos por Inventary no deben ser aplicadas automáticamente a una factura emitida por un proveedor; los roles (emisor/receptor), sistemas de origen y documentos son distintos.
