@@ -1,5 +1,8 @@
 # Propuesta UX/UI de Ventas — versión revisada para React y WhatsApp
 
+> **Ampliación logística obligatoria:** la experiencia de retiro/envío y la preparación desde la bodega que tiene el stock están detalladas en [PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md](PROPUESTA_LOGISTICA_RETIRO_Y_ENVIOS.md). Esta capa es distinta del simple campo de entrega del checkout.
+
+
 **Fecha:** 28 de octubre de 2026  
 **Estado:** propuesta de UX, contratos y experimentación; no implica que todos los endpoints, pagos, facturación electrónica ni modelos estén implementados.  
 **Relacionados:** [PROPUESTA_UX_VENTAS.md](PROPUESTA_UX_VENTAS.md) · [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md).
@@ -204,3 +207,24 @@ Devoluciones, cancelaciones, margen, coste de descuentos, quejas, bajas/bloqueos
 - Motor comercial común, algoritmos, arquitectura y privacidad: [PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md](PROPUESTA_MOTOR_COMERCIAL_INTELIGENTE.md)
 
 Las fuentes orientan hipótesis y guardas; los resultados deberán validarse con los datos reales de Inventary y pruebas con compradores. No se deben presentar funcionalidades futuras como ya implementadas.
+
+
+---
+
+## Ampliación de alcance: despacho, retiro y preparación en la ubicación de origen
+
+La opción de entrega del paso 2 no es suficiente por sí sola. Debe existir un paso explícito de cumplimiento, condicionado a las opciones que el backend pueda ejecutar:
+
+- **Retirar en origen:** la bodega/local que tiene las existencias prepara las líneas; el cliente solo recibe el aviso de listo después de la confirmación del personal autorizado.
+- **Enviar desde origen:** la bodega prepara, empaqueta y entrega al transportista o despacho interno; el destinatario y la dirección se guardan independientemente de la bodega.
+- **Retirar en otro local:** solo se ofrece si el negocio soporta una transferencia hacia ese local; la recepción del traslado debe quedar confirmada antes de anunciar que está listo.
+
+El sistema actual de pedidos WhatsApp cotiza con un solo warehouseId y reserva las líneas en ese almacén. Hay una API de transferencia de inventario, pero eso no equivale a tener preparado el pedido para cliente, registrar el despacho del transportista o confirmar un retiro. La propuesta completa describe estados, contratos y fases.
+
+**Estados independientes:** pago, inventario reservado, preparación, listo para retiro, despacho, tránsito, entrega y recogida. No mostrar «listo para retirar» cuando solo existe una reserva ni «entregado» porque se confirmó un pago.
+
+**Carrito con stock en varias bodegas:** primero buscar un origen común autorizado. Si no existe, ofrecer traslado o cumplimiento dividido únicamente cuando esté soportado y se muestre de antemano qué artículos salen de cada ubicación, sus costes y plazos. Nunca crear envíos divididos de forma silenciosa.
+
+**UX operativa adicional:** bandeja de pedidos por preparar para el personal de cada local, picking/empaque con confirmación por línea, incidencias de faltante/daño, despacho, validación segura del código de retiro y prueba de entrega. Todas las acciones deben ser autorizadas por ubicación y auditables.
+
+Este es alcance nuevo propuesto, no una afirmación de que el sistema actual ya tenga esos endpoints, estados o integraciones.
