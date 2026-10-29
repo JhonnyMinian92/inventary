@@ -995,3 +995,24 @@ El dueño del negocio debe poder desplegar cualquier pedido y, en menos de un mi
 
 La pantalla no debe intentar predecir ni controlar la personalidad del cliente. Debe **preparar al negocio con evidencia, contexto, políticas, alternativas permitidas y acciones concretas**, de modo que incluso una conversación difícil se atienda con claridad y sin promesas o cargos inventados.
 
+---
+
+## Adenda obligatoria — Facturación SRI para pedidos WhatsApp y WebView
+
+Contrato común: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+Los pedidos de WhatsApp, WebView y web deben utilizar la misma creación de venta y el mismo flujo de facturación fiscal; no se implementa un generador fiscal separado dentro del bot o de n8n.
+
+- El checkout debe capturar/confirmar los datos de receptor que necesite el tipo de identificación y el documento, y el contexto fiscal de emisión válido. No debe confundir el local de retiro/almacén origen con el establecimiento que emite la factura.
+- La venta debe transmitir al backend fiscal la venta confirmada, sus líneas, snapshot del receptor, contexto fiscal, referencia idempotente y la prevalidación/desglose tributario acordado.
+- Inventary no construye el XML, no firma ni genera secuenciales. El backend fiscal devuelve el número real, la clave de acceso, el establecimiento/punto usados y el estado. El bot no informa «factura autorizada» hasta que el estado recibido lo confirme.
+- Un pedido, una venta, una reserva de stock, un pago y una factura son estados distintos. La aceptación del pedido no demuestra que el pago llegó ni que la factura fue autorizada.
+- Los mensajes pueden comunicar «solicitud de factura registrada/en proceso» cuando ese sea el resultado; no deben adjuntar un enlace sin permiso o mostrar un número inventado.
+- Los reintentos usan el mismo Idempotency-Key/operationId y consultan el estado existente antes de crear otra solicitud. Los callbacks del backend fiscal se deduplican.
+- Una cancelación antes de que exista factura fiscal no es igual que una solicitud de anulación de una factura autorizada. Una devolución válida de artículos normalmente requiere tramitar el documento fiscal correctivo aplicable, como una nota de crédito, no anular automáticamente la factura original.
+- n8n puede notificar estados fiscales confirmados, errores y tareas que requieren a una persona; no genera XML, firma, emite secuenciales, ni escribe directamente estados fiscales o movimientos de inventario.
+- El bot explica el estado real de la devolución de mercadería, del documento fiscal y del reembolso por separado.
+
+La resolución NAC-DGERCGC25-00000017 cambia al día 7 del mes siguiente el plazo del artículo 3 de la resolución de anulación, con vigencia desde el 1 de enero de 2026. Las facturas transmitidas como consumidor final tienen restricciones especiales. El flujo automatizado debe usar la regla consolidada del backend fiscal, no una fórmula o texto desactualizado en el bot.
+
+Pruebas adicionales: pedido WhatsApp/WebView que termina con factura autorizada; emisión pendiente/rechazada; timeout y reintento sin duplicación; establecimiento cerrado/RUC no elegible; devolución parcial con nota de crédito vinculada; notificación que no se envía como autorizada antes del callback/consulta definitivo.
