@@ -243,3 +243,40 @@ La tabla de Ventas debe identificar las facturas cuyo canal es SUBSCRIPTION y en
 Para la primera fase, no mezclar en una sola llamada los artículos de venta única y el contrato recurrente. Si se necesita comprar ambos, se deben confirmar como operaciones diferenciadas y relacionadas; una experiencia de pedido unificado requiere coordinación atómica en backend y debe implementarse como una fase posterior.
 
 **Pruebas de aceptación compartidas:** un plan no debe entrar en POST /sales; contratarlo desde Ventas crea un solo contrato y su primera factura según el calendario; esa factura enlaza al contrato; cancelación/anulación mantiene consistentes cuota, factura y suscripción; y los estados de contratación, facturación, pago y acceso no se confunden.
+
+---
+
+## Adenda obligatoria — Integración SRI y backend fiscal externo
+
+**Esta adenda prevalece sobre cualquier interpretación anterior que permita tratar una venta interna como una factura fiscal.** El contrato de referencia es [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+Inventary no construye XML, no firma, no transmite directamente al SRI y no genera números fiscales. Al confirmar una venta, debe enviar al backend fiscal la información de la operación, el snapshot del receptor y el contexto fiscal de emisión. El backend externo valida, calcula/valida impuestos según el contrato acordado, genera/firma/transmite y devuelve el número real, establecimiento, punto de emisión, clave de acceso, estado de autorización y referencias de XML/RIDE disponibles.
+
+### Requisitos no negociables de Ventas
+
+- El almacén de origen del stock no es automáticamente el establecimiento fiscal emisor. Ventas debe seleccionar un contexto de facturación válido proveniente de la configuración fiscal, mostrando establecimiento y punto de emisión, sin permitir introducir secuenciales manualmente.
+- El backend actual persiste tax = 0 y total = subtotal, y la solicitud no transporta un desglose fiscal completo. La integración no puede habilitarse en producción hasta acordar una prevalidación/cotización fiscal y guardar su snapshot o implementar explícitamente el cálculo tributario autoritativo. No hardcodear tarifa ni códigos de impuesto en React.
+- Los datos fiscales del receptor (tipo/número de identificación, nombre/razón social y demás campos necesarios) deben conservarse como snapshot de la venta; editar posteriormente el contacto no reescribe una factura ya emitida.
+- El estado comercial de la venta y el estado fiscal del documento son independientes. «Venta registrada», «solicitud recibida por el facturador» y «factura autorizada por el SRI» son hechos diferentes. Solo la respuesta confirmada del backend fiscal permite mostrar «Factura autorizada».
+- La petición se identifica de forma idempotente por venta y tipo de documento. Si hay timeout se consulta la operación por su ID/clave de idempotencia antes de volver a enviar; nunca se crea otra venta para resolver un resultado fiscal ambiguo.
+- La emisión se despacha inmediatamente tras confirmar la transacción local, con Outbox durable para recuperación. Un Outbox no justifica dejar solicitudes fiscales acumuladas sin atender. Los errores o demoras generan una tarea visible y prioritaria y requieren el procedimiento de contingencia aprobado por el responsable tributario.
+- La UI debe distinguir emisión pendiente, autorizada, rechazada, error recuperable, anulación pendiente, anulada, nota de crédito pendiente/autorizada y revisión manual, manteniendo los códigos reales que provea el backend.
+
+### Cancelación y devolución: no son sinónimos
+
+La cancelación interna actual tiene solicitud, aprobación y reposición de stock, pero aún no tiene vínculo con el estado fiscal. Antes de completar una cancelación de una venta facturada, el flujo debe coordinar la solicitud fiscal correspondiente y evitar que Inventary afirme que la factura está anulada antes de recibir esa respuesta. El orden entre aprobación fiscal y movimiento compensatorio debe implementarse con estados durables e idempotencia, sin mantener una transacción de base de datos abierta durante una llamada HTTP.
+
+Una devolución de una operación válida que sí ocurrió no debe enviar automáticamente una orden de anulación de la factura. Debe enviar los hechos de la devolución al backend fiscal y solicitar el procedimiento aplicable —normalmente una nota de crédito cuando legalmente corresponda—, vinculada al comprobante original. La devolución de mercadería, la nota de crédito y el reembolso de dinero tienen estados separados.
+
+La Resolución NAC-DGERCGC25-00000017 reformó el plazo del artículo 3 de la resolución original: desde el 1 de enero de 2026, el texto cambia del día 10 al **día 7 del mes siguiente**, con las condiciones sobre día no laborable establecidas en la norma. También reformó el artículo 5; no se debe conservar por inercia el límite de 12 meses de la redacción inicial sin revisar la normativa consolidada vigente. Las facturas transmitidas con la leyenda «consumidor final» tienen restricciones específicas de anulación/modificación; no automatizar una excepción comercial.
+
+### Criterios de aceptación adicionales
+
+1. Una venta produce como máximo una factura principal para una misma clave de operación.
+2. Los números de comprobante nunca son generados por Inventary; se persisten exactamente como los devuelve el backend fiscal.
+3. La pantalla no confunde factura autorizada con pago recibido.
+4. Una devolución genera una solicitud fiscal referenciada a la factura original y sus líneas; no duplica movimientos ni documento con reintentos.
+5. Las pruebas cubren errores de validación fiscal, RUC/establecimiento no elegible, timeout, callback duplicado, factura ya autorizada, consumidor final, cancelación pendiente, nota de crédito y conciliación tras reinicio.
+6. La interfaz muestra al usuario si la operación comercial está registrada pero la situación fiscal requiere atención.
+
+Consulta el contrato canónico para endpoints propuestos, payloads, estados, auditoría, outbox y escenarios completos.
