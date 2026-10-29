@@ -1825,3 +1825,13 @@ Una venta o cuota no puede ser anunciada como fiscalmente autorizada hasta que I
 La Resolución NAC-DGERCGC25-00000017 sustituyó el plazo del artículo 3 por el día 7 del mes siguiente, con vigencia desde el 1 de enero de 2026, y reformó el artículo 5 de la resolución inicial. El backend fiscal, no un workflow estático, mantiene la normativa consolidada y el tratamiento de consumidor final/otras excepciones.
 
 Pruebas n8n: evento duplicado no duplica notificación ni documento; evento fuera de orden consulta estado actual; timeout fiscal no crea factura nueva; ningún mensaje dice “autorizada” sin estado confirmado; la devolución notifica el estado de nota de crédito separado del estado de stock y del reembolso.
+
+---
+
+## Addendum fiscal adicional — Registro del proveedor del sistema de facturación
+
+Contrato de referencia: [PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md](PROPUESTA_INTEGRACION_FACTURACION_ELECTRONICA_SRI_V1.md).
+
+La Resolución SRI NAC-DGERCGC26-00000027, publicada en el Quinto Suplemento del Registro Oficial No. 335 el 28 de julio de 2026, regula el registro de ciertas categorías de proveedores de sistemas/servicios de facturación electrónica. Su artículo 5 requiere, cuando el proveedor esté comprendido en el ámbito, incluir su RUC en la sección de información adicional de los comprobantes conforme a la ficha técnica; la transitoria tercera indica 60 días calendario desde publicación.
+
+n8n no debe construir el XML ni añadir este dato manualmente. El backend fiscal debe validar la aplicabilidad, mantener la identidad fiscal del proveedor tecnológico y escribir el dato en el XML/RIDE a través del procedimiento correcto. La integración de Inventary debe poder comprobar en configuración/health check que el proveedor está configurado antes de emitir. No confundir proveedor tecnológico con contribuyente emisor o receptor. No asumir que el servicio externo está exento ni que necesariamente pertenece al artículo 2: confirmarlo con el proveedor/responsable tributario. Fuente: [SRI, aviso oficial](https://www.sri.gob.ec/detalle-noticias?idnoticia=1318&marquesina=1).
