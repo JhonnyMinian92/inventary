@@ -4,7 +4,7 @@
 **Rama de ejecución:** implementacion_propuestas  
 **Corte de análisis:** 31 de octubre de 2026  
 **Alcance:** frontend, backend, datos, seguridad, integraciones, operación y experiencia comercial.  
-**Estado:** Fase 1 completada; Fase 3 implementada y validada por CI en `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`; pendientes la verificación visual E2E de navegador de la Fase 3 y las fases 2 y 4–10.
+**Estado:** Fase 1 completada; Fase 3 implementada y validada por CI en `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`; pendientes la verificación visual E2E de navegador de la Fase 3 y las fases 2 y 4–10.
 
 ## 1. Resultado de la consolidación
 
@@ -148,10 +148,11 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 **Criterios de salida:** cada ruta existente sigue funcionando; App.jsx no orquesta operaciones; ninguna tabla descarga el historial completo; filtros/página viven en URL; cada vista tiene estado independiente; test, build, responsive, accesibilidad y base /inventary/ validados.
 
 **Implementación y evidencia (2026-10-31):**
-- Reorganización registrada en `implementacion_propuestas`; commit de arquitectura `0148e061b848418e9c633a6742f78a3000f3a762` y optimización de carga por ruta `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`.
-- GitHub Actions [Frontend Build #41209006673](https://github.com/JhonnyMinian92/inventary/actions/runs/41209006673): **success** sobre el SHA final exacto.
+- Reorganización registrada en `implementacion_propuestas`; commits de arquitectura `0148e061b848418e9c633a6742f78a3000f3a762`, carga por ruta `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667` y separación de estilos `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`.
+- GitHub Actions [Frontend Build #41209564984](https://github.com/JhonnyMinian92/inventary/actions/runs/41209564984): **success** sobre el SHA final exacto `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`.
 - `npm test`: 22 pruebas aprobadas, 0 fallidas. `npm run build`: correcto.
-- La división por demanda redujo el chunk inicial de JavaScript de 586.47 kB (155.64 kB gzip antes de la división) a 309.24 kB (95.82 kB gzip); los módulos de página y formularios se generan como chunks separados.
+- Carga por demanda redujo el chunk inicial de JavaScript de 586.47 kB (155.64 kB gzip antes de la división) a 309.23 kB (95.84 kB gzip). Las páginas y formularios se generan como chunks separados.
+- La extracción de estilos redujo `src/styles.css` de 49.8 KB a 23.1 KB y separó CSS de catálogo, operaciones, devoluciones, reportes, detalles transaccionales, workflows y accesibilidad en módulos asociados a sus features/shared UI.
 - Revisión estática confirmó base Vite `/inventary/`, fallback SPA de Nginx, breakpoints responsive, `:focus-visible` y `prefers-reduced-motion`. No se ejecutó una prueba visual automatizada en navegador a 360/768/escritorio; esa comprobación queda explícitamente pendiente y no se declara como validada.
 
 
@@ -378,6 +379,6 @@ Una fase no se cierra por “compilar” solamente. Debe:
 - Fase 1: completada y validada por CI.
 - Fase 3: reorganización de código, pruebas unitarias y build completados; queda pendiente la verificación visual E2E en navegador indicada en su evidencia.
 - Fases pendientes de implementación: **2 y 4–10** (8 fases).
-- Rama actual de trabajo: `implementacion_propuestas`; último SHA validado por CI: `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`.
+- Rama actual de trabajo: `implementacion_propuestas`; último SHA validado por CI: `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`.
 - `master` no fue modificada.
 - Este plan es la fuente viva de secuencia; la matriz de cobertura complementaria detalla cada uno de los 22 documentos y su asignación por fase.
