@@ -27,4 +27,14 @@ public interface WhatsAppOrderRepository extends JpaRepository<WhatsAppOrder,UUI
   """)
  org.springframework.data.domain.Page<WhatsAppOrder> search(@Param("status") WhatsAppOrderStatus status,@Param("customerRef") String customerRef,
   @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,org.springframework.data.domain.Pageable pageable);
+
+ @EntityGraph(attributePaths={"cart","quote","warehouse","sale"})
+ @Query("""
+  select o from WhatsAppOrder o where (:status is null or o.status=:status)
+   and (:customerRef is null or o.customerRef=:customerRef)
+   and o.createdAt>=:fromTime and o.createdAt<:toTime and o.warehouse.id in :warehouseIds
+  """)
+ org.springframework.data.domain.Page<WhatsAppOrder> searchScoped(@Param("status") WhatsAppOrderStatus status,@Param("customerRef") String customerRef,
+  @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,
+  org.springframework.data.domain.Pageable pageable);
 }
