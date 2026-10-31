@@ -1,5 +1,6 @@
 import { CheckCircle2, Eye, Send, XCircle, PackageCheck } from 'lucide-react';
 import { statusLabel, statusTone } from '../../utils/format.js';
+import ServerPagination from '../../ui/ServerPagination.jsx';
 
 function idOf(item) { return item?.id ?? item?.purchaseOrderId ?? ''; }
 function date(value) {
@@ -8,7 +9,7 @@ function date(value) {
   return Number.isNaN(parsed.valueOf()) ? String(value) : parsed.toLocaleDateString('es-EC');
 }
 
-export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, onCancel, onReceive, loading = false }) {
+export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, onCancel, onReceive, loading = false, pagination, page = 0, onPageChange }) {
   return <div className="table-wrap">
     <table aria-label="Órdenes de compra">
       <caption className="visually-hidden">Órdenes de compra y sus estados de aprobación y recepción</caption>
@@ -38,6 +39,7 @@ export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, 
         </tr>;
       })}</tbody>
     </table>
-    {!rows.length && <div className="empty-state" role="status">Todavía no hay órdenes de compra.</div>}
+    {!rows.length && <div className="empty-state" role="status">Todavía no hay órdenes de compra en esta página.</div>}
+    <ServerPagination info={pagination} page={page} loading={loading} onChange={onPageChange} />
   </div>;
 }
