@@ -97,7 +97,7 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Backend CI: https://github.com/JhonnyMinian92/inventary/actions/runs/41165468427 — success; Maven verify/PostgreSQL 16, Compose normal y Kafka, smoke test de base vacía y limpieza.
 - El backend probó el código fuente de Fase 1 en SHA 51b3ce2b719d3c35643136a2ee893048a0c6b581; el frontend probó el código de interfaz de la fase en SHA 8a9d9e3137f0af61cd14dca0e8ae0c2556f4cfa6. Los commits posteriores indicados en este plan son documentación; no se atribuye una prueba de código distinta a esos resultados.
 
-<badge>Fase 1 completada</badge>
+**Estado: FASE 1 COMPLETADA**
 
 ### Fase 2 — Seguridad, ámbitos, integridad transaccional y trazabilidad base
 
