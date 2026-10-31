@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
-import { api, listFrom, listAllPages } from '../../api';
+import { api, listFrom } from '../../api';
+import ServerPagination from '../../ui/ServerPagination.jsx';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import UnitConversions from './UnitConversions.jsx';
 
@@ -84,7 +85,11 @@ function freshData(kind, item = null) {
 export default function OperationsCatalogs({ onChanged }) {
   const [kind, setKind] = useState('warehouses');
   const [records, setRecords] = useState({ warehouses: [], suppliers: [], customers: [], units: [] });
+  const [recordCounts, setRecordCounts] = useState({ warehouses: 0, suppliers: 0, customers: 0, units: 0 });
+  const [page, setPage] = useState(0);
+  const [pageInfo, setPageInfo] = useState(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -104,28 +109,48 @@ export default function OperationsCatalogs({ onChanged }) {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => { setPage(0); }, [kind, debouncedSearch]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
-    const [warehouses, suppliers, customers, units] = await Promise.allSettled([
-      listAllPages(api.warehouses, { size: 100 }), listAllPages(api.suppliers, { size: 100 }), listAllPages(api.customers, { size: 100 }), api.units()
-    ]);
-    const result = { warehouses: [], suppliers: [], customers: [], units: [] };
-    const failures = [];
-    for (const [key, response] of [['warehouses', warehouses], ['suppliers', suppliers], ['customers', customers], ['units', units]]) {
-      if (response.status === 'fulfilled') result[key] = listFrom(response.value);
-      else failures.push(configs[key].label.toLowerCase() + ': ' + (response.reason?.message || 'error'));
+    try {
+      const config = configs[kind];
+      const params = kind === 'units' ? undefined : {
+        page, size: 20,
+        ...(kind === 'suppliers' || kind === 'customers') && debouncedSearch ? { q: debouncedSearch } : {}
+      };
+      const payload = kind === 'units' ? await api.units() : await config.list(params);
+      const rows = listFrom(payload);
+      setRecords(current => ({ ...current, [kind]: rows }));
+      if (kind === 'units') {
+        setPageInfo(null);
+        setRecordCounts(current => ({ ...current, units: rows.length }));
+      } else {
+        const info = {
+          page: Number(payload?.number ?? 0), size: Number(payload?.size ?? 20),
+          totalElements: Number(payload?.totalElements ?? rows.length), totalPages: Number(payload?.totalPages ?? 1)
+        };
+        setPageInfo(info);
+        setRecordCounts(current => ({ ...current, [kind]: info.totalElements }));
+      }
+    } catch (err) {
+      setError(err?.status === 403 ? 'No tienes permiso para consultar este catálogo.' : (err?.message || 'No se pudo cargar el catálogo.'));
+    } finally {
+      setLoading(false);
     }
-    setRecords(current => Object.fromEntries(Object.keys(result).map(key => [key, failures.some(failure => failure.startsWith(configs[key].label.toLowerCase() + ':')) ? current[key] : result[key]])));
-    if (failures.length) setError('Algunos catálogos no se pudieron cargar. ' + failures.join(' · '));
-    setLoading(false);
-  }, []);
+  }, [kind, page, debouncedSearch]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    if (!query) return records[kind];
+    if (!query || kind === 'suppliers' || kind === 'customers') return records[kind];
     return records[kind].filter(item => configs[kind].fields.some(field => String(item?.[field.key] || '').toLocaleLowerCase().includes(query)));
   }, [records, kind, search]);
 
@@ -224,11 +249,11 @@ export default function OperationsCatalogs({ onChanged }) {
       <button className="button primary" onClick={() => open()}>+ Nuevo {config.singular}</button>
     </div>
     <div className="catalog-tabs" role="tablist" aria-label="Catálogos auxiliares">
-      {Object.entries(configs).map(([key, entry]) => <button key={key} role="tab" aria-selected={kind === key} className={kind === key ? 'catalog-tab active' : 'catalog-tab'} onClick={() => { setKind(key); setSearch(''); setError(''); setNotice(''); }}>{entry.label}<span>{records[key].length}</span></button>)}
+      {Object.entries(configs).map(([key, entry]) => <button key={key} role="tab" aria-selected={kind === key} className={kind === key ? 'catalog-tab active' : 'catalog-tab'} onClick={() => { setKind(key); setSearch(''); setError(''); setNotice(''); }}>{entry.label}<span>{recordCounts[key]}</span></button>)}
     </div>
     <div className="toolbar">
       <div className="search-box"><input aria-label={'Buscar en ' + config.label.toLowerCase()} value={search} onChange={event => setSearch(event.target.value)} placeholder={'Buscar ' + config.label.toLowerCase() + '…'} /></div>
-      <span className="muted">{loading ? 'Actualizando…' : visible.length + ' registros'}</span>
+      <span className="muted">{loading ? 'Actualizando…' : (pageInfo?.totalElements ?? visible.length) + ' registros'}</span>
     </div>
     <div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field.key}>{field.label}</th>)}<th>Estado</th><th>Acciones</th></tr></thead><tbody>
       {visible.map((item, index) => <tr key={idOf(item) || index}>
@@ -236,7 +261,8 @@ export default function OperationsCatalogs({ onChanged }) {
         <td><span className={'pill ' + (inactive(item) ? 'inactive' : 'active')}>{inactive(item) ? 'Inactivo' : 'Activo'}</span></td>
         <td><div className="row-actions"><button className="small-action" disabled={loading} onClick={() => open(item)}>Editar</button>{config.activate && config.deactivate && <button className="small-action" disabled={loading} onClick={() => toggle(item)}>{inactive(item) ? 'Activar' : 'Desactivar'}</button>}{inactive(item) && config.delete && <button type="button" className="small-action danger" disabled={loading} onClick={() => remove(item)}>Eliminar</button>}</div></td>
       </tr>)}
-    </tbody></table>{!visible.length && <div className="empty-state">{loading ? 'Cargando registros…' : 'No hay registros que coincidan con la búsqueda.'}</div>}</div>
+    </tbody></table>{!visible.length && <div className="empty-state">{loading ? 'Cargando registros…' : error ? 'No se pudieron cargar los registros.' : 'No hay registros que coincidan con la búsqueda.'}</div>}</div>
+    {pageInfo && <ServerPagination info={pageInfo} page={page} loading={loading} onChange={setPage} />}
     {kind === 'units' && <UnitConversions units={records.units} />}
 
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
