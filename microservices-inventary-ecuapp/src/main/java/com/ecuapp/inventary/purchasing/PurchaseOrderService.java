@@ -2,6 +2,7 @@ package com.ecuapp.inventary.purchasing;
 
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
 import com.ecuapp.inventary.partners.*;
@@ -34,23 +35,37 @@ public class PurchaseOrderService {
  private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;private final GoodsReceiptLineRepository receiptLines;private final IdempotencyRecordRepository idempotencyRecords;private final BusinessPartnerRepository partners;
  private final WarehouseRepository warehouses;private final ProductRepository products;private final StockBalanceLocks balanceLocks;private final UnitOfMeasureRepository units;
  private final StockMovementRepository movements;private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final InventoryCostingService costing;
- private final boolean requireDistinctApprover;
+ private final boolean requireDistinctApprover;private final WarehouseScopeService scopes;
  public PurchaseOrderService(PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,IdempotencyRecordRepository idempotencyRecords,BusinessPartnerRepository partners,WarehouseRepository warehouses,
    ProductRepository products,StockBalanceLocks balanceLocks,UnitOfMeasureRepository units,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,InventoryCostingService costing,
-   @Value("${app.purchasing.require-distinct-approver:true}") boolean requireDistinctApprover){
+   @Value("${app.purchasing.require-distinct-approver:true}") boolean requireDistinctApprover,WarehouseScopeService scopes){
   this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balanceLocks=balanceLocks;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.costing=costing;
-  this.requireDistinctApprover=requireDistinctApprover;
+  this.requireDistinctApprover=requireDistinctApprover;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(PurchaseOrderStatus status,UUID supplierId,UUID warehouseId,Instant from,Instant to,Pageable p){
+ @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(PurchaseOrderStatus status,UUID supplierId,UUID warehouseId,Instant from,Instant to,Pageable p,String actor){
   validateRange(from,to);
-  return orders.search(status,supplierId,warehouseId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,ORDER_SORT,Sort.by(Sort.Direction.DESC,"orderedAt"))).map(PurchaseDtos.OrderView::from);
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,ORDER_SORT,Sort.by(Sort.Direction.DESC,"orderedAt"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  return (allowed==null?orders.search(status,supplierId,warehouseId,lower,upper,pageable):
+   orders.searchScoped(status,supplierId,warehouseId,lower,upper,allowed,pageable)).map(PurchaseDtos.OrderView::from);
  }
- @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id){return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id)));}
- @Transactional(readOnly=true) public Page<PurchaseDtos.ReceiptView> listReceipts(UUID purchaseOrderId,UUID warehouseId,Instant from,Instant to,Pageable p){
+ @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id,String actor){
+  PurchaseOrder order=orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id));
+  scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());return PurchaseDtos.OrderView.from(order);
+ }
+ @Transactional(readOnly=true) public Page<PurchaseDtos.ReceiptView> listReceipts(UUID purchaseOrderId,UUID warehouseId,Instant from,Instant to,Pageable p,String actor){
   validateRange(from,to);
-  return receipts.search(purchaseOrderId,warehouseId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,RECEIPT_SORT,Sort.by(Sort.Direction.DESC,"receivedAt"))).map(PurchaseDtos.ReceiptView::from);
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,RECEIPT_SORT,Sort.by(Sort.Direction.DESC,"receivedAt"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  return (allowed==null?receipts.search(purchaseOrderId,warehouseId,lower,upper,pageable):
+   receipts.searchScoped(purchaseOrderId,warehouseId,lower,upper,allowed,pageable)).map(PurchaseDtos.ReceiptView::from);
  }
  @Transactional public PurchaseDtos.OrderView create(String key,PurchaseDtos.CreateOrderRequest r,String actor){
+  scopes.requireWarehouseAccess(actor,r.warehouseId());
   key=normalizeKey(key);
   String requestHash=hashOrderRequest(r);
   idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"PURCHASE_ORDER_CREATE",key,requestHash);
@@ -84,22 +99,27 @@ public class PurchaseOrderService {
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
  @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){
-  PurchaseOrder order=requireForUpdate(id);
+  PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
   if(order.submit(actor))audit.record(actor,"PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
   return detailed(id);
  }
  @Transactional public PurchaseDtos.OrderView approve(UUID id,String actor){
-  PurchaseOrder order=requireForUpdate(id);
+  PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
   if(order.approve(actor,requireDistinctApprover))audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
   return detailed(id);
  }
  @Transactional public PurchaseDtos.OrderView cancel(UUID id,String actor){
-  PurchaseOrder order=requireForUpdate(id);
+  PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
   if(order.cancel(actor))audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
   return detailed(id);
  }
- @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id){return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id)));}
+ @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id,String actor){
+  GoodsReceipt receipt=receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id));
+  scopes.requireWarehouseAccess(actor,receipt.getWarehouse().getId());return PurchaseDtos.ReceiptView.from(receipt);
+ }
  @Transactional public PurchaseDtos.ReceiptView receive(UUID orderId,String rawKey,PurchaseDtos.ReceiptRequest request,String actor){
+  PurchaseOrder visibleOrder=orders.findById(orderId).orElseThrow(()->new ResourceNotFoundException("Orden de compra",orderId));
+  scopes.requireWarehouseAccess(actor,visibleOrder.getWarehouse().getId());
   String key=normalizeKey(rawKey);
   String hash=hashRequest(orderId,request);
   Optional<GoodsReceipt> previous=receipts.findByIdempotencyKey(key);
@@ -117,6 +137,7 @@ public class PurchaseOrderService {
    return PurchaseDtos.ReceiptView.from(receipts.findDetailedById(idempotency.getResourceId()).orElseThrow(()->new ResourceNotFoundException("Recepción",idempotency.getResourceId())));
   if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   PurchaseOrder order=orders.findForUpdate(orderId).orElseThrow(()->new ResourceNotFoundException("Orden de compra",orderId));
+  scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
   if(order.getStatus()!=PurchaseOrderStatus.APPROVED&&order.getStatus()!=PurchaseOrderStatus.PARTIALLY_RECEIVED)throw new BusinessRuleException("Solo se reciben órdenes aprobadas o parcialmente recibidas.");
   if(!order.getWarehouse().isActive())throw new BusinessRuleException("El almacén de destino está inactivo.");
   Map<UUID,PurchaseOrderLine> lineById=order.getLines().stream().collect(Collectors.toMap(PurchaseOrderLine::getId,Function.identity()));
