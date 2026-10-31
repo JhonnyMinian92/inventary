@@ -137,12 +137,14 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
 
     setData(current => {
       const next = { ...EMPTY, ...current, ...updates };
+      const count = (key, previous) => nextErrors[key] ? null : (Object.hasOwn(updates, key) ? totalOf(updates[key]) : previous);
+      const approved = count('pendingApproved', null);
+      const partial = count('pendingPartial', null);
       next.pendingCounts = {
-        submittedPurchases: updates.pendingSubmitted ? totalOf(updates.pendingSubmitted) : current.pendingCounts.submittedPurchases,
-        receivablePurchases: (updates.pendingApproved ? totalOf(updates.pendingApproved) : current.pendingCounts.receivablePurchases)
-          + (updates.pendingPartial ? totalOf(updates.pendingPartial) : current.pendingCounts.receivablePurchases),
-        drafts: updates.pendingDraft ? totalOf(updates.pendingDraft) : current.pendingCounts.drafts,
-        cancellationRequests: updates.pendingCancellation ? totalOf(updates.pendingCancellation) : current.pendingCounts.cancellationRequests
+        submittedPurchases: count('pendingSubmitted', current.pendingCounts.submittedPurchases),
+        receivablePurchases: approved === null || partial === null ? null : approved + partial,
+        drafts: count('pendingDraft', current.pendingCounts.drafts),
+        cancellationRequests: count('pendingCancellation', current.pendingCounts.cancellationRequests)
       };
       next.whatsappPending = updates.whatsappPending ? totalOf(updates.whatsappPending) : current.whatsappPending;
       next.pageInfo = {
