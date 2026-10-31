@@ -19,9 +19,9 @@ public class PurchaseReturnController {
  public Page<PurchaseReturnDtos.View> list(@RequestParam(required=false) UUID goodsReceiptId,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant from,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,
-  @PageableDefault(size=20) Pageable p){return service.list(goodsReceiptId,warehouseId,from,to,p);}
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(goodsReceiptId,warehouseId,from,to,p,auth.getName());}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
- public PurchaseReturnDtos.View get(@PathVariable UUID id){return service.get(id);}
+ public PurchaseReturnDtos.View get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('purchasing:manage')")
  public PurchaseReturnDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody PurchaseReturnDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
 }
