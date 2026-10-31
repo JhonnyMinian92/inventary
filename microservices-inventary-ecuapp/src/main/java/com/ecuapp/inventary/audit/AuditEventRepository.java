@@ -46,9 +46,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent,UUID>{
    or e.metadata ->> 'sourceWarehouseId' in (:warehouseIds)
    or e.metadata ->> 'destinationWarehouseId' in (:warehouseIds)
    or (e.resource_type='HTTP_REQUEST' and e.outcome='DENIED')
- )
- order by e.occurred_at desc
- """,nativeQuery=true)
+ )""",nativeQuery=true)
  Page<AuditEvent> searchScoped(@Param("actor") String actor,@Param("action") String action,
   @Param("resourceType") String resourceType,@Param("outcome") String outcome,@Param("fromTime") Instant fromTime,
   @Param("toTime") Instant toTime,@Param("warehouseIds") java.util.Collection<String> warehouseIds,Pageable pageable);
