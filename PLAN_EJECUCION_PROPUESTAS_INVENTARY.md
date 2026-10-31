@@ -128,6 +128,26 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Duplicación Outbox/Inbox, webhook repetido, timeout ambiguo, rollback integral y fallo al guardar auditoría.
 - Pruebas SQL de append-only/constraints con la cuenta real de ejecución.
 
+**Avance de implementación y validación (2026-10-31; cierre todavía parcial):**
+
+- La autorización de acciones del frontend ahora falla de forma cerrada: si el perfil/permisos aún no se cargaron o la colección de permisos es inválida, no concede permisos explícitos. Se añadieron cuatro pruebas unitarias específicas.
+- El filtro de auditoría HTTP registra lecturas GET exitosas de rutas sensibles (incluidas administración, auditoría, reportes, costes, socios, operaciones e inventario) sin copiar cuerpos, parámetros, cookies, credenciales ni respuestas; la metadata queda limitada a método, ruta y status.
+- Los ajustes manuales y los conteos físicos publican eventos Outbox transaccionales. Los conteos emiten creación, contabilización y cancelación; los ajustes emiten INVENTORY_ADJUSTMENT_POSTED. Las pruebas comprueban que la repetición idempotente no duplica eventos.
+- Las órdenes de compra ahora emiten PURCHASE_ORDER_CREATED, PURCHASE_ORDER_SUBMITTED, PURCHASE_ORDER_APPROVED y PURCHASE_ORDER_CANCELLED, solo cuando la transición cambia realmente el estado. Las pruebas API verifican un evento por transición incluso al repetir el comando.
+- Los conteos físicos aplican maker-checker: quien captura no puede contabilizar su propio conteo. La identidad de quien contabiliza se guarda en posted_by y se devuelve en el DTO, auditoría y Outbox. La migración V20 etiqueta los conteos históricos ya contabilizados como LEGACY_UNATTRIBUTED, sin atribuirles un operador ficticio.
+- La política de ámbitos temporales de almacén, RBAC, lectura financiera separada, aprobación de órdenes de compra, cancelación de ventas por solicitante/aprobador distintos, auditoría append-only, Outbox/Inbox y las pruebas de PostgreSQL existentes se conservan y se ejercitan en la suite.
+
+**Pendiente para cerrar formalmente la Fase 2:**
+
+- Extender el ámbito más allá de almacenes a entidad legal/RUC, establecimiento y recurso, con filtros de lista, detalle, exportaciones y agregados; hoy el control persistido es principalmente por almacén.
+- Separar permisos de PII y datos fiscales de los permisos operativos/financieros y aplicar la redacción de esos campos en todos los DTOs y exportaciones.
+- Completar maker-checker para ajustes manuales, devoluciones de ventas, devoluciones a proveedores y reembolsos; actualmente existen controles por rol/ámbito e idempotencia, pero esos flujos no tienen aprobación independiente completa.
+- Completar y versionar el envelope Outbox con versión de esquema, versión de agregado, correlación y causalidad persistidas; revisar todos los eventos de dominio y su redrive.
+- Cerrar identidad/deduplicación de webhooks por canal y aportar evidencia de backup/PITR, restore, RPO/RTO y redrive posterior a recuperación.
+- Completar la matriz de pruebas HTTP por rol y ámbito, manipulación de IDs, concurrencia y aislamiento de datos para todas las operaciones incluidas en la fase.
+
+**Estado: EN PROGRESO — los trabajos anteriores están implementados, pero la fase no se declara cerrada mientras sigan pendientes estos controles.**
+
 ### Fase 3 — Arquitectura y separación del frontend React
 
 **Objetivo:** migrar por etapas a la jerarquía propuesta manteniendo rutas, comportamiento, contrato HTTP y stack.
@@ -153,7 +173,13 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - `npm test`: 22 pruebas aprobadas, 0 fallidas. `npm run build`: correcto.
 - Carga por demanda redujo el chunk inicial de JavaScript de 586.47 kB (155.64 kB gzip antes de la división) a 309.23 kB (95.84 kB gzip). Las páginas y formularios se generan como chunks separados.
 - La extracción de estilos redujo `src/styles.css` de 49.8 KB a 23.1 KB y separó CSS de catálogo, operaciones, devoluciones, reportes, detalles transaccionales, workflows y accesibilidad en módulos asociados a sus features/shared UI.
-- Revisión estática confirmó base Vite `/inventary/`, fallback SPA de Nginx, breakpoints responsive, `:focus-visible` y `prefers-reduced-motion`. No se ejecutó una prueba visual automatizada en navegador a 360/768/escritorio; esa comprobación queda explícitamente pendiente y no se declara como validada.
+- Revisión estática confirmó base Vite /inventary/, fallback SPA de Nginx, breakpoints responsive, :focus-visible y prefers-reduced-motion.
+- GitHub Actions [Frontend Build #41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556): **success** sobre SHA a566795289fa4caef45dfe81c24b81fa922dc33c; npm test aprobó **26/26**, npm run build y el preview de producción finalizaron correctamente.
+- El smoke E2E ejecutó Chromium en 360, 768 y 1280 px. Verificó que el documento y el body no desbordan horizontalmente, que se renderiza el encabezado de login y que los dos campos tienen etiquetas asociadas. El panel complementario se oculta en 360/768 y aparece en 1280. Las tres capturas se guardaron como artefacto del workflow.
+- El test E2E cubre la pantalla de login y su comportamiento responsive; no equivale a una aceptación browser exhaustiva de todos los recorridos autenticados y de negocio. Esos recorridos deben probarse con las cuentas y datos de cada rol antes de declarar aceptación funcional completa.
+- La autorización visual se ajustó a fail-closed y se cubrió con pruebas unitarias; frontend y backend mantienen la separación de contratos y la estructura por features.
+
+**Estado: IMPLEMENTACIÓN ESTRUCTURAL COMPLETADA; E2E responsive de login validado. La aceptación browser integral de todos los flujos/roles sigue siendo una tarea de cierre, no se declara cubierta por el smoke de login.**
 
 
 ### Fase 4 — Arquitectura modular del backend Spring Boot
@@ -377,8 +403,9 @@ Una fase no se cierra por “compilar” solamente. Debe:
 
 - Fases totales: **10**.
 - Fase 1: completada y validada por CI.
-- Fase 3: reorganización de código, pruebas unitarias y build completados; queda pendiente la verificación visual E2E en navegador indicada en su evidencia.
-- Fases pendientes de implementación: **2 y 4–10** (8 fases).
-- Rama actual de trabajo: `implementacion_propuestas`; último SHA validado por CI: `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`.
-- `master` no fue modificada.
+- Fase 2: **implementación parcial**; se añadieron auditoría de lecturas sensibles, eventos Outbox para ajustes/conteos/órdenes de compra y maker-checker en conteos físicos. No se declara cerrada por las brechas enumeradas en su sección.
+- Fase 3: **implementación estructural completada y smoke E2E responsive del login validado**; la aceptación browser de todos los flujos autenticados queda pendiente.
+- Fases pendientes de implementación/cierre: **Fase 2 (cierre), 4–10**.
+- Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend: [run 41213937126](https://github.com/JhonnyMinian92/inventary/actions/runs/41213937126), success para el estado previo a V20. La validación completa del código actual (incluida V20 y ciclo Outbox de compras) se referencia al run [41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258) una vez finalice.
+- Rama actual de trabajo: implementacion_propuestas; master no fue modificada.
 - Este plan es la fuente viva de secuencia; la matriz de cobertura complementaria detalla cada uno de los 22 documentos y su asignación por fase.
