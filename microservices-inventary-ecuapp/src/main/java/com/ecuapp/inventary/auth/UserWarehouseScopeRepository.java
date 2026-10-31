@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.auth;
 
 import org.springframework.data.jpa.repository.*;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +25,9 @@ public interface UserWarehouseScopeRepository extends JpaRepository<UserWarehous
     boolean existsByUserIdAndWarehouseIdAndActiveTrue(UUID userId,UUID warehouseId);
     @EntityGraph(attributePaths={"warehouse"}) List<UserWarehouseScope> findByUserIdOrderByCreatedAtDesc(UUID userId);
     Optional<UserWarehouseScope> findByIdAndUserId(UUID id,UUID userId);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from UserWarehouseScope s where s.id=:id and s.user.id=:userId")
+    Optional<UserWarehouseScope> findForUpdateByIdAndUserId(@Param("id") UUID id,@Param("userId") UUID userId);
     @EntityGraph(attributePaths={"warehouse"})
     @Query("""
         select s from UserWarehouseScope s where s.user.id=:userId and s.warehouse.id=:warehouseId
