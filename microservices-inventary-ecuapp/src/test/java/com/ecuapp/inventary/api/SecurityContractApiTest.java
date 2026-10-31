@@ -205,7 +205,7 @@ class SecurityContractApiTest extends ApiTestSupport {
         assertEquals(1, events, "successful sensitive reads must be correlated to the authenticated actor");
 
         Integer metadataFields = jdbc.queryForObject("""
-            select jsonb_object_length(metadata) from audit_event
+            select count(*) from jsonb_object_keys(metadata)
             where action='SENSITIVE_DATA_READ' and correlation_id=?
             """, Integer.class, requestId);
         assertEquals(3, metadataFields, "audit metadata must contain only method, path and status; never response or request data");

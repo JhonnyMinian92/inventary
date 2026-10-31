@@ -95,14 +95,17 @@ class WarehouseScopesApiTest extends ApiTestSupport {
 
         JsonNode page=httpGet(auditor,"/api/v1/inventory/movements?warehouseId="+warehouse.get("id").asText(),200);
         assertEquals(1,page.path("content").size());
-        assertTrue(page.path("content").get(0).path("unitCost").isNull());
+        assertTrue(isNullOrMissing(page.path("content").get(0).path("unitCost")));
 
         JsonNode detail=httpGet(auditor,"/api/v1/inventory/movements/"+movement.get("id").asText(),200);
-        assertTrue(detail.path("movement").path("unitCost").isNull());
-        assertTrue(detail.path("valuedTotalCost").isNull());
+        assertTrue(isNullOrMissing(detail.path("movement").path("unitCost")));
+        assertTrue(isNullOrMissing(detail.path("valuedTotalCost")));
         assertEquals(0,detail.path("valuation").size());
 
         JsonNode financial=httpGet(admin(),"/api/v1/inventory/movements/"+movement.get("id").asText(),200);
         assertFalse(financial.path("movement").path("unitCost").isNull());
+    }
+    private static boolean isNullOrMissing(JsonNode value) {
+        return value == null || value.isMissingNode() || value.isNull();
     }
 }

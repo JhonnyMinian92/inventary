@@ -23,6 +23,8 @@ class AuditAndOutboxApiTest extends ApiTestSupport {
         String warehouseCode = "AUD" + suffix();
         JsonNode warehouse = httpPost(admin(), "/api/v1/warehouses", Map.of("code", warehouseCode, "name", "Auditado"), 201);
         String auditor = token("AUDITOR");
+        // The auditor is warehouse-scoped; explicitly grant access to the warehouse created in this test.
+        ensureWarehouseScope("AUDITOR", warehouse.get("id").asText());
         JsonNode events = httpGet(auditor, "/api/v1/audit-events?action=WAREHOUSE_CREATED&resourceType=WAREHOUSE&actor=" + username("SUPER_ADMIN")
             + "&outcome=SUCCESS&from=" + Instant.now().minusSeconds(600) + "&size=100", 200);
         JsonNode match = null;
