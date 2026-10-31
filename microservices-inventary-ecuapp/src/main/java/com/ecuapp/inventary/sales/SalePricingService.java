@@ -48,7 +48,9 @@ public class SalePricingService {
             Product product = products.findById(item.productId()).orElseThrow(() -> new ResourceNotFoundException("Producto", item.productId()));
             WarehouseLocation location = balances.findByProductIdAndWarehouseId(product.getId(), request.warehouseId())
                 .map(StockBalance::getLocation).orElse(null);
-            LinePrice price = price(product, location, item.quantity().setScale(3, RoundingMode.HALF_UP));
+            LinePrice price = product.getKind() == com.ecuapp.inventary.catalog.ProductKind.STOCKED_GOOD
+                ? price(product, location, item.quantity().setScale(3, RoundingMode.HALF_UP))
+                : new LinePrice(BigDecimal.ZERO.setScale(2), product.getSalePrice().setScale(2, RoundingMode.HALF_UP), product.getMarginPercent());
             return new SaleDtos.PriceView(product.getId(), item.quantity(), price.minimumPrice(), price.suggestedPrice(), price.marginPercent(), product.getCurrency());
         }).toList();
     }
