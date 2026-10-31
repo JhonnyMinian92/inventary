@@ -96,6 +96,7 @@ public class SecurityConfig {
     .requestMatchers("/api/v1/costing/**").hasAuthority("costing:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/catalog/**").hasAuthority("catalog:read")
     .requestMatchers("/api/v1/catalog/**").hasAuthority("catalog:manage")
+    .requestMatchers(HttpMethod.GET,"/api/v1/inventory/movements","/api/v1/inventory/movements/**","/api/v1/inventory/transfers","/api/v1/inventory/transfers/**").hasAnyAuthority("inventory:read","inventory:manage","audit:read")
     .requestMatchers(HttpMethod.GET,"/api/v1/inventory/**","/api/v1/warehouses/**").hasAuthority("inventory:read")
     .requestMatchers("/api/v1/inventory/**","/api/v1/warehouses/**").hasAuthority("inventory:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/purchase-orders/**","/api/v1/goods-receipts/**","/api/v1/purchase-returns/**").hasAuthority("purchasing:read")
