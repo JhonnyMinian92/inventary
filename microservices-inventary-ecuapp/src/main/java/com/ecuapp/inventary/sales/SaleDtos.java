@@ -16,7 +16,7 @@ public final class SaleDtos {
  }
  public record PricingLine(@NotNull UUID productId,@NotNull @DecimalMin(value="0.001") @Digits(integer=11,fraction=3) BigDecimal quantity){}
  public record PricingRequest(@NotNull UUID warehouseId,@NotEmpty @Size(max=100) List<@Valid PricingLine> items){}
- /** minimumPrice is the cost of the units that would be sold; suggestedPrice adds the product markup. */
+ /** minimumPrice is the no-loss floor for stocked goods; it is zero for non-stocked goods and services. */
  public record PriceView(UUID productId,BigDecimal quantity,BigDecimal minimumPrice,BigDecimal suggestedPrice,BigDecimal marginPercent,String currency){}
  public record CreateRequest(@NotNull UUID warehouseId,@Size(max=160) String customerName,@Size(max=40) String customerPhone,
   @NotNull SaleChannel channel,@NotEmpty @Size(max=100) List<@Valid LineRequest> items,UUID customerId){
