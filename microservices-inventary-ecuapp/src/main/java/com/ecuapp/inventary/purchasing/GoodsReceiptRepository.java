@@ -23,4 +23,14 @@ public interface GoodsReceiptRepository extends JpaRepository<GoodsReceipt,UUID>
   """)
  Page<GoodsReceipt> search(@Param("purchaseOrderId") UUID purchaseOrderId,@Param("warehouseId") UUID warehouseId,
   @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,Pageable pageable);
+
+ @EntityGraph(attributePaths={"purchaseOrder","purchaseOrder.supplier","warehouse"})
+ @Query("""
+  select r from GoodsReceipt r where (:purchaseOrderId is null or r.purchaseOrder.id=:purchaseOrderId)
+   and (:warehouseId is null or r.warehouse.id=:warehouseId) and r.warehouse.id in :warehouseIds
+   and r.receivedAt>=:fromTime and r.receivedAt<:toTime
+  """)
+ Page<GoodsReceipt> searchScoped(@Param("purchaseOrderId") UUID purchaseOrderId,@Param("warehouseId") UUID warehouseId,
+  @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,
+  @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
