@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.subscriptions;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.partners.BusinessPartner;
@@ -46,7 +47,7 @@ import java.util.stream.Collectors;
 public class SubscriptionService {
     private static final String CREATE_SCOPE = "SUBSCRIPTION_CREATE";
     private static final Set<String> SORT = Set.of("createdAt", "startDate", "subscriptionNumber", "status");
-    static final String SYSTEM_ACTOR = "sistema";
+    static final String SYSTEM_ACTOR = WarehouseScopeService.SYSTEM_ACTOR_SUBSCRIPTION_BILLING;
 
     private final SubscriptionRepository subscriptions;
     private final ProductRepository products;
@@ -57,10 +58,12 @@ public class SubscriptionService {
     private final IdempotencyRecordRepository idempotencyRecords;
     private final AuditService audit;
     private final ZoneId zone;
+    private final WarehouseScopeService scopes;
 
     public SubscriptionService(SubscriptionRepository subscriptions, ProductRepository products, BusinessPartnerRepository partners,
                                WarehouseRepository warehouses, SaleService saleService, SaleRepository sales,
                                IdempotencyRecordRepository idempotencyRecords, AuditService audit,
+                               WarehouseScopeService scopes,
                                @Value("${app.reports.time-zone:America/Guayaquil}") String zone) {
         this.subscriptions = subscriptions;
         this.products = products;
@@ -70,6 +73,7 @@ public class SubscriptionService {
         this.sales = sales;
         this.idempotencyRecords = idempotencyRecords;
         this.audit = audit;
+        this.scopes = scopes;
         this.zone = ZoneId.of(zone);
     }
 
@@ -83,7 +87,8 @@ public class SubscriptionService {
             canDiscount);
     }
 
-    public SubscriptionDtos.PreviewView preview(SubscriptionDtos.PreviewRequest request) {
+    public SubscriptionDtos.PreviewView preview(SubscriptionDtos.PreviewRequest request,String actor) {
+        scopes.requireWarehouseAccess(actor,request.warehouseId());
         LocalDate start = request.startDate() == null ? today() : request.startDate();
         List<SubscriptionSchedule.Period> periods = SubscriptionSchedule.build(start, request.termMonths(), request.billingFrequency(), request.monthlyPrice());
         BigDecimal total = SubscriptionSchedule.total(periods);
@@ -94,20 +99,26 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
-    public Page<SubscriptionDtos.View> list(Subscription.Status status, UUID customerId, Pageable pageable) {
-        Page<Subscription> page = subscriptions.search(status, customerId, Pages.of(pageable, SORT, Sort.by(Sort.Direction.DESC, "createdAt")));
+    public Page<SubscriptionDtos.View> list(Subscription.Status status, UUID customerId, Pageable pageable,String actor) {
+        var allowed=scopes.accessibleWarehouseIds(actor);
+        Pageable limited=Pages.of(pageable,SORT,Sort.by(Sort.Direction.DESC,"createdAt"));
+        if(allowed!=null&&allowed.isEmpty())return Page.empty(limited);
+        Page<Subscription> page = allowed==null?subscriptions.search(status,customerId,limited):
+            subscriptions.searchScoped(status,customerId,allowed,limited);
         Map<UUID, Sale> invoices = invoicesOf(page.getContent());
         return page.map(s -> view(s, invoices, false));
     }
 
     @Transactional(readOnly = true)
-    public SubscriptionDtos.View get(UUID id) {
+    public SubscriptionDtos.View get(UUID id,String actor) {
         Subscription s = require(id);
+        scopes.requireWarehouseAccess(actor,s.getWarehouse().getId());
         return view(s, invoicesOf(List.of(s)), true);
     }
 
     @Transactional
     public SubscriptionDtos.View create(String rawKey, SubscriptionDtos.CreateRequest request, String actor, boolean canDiscount) {
+        scopes.requireWarehouseAccess(actor,request.warehouseId());
         String key = normalizeKey(rawKey);
         String hash = sha256(String.join("|", String.valueOf(request.customerId()), String.valueOf(request.productId()), String.valueOf(request.warehouseId()),
             String.valueOf(request.startDate()), String.valueOf(request.billingFrequency()), String.valueOf(request.termMonths()),
@@ -116,7 +127,7 @@ public class SubscriptionService {
         IdempotencyRecord record = idempotencyRecords.findForUpdate(CREATE_SCOPE, key)
             .orElseThrow(() -> new IllegalStateException("No se pudo reservar la clave de idempotencia."));
         if (!hash.equals(record.getRequestHash())) throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
-        if (record.getStatus() == IdempotencyRecord.RecordStatus.COMPLETED && record.getResourceId() != null) return get(record.getResourceId());
+        if (record.getStatus() == IdempotencyRecord.RecordStatus.COMPLETED && record.getResourceId() != null) return get(record.getResourceId(),actor);
 
         BusinessPartner customer = partners.findForUpdateByIdAndTypeIn(request.customerId(), List.of(PartnerType.CUSTOMER, PartnerType.BOTH))
             .orElseThrow(() -> new ResourceNotFoundException("Cliente", request.customerId()));
@@ -147,8 +158,9 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
-    public SubscriptionDtos.CancellationPreview cancellationPreview(UUID id) {
+    public SubscriptionDtos.CancellationPreview cancellationPreview(UUID id,String actor) {
         Subscription s = require(id);
+        scopes.requireWarehouseAccess(actor,s.getWarehouse().getId());
         LocalDate today = today();
         List<SubscriptionInstallment> charged = s.getStatus() == Subscription.Status.ACTIVE ? chargedOnCancel(s, today) : List.of();
         List<SubscriptionInstallment> dropped = s.getStatus() == Subscription.Status.ACTIVE
@@ -162,7 +174,10 @@ public class SubscriptionService {
 
     @Transactional
     public SubscriptionDtos.View cancel(UUID id, String reason, String actor) {
+        Subscription current=require(id);
+        scopes.requireWarehouseAccess(actor,current.getWarehouse().getId());
         Subscription s = subscriptions.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Suscripción", id));
+        scopes.requireWarehouseAccess(actor,s.getWarehouse().getId());
         if (s.getStatus() != Subscription.Status.ACTIVE) throw new ConflictException("Solo se puede cancelar una suscripción activa.");
         LocalDate today = today();
         List<SubscriptionInstallment> charged = chargedOnCancel(s, today);
@@ -172,16 +187,19 @@ public class SubscriptionService {
         audit.record(actor, "SUBSCRIPTION_CANCELLED", "SUBSCRIPTION", s.getId(), Map.of("number", s.getSubscriptionNumber(), "reason", reason.trim(),
             "chargedNow", sum(charged).toPlainString()));
         subscriptions.flush();
-        return get(id);
+        return get(id,actor);
     }
 
     @Transactional
     public SubscriptionDtos.View prepay(UUID id, BigDecimal discountPercent, String actor, boolean canDiscount) {
+        Subscription current=require(id);
+        scopes.requireWarehouseAccess(actor,current.getWarehouse().getId());
         Subscription s = subscriptions.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Suscripción", id));
+        scopes.requireWarehouseAccess(actor,s.getWarehouse().getId());
         if (s.getStatus() != Subscription.Status.ACTIVE) throw new ConflictException("Solo se puede pagar por adelantado una suscripción activa.");
         prepayPending(s, discountPercent, actor, canDiscount, today());
         subscriptions.flush();
-        return get(id);
+        return get(id,actor);
     }
 
     @Transactional(readOnly = true)
