@@ -5,7 +5,7 @@ import AreaChart from '../../components/charts/AreaChart.jsx';
 import BarList from '../../components/charts/BarList.jsx';
 import Sparkline from '../../components/charts/Sparkline.jsx';
 import { Skeleton, SkeletonBlock, SkeletonTiles } from '../../ui/Skeleton.jsx';
-import { compactMoney, compactNumber, idOf, isInactive, isoDate, money, movementDirection, movementLabel, number, relativeTime, shortDate } from '../../utils/format.js';
+import { compactMoney, compactNumber, idOf, isoDate, money, movementDirection, movementLabel, number, relativeTime, shortDate } from '../../utils/format.js';
 import './dashboard.css';
 
 const RANGES = [[7, '7 días'], [30, '30 días'], [90, '90 días']];
@@ -52,11 +52,11 @@ function Card({ title, action, children, className = '' }) {
   </section>;
 }
 
-export default function Dashboard({ data, ready, refreshing, refreshKey, whatsappPending, can, onNavigate, onStartWorkflow, onOpenProduct }) {
+export default function Dashboard({ data, ready, refreshing, refreshKey, whatsappPending, pendingCounts = {}, can, onNavigate, onStartWorkflow, onOpenProduct }) {
   const { products, balances, movements, purchases, sales, warehouses, valuation } = data;
   const [days, setDays] = useState(30);
   const [view, setView] = useState('chart');
-  const [report, setReport] = useState({ loading: true, sales: null, lowStock: null });
+  const [report, setReport] = useState({ loading: true, sales: null, lowStock: null, lowStockTotal: null });
   const canFinance = can('reports:financial');
 
   useEffect(() => {
@@ -71,35 +71,31 @@ export default function Dashboard({ data, ready, refreshing, refreshKey, whatsap
       setReport({
         loading: false,
         sales: salesResult.status === 'fulfilled' ? salesResult.value : null,
-        lowStock: lowResult.status === 'fulfilled' && lowResult.value ? listFrom(lowResult.value) : null
+        lowStock: lowResult.status === 'fulfilled' && lowResult.value ? listFrom(lowResult.value) : null,
+        lowStockTotal: lowResult.status === 'fulfilled' && lowResult.value
+          ? Number(lowResult.value.totalElements ?? lowResult.value.page?.totalElements ?? listFrom(lowResult.value).length)
+          : null
       });
     });
     return () => { active = false; };
   }, [days, canFinance, refreshKey]);
 
   const productName = useMemo(() => new Map(products.map(product => [String(idOf(product)), product.name])), [products]);
-  const stockByProduct = useMemo(() => {
-    const totals = new Map();
-    balances.forEach(row => totals.set(String(row.productId), (totals.get(String(row.productId)) || 0) + Number(row.onHand || 0)));
-    return totals;
-  }, [balances]);
   const series = useMemo(() => dailySeries(report.sales, days), [report.sales, days]);
   const summary = report.sales?.summary;
   const units = balances.reduce((sum, row) => sum + Number(row.onHand || 0), 0);
   const totals = listFrom(valuation?.totals);
   const inventoryValue = !valuation ? '—' : totals.length > 1 ? 'Varias monedas' : compactMoney(totals[0]?.totalValue || 0);
-  const outOfStock = products.filter(product => !isInactive(product) && (product.kind || 'STOCKED_GOOD') === 'STOCKED_GOOD' && !(stockByProduct.get(String(idOf(product))) > 0));
   const lowStock = report.lowStock || [];
   const status = order => String(order.status || '').toUpperCase();
 
   const pending = [
-    { id: 'approve', icon: ClipboardCheck, label: 'Compras por aprobar', count: purchases.filter(order => status(order) === 'SUBMITTED').length, go: () => onNavigate('purchases') },
-    { id: 'receive', icon: Truck, label: 'Compras por recibir', count: purchases.filter(order => ['APPROVED', 'PARTIALLY_RECEIVED'].includes(status(order))).length, go: () => onNavigate('purchases') },
-    { id: 'whatsapp', icon: MessageCircle, label: 'Pedidos WhatsApp por cobrar', count: whatsappPending || 0, go: () => onNavigate('whatsapp') },
-    { id: 'cancel', icon: Ban, label: 'Anulaciones por aprobar', count: sales.filter(sale => status(sale) === 'CANCELLATION_REQUESTED').length, go: () => onNavigate('sales') },
-    { id: 'drafts', icon: FileClock, label: 'Compras en borrador', count: purchases.filter(order => status(order) === 'DRAFT').length, go: () => onNavigate('purchases') },
-    { id: 'empty', icon: PackageX, label: 'Productos sin existencias', count: outOfStock.length, go: () => onNavigate('products') }
-  ].filter(task => task.count > 0);
+    { id: 'approve', icon: ClipboardCheck, label: 'Compras por aprobar', count: pendingCounts.submittedPurchases ?? purchases.filter(order => status(order) === 'SUBMITTED').length, go: () => onNavigate('purchases') },
+    { id: 'receive', icon: Truck, label: 'Compras por recibir', count: pendingCounts.receivablePurchases ?? purchases.filter(order => ['APPROVED', 'PARTIALLY_RECEIVED'].includes(status(order))).length, go: () => onNavigate('purchases') },
+    { id: 'whatsapp', icon: MessageCircle, label: 'Pedidos WhatsApp por cobrar', count: whatsappPending ?? 0, go: () => onNavigate('whatsapp') },
+    { id: 'cancel', icon: Ban, label: 'Anulaciones por aprobar', count: pendingCounts.cancellationRequests ?? sales.filter(sale => status(sale) === 'CANCELLATION_REQUESTED').length, go: () => onNavigate('sales') },
+    { id: 'drafts', icon: FileClock, label: 'Compras en borrador', count: pendingCounts.drafts ?? purchases.filter(order => status(order) === 'DRAFT').length, go: () => onNavigate('purchases') }
+  ].filter(task => Number.isFinite(Number(task.count)) && Number(task.count) > 0);
 
   const byWarehouse = useMemo(() => {
     const totalsByWarehouse = new Map();
@@ -138,8 +134,8 @@ export default function Dashboard({ data, ready, refreshing, refreshKey, whatsap
     {report.loading && !report.sales && canFinance ? <SkeletonTiles /> : <div className="kpi-grid">
       <Tile label="Ventas netas" value={summary ? compactMoney(summary.netSales) : '—'} detail={summary ? `${number(summary.salesCount)} ventas` : 'Sin acceso a reportes'} trend={summary ? series.map(point => point.value) : null} />
       <Tile label="Utilidad bruta" value={summary ? compactMoney(summary.grossProfit) : '—'} detail={margin === null ? 'Sin ventas en el periodo' : `Margen ${margin} %`} />
-      <Tile label="Valor del inventario" value={inventoryValue} detail={`${compactNumber(units)} unidades · ${warehouses.length} almacenes`} />
-      <Tile label="Bajo mínimo" value={report.lowStock ? number(lowStock.length) : '—'} status={report.lowStock ? (lowStock.length ? 'warning' : 'good') : ''}
+      <Tile label="Valor del inventario" value={inventoryValue} detail={`${compactNumber(units)} unidades en la muestra · ${warehouses.length} almacenes cargados`} />
+      <Tile label="Bajo mínimo" value={report.lowStock ? number(report.lowStockTotal ?? lowStock.length) : '—'} status={report.lowStock ? (lowStock.length ? 'warning' : 'good') : ''}
         detail={report.lowStock ? (lowStock.length ? 'Productos por reponer' : 'Existencias en orden') : 'Sin acceso a reportes'} />
     </div>}
 
@@ -174,7 +170,7 @@ export default function Dashboard({ data, ready, refreshing, refreshKey, whatsap
             </button>
           </li>)}</ul>}
       </Card>
-      <Card title="Existencias por almacén" action={<button type="button" className="text-button" onClick={() => onNavigate('inventory')}>Inventario <ChevronRight size={14} /></button>}>
+      <Card title="Existencias consultadas por almacén" action={<button type="button" className="text-button" onClick={() => onNavigate('inventory')}>Inventario <ChevronRight size={14} /></button>}>
         <BarList items={byWarehouse} formatValue={compactNumber} label="Unidades en existencia por almacén" empty="Aún no hay existencias registradas." />
       </Card>
     </div>
