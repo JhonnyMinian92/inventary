@@ -1,11 +1,13 @@
 package com.ecuapp.inventary.reports;
 
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.inventory.ReorderDtos;
 import com.ecuapp.inventary.inventory.ReorderService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,11 +25,14 @@ public class InventoryBalanceReportController {
     private final InventoryBalanceReportService balance;
     private final OperationalReportService reports;
     private final ReorderService reorder;
+    private final WarehouseScopeService scopes;
 
-    public InventoryBalanceReportController(InventoryBalanceReportService balance, OperationalReportService reports, ReorderService reorder) {
+    public InventoryBalanceReportController(InventoryBalanceReportService balance, OperationalReportService reports, ReorderService reorder,
+                                            WarehouseScopeService scopes) {
         this.balance = balance;
         this.reports = reports;
         this.reorder = reorder;
+        this.scopes = scopes;
     }
 
     @GetMapping("/inventory-balance")
@@ -37,24 +42,24 @@ public class InventoryBalanceReportController {
             @RequestParam UUID warehouseId,
             @RequestParam(required = false) UUID productId,
             @RequestParam(required = false) String zone,
-            @PageableDefault(size = 50) Pageable pageable) {
-        return balance.get(from, to, warehouseId, productId, zone, pageable);
+            @PageableDefault(size = 50) Pageable pageable,Authentication auth) {
+        return balance.get(from, to, warehouseId, productId, zone, pageable,auth.getName());
     }
 
     @GetMapping("/valuation")
     public ReportDtos.ValuationReport valuation(@RequestParam(required = false) UUID warehouseId,
                                                 @RequestParam(required = false) UUID productId,
                                                 @RequestParam(defaultValue = "false") boolean includeEmpty,
-                                                @PageableDefault(size = 50) Pageable pageable) {
-        return reports.valuation(warehouseId, productId, includeEmpty, pageable);
+                                                @PageableDefault(size = 50) Pageable pageable,Authentication auth) {
+        return reports.valuation(warehouseId, productId, includeEmpty, pageable,auth.getName());
     }
 
     @GetMapping("/sales")
     public ReportDtos.SalesReport sales(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                        @RequestParam(required = false) UUID warehouseId,
-                                       @RequestParam(required = false) String zone) {
-        return reports.sales(from, to, warehouseId, zone);
+                                       @RequestParam(required = false) String zone,Authentication auth) {
+        return reports.sales(from, to, warehouseId, zone,auth.getName());
     }
 
     @GetMapping("/purchases")
@@ -62,8 +67,8 @@ public class InventoryBalanceReportController {
                                                 @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
                                                 @RequestParam(required = false) UUID warehouseId,
                                                 @RequestParam(required = false) UUID supplierId,
-                                                @RequestParam(required = false) String zone) {
-        return reports.purchases(from, to, warehouseId, supplierId, zone);
+                                                @RequestParam(required = false) String zone,Authentication auth) {
+        return reports.purchases(from, to, warehouseId, supplierId, zone,auth.getName());
     }
 
     @GetMapping("/kardex")
@@ -71,12 +76,13 @@ public class InventoryBalanceReportController {
                                           @RequestParam UUID warehouseId,
                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                           @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-                                          @RequestParam(required = false) String zone) {
-        return reports.kardex(productId, warehouseId, from, to, zone);
+                                          @RequestParam(required = false) String zone,Authentication auth) {
+        return reports.kardex(productId, warehouseId, from, to, zone,auth.getName());
     }
 
     @GetMapping("/low-stock")
-    public List<ReorderDtos.Suggestion> lowStock(@RequestParam(required = false) UUID warehouseId) {
-        return reorder.suggestions().stream().filter(s -> warehouseId == null || warehouseId.equals(s.warehouseId())).toList();
+    public List<ReorderDtos.Suggestion> lowStock(@RequestParam(required = false) UUID warehouseId,Authentication auth) {
+        if(warehouseId!=null)scopes.requireWarehouseAccess(auth.getName(),warehouseId);
+        return reorder.suggestions(auth.getName()).stream().filter(s -> warehouseId == null || warehouseId.equals(s.warehouseId())).toList();
     }
 }
