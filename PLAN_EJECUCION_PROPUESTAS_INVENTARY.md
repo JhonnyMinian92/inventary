@@ -174,7 +174,9 @@ Cambios de esta ejecución:
 - Se añadió prueba de API para cotizar y vender un servicio sin generar movimientos de inventario.
 - Los workflows backend y frontend ahora también se ejecutan al hacer push a `implementacion_propuestas`.
 
-**Validación pendiente:** los cambios están publicados, pero no se afirma que Maven verify, npm test, build o los smoke tests hayan pasado hasta inspeccionar las ejecuciones de GitHub Actions.
+**Evidencia CI disponible:** Frontend Build terminó correctamente (run [41165392564](https://github.com/JhonnyMinian92/inventary/actions/runs/41165392564)); los pasos de instalación `npm ci`, `npm test` y `npm run build` finalizaron en verde. Backend CI está ejecutándose sobre el SHA `51b3ce2b719d3c35643136a2ee893048a0c6b581` (run [41165468427](https://github.com/JhonnyMinian92/inventary/actions/runs/41165468427)); Maven verify, Compose y smoke test todavía no tienen conclusión.
+
+**Validación pendiente:** la implementación de Fase 1 está publicada; su cierre de validación backend queda pendiente hasta que el workflow termine y se revise el resultado.
 
 ## 6. Fases restantes
 
