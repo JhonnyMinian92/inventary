@@ -43,9 +43,9 @@ public class WarehouseService {
   Warehouse saved=repo.saveAndFlush(new Warehouse(code,r.name().trim(),clean(r.address())));
   locations.save(new WarehouseLocation(saved,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE));
   scopes.grantCreatorAccess(actor,saved);
-  audit.record(actor,"WAREHOUSE_CREATED","WAREHOUSE",saved.getId(),Map.of("code",saved.getCode()));return WarehouseDtos.View.from(saved);
+  audit.record(actor,"WAREHOUSE_CREATED","WAREHOUSE",saved.getId(),Map.of("code",saved.getCode(),"warehouseId",saved.getId().toString()));return WarehouseDtos.View.from(saved);
  }
- @Transactional public WarehouseDtos.View update(UUID id,WarehouseDtos.WriteRequest r,String actor){scopes.requireWarehouseAccess(actor,id);Warehouse w=require(id);String code=r.code().trim().toUpperCase(Locale.ROOT);if(!w.getCode().equals(code))throw new ConflictException("El código de almacén es inmutable; cree otro almacén para cambiarlo.");w.update(r.name().trim(),clean(r.address()));repo.flush();audit.record(actor,"WAREHOUSE_UPDATED","WAREHOUSE",id,Map.of("code",w.getCode()));return WarehouseDtos.View.from(w);}
+ @Transactional public WarehouseDtos.View update(UUID id,WarehouseDtos.WriteRequest r,String actor){scopes.requireWarehouseAccess(actor,id);Warehouse w=require(id);String code=r.code().trim().toUpperCase(Locale.ROOT);if(!w.getCode().equals(code))throw new ConflictException("El código de almacén es inmutable; cree otro almacén para cambiarlo.");w.update(r.name().trim(),clean(r.address()));repo.flush();audit.record(actor,"WAREHOUSE_UPDATED","WAREHOUSE",id,Map.of("code",w.getCode(),"warehouseId",id.toString()));return WarehouseDtos.View.from(w);}
  @Transactional public void deactivate(UUID id,String actor){
   scopes.requireWarehouseAccess(actor,id);
   Warehouse w=repo.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Almacén",id));if(!w.isActive())return;
@@ -80,7 +80,7 @@ public class WarehouseService {
   }catch(DataIntegrityViolationException ex){
    throw new ConflictException("El almacén conserva referencias de historial o configuración y no puede eliminarse físicamente.");
   }
-  audit.record(actor,"WAREHOUSE_DELETED","WAREHOUSE",id,Map.of("code",code));
+  audit.record(actor,"WAREHOUSE_DELETED","WAREHOUSE",id,Map.of("code",code,"warehouseId",id.toString()));
  }
  @Transactional public void activate(UUID id,String actor){scopes.requireWarehouseAccess(actor,id);Warehouse w=require(id);if(w.isActive())return;w.activate();audit.record(actor,"WAREHOUSE_ACTIVATED","WAREHOUSE",id,Map.of("code",w.getCode()));}
  @Transactional(readOnly=true) public List<WarehouseDtos.LocationView> locations(UUID warehouseId,String actor){
