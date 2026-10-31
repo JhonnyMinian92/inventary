@@ -61,11 +61,8 @@ public class ApiRequestAuditFilter extends OncePerRequestFilter {
         } finally {
             int status = response.getStatus();
             String path = request.getRequestURI();
-            if (path == null || !path.startsWith("/api/")) {
-                return;
-            }
-
-            try {
+            if (path != null && path.startsWith("/api/")) {
+                try {
                 String actor = authenticatedActor(request);
                 String requestId = requestId(request);
                 if (status >= 400) {
@@ -78,8 +75,9 @@ public class ApiRequestAuditFilter extends OncePerRequestFilter {
                         requestId, Map.of("method", safeMethod(request.getMethod()),
                             "path", safePath(path), "status", status));
                 }
-            } catch (RuntimeException failure) {
-                log.warn("Could not persist HTTP audit event; requestId={}", requestId(request));
+                } catch (RuntimeException failure) {
+                    log.warn("Could not persist HTTP audit event; requestId={}", requestId(request));
+                }
             }
         }
     }

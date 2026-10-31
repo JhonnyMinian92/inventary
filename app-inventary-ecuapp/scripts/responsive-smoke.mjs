@@ -88,7 +88,7 @@ async function waitForLogin() {
 try {
   await waitForDebugger();
   const targetResponse = await fetch(
-    `http://127.0.0.1:${debugPort}/json/new?${encodeURIComponent(targetUrl)}`,
+    `http://127.0.0.1:${debugPort}/json/new?${targetUrl}`,
     { method: 'PUT' }
   );
   assert.equal(targetResponse.ok, true, 'Chrome must create the application page target');
