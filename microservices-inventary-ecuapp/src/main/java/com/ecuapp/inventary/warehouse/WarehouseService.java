@@ -70,6 +70,8 @@ public class WarehouseService {
    throw new ConflictException("No se puede eliminar físicamente un almacén con transferencias históricas.");
   if(counts.existsForWarehouse(id))
    throw new ConflictException("No se puede eliminar físicamente un almacén con conteos de inventario registrados.");
+  if(scopes.hasAnyAssignment(id))
+   throw new ConflictException("No se puede eliminar físicamente un almacén con historial de asignaciones de acceso; desactívelo para conservar la trazabilidad.");
   String code=w.getCode();
   try{
    locations.deleteAll(locations.findByWarehouseIdOrderByCodeAsc(id));
