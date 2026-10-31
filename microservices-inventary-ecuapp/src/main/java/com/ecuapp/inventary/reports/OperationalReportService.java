@@ -318,11 +318,11 @@ public class OperationalReportService {
 
     @Transactional(readOnly = true)
     public ReportDtos.KardexReport kardex(UUID productId, UUID warehouseId, LocalDate from, LocalDate to, String zone,String actor) {
-        warehouseId=resolveWarehouseScope(warehouseId,actor);
+        final UUID scopedWarehouseId = resolveWarehouseScope(warehouseId,actor);
         ReportPeriod period = ReportPeriod.of(from, to, zone, defaultZone);
         Product product = products.findById(productId).orElseThrow(() -> new ResourceNotFoundException("Producto", productId));
-        Warehouse warehouse = warehouses.findById(warehouseId).orElseThrow(() -> new ResourceNotFoundException("Almacén", warehouseId));
-        MapSqlParameterSource params = periodParams(period).addValue("productId", productId).addValue("warehouseId", warehouseId)
+        Warehouse warehouse = warehouses.findById(scopedWarehouseId).orElseThrow(() -> new ResourceNotFoundException("Almacén", scopedWarehouseId));
+        MapSqlParameterSource params = periodParams(period).addValue("productId", productId).addValue("scopedWarehouseId", scopedWarehouseId)
             .addValue("limit", MAX_KARDEX_LINES + 1);
         BigDecimal[] opening = jdbc.queryForObject(KARDEX_OPENING_SQL, params, (rs, i) -> new BigDecimal[]{
             rs.getBigDecimal("on_hand").subtract(rs.getBigDecimal("since_from")), rs.getBigDecimal("opening_value")});
