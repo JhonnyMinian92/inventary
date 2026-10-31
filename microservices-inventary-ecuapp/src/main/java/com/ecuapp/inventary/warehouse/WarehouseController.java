@@ -14,8 +14,8 @@ import java.util.UUID;
 public class WarehouseController {
  private final WarehouseService service;
  public WarehouseController(WarehouseService service){this.service=service;}
- @GetMapping public Page<WarehouseDtos.View> list(@RequestParam(required=false) Boolean active,@PageableDefault(size=20,sort="name") Pageable p){return service.list(active,p);}
- @GetMapping("/{id}") public WarehouseDtos.View get(@PathVariable UUID id){return service.get(id);}
+ @GetMapping public Page<WarehouseDtos.View> list(@RequestParam(required=false) Boolean active,@PageableDefault(size=20,sort="name") Pageable p,Authentication auth){return service.list(active,p,auth.getName());}
+ @GetMapping("/{id}") public WarehouseDtos.View get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public WarehouseDtos.View create(@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.create(r,auth.getName());}
  @PutMapping("/{id}") @PreAuthorize("hasAuthority('inventory:manage')")
@@ -27,7 +27,7 @@ public class WarehouseController {
  @PostMapping("/{id}/activate") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('inventory:manage')")
  public void activate(@PathVariable UUID id,Authentication auth){service.activate(id,auth.getName());}
  /** Stock is kept in the MAIN location; extra locations are registered for layout and future multi-bin operations. */
- @GetMapping("/{id}/locations") public List<WarehouseDtos.LocationView> locations(@PathVariable UUID id){return service.locations(id);}
+ @GetMapping("/{id}/locations") public List<WarehouseDtos.LocationView> locations(@PathVariable UUID id,Authentication auth){return service.locations(id,auth.getName());}
  @PostMapping("/{id}/locations") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public WarehouseDtos.LocationView createLocation(@PathVariable UUID id,@Valid @RequestBody WarehouseDtos.LocationRequest r,Authentication auth){return service.createLocation(id,r,auth.getName());}
 }
