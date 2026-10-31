@@ -23,4 +23,13 @@ public interface PurchaseReturnRepository extends JpaRepository<PurchaseReturn,U
   """)
  Page<PurchaseReturn> search(@Param("goodsReceiptId") UUID goodsReceiptId,@Param("warehouseId") UUID warehouseId,
   @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,Pageable pageable);
+
+ @EntityGraph(attributePaths={"purchaseOrder","goodsReceipt","warehouse"})
+ @Query("""
+  select r from PurchaseReturn r where (:goodsReceiptId is null or r.goodsReceipt.id=:goodsReceiptId)
+   and (:warehouseId is null or r.warehouse.id=:warehouseId) and r.warehouse.id in :warehouseIds
+   and r.createdAt>=:fromTime and r.createdAt<:toTime
+  """)
+ Page<PurchaseReturn> searchScoped(@Param("goodsReceiptId") UUID goodsReceiptId,@Param("warehouseId") UUID warehouseId,
+  @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
