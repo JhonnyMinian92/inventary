@@ -24,7 +24,7 @@ function totalOf(payload) { return pageMeta(payload).totalElements; }
  * Loads only the datasets needed by the current route/workflow.
  * No whole-history scan is used for operational tables; table pages request bounded server pages.
  */
-export function useWorkspaceData({ token, section, modal, expireSession, onError }) {
+export function useWorkspaceData({ token, section, modal, listPage = 0, expireSession, onError }) {
   const [data, setData] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
@@ -72,12 +72,12 @@ export function useWorkspaceData({ token, section, modal, expireSession, onError
     }
 
     if (section === 'purchases') {
-      add('purchases', () => api.purchaseOrders({ page: 0, size: FIRST_PAGE_SIZE, sort: 'orderedAt,desc' }), listFrom);
+      add('purchases', () => api.purchaseOrders({ page: listPage, size: FIRST_PAGE_SIZE, sort: 'orderedAt,desc' }), listFrom);
       add('purchasePage', () => api.purchaseOrders({ page: 0, size: FIRST_PAGE_SIZE, sort: 'orderedAt,desc' }), pageMeta);
     }
 
     if (section === 'sales') {
-      add('sales', () => api.sales({ page: 0, size: FIRST_PAGE_SIZE, sort: 'soldAt,desc' }), listFrom);
+      add('sales', () => api.sales({ page: listPage, size: FIRST_PAGE_SIZE, sort: 'soldAt,desc' }), listFrom);
       add('salesPage', () => api.sales({ page: 0, size: FIRST_PAGE_SIZE, sort: 'soldAt,desc' }), pageMeta);
     }
 
@@ -156,7 +156,7 @@ export function useWorkspaceData({ token, section, modal, expireSession, onError
     if (importantErrors.length) onError?.(importantErrors[0].message);
     setHasLoadedData(true);
     setLoading(false);
-  }, [token, section, modal, expireSession, onError]);
+  }, [token, section, modal, listPage, expireSession, onError]);
 
   useEffect(() => {
     void loadData();
