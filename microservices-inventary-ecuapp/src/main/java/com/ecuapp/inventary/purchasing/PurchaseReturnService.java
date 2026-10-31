@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.purchasing;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.UnitOfMeasure;
 import com.ecuapp.inventary.catalog.UnitOfMeasureRepository;
 import com.ecuapp.inventary.common.*;
@@ -30,18 +31,28 @@ public class PurchaseReturnService {
  private final PurchaseReturnRepository returns;private final PurchaseOrderRepository orders;private final GoodsReceiptRepository receipts;
  private final GoodsReceiptLineRepository receiptLines;private final StockBalanceRepository balances;private final StockMovementRepository movements;
  private final OutboxEventRepository outbox;private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;
- private final InventoryCostingService costing;
+ private final InventoryCostingService costing;private final WarehouseScopeService scopes;
  public PurchaseReturnService(PurchaseReturnRepository returns,PurchaseOrderRepository orders,GoodsReceiptRepository receipts,GoodsReceiptLineRepository receiptLines,
   StockBalanceRepository balances,StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units,
-  InventoryCostingService costing){
-  this.returns=returns;this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;
+  InventoryCostingService costing,WarehouseScopeService scopes){
+  this.returns=returns;this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.balances=balances;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public PurchaseReturnDtos.View get(UUID id){return PurchaseReturnDtos.View.from(returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución a proveedor",id)));}
- @Transactional(readOnly=true) public Page<PurchaseReturnDtos.View> list(UUID goodsReceiptId,UUID warehouseId,Instant from,Instant to,Pageable p){
+ @Transactional(readOnly=true) public PurchaseReturnDtos.View get(UUID id,String actor){
+  PurchaseReturn r=returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución a proveedor",id));
+  scopes.requireWarehouseAccess(actor,r.getWarehouse().getId());return PurchaseReturnDtos.View.from(r);
+ }
+ @Transactional(readOnly=true) public Page<PurchaseReturnDtos.View> list(UUID goodsReceiptId,UUID warehouseId,Instant from,Instant to,Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
-  return returns.search(goodsReceiptId,warehouseId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"createdAt"))).map(PurchaseReturnDtos.View::from);
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"createdAt"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  return (allowed==null?returns.search(goodsReceiptId,warehouseId,lower,upper,pageable):
+   returns.searchScoped(goodsReceiptId,warehouseId,lower,upper,allowed,pageable)).map(PurchaseReturnDtos.View::from);
  }
  @Transactional public PurchaseReturnDtos.View create(String key,PurchaseReturnDtos.CreateRequest request,String actor){
+  GoodsReceipt visible=receipts.findDetailedById(request.goodsReceiptId()).orElseThrow(()->new ResourceNotFoundException("Recepción",request.goodsReceiptId()));
+  scopes.requireWarehouseAccess(actor,visible.getWarehouse().getId());
   String normalizedKey=normalizeKey(key);String hash=canonicalHash(request);
   int claimed=idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"PURCHASE_RETURN_CREATE",normalizedKey,hash);
   IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("PURCHASE_RETURN_CREATE",normalizedKey).orElseThrow(()->new IllegalStateException("No se pudo reservar la clave de idempotencia."));
@@ -54,6 +65,7 @@ public class PurchaseReturnService {
    return PurchaseReturnDtos.View.from(returns.findDetailedById(previous.get().getId()).orElseThrow());
   }
   GoodsReceipt receipt=receipts.findDetailedById(request.goodsReceiptId()).orElseThrow(()->new ResourceNotFoundException("Recepción",request.goodsReceiptId()));
+  scopes.requireWarehouseAccess(actor,receipt.getWarehouse().getId());
   if(!"POSTED".equals(receipt.getStatus()))throw new BusinessRuleException("Solo se puede devolver mercadería de una recepción contabilizada.");
   // The purchase order row serializes returns and receipts of the same purchase.
   PurchaseOrder order=orders.findForUpdate(receipt.getPurchaseOrder().getId()).orElseThrow();
