@@ -1,5 +1,6 @@
 import { Ban, CheckCircle2, Eye } from 'lucide-react';
 import { statusLabel, statusTone } from '../../utils/format.js';
+import ServerPagination from '../../ui/ServerPagination.jsx';
 
 function idOf(item) { return item?.id ?? item?.saleId ?? ''; }
 function date(value) {
@@ -13,7 +14,7 @@ function money(value, currency = 'USD') {
   catch { return Number(value).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency; }
 }
 
-export default function SalesTable({ rows = [], loading = false, onView, onRequestCancel, onApproveCancellation }) {
+export default function SalesTable({ rows = [], loading = false, onView, onRequestCancel, onApproveCancellation, pagination, page = 0, onPageChange }) {
   return <div className="table-wrap">
     <table aria-label="Ventas registradas">
       <caption className="visually-hidden">Ventas y solicitudes de anulación</caption>
@@ -38,6 +39,7 @@ export default function SalesTable({ rows = [], loading = false, onView, onReque
         </tr>;
       })}</tbody>
     </table>
-    {!rows.length && <div className="empty-state" role="status">Todavía no hay ventas registradas.</div>}
+    {!rows.length && <div className="empty-state" role="status">No hay ventas en esta página.</div>}
+    <ServerPagination info={pagination} page={page} loading={loading} onChange={onPageChange} />
   </div>;
 }
