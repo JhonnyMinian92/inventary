@@ -34,7 +34,7 @@ public interface StockTransferRepository extends JpaRepository<StockTransfer,UUI
   select t from StockTransfer t where (:status is null or t.status=:status)
    and (:sourceWarehouseId is null or t.sourceWarehouse.id=:sourceWarehouseId)
    and (:destinationWarehouseId is null or t.destinationWarehouse.id=:destinationWarehouseId)
-   and t.sourceWarehouse.id in :warehouseIds and t.destinationWarehouse.id in :warehouseIds
+   and (t.sourceWarehouse.id in :warehouseIds or t.destinationWarehouse.id in :warehouseIds)
   """)
  Page<StockTransfer> searchScoped(@Param("status") TransferStatus status,@Param("sourceWarehouseId") UUID sourceWarehouseId,
   @Param("destinationWarehouseId") UUID destinationWarehouseId,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
