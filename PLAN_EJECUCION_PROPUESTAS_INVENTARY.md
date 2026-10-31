@@ -136,6 +136,7 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Las órdenes de compra ahora emiten PURCHASE_ORDER_CREATED, PURCHASE_ORDER_SUBMITTED, PURCHASE_ORDER_APPROVED y PURCHASE_ORDER_CANCELLED, solo cuando la transición cambia realmente el estado. Las pruebas API verifican un evento por transición incluso al repetir el comando.
 - Los conteos físicos aplican maker-checker: quien captura no puede contabilizar su propio conteo. La identidad de quien contabiliza se guarda en posted_by y se devuelve en el DTO, auditoría y Outbox. La migración V20 etiqueta los conteos históricos ya contabilizados como LEGACY_UNATTRIBUTED, sin atribuirles un operador ficticio.
 - La política de ámbitos temporales de almacén, RBAC, lectura financiera separada, aprobación de órdenes de compra, cancelación de ventas por solicitante/aprobador distintos, auditoría append-only, Outbox/Inbox y las pruebas de PostgreSQL existentes se conservan y se ejercitan en la suite.
+- GitHub Actions [backend-ci #41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258): **success** sobre el SHA de código `7e6d982895b020d1fae26d3e30602edb0997cc47`; Maven/Java 21 y PostgreSQL 16 aprobaron **106/106 pruebas**, Flyway aplicó V1–V20 y Hibernate validó los mappings. Docker Compose normal y Kafka validaron su configuración; el smoke test construyó e inició la API desde un volumen PostgreSQL vacío y el healthcheck respondió tras cuatro intentos.
 
 **Pendiente para cerrar formalmente la Fase 2:**
 
@@ -406,6 +407,6 @@ Una fase no se cierra por “compilar” solamente. Debe:
 - Fase 2: **implementación parcial**; se añadieron auditoría de lecturas sensibles, eventos Outbox para ajustes/conteos/órdenes de compra y maker-checker en conteos físicos. No se declara cerrada por las brechas enumeradas en su sección.
 - Fase 3: **implementación estructural completada y smoke E2E responsive del login validado**; la aceptación browser de todos los flujos autenticados queda pendiente.
 - Fases pendientes de implementación/cierre: **Fase 2 (cierre), 4–10**.
-- Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend: [run 41213937126](https://github.com/JhonnyMinian92/inventary/actions/runs/41213937126), success para el estado previo a V20. La validación completa del código actual (incluida V20 y ciclo Outbox de compras) se referencia al run [41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258) una vez finalice.
+- Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend del código actual: [run 41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258), success, 106/106 tests, validación Flyway/Hibernate, Compose y smoke test desde volumen vacío.
 - Rama actual de trabajo: implementacion_propuestas; master no fue modificada.
 - Este plan es la fuente viva de secuencia; la matriz de cobertura complementaria detalla cada uno de los 22 documentos y su asignación por fase.
