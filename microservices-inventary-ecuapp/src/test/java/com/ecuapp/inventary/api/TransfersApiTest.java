@@ -44,7 +44,7 @@ class TransfersApiTest extends ApiTestSupport {
         assertAmount("2", onHand(productId, destination));
         assertAmount("5", onHand(productId, source).add(onHand(productId, destination)));
 
-        JsonNode in = httpGet(manager, "/api/v1/inventory/movements?referenceId=" + id + "&type=TRANSFER_IN", 200).get("content").get(0);
+        JsonNode in = httpGet(admin(), "/api/v1/inventory/movements?referenceId=" + id + "&type=TRANSFER_IN", 200).get("content").get(0);
         assertAmount("2.40", in.get("unitCost"));
         JsonNode valuation = httpGet(admin(), "/api/v1/reports/valuation?productId=" + productId + "&warehouseId=" + destination, 200).get("items").get(0);
         assertAmount("4.80", valuation.get("totalValue"));
