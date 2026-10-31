@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, MessageCircle, Plus, Repeat, Search, Warehouse } from 'lucide-react';
-import { api, listFrom, listAllPages } from './api';
+import { api, listFrom } from './api';
 import { currentRoute, detailPath, documentTitle, HOME_ROUTE, loginPath, navigate, nextFromSearch, pathFor, sectionPath, workflowPath } from './router.js';
 import LoginPage from './features/auth/LoginPage.jsx';
 import ProductForm from './features/catalog/ProductForm.jsx';
@@ -27,6 +27,7 @@ import { clearToasts, confirmDialog, toast, useMessageToast } from './ui/feedbac
 import { SkeletonTable } from './ui/Skeleton.jsx';
 import { compactMoney, isInactive, number, titleCase } from './utils/format.js';
 import { useAuth } from './app/providers/AuthProvider.jsx';
+import { useWorkspaceData } from './app/model/useWorkspaceData.js';
 import AppShell from './app/layouts/AppShell.jsx';
 
 const NAV_GROUPS = [
@@ -72,26 +73,12 @@ function AppWorkspace() {
   const [section, setSection] = useState(() => routeState().section);
   const [routeEntityId, setRouteEntityId] = useState(() => routeState().entityId);
   const [detailRoute, setDetailRoute] = useState(() => routeState().detail);
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [units, setUnits] = useState([]);
-  const [warehouses, setWarehouses] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [balances, setBalances] = useState([]);
-  const [movements, setMovements] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [sales, setSales] = useState([]);
-  const [valuation, setValuation] = useState(null);
-  const [whatsappPending, setWhatsappPending] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [purchaseDetail, setPurchaseDetail] = useState(null);
   const [saleDetail, setSaleDetail] = useState(null);
   const [saleToCancel, setSaleToCancel] = useState(null);
   const [saleCancelReason, setSaleCancelReason] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [hasLoadedData, setHasLoadedData] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState(() => routeState().workflow);
@@ -101,46 +88,22 @@ function AppWorkspace() {
   useMessageToast(error, setError, 'error');
   useMessageToast(notice, setNotice, 'success');
 
+  const workspace = useWorkspaceData({ token, section, modal, expireSession, onError: setError });
+  const {
+    products, setProducts, categories, setCategories, units, setUnits, warehouses, suppliers, customers,
+    balances, setBalances, movements, purchases, sales, valuation, whatsappPending,
+    pendingCounts, pageInfo, loading: dataLoading, hasLoadedData, refreshKey, errors: dataErrors,
+    loadData
+  } = workspace;
+  const loading = actionLoading || dataLoading;
+
+
   useEffect(() => { if (authError) setError(authError); }, [authError]);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setRefreshKey(key => key + 1);
-    const tasks = [
-      ['products', listAllPages(api.products, { size: 100 })], ['categories', listAllPages(api.categories, { size: 100 })], ['units', api.units()],
-      ['warehouses', listAllPages(api.warehouses, { size: 100 })], ['suppliers', listAllPages(api.suppliers, { size: 100 })],
-      ['customers', listAllPages(api.customers, { size: 100 })], ['balances', listAllPages(api.balances, { size: 100 })],
-      // Solo los movimientos más recientes: el historial completo se consulta con filtros o en el kárdex.
-      ['movements', api.movements({ size: 100 })], ['purchases', listAllPages(api.purchaseOrders, { size: 100 })],
-      ['sales', listAllPages(api.sales, { size: 100 })], ['valuation', api.inventoryValuationReport({ size: 100 })],
-      ['whatsapp', api.whatsappOrders({ status: 'AWAITING_PAYMENT', size: 1 })]
-    ];
-    const results = await Promise.allSettled(tasks.map(t => t[1]));
-    if (results.some(result => result.status === 'rejected' && result.reason?.status === 401)) {
-      expireSession();
-      setHasLoadedData(true);
-      setLoading(false);
-      return;
-    }
-    const failed = [];
-    results.forEach((result, i) => {
-      const [key] = tasks[i];
-      if (key === 'valuation') { setValuation(result.status === 'fulfilled' ? result.value : null); return; }
-      if (key === 'whatsapp') { setWhatsappPending(result.status === 'fulfilled' ? Number(result.value?.page?.totalElements ?? 0) : null); return; }
-      if (result.status === 'fulfilled') {
-        const value = listFrom(result.value);
-        ({ products: setProducts, categories: setCategories, units: setUnits, warehouses: setWarehouses, suppliers: setSuppliers, customers: setCustomers, balances: setBalances, movements: setMovements, purchases: setPurchases, sales: setSales })[key](value);
-      } else if (['products', 'categories', 'warehouses', 'balances'].includes(key) && result.reason?.status !== 403) failed.push(result.reason?.message || 'error');
-    });
-    if (failed.length) setError(results.every(result => result.status === 'rejected') ? 'No hay conexión con el servidor.' : 'No se pudieron cargar algunos datos: ' + [...new Set(failed)].join(' · '));
-    setHasLoadedData(true);
-    setLoading(false);
-  }, [expireSession]);
-
   useEffect(() => {
-    if (!token) return;
-    loadData();
-  }, [token, loadData, expireSession]);
+    const forbidden = Object.values(dataErrors).find(item => item.kind === 'forbidden');
+    if (forbidden && section !== 'overview') setError('No tienes permisos para consultar esta sección.');
+  }, [dataErrors, section]);
+
 
   const syncFromLocation = useCallback(() => {
     const route = currentRoute();
@@ -227,7 +190,7 @@ function AppWorkspace() {
   useEffect(() => {
     if (modal !== 'receive' || !routeEntityId || String(pickId(selectedOrder)) === String(routeEntityId)) return undefined;
     let active = true;
-    setLoading(true);
+    setActionLoading(true);
     api.purchaseOrder(routeEntityId)
       .then(detail => { if (active) setSelectedOrder(detail); })
       .catch(err => {
@@ -235,7 +198,7 @@ function AppWorkspace() {
         if (err?.status === 401) expireSession();
         else setError(err?.message || 'No se pudo cargar la orden para recibirla.');
       })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => { if (active) setActionLoading(false); });
     return () => { active = false; };
   }, [modal, routeEntityId, expireSession]);
 
@@ -244,7 +207,7 @@ function AppWorkspace() {
     if (!token || !detailRoute || !MODAL_DETAILS.has(detailRoute.kind)) return undefined;
     let active = true;
     const isPurchase = detailRoute.kind === 'purchase';
-    setLoading(true);
+    setActionLoading(true);
     (isPurchase ? api.purchaseOrder(detailRoute.id) : api.sale(detailRoute.id))
       .then(detail => {
         if (!active) return;
@@ -258,7 +221,7 @@ function AppWorkspace() {
         setDetailRoute(null);
         navigate(sectionPath(isPurchase ? 'purchases' : 'sales'), { replace: true });
       })
-      .finally(() => { if (active) setLoading(false); });
+      .finally(() => { if (active) setActionLoading(false); });
     return () => { active = false; };
   }, [token, detailRoute, expireSession]);
 
@@ -272,7 +235,7 @@ function AppWorkspace() {
   async function runAction(action, success) {
     const wasWorkflow = WORKFLOW_MODALS.has(modal);
     const workflowSection = WORKFLOW_SECTIONS[modal] || section;
-    setLoading(true);
+    setActionLoading(true);
     try {
       await action();
       setNotice(success);
@@ -290,7 +253,7 @@ function AppWorkspace() {
       if (e.status === 401) expireSession();
       else setError(e.message || 'No se pudo completar la operación.');
       return false;
-    } finally { setLoading(false); }
+    } finally { setActionLoading(false); }
   }
 
   async function submitProduct(form) {
@@ -406,7 +369,7 @@ function AppWorkspace() {
   }
 
   async function openReceive(order) {
-    setLoading(true);
+    setActionLoading(true);
     try {
       const detail = await api.purchaseOrder(pickId(order));
       setSelectedOrder(detail);
@@ -414,7 +377,7 @@ function AppWorkspace() {
     } catch (err) {
       setError('No se pudo cargar la orden para recibirla: ' + (err?.message || 'error'));
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   }
 
@@ -454,7 +417,7 @@ function AppWorkspace() {
 
   async function loadInventoryFilter(event, filterValues = inventoryFilter) {
     event?.preventDefault?.();
-    setLoading(true);
+    setActionLoading(true);
     const params = {};
     if (filterValues.warehouseId) params.warehouseId = filterValues.warehouseId;
     if (filterValues.productId) params.productId = filterValues.productId;
@@ -462,7 +425,7 @@ function AppWorkspace() {
     const [balanceResult, movementResult] = await Promise.allSettled([api.balances(params), api.movements(params)]);
     if ([balanceResult, movementResult].some(result => result.status === 'rejected' && result.reason?.status === 401)) {
       expireSession();
-      setLoading(false);
+      setActionLoading(false);
       return;
     }
     const failures = [];
@@ -471,7 +434,7 @@ function AppWorkspace() {
     if (movementResult.status === 'fulfilled') setMovements(listFrom(movementResult.value));
     else if (movementResult.reason?.status !== 403) failures.push('movimientos: ' + (movementResult.reason?.message || 'error'));
     if (failures.length) setError('No se pudieron aplicar todos los filtros. ' + failures.join(' · '));
-    setLoading(false);
+    setActionLoading(false);
   }
 
   function openProduct(product = null) {
@@ -502,7 +465,7 @@ function AppWorkspace() {
     navigateSection={navigateSection} displayName={displayName} apiStatus={apiStatus} roleLabel={roleLabel}
     onLogout={handleLogout} isWorkflow={isWorkflow} modal={modal} editing={editing}
     workflowTitles={WORKFLOW_TITLES} sectionTitles={SECTION_TITLES} headerAction={headerAction}
-    refreshing={refreshing} loading={loading} onRefresh={loadData}
+    refreshing={refreshing} loading={loading} onRefresh={() => void loadData()}
     overlays={
       <>
         
