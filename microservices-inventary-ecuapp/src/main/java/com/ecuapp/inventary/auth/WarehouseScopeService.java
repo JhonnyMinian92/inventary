@@ -123,7 +123,7 @@ public class WarehouseScopeService {
     @Transactional
     public void revoke(UUID userId,UUID scopeId,String actor) {
         requireSecurityActor(actor);
-        UserWarehouseScope scope=scopes.findByIdAndUserId(scopeId,userId)
+        UserWarehouseScope scope=scopes.findForUpdateByIdAndUserId(scopeId,userId)
             .orElseThrow(()->new ResourceNotFoundException("Asignación de bodega",scopeId));
         if(!scope.isActive())return;
         scope.revoke(actor);
