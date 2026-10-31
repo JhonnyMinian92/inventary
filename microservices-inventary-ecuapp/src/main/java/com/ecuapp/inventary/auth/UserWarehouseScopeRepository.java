@@ -24,13 +24,12 @@ public interface UserWarehouseScopeRepository extends JpaRepository<UserWarehous
     boolean existsByUserIdAndWarehouseIdAndActiveTrue(UUID userId,UUID warehouseId);
     @EntityGraph(attributePaths={"warehouse"}) List<UserWarehouseScope> findByUserIdOrderByCreatedAtDesc(UUID userId);
     Optional<UserWarehouseScope> findByIdAndUserId(UUID id,UUID userId);
-    @Modifying
+    @EntityGraph(attributePaths={"warehouse"})
     @Query("""
-        update UserWarehouseScope s set s.active=false,s.revokedAt=:now,s.revokedBy='SYSTEM_EXPIRY'
-        where s.user.id=:userId and s.warehouse.id=:warehouseId and s.active=true
-          and s.validUntil is not null and s.validUntil<=:now
+        select s from UserWarehouseScope s where s.user.id=:userId and s.warehouse.id=:warehouseId
+          and s.active=true and s.validUntil is not null and s.validUntil<=:now
         """)
-    int expirePrevious(@Param("userId") UUID userId,@Param("warehouseId") UUID warehouseId,@Param("now") Instant now);
+    List<UserWarehouseScope> findExpiredActive(@Param("userId") UUID userId,@Param("warehouseId") UUID warehouseId,@Param("now") Instant now);
 
     @Query("select case when count(s)>0 then true else false end from UserWarehouseScope s where s.warehouse.id=:warehouseId")
     boolean existsAnyForWarehouse(@Param("warehouseId") UUID warehouseId);
