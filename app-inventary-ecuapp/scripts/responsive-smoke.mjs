@@ -9,7 +9,8 @@ const profileDir = `/tmp/inventary-chrome-smoke-${process.pid}`;
 const targetUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:4173/inventary/iniciar-sesion';
 const outputDir = new URL('../test-results/', import.meta.url);
 
-await rm(profileDir, { recursive: true, force: true });
+await rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+await rm(outputDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 await mkdir(outputDir, { recursive: true });
 
 const chrome = spawn(chromePath, [
@@ -137,6 +138,15 @@ try {
   }
 } finally {
   try { socket?.close(); } catch { /* Best-effort teardown. */ }
-  chrome.kill('SIGTERM');
-  await rm(profileDir, { recursive: true, force: true });
+  // Chromium may still be flushing its profile after SIGTERM; wait for exit before removing it.
+  if (chrome.exitCode === null && chrome.signalCode === null) {
+    const exited = new Promise(resolve => chrome.once('exit', resolve));
+    chrome.kill('SIGTERM');
+    const stopped = await Promise.race([exited.then(() => true), delay(5000).then(() => false)]);
+    if (!stopped) {
+      chrome.kill('SIGKILL');
+      await Promise.race([exited, delay(2000)]);
+    }
+  }
+  await rm(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
