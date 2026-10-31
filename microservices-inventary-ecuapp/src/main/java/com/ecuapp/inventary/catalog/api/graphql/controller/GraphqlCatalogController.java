@@ -16,7 +16,7 @@ import java.util.UUID;
 @Controller
 public class GraphqlCatalogController {
  private final ProductService products;private final CategoryService categories;
- public GraphqlCatalogController(ProductService products,CategoryRepository categories){this.products=products;this.categories=categories;}
+ public GraphqlCatalogController(ProductService products,CategoryService categories){this.products=products;this.categories=categories;}
 
  @QueryMapping
  public ProductPage publicProducts(@Argument Integer page,@Argument Integer size){
