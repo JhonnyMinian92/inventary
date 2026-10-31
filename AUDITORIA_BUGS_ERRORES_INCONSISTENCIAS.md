@@ -173,3 +173,12 @@ Este documento es un registro de hallazgos estáticos. Las correcciones están p
 | Documentación raíz/frontend desactualizada | Parcialmente corregido | READMEs actualizados y roadmap maestro añadido. Las referencias históricas de esta auditoría siguen describiendo el snapshot original. |
 
 Los demás hallazgos de P1/P2 —impuestos y contrato fiscal, snapshots de facturación, asignación de almacén por usuario/caja, devolución monetaria, separación entre cancelación comercial y fiscal, descuentos y logística— permanecen pendientes y se distribuyen en las fases 3, 4 y 5 del plan maestro. No se consideran resueltos por los cambios de estabilización.
+
+
+## Adenda de trazabilidad — consolidación completa de propuestas · 2026-10-30
+
+El estado de los hallazgos y las brechas de producto se ejecutará conforme al plan y a la matriz que consolidan los 22 documentos raíz:
+- [Plan maestro de implementación](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md)
+- [Matriz de trazabilidad de propuestas](MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md)
+
+Los defectos corregidos en Fase 1 incluyen la regla de precio mínimo aplicada indebidamente a SERVICE/NON_STOCKED_GOOD, la configuración de bootstrap y la reproducibilidad de CI; se añadieron pruebas de regresión y se validaron los workflows. Impuestos/SRI, snapshots fiscales completos, ámbitos de usuario/caja, pagos/reembolsos, descuentos, fulfillment y pruebas E2E permanecen asignados a fases posteriores, no se declaran resueltos por esta Fase 1.
