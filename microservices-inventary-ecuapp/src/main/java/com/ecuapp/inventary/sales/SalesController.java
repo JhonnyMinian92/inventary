@@ -1,4 +1,5 @@
 package com.ecuapp.inventary.sales;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -12,11 +13,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 @RestController @RequestMapping("/api/v1/sales")
 public class SalesController {
- private final SaleService service;private final SalePricingService pricing;
- public SalesController(SaleService service,SalePricingService pricing){this.service=service;this.pricing=pricing;}
+ private final SaleService service;private final SalePricingService pricing;private final WarehouseScopeService scopes;
+ public SalesController(SaleService service,SalePricingService pricing,WarehouseScopeService scopes){this.service=service;this.pricing=pricing;this.scopes=scopes;}
  /** Read-only: suggested and minimum (no-loss) prices for the lines of a sale being prepared. */
  @PostMapping("/pricing") @PreAuthorize("hasAuthority('sales:manage')")
- public java.util.List<SaleDtos.PriceView> pricing(@Valid @RequestBody SaleDtos.PricingRequest request){return pricing.quote(request);}
+ public java.util.List<SaleDtos.PriceView> pricing(@Valid @RequestBody SaleDtos.PricingRequest request,Authentication auth){scopes.requireWarehouseAccess(auth.getName(),request.warehouseId());return pricing.quote(request);}
  @GetMapping @PreAuthorize("hasAuthority('sales:read')")
  public Page<SaleDtos.View> list(@RequestParam(required=false) SaleStatus status,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) UUID customerId,@RequestParam(required=false) SaleChannel channel,
