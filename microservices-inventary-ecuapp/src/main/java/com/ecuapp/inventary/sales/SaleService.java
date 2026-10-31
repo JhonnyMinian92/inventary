@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.sales;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
@@ -34,26 +35,34 @@ public class SaleService {
  private final StockBalanceRepository balances;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
  private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;
  private final BusinessPartnerRepository partners;private final IdempotencyRecordRepository idempotencyRecords;
- private final UnitOfMeasureRepository units;private final InventoryCostingService costing;private final SalePricingService pricing;
+ private final UnitOfMeasureRepository units;private final InventoryCostingService costing;private final SalePricingService pricing;private final WarehouseScopeService scopes;
  private static final Set<String> SORT=Set.of("soldAt","saleNumber","total","status");
  public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,
   SalesReturnLineRepository returnLines,BusinessPartnerRepository partners,IdempotencyRecordRepository idempotencyRecords,
-  UnitOfMeasureRepository units,InventoryCostingService costing,SalePricingService pricing){
+  UnitOfMeasureRepository units,InventoryCostingService costing,SalePricingService pricing,WarehouseScopeService scopes){
   this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;
   this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;this.partners=partners;
-  this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;this.pricing=pricing;
+  this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;this.pricing=pricing;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public Page<SaleDtos.View> list(SaleStatus status,UUID warehouseId,UUID customerId,SaleChannel channel,java.time.Instant from,java.time.Instant to,Pageable p){
+ @Transactional(readOnly=true) public Page<SaleDtos.View> list(SaleStatus status,UUID warehouseId,UUID customerId,SaleChannel channel,java.time.Instant from,java.time.Instant to,Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
-  return sales.search(status,warehouseId,customerId,channel,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"soldAt"))).map(SaleDtos.View::from);
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"soldAt"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  return (allowed==null?sales.search(status,warehouseId,customerId,channel,lower,upper,pageable):
+   sales.searchScoped(status,warehouseId,customerId,channel,lower,upper,allowed,pageable)).map(SaleDtos.View::from);
  }
- @Transactional(readOnly=true) public SaleDtos.View get(UUID id){
-  return SaleDtos.View.from(sales.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id)));
+ @Transactional(readOnly=true) public SaleDtos.View get(UUID id,String actor){
+  Sale sale=sales.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id));
+  scopes.requireWarehouseAccess(actor,sale.getWarehouse().getId());
+  return SaleDtos.View.from(sale);
  }
 
  @Transactional
  public SaleDtos.View create(String suppliedKey,SaleDtos.CreateRequest request,String actor){
+  scopes.requireWarehouseAccess(actor,request.warehouseId());
   String key=normalizeIdempotencyKey(suppliedKey);
   String hash=requestHash(request);
 
@@ -190,6 +199,7 @@ public class SaleService {
 
  @Transactional
  public SaleDtos.View requestCancellation(UUID id,String suppliedKey,String reason,String actor){
+  requireSaleScope(id,actor);
   String key=normalizeIdempotencyKey(suppliedKey);
   if(reason==null||reason.isBlank()||reason.trim().length()>1000)throw new BusinessRuleException("Debe indicar un motivo de cancelación de hasta 1000 caracteres.");
   String cleanReason=reason.trim();
@@ -207,6 +217,7 @@ public class SaleService {
 
  @Transactional
  public SaleDtos.View approveCancellation(UUID id,String suppliedKey,String actor){
+  requireSaleScope(id,actor);
   String key=normalizeIdempotencyKey(suppliedKey);
   IdempotencyRecord record=claimIdempotency("SALE_CANCEL_APPROVE",key,sha256("SALE_CANCEL_APPROVE|"+id));
   if(record.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return SaleDtos.View.from(sales.findDetailedById(record.getResourceId()).orElseThrow(()->new ConflictException("La clave de idempotencia apunta a una venta inexistente.")));
@@ -277,4 +288,8 @@ public class SaleService {
   catch(Exception ex){throw new IllegalStateException("No se pudo calcular huella de idempotencia.",ex);}
  }
  private String clean(String value){return value==null||value.isBlank()?null:value.trim();}
+ private void requireSaleScope(UUID id,String actor){
+  Sale sale=sales.findById(id).orElseThrow(()->new ResourceNotFoundException("Venta",id));
+  scopes.requireWarehouseAccess(actor,sale.getWarehouse().getId());
+ }
 }
