@@ -1,4 +1,4 @@
-> **Estado actualizado — 2026-10-31, rama `implementacion_propuestas`:** se está cerrando la Fase 3 de arquitectura. La compilación y las pruebas de cierre se asocian al SHA final de esta fase; un workflow anterior exitoso no sustituye esa validación.
+> **Estado actualizado — 2026-10-31, rama `implementacion_propuestas`:** la reorganización de código de la Fase 3 está implementada y validada por CI en el SHA `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`. El workflow ejecutó 22 pruebas y el build de producción con éxito. La comprobación visual E2E en navegador queda pendiente y no se presenta como realizada.
 
 # Plan de implementación del frontend
 
@@ -37,7 +37,7 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 3 — Arquitectura y separación del frontend React
 
-**Estado de implementación en `implementacion_propuestas`: cambios incorporados; validación CI pendiente del SHA final.**
+**Estado de implementación en `implementacion_propuestas`: código y CI completados en el SHA `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`; 22 pruebas y build correctos. La inspección responsive/a11y fue estática; falta prueba visual E2E en navegador.**
 
 - Punto de entrada reducido a composición de providers y workspace; el root `src/App.jsx` queda como fachada de compatibilidad.
 - Separación explícita de `app`, `pages`, `widgets`, `features`, `entities` y `shared`, con dependencias dirigidas y una navegación declarativa.
