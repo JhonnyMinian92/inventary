@@ -20,4 +20,14 @@ public interface SalesReturnRepository extends JpaRepository<SalesReturn,UUID>{
   """)
  org.springframework.data.domain.Page<SalesReturn> search(@Param("sourceSaleId") UUID sourceSaleId,@Param("warehouseId") UUID warehouseId,
   @Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,org.springframework.data.domain.Pageable pageable);
+
+ @EntityGraph(attributePaths={"sourceSale","warehouse"})
+ @Query("""
+  select r from SalesReturn r where (:sourceSaleId is null or r.sourceSale.id=:sourceSaleId)
+   and (:warehouseId is null or r.warehouse.id=:warehouseId) and r.warehouse.id in :warehouseIds
+   and r.createdAt>=:fromTime and r.createdAt<:toTime
+  """)
+ org.springframework.data.domain.Page<SalesReturn> searchScoped(@Param("sourceSaleId") UUID sourceSaleId,@Param("warehouseId") UUID warehouseId,
+  @Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,
+  @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,org.springframework.data.domain.Pageable pageable);
 }
