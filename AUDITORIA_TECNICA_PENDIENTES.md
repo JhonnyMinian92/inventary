@@ -429,3 +429,18 @@ No cerrar auditoría ni declarar backend completo hasta cumplir todo lo siguient
 - Pruebas actuales: `src/test/java/com/ecuapp/inventary/**`.
 
 **Recordatorio:** la existencia de clases, tablas o documentación no demuestra funcionamiento en producción. La aprobación final debe apoyarse en pruebas reproducibles y evidencia del commit probado.
+
+---
+
+## Adenda de vigencia — rama implementacion_propuestas · 2026-10-30
+
+Este documento conserva una auditoría de un snapshot anterior y **no constituye un inventario vivo del HEAD actual**. Sus referencias a número de archivos, migraciones, ausencia de frontend, estado de costing, pruebas y ramas corresponden al corte indicado en el propio documento y deben revalidarse antes de actuar sobre ellas.
+
+La consolidación vigente de las 22 propuestas de raíz, las dos propuestas de arquitectura y las auditorías se encuentra en:
+- [Plan maestro por fases](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md)
+- [Matriz de trazabilidad de las 22 propuestas](MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md)
+- [Auditoría de bugs con seguimiento de Fase 1](AUDITORIA_BUGS_ERRORES_INCONSISTENCIAS.md)
+
+**Estado verificado para Fase 1:** frontend CI (run 41165392564) y backend CI con PostgreSQL 16/Compose/smoke test desde volumen vacío (run 41165468427) finalizaron en success. Los hallazgos históricos que no están expresamente declarados corregidos siguen pendientes de revalidación; no deben cerrarse por mera existencia de una clase o migración.
+
+Las próximas fases deben cumplir el orden y los criterios de la matriz. No se deben eliminar pruebas ni debilitar seguridad para conseguir CI verde. No se considera terminada la entrega ni lista para producción hasta cerrar las fases pendientes y sus evidencias.
