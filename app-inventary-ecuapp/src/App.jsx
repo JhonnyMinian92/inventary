@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, LogOut, MessageCircle, Plus, RefreshCw, Repeat, Search, Warehouse } from 'lucide-react';
-import { api, getToken, getTokenExpiry, listFrom, listAllPages, setToken } from './api';
+import { api, listFrom, listAllPages } from './api';
 import { currentRoute, detailPath, documentTitle, HOME_ROUTE, isPlainLeftClick, loginPath, navigate, nextFromSearch, pathFor, sectionPath, workflowPath } from './router.js';
 import LoginPage from './features/auth/LoginPage.jsx';
 import { BrandMark } from './components/BrandLogo.jsx';
@@ -28,6 +28,7 @@ import FeedbackHost from './ui/FeedbackHost.jsx';
 import { clearToasts, confirmDialog, toast, useMessageToast } from './ui/feedback.js';
 import { SkeletonTable } from './ui/Skeleton.jsx';
 import { compactMoney, isInactive, number, titleCase } from './utils/format.js';
+import { useAuth } from './app/providers/AuthProvider.jsx';
 
 const NAV_GROUPS = [
   { label: 'General', items: [{ id: 'overview', label: 'Resumen', icon: LayoutDashboard }] },
@@ -67,9 +68,8 @@ function pickId(x) { return x?.id ?? x?.productId ?? x?.categoryId ?? x?.warehou
 function pickName(x) { return x?.name ?? x?.description ?? x?.sku ?? String(pickId(x)); }
 function quantity(x) { return x?.onHand ?? x?.quantity ?? x?.available ?? x?.stock ?? 0; }
 
-function App() {
-  const [token, setTokenState] = useState(getToken());
-  const [user, setUser] = useState(null);
+function AppWorkspace() {
+  const { token, user, apiStatus, can, expireSession, login, logout: logoutSession, authError } = useAuth();
   const [section, setSection] = useState(() => routeState().section);
   const [routeEntityId, setRouteEntityId] = useState(() => routeState().entityId);
   const [detailRoute, setDetailRoute] = useState(() => routeState().detail);
@@ -93,7 +93,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [apiStatus, setApiStatus] = useState('checking');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState(() => routeState().workflow);
@@ -103,16 +102,7 @@ function App() {
   useMessageToast(error, setError, 'error');
   useMessageToast(notice, setNotice, 'success');
 
-  // Mientras /auth/me no responde no se ocultan opciones; el backend aplica los permisos en cualquier caso.
-  const can = useCallback(permission => !permission || !user || (user.permissions || []).includes(permission), [user]);
-
-  const expireSession = useCallback((message = 'La sesión expiró o ya no es válida. Inicia sesión nuevamente.') => {
-    setToken('');
-    setTokenState('');
-    setUser(null);
-    setApiStatus('error');
-    toast.info(message);
-  }, []);
+  useEffect(() => { if (authError) setError(authError); }, [authError]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -133,7 +123,6 @@ function App() {
       setLoading(false);
       return;
     }
-    setApiStatus(results.some(result => result.status === 'fulfilled') ? 'connected' : 'error');
     const failed = [];
     results.forEach((result, i) => {
       const [key] = tasks[i];
@@ -151,18 +140,8 @@ function App() {
 
   useEffect(() => {
     if (!token) return;
-    api.me().then(setUser).catch(e => { if (e.status === 401) expireSession(); else setError(e.message); });
     loadData();
   }, [token, loadData, expireSession]);
-
-  // Cierra la sesión en el instante en que vence el token, sin esperar a un 401.
-  useEffect(() => {
-    if (!token) return undefined;
-    const expiresAt = getTokenExpiry();
-    if (!expiresAt) return undefined;
-    const timer = window.setTimeout(() => expireSession('Tu sesión expiró por seguridad. Inicia sesión nuevamente.'), Math.max(0, expiresAt - Date.now()));
-    return () => window.clearTimeout(timer);
-  }, [token, expireSession]);
 
   const syncFromLocation = useCallback(() => {
     const route = currentRoute();
@@ -390,17 +369,10 @@ function App() {
     await runAction(() => kind === 'product' ? api.deleteProduct(pickId(item)) : api.deleteCategory(pickId(item)), `${titleCase(noun)} eliminad${kind === 'product' ? 'o' : 'a'}.`);
   }
 
-  async function logout() {
-    try {
-      await api.logout();
-    } catch (logoutError) {
-      toast.warning('La sesión se cerró en este equipo, pero el servidor no confirmó el cierre: ' + (logoutError?.message || 'error desconocido'));
-    } finally {
-      navigate(loginPath(), { replace: true });
-      setToken('');
-      setTokenState('');
-      setUser(null);
-    }
+  async function handleLogout() {
+    const logoutError = await logoutSession();
+    if (logoutError) toast.warning('La sesión se cerró en este equipo, pero el servidor no confirmó el cierre: ' + (logoutError?.message || 'error desconocido'));
+    navigate(loginPath(), { replace: true });
   }
 
   async function submitPurchase(data) {
@@ -513,13 +485,9 @@ function App() {
   }
 
   if (!token) return <>
-    <LoginPage onLogin={async ({ username, password, remember }) => {
-      const result = await api.login(username, password);
-      const access = result?.accessToken;
-      if (!access) throw new Error('La respuesta de inicio de sesión no contiene accessToken.');
-      setToken(access, { persist: remember, expiresAt: result.expiresAt });
+    <LoginPage onLogin={async credentials => {
+      await login(credentials);
       clearToasts();
-      setTokenState(access);
     }} />
     <FeedbackHost />
   </>;
@@ -552,7 +520,7 @@ function App() {
         <div className="sidebar-profile">
           <span className="avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span>
           <span className="profile-copy"><strong>{displayName}</strong><small className={apiStatus === 'error' ? 'offline' : ''}>{apiStatus === 'error' ? 'Sin conexión' : roleLabel}</small></span>
-          <button type="button" className="icon-button ghost" onClick={logout} aria-label="Cerrar sesión" title="Cerrar sesión"><LogOut size={17} /></button>
+          <button type="button" className="icon-button ghost" onClick={handleLogout} aria-label="Cerrar sesión" title="Cerrar sesión"><LogOut size={17} /></button>
         </div>
         <div className="sidebar-legal"><img src={ecuappLogo} alt="" width="18" height="18" /><span>© {new Date().getFullYear()} EcuApp. Todos los derechos reservados.</span></div>
       </div>
@@ -657,4 +625,4 @@ function Modal({ title, onClose, children, busy }) {
   </div>;
 }
 
-export default App;
+export default AppWorkspace;
