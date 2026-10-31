@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, RotateCcw, X } from 'lucide-react';
-import { api, listFrom, listAllPages } from '../../api';
+import { api, listFrom } from '../../api';
+import ServerPagination from '../../ui/ServerPagination.jsx';
 import StepProgress from '../../components/StepProgress.jsx';
 import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
 
@@ -14,6 +15,8 @@ function readSalesReturnFromUrl() {
 
 export default function SalesReturns({ onChanged }) {
   const [rows, setRows] = useState([]);
+  const [returnsPage, setReturnsPage] = useState(0);
+  const [returnsPageInfo, setReturnsPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,17 +36,23 @@ export default function SalesReturns({ onChanged }) {
     setLoading(true);
     setError('');
     const [returnsResult, salesResult] = await Promise.allSettled([
-      listAllPages(api.salesReturns, { size: 100, sort: 'createdAt,desc' }),
-      listAllPages(api.sales, { size: 100, sort: 'soldAt,desc' })
+      api.salesReturns({ page: returnsPage, size: 20, sort: 'createdAt,desc' }),
+      api.sales({ status: 'COMPLETED', page: 0, size: 100, sort: 'soldAt,desc' })
     ]);
     const failures = [];
-    if (returnsResult.status === 'fulfilled') setRows(listFrom(returnsResult.value));
-    else failures.push('devoluciones: ' + (returnsResult.reason?.message || 'error'));
-    if (salesResult.status === 'fulfilled') setSales(listFrom(salesResult.value).filter(sale => String(sale.status || '').toUpperCase() === 'COMPLETED'));
+    if (returnsResult.status === 'fulfilled') {
+      setRows(listFrom(returnsResult.value));
+      setReturnsPageInfo({
+        page: Number(returnsResult.value?.number ?? 0), size: Number(returnsResult.value?.size ?? 20),
+        totalElements: Number(returnsResult.value?.totalElements ?? listFrom(returnsResult.value).length),
+        totalPages: Number(returnsResult.value?.totalPages ?? 1)
+      });
+    } else failures.push('devoluciones: ' + (returnsResult.reason?.message || 'error'));
+    if (salesResult.status === 'fulfilled') setSales(listFrom(salesResult.value));
     else failures.push('ventas: ' + (salesResult.reason?.message || 'error'));
     if (failures.length) setError('No se pudieron cargar todos los datos. ' + failures.join(' · '));
     setLoading(false);
-  }, []);
+  }, [returnsPage]);
 
   // Reload on open too: sales cancelled or returned elsewhere must not be offered as returnable.
   useEffect(() => { void refresh(); }, [refresh, formOpen]);
@@ -72,7 +81,7 @@ export default function SalesReturns({ onChanged }) {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.sale(sourceSaleId), listAllPages(api.salesReturns, { sourceSaleId, size: 100 })])
+    Promise.all([api.sale(sourceSaleId), api.salesReturns({ sourceSaleId, page: 0, size: 100 })])
       .then(([sale, returnsPayload]) => {
         if (!active) return;
         const returns = listFrom(returnsPayload).filter(item => String(item.status || '').toUpperCase() !== 'CANCELLED');
@@ -235,7 +244,8 @@ export default function SalesReturns({ onChanged }) {
         <td><span className={'pill ' + (row.status === 'POSTED' ? 'active' : 'inactive')}>{row.status || '—'}</span></td>
         <td>{date(row.createdAt)}</td><td>{row.reason || '—'}</td><td>{money(row.total)}</td>
       </tr>)}
-    </tbody></table>{!rows.length && <div className="empty-state">{loading ? 'Cargando devoluciones…' : 'Todavía no hay devoluciones de clientes.'}</div>}</div>}
+    </tbody></table>{!rows.length && <div className="empty-state">{loading ? 'Cargando devoluciones…' : 'No hay devoluciones en esta página.'}</div>}
+      <ServerPagination info={returnsPageInfo} page={returnsPage} loading={loading} onChange={setReturnsPage} /></div>}
 
     {formOpen && <section className="return-workspace" aria-labelledby="sales-return-title">
       <div className="return-workspace-heading">
