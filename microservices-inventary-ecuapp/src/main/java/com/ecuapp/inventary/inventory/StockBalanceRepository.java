@@ -32,4 +32,13 @@ public interface StockBalanceRepository extends JpaRepository<StockBalance,UUID>
   and (:onlyAvailable=false or (b.onHand - b.reserved) > 0)
   """)
  Page<StockBalance> search(@Param("productId") UUID productId,@Param("warehouseId") UUID warehouseId,@Param("onlyAvailable") boolean onlyAvailable,Pageable pageable);
+
+ @EntityGraph(attributePaths={"product","warehouse"})
+ @Query("""
+  select b from StockBalance b where (:productId is null or b.product.id=:productId)
+   and (:warehouseId is null or b.warehouse.id=:warehouseId) and b.warehouse.id in :warehouseIds
+   and (:onlyAvailable=false or (b.onHand-b.reserved)>0)
+  """)
+ Page<StockBalance> searchScoped(@Param("productId") UUID productId,@Param("warehouseId") UUID warehouseId,
+  @Param("onlyAvailable") boolean onlyAvailable,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
