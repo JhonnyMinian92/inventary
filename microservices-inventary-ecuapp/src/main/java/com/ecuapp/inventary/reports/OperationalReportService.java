@@ -1,5 +1,6 @@
 package com.ecuapp.inventary.reports;
 
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.Product;
 import com.ecuapp.inventary.catalog.ProductRepository;
 import com.ecuapp.inventary.common.InvalidQueryException;
@@ -226,18 +227,22 @@ public class OperationalReportService {
     private final ProductRepository products;
     private final WarehouseRepository warehouses;
     private final ZoneId defaultZone;
+    private final WarehouseScopeService scopes;
 
     public OperationalReportService(NamedParameterJdbcTemplate jdbc, InventoryCostingService costing, ProductRepository products,
-                                    WarehouseRepository warehouses, @Value("${app.reports.time-zone:America/Guayaquil}") String defaultZone) {
+                                    WarehouseRepository warehouses, WarehouseScopeService scopes,
+                                    @Value("${app.reports.time-zone:America/Guayaquil}") String defaultZone) {
         this.jdbc = jdbc;
         this.costing = costing;
         this.products = products;
         this.warehouses = warehouses;
+        this.scopes = scopes;
         this.defaultZone = ZoneId.of(defaultZone);
     }
 
     @Transactional(readOnly = true)
-    public ReportDtos.ValuationReport valuation(UUID warehouseId, UUID productId, boolean includeEmpty, Pageable pageable) {
+    public ReportDtos.ValuationReport valuation(UUID warehouseId, UUID productId, boolean includeEmpty, Pageable pageable,String actor) {
+        warehouseId=resolveWarehouseScope(warehouseId,actor);
         if (pageable.getPageNumber() < 0) throw new InvalidQueryException("El número de página no puede ser negativo.");
         int size = Math.min(Math.max(pageable.getPageSize(), 1), 100);
         MapSqlParameterSource params = new MapSqlParameterSource()
@@ -262,7 +267,8 @@ public class OperationalReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReportDtos.SalesReport sales(LocalDate from, LocalDate to, UUID warehouseId, String zone) {
+    public ReportDtos.SalesReport sales(LocalDate from, LocalDate to, UUID warehouseId, String zone,String actor) {
+        warehouseId=resolveWarehouseScope(warehouseId,actor);
         ReportPeriod period = ReportPeriod.of(from, to, zone, defaultZone);
         MapSqlParameterSource params = periodParams(period).addValue("warehouseId", warehouseId, Types.OTHER)
             .addValue("zone", period.zone().getId()).addValue("limit", MAX_PRODUCT_ROWS);
@@ -287,7 +293,8 @@ public class OperationalReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReportDtos.PurchasesReport purchases(LocalDate from, LocalDate to, UUID warehouseId, UUID supplierId, String zone) {
+    public ReportDtos.PurchasesReport purchases(LocalDate from, LocalDate to, UUID warehouseId, UUID supplierId, String zone,String actor) {
+        warehouseId=resolveWarehouseScope(warehouseId,actor);
         ReportPeriod period = ReportPeriod.of(from, to, zone, defaultZone);
         MapSqlParameterSource params = periodParams(period).addValue("warehouseId", warehouseId, Types.OTHER)
             .addValue("supplierId", supplierId, Types.OTHER).addValue("limit", MAX_PRODUCT_ROWS);
@@ -310,7 +317,8 @@ public class OperationalReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReportDtos.KardexReport kardex(UUID productId, UUID warehouseId, LocalDate from, LocalDate to, String zone) {
+    public ReportDtos.KardexReport kardex(UUID productId, UUID warehouseId, LocalDate from, LocalDate to, String zone,String actor) {
+        warehouseId=resolveWarehouseScope(warehouseId,actor);
         ReportPeriod period = ReportPeriod.of(from, to, zone, defaultZone);
         Product product = products.findById(productId).orElseThrow(() -> new ResourceNotFoundException("Producto", productId));
         Warehouse warehouse = warehouses.findById(warehouseId).orElseThrow(() -> new ResourceNotFoundException("Almacén", warehouseId));
@@ -343,6 +351,22 @@ public class OperationalReportService {
         return new ReportDtos.KardexReport(product.getId(), product.getSku(), product.getName(), warehouse.getId(), warehouse.getCode(),
             period.from(), period.to(), period.zone().getId(), opening[0].setScale(3, RoundingMode.HALF_UP), opening[1].setScale(2, RoundingMode.HALF_UP),
             quantity, value.setScale(2, RoundingMode.HALF_UP), lines);
+    }
+
+    /**
+     * Financial/operational reports must never aggregate across a limited user's invisible warehouses.
+     * A single assigned warehouse is a safe default; several require an explicit filter.
+     */
+    private UUID resolveWarehouseScope(UUID requested,String actor) {
+        var allowed=scopes.accessibleWarehouseIds(actor);
+        if(allowed==null)return requested;
+        if(requested!=null) {
+            scopes.requireWarehouseAccess(actor,requested);
+            return requested;
+        }
+        if(allowed.isEmpty())throw new ResourceNotFoundException("Almacén","sin ámbito asignado");
+        if(allowed.size()>1)throw new InvalidQueryException("Seleccione warehouseId para consultar un informe con varias bodegas asignadas.");
+        return allowed.iterator().next();
     }
 
     private MapSqlParameterSource periodParams(ReportPeriod period) {
