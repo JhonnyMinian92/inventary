@@ -45,7 +45,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
   const pricingKey = useMemo(() => lines.filter(line => line.productId && Number(line.quantity) > 0)
     .map(line => `${line.productId}:${Number(line.quantity)}`).sort().join(','), [lines]);
 
-  // Precio sugerido (costo de compra + ganancia) y mínimo sin pérdida; ambos los calcula el backend.
+  // El backend aplica el precio sugerido y el mínimo sin pérdida solo a productos con control de stock.
   useEffect(() => {
     if (!warehouseId || !pricingKey) { setPricingByProduct({}); setPricingLoading(false); return undefined; }
     let active = true;
@@ -271,7 +271,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
     {step === 1 && <section className="workflow-stage" aria-labelledby="sale-products-title">
       <div className="workflow-stage-heading">
         <span className="workflow-stage-icon"><ShoppingCart size={20}/></span>
-        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Busca el producto o servicio por su nombre. El precio se sugiere con la ganancia configurada y puedes ajustarlo, sin bajar del costo. Las suscripciones se registran en Suscripciones.</p></div>
+        <div><h2 id="sale-products-title">Artículos de la venta</h2><p>Busca el producto o servicio por su nombre. El precio se sugiere desde el backend. En productos con stock se valida el costo de salida; en servicios y productos sin control de existencias se aplica el precio de catálogo. Las suscripciones se registran en Suscripciones.</p></div>
       </div>
       {!activeProducts.length && <div className="empty-state workflow-empty">No hay productos ni servicios activos para vender.</div>}
       <div className="workflow-line-list">
@@ -295,10 +295,10 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
               </div>
               <label className="field"><span>Cantidad<b> *</b></span><input type="number" min="0.001" step="0.001" inputMode="decimal" required value={line.quantity} onChange={event => updateLine(index, 'quantity', event.target.value)} /></label>
               <label className="field"><span>Precio de venta (c/u)<b> *</b></span>
-                <input type="number" min={pricing ? pricing.minimumPrice : 0} step="0.01" inputMode="decimal" required disabled={!line.productId} aria-invalid={loss}
+                <input type="number" min={pricing && hasCostFloor ? pricing.minimumPrice : 0} step="0.01" inputMode="decimal" required disabled={!line.productId} aria-invalid={loss}
                   value={line.unitPrice} placeholder={pricingLoading ? 'Calculando…' : '0.00'} onChange={event => updateLine(index, 'unitPrice', event.target.value)} />
                 {pricing && <small className="field-help price-help">
-                  Sugerido {money(pricing.suggestedPrice)} (+{percent(Number(pricing.marginPercent || 0))}) · Mínimo sin pérdida {money(pricing.minimumPrice)}
+                  Sugerido {money(pricing.suggestedPrice)} (+{percent(Number(pricing.marginPercent || 0))}){hasCostFloor ? <> · Mínimo sin pérdida {money(pricing.minimumPrice)}</> : <> · Sin control de existencias</> }
                   {line.priceEdited && Number(line.unitPrice) !== Number(pricing.suggestedPrice) && <> · <button type="button" className="text-button inline" onClick={() => applySuggestedPrice(index)}>Usar sugerido</button></>}
                 </small>}
               </label>
