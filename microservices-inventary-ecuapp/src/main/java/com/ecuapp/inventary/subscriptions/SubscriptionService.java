@@ -154,7 +154,7 @@ public class SubscriptionService {
             "productId", product.getId().toString(), "frequency", frequency.name(), "termMonths", term, "total", subscription.getTotalAmount().toPlainString()));
         record.markCompleted("SUBSCRIPTION", subscription.getId(), (short) 201);
         idempotencyRecords.saveAndFlush(record);
-        return get(subscription.getId());
+        return get(subscription.getId(),actor);
     }
 
     @Transactional(readOnly = true)
