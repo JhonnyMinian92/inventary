@@ -31,4 +31,15 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
   """)
  Page<PurchaseOrder> search(@Param("status") PurchaseOrderStatus status,@Param("supplierId") UUID supplierId,@Param("warehouseId") UUID warehouseId,
   @Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,Pageable pageable);
+
+ @EntityGraph(attributePaths={"supplier","warehouse"})
+ @Query("""
+  select p from PurchaseOrder p where (:status is null or p.status=:status)
+   and (:supplierId is null or p.supplier.id=:supplierId)
+   and (:warehouseId is null or p.warehouse.id=:warehouseId)
+   and p.warehouse.id in :warehouseIds and p.orderedAt>=:fromTime and p.orderedAt<:toTime
+  """)
+ Page<PurchaseOrder> searchScoped(@Param("status") PurchaseOrderStatus status,@Param("supplierId") UUID supplierId,
+  @Param("warehouseId") UUID warehouseId,@Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,
+  @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
