@@ -1,4 +1,6 @@
-package com.ecuapp.inventary.catalog;
+package com.ecuapp.inventary.catalog.api.rest.dto;
+
+import com.ecuapp.inventary.catalog.*;
 
 import com.ecuapp.inventary.catalog.application.ProductResult;
 import jakarta.validation.constraints.*;

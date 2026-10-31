@@ -1,4 +1,6 @@
-package com.ecuapp.inventary.catalog;
+package com.ecuapp.inventary.catalog.api.rest.dto;
+
+import com.ecuapp.inventary.catalog.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

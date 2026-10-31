@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.catalog.api.graphql.controller;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.catalog.api.rest.dto.*;
 import com.ecuapp.inventary.catalog.application.service.CategoryService;
 import com.ecuapp.inventary.catalog.application.service.ProductService;
 import org.springframework.data.domain.Page;

@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.catalog.application.service;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.catalog.api.rest.dto.*;
 
 import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.BusinessRuleException;

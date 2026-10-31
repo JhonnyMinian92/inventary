@@ -205,13 +205,13 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - El resolver GraphQL del catálogo se ubicó en `catalog.api.graphql.controller`; para listar categorías delega en `CategoryService`, no accede directamente al repositorio Spring Data.
 - Los servicios de aplicación `ProductService`, `CategoryService`, `CatalogStructureService`, `ProductVariantService` y `CategorySuggestionService` se ubicaron en `catalog.application.service`.
 - Se actualizó el adaptador de integración WhatsApp para consumir el nuevo paquete de `ProductService`.
-- Se hicieron públicos los mappers estáticos de los DTOs del catálogo que ahora se consumen entre paquetes.
+- Los DTOs `ProductDtos`, `CategoryDtos` y `CatalogStructureDtos` se trasladaron a `catalog.api.rest.dto`; se hicieron públicos los mappers estáticos usados entre paquetes.
 - Los paths REST, los nombres de las operaciones GraphQL, el schema GraphQL, los DTOs serializados, las entidades y los mappings JPA se conservaron. No se añadieron ni editaron migraciones Flyway.
 
 **Brechas que impiden declarar cerrada la Fase 4:**
 - Las entidades JPA y los repositorios Spring Data de catálogo siguen en el paquete raíz heredado; el puerto `ProductPersistencePort` todavía usa la entidad JPA `Product` como modelo.
 - Los servicios del catálogo mantienen dependencias directas a repositorios de otros dominios y a DTOs de presentación en flujos heredados; requieren puertos/contratos de aplicación y mappers específicos antes de cumplir aislamiento estricto.
-- `CategoryDtos` y `CatalogStructureDtos` todavía combinan request/response records; su separación requiere comandos y resultados de aplicación para no invertir las dependencias.
+- Aunque `CategoryDtos` y `CatalogStructureDtos` ya residen en `api.rest.dto`, todavía combinan request/response records y los servicios los reciben directamente; faltan comandos/resultados de aplicación para eliminar la dependencia Application→API.
 - Los demás dominios del backend aún no se han migrado a la jerarquía objetivo.
 - La suite Maven/PostgreSQL y el smoke de arranque deben validarse en el SHA resultante de esta reorganización.
 

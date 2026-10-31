@@ -10,11 +10,16 @@
 ```text
 catalog/
 ├── api/
-│   ├── rest/controller/
-│   │   ├── ProductController.java
-│   │   ├── CategoryController.java
-│   │   ├── PublicCatalogController.java
-│   │   └── CatalogStructureController.java
+│   ├── rest/
+│   │   ├── controller/
+│   │   │   ├── ProductController.java
+│   │   │   ├── CategoryController.java
+│   │   │   ├── PublicCatalogController.java
+│   │   │   └── CatalogStructureController.java
+│   │   └── dto/
+│   │       ├── ProductDtos.java
+│   │       ├── CategoryDtos.java
+│   │       └── CatalogStructureDtos.java
 │   └── graphql/controller/
 │       └── GraphqlCatalogController.java
 ├── application/
@@ -28,7 +33,7 @@ catalog/
 │   └── ... contratos de caso de uso ya existentes
 ├── infrastructure/
 │   └── adapter/out/persistence/JpaProductPersistenceAdapter.java
-└── (paquete raíz transicional: entidades, repositorios, enums y DTOs existentes)
+└── (paquete raíz transicional: entidades, repositorios y enums existentes)
 ```
 
 ## Cambios de dependencia
@@ -36,7 +41,7 @@ catalog/
 - Los controladores REST delegan en servicios/casos de uso; no agregan acceso a repositorios.
 - GraphQL ya no inyecta `CategoryRepository`: obtiene la página de categorías activas mediante `CategoryService`.
 - WhatsApp conserva el mismo contrato de catálogo y cambia únicamente el import de `ProductService`.
-- Los mappers estáticos `from(...)` de DTOs usados desde los nuevos paquetes se marcaron públicos; no cambia su JSON.
+- Los DTOs `ProductDtos`, `CategoryDtos` y `CatalogStructureDtos` se trasladaron a `api.rest.dto`. Sus mappers estáticos `from(...)` se marcaron públicos para el consumo entre paquetes; no cambia su JSON.
 
 ## Compatibilidad preservada
 
@@ -47,7 +52,7 @@ No se modificaron rutas REST, métodos HTTP, nombres de argumentos, DTOs seriali
 1. Mover entidades JPA y repositorios Spring Data a `infrastructure.persistence`, incluyendo actualización de relaciones JPA y referencias cruzadas sin cambiar nombres SQL.
 2. Separar los modelos de dominio de entidades JPA. Actualmente `ProductPersistencePort` todavía expone `catalog.Product`, que es JPA.
 3. Introducir puertos de aplicación para las dependencias que el catálogo mantiene hacia inventory, purchasing, transfers y media; no mover interfaces sin un caso de uso concreto.
-4. Separar DTOs de API de comandos/resultados de aplicación, especialmente `CategoryDtos` y `CatalogStructureDtos`, que todavía participan en servicios.
+4. Separar comandos/resultados de aplicación de `CategoryDtos` y `CatalogStructureDtos`: aunque los DTOs ya están en `api.rest.dto`, los servicios todavía los reciben directamente y generan una dependencia Application→API.
 5. Completar `platform` y `shared` y aplicar el mismo patrón a auth, audit, inventory, media, partners, purchasing, reports, returns, sales, subscriptions, transfers, warehouse y whatsapp.
 6. Ampliar las reglas de arquitectura más allá del adaptador API de catálogo: prohibir dependencias Domain→Spring/JPA/HTTP/Kafka y API→infraestructura en todos los contextos, además de pruebas de contrato que comparen rutas y schema.
 7. Validar con `./mvnw -B --no-transfer-progress verify`, PostgreSQL 16, smoke Compose con volumen vacío y pruebas HTTP/GraphQL/security.

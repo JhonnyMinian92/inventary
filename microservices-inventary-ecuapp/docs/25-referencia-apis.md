@@ -21,7 +21,7 @@ La matriz distingue el código presente, la evidencia histórica y la validació
 | Login, identidad, usuarios, roles y permisos | auth/AuthController, UserManagementController, RoleManagementController, SecurityConfig | AuthAdminApiTest, SecurityContractApiTest, RoleMatrixApiTest | Código presente; pruebas de otro snapshot; reejecutar |
 | Productos, categorías y esquema de atributos | catalog/ProductController, CategoryController, CatalogStructureController | CatalogApiTest, DomainRulesTest | Código presente; pruebas históricas; reejecutar |
 | Variantes, unidades, conversiones e imágenes | catalog/CatalogStructureController, media/ProductImageController | CatalogApiTest | Código presente; pruebas históricas; reejecutar |
-| Catálogo público REST y GraphQL | catalog/PublicCatalogController, graphql/GraphqlCatalogController, graphql/schema.graphqls | CatalogApiTest, SecurityContractApiTest | Código presente; pruebas históricas; reejecutar |
+| Catálogo público REST y GraphQL | catalog/api/rest/controller/PublicCatalogController, catalog/api/graphql/controller/GraphqlCatalogController, graphql/schema.graphqls | CatalogApiTest, SecurityContractApiTest | Código presente; pruebas históricas; reejecutar |
 | Proveedores, clientes y almacenes | partners/PartnerController, warehouse/WarehouseController | CatalogApiTest, InventoryApiTest | Código presente; pruebas históricas; reejecutar |
 | Saldos, disponibilidad, movimientos, ajustes, conteos, reposición | inventory/InventoryController, InventoryCountController, ReorderController | InventoryApiTest, StockBalanceTest | Código presente; pruebas históricas; reejecutar |
 | Traslados/compensaciones | transfers/StockTransferController | TransfersApiTest | Código presente; pruebas históricas; reejecutar |

@@ -1,5 +1,7 @@
 package com.ecuapp.inventary.catalog;
 
+import com.ecuapp.inventary.catalog.api.rest.dto.CatalogStructureDtos;
+
 import com.ecuapp.inventary.catalog.CategoryAttributeDefinition.ValueType;
 import com.ecuapp.inventary.common.BusinessRuleException;
 import org.springframework.stereotype.Component;

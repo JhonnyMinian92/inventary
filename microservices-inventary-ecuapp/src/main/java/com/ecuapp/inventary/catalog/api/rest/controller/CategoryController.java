@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.catalog.api.rest.controller;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.catalog.api.rest.dto.*;
 import com.ecuapp.inventary.catalog.application.service.*;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;

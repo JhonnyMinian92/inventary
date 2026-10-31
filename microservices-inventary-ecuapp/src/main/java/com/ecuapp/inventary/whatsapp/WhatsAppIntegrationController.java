@@ -1,7 +1,7 @@
 package com.ecuapp.inventary.whatsapp;
 
 import com.ecuapp.inventary.catalog.application.service.ProductService;
-import com.ecuapp.inventary.catalog.ProductDtos;
+import com.ecuapp.inventary.catalog.api.rest.dto.ProductDtos;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
