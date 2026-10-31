@@ -31,4 +31,7 @@ public interface UserWarehouseScopeRepository extends JpaRepository<UserWarehous
           and s.validUntil is not null and s.validUntil<=:now
         """)
     int expirePrevious(@Param("userId") UUID userId,@Param("warehouseId") UUID warehouseId,@Param("now") Instant now);
+
+    @Query("select case when count(s)>0 then true else false end from UserWarehouseScope s where s.warehouse.id=:warehouseId")
+    boolean existsAnyForWarehouse(@Param("warehouseId") UUID warehouseId);
 }
