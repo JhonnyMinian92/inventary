@@ -85,4 +85,25 @@ class WarehouseScopesApiTest extends ApiTestSupport {
         assertEquals(1,jdbc.queryForObject("select count(*) from audit_event where resource_id=?::uuid and action='USER_WAREHOUSE_SCOPE_EXPIRED'",
             Integer.class,UUID.fromString(expired.get("id").asText())));
     }
+
+    @Test
+    void auditReadDoesNotExposeFinancialCostFieldsWithoutFinancialPermission() {
+        JsonNode warehouse=warehouse();
+        JsonNode product=product("2.50","5.00");
+        JsonNode movement=stock(product.get("id").asText(),warehouse.get("id").asText(),"3","2.50");
+        String auditor=token("AUDITOR");
+
+        JsonNode page=httpGet(auditor,"/api/v1/inventory/movements?warehouseId="+warehouse.get("id").asText(),200);
+        assertEquals(1,page.path("content").size());
+        assertTrue(page.path("content").get(0).path("unitCost").isNull());
+
+        JsonNode detail=httpGet(auditor,"/api/v1/inventory/movements/"+movement.get("id").asText(),200);
+        assertTrue(detail.path("movement").path("unitCost").isNull());
+        assertTrue(detail.path("valuedTotalCost").isNull());
+        assertEquals(0,detail.path("valuation").size());
+
+        JsonNode financial=httpGet(admin(),"/api/v1/inventory/movements/"+movement.get("id").asText(),200);
+        assertFalse(financial.path("movement").path("unitCost").isNull());
+        assertFalse(financial.path("valuedTotalCost").isNull());
+    }
 }
