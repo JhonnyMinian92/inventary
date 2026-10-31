@@ -322,7 +322,7 @@ public class OperationalReportService {
         ReportPeriod period = ReportPeriod.of(from, to, zone, defaultZone);
         Product product = products.findById(productId).orElseThrow(() -> new ResourceNotFoundException("Producto", productId));
         Warehouse warehouse = warehouses.findById(scopedWarehouseId).orElseThrow(() -> new ResourceNotFoundException("Almacén", scopedWarehouseId));
-        MapSqlParameterSource params = periodParams(period).addValue("productId", productId).addValue("scopedWarehouseId", scopedWarehouseId)
+        MapSqlParameterSource params = periodParams(period).addValue("productId", productId) .addValue("warehouseId", scopedWarehouseId)
             .addValue("limit", MAX_KARDEX_LINES + 1);
         BigDecimal[] opening = jdbc.queryForObject(KARDEX_OPENING_SQL, params, (rs, i) -> new BigDecimal[]{
             rs.getBigDecimal("on_hand").subtract(rs.getBigDecimal("since_from")), rs.getBigDecimal("opening_value")});
