@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '../../ui/feedback.js';
 import { Activity, CalendarRange, Download, FileSpreadsheet, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { api, listFrom } from '../../api';
 import { buildCsv } from '../../utils/csv.js';
+import { readSearchValue, updateBrowserQuery } from '../../shared/lib/url-state.js';
 
 const REPORT_TABS = [
   { id: 'balance', label: 'Balance de inventario' },
@@ -20,6 +21,27 @@ function startDate() {
   const date = new Date();
   date.setDate(date.getDate() - 30);
   return localDate(date);
+}
+const REPORT_TAB_IDS = new Set(REPORT_TABS.map(tab => tab.id));
+const REPORT_ZONES = new Set(['America/Guayaquil', 'America/Galapagos', 'UTC', 'America/New_York']);
+function initialReportTab() {
+  const tab = readSearchValue(window.location.search, 'reports.tab', 'balance');
+  return REPORT_TAB_IDS.has(tab) ? tab : 'balance';
+}
+function initialReportFilters() {
+  const zone = readSearchValue(window.location.search, 'reports.zone', 'America/Guayaquil');
+  return {
+    from: readSearchValue(window.location.search, 'reports.from', startDate()),
+    to: readSearchValue(window.location.search, 'reports.to', localDate()),
+    warehouseId: readSearchValue(window.location.search, 'reports.warehouseId', ''),
+    productId: readSearchValue(window.location.search, 'reports.productId', ''),
+    supplierId: readSearchValue(window.location.search, 'reports.supplierId', ''),
+    zone: REPORT_ZONES.has(zone) ? zone : 'America/Guayaquil'
+  };
+}
+function initialReportPage() {
+  const page = Number(readSearchValue(window.location.search, 'reports.page', '0'));
+  return Number.isSafeInteger(page) && page >= 0 ? page : 0;
 }
 function idOf(item) { return item?.id ?? item?.productId ?? item?.warehouseId ?? ''; }
 function rowKey(item, index) { return item?.id ?? [item?.productId, item?.warehouseId, item?.referenceId, item?.date, index].filter(value => value !== null && value !== undefined && value !== '').join('-'); }
@@ -117,18 +139,50 @@ function ReportTable({ rows, columns, caption, empty }) {
 }
 
 export default function ReportsCenter({ warehouses = [], products = [], suppliers = [], onUnauthorized }) {
-  const [activeTab, setActiveTab] = useState('balance');
-  const [filters, setFilters] = useState(() => ({ from: startDate(), to: localDate(), warehouseId: '', productId: '', supplierId: '', zone: 'America/Guayaquil' }));
+  const [activeTab, setActiveTab] = useState(initialReportTab);
+  const [reportPage, setReportPage] = useState(initialReportPage);
+  const [filters, setFilters] = useState(initialReportFilters);
   const [results, setResults] = useState({});
   const [queried, setQueried] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const requestVersion = useRef(0);
   useEffect(() => {
     if (!error) return;
     toast(error.message, { tone: error.kind === 'permission' ? 'warning' : 'error' });
     setError(null);
   }, [error]);
   const [lastRun, setLastRun] = useState({});
+
+  useEffect(() => {
+    const syncFromLocation = () => {
+      requestVersion.current += 1;
+      const tab = initialReportTab();
+      setActiveTab(tab);
+      setReportPage(initialReportPage());
+      setFilters(initialReportFilters());
+      setResults({});
+      setQueried({});
+      setLastRun({});
+      setLoading(false);
+      setError(null);
+    };
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
+  }, []);
+
+  useEffect(() => {
+    updateBrowserQuery({
+      'reports.tab': activeTab === 'balance' ? null : activeTab,
+      'reports.from': filters.from || null,
+      'reports.to': filters.to || null,
+      'reports.warehouseId': filters.warehouseId || null,
+      'reports.productId': filters.productId || null,
+      'reports.supplierId': filters.supplierId || null,
+      'reports.zone': filters.zone === 'America/Guayaquil' ? null : filters.zone,
+      'reports.page': reportPage || null
+    }, { replace: true });
+  }, [activeTab, filters, reportPage]);
   const data = results[activeTab];
   const resultReady = Boolean(queried[activeTab] && data !== undefined);
   const today = localDate();
@@ -190,13 +244,19 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
   }, [activeTab]);
 
   function updateFilter(key, value) {
+    requestVersion.current += 1;
+    setLoading(false);
     setFilters(current => ({ ...current, [key]: value }));
-    setResults(current => ({ ...current, [activeTab]: undefined }));
-    setQueried(current => ({ ...current, [activeTab]: false }));
+    setReportPage(0);
+    // Every report shares some filters. Clear all cached results so no tab can
+    // accidentally display figures produced with a previous filter combination.
+    setResults({});
+    setQueried({});
+    setLastRun({});
     setError(null);
   }
 
-  async function runReport(event, requestedPage = 0) {
+  async function runReport(event, requestedPage = reportPage) {
     event?.preventDefault?.();
     if (loading) return;
     const rejectFilters = message => {
@@ -232,13 +292,16 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       return;
     }
 
+    const version = ++requestVersion.current;
+    const nextPage = Math.max(0, Number(requestedPage) || 0);
+    setReportPage(nextPage);
     setLoading(true);
     setError(null);
     try {
       let response;
       const range = { from: filters.from, to: filters.to, zone: filters.zone };
       if (activeTab === 'balance') {
-        const params = { ...range, warehouseId: filters.warehouseId, page: requestedPage, size: 100 };
+        const params = { ...range, warehouseId: filters.warehouseId, page: nextPage, size: 100 };
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryBalanceReport(params);
         response = { ...response, pageItems: listFrom(response.items) };
@@ -254,7 +317,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       } else if (activeTab === 'kardex') {
         response = await api.kardexReport({ ...range, warehouseId: filters.warehouseId, productId: filters.productId });
       } else if (activeTab === 'valuation') {
-        const params = { page: requestedPage, size: 100, includeEmpty: false };
+        const params = { page: nextPage, size: 100, includeEmpty: false };
         if (filters.warehouseId) params.warehouseId = filters.warehouseId;
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryValuationReport(params);
@@ -262,17 +325,19 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       } else {
         response = await api.lowStockReport(filters.warehouseId ? { warehouseId: filters.warehouseId } : {});
       }
+      if (requestVersion.current !== version) return;
       setResults(current => ({ ...current, [activeTab]: response }));
       setQueried(current => ({ ...current, [activeTab]: true }));
       setLastRun(current => ({ ...current, [activeTab]: new Date().toISOString() }));
     } catch (err) {
+      if (requestVersion.current !== version) return;
       const nextError = formatError(err);
       setError(nextError);
       setResults(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: undefined }));
       setQueried(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: false }));
       if (err?.status === 401) onUnauthorized?.();
     } finally {
-      setLoading(false);
+      if (requestVersion.current === version) setLoading(false);
     }
   }
 
@@ -388,7 +453,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       {resultReady && tableRows.length > 0 && <button className="button secondary" type="button" onClick={exportData}><Download size={16}/> Exportar CSV</button>}
     </div>
     <div className="report-tabs" role="tablist" aria-label="Informes de inventario">
-      {REPORT_TABS.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="report-results" id={'report-tab-' + tab.id} className={activeTab === tab.id ? 'report-tab active' : 'report-tab'} onClick={() => { if (!loading) { setActiveTab(tab.id); setError(null); } }} disabled={loading}>{tab.label}</button>)}
+      {REPORT_TABS.map(tab => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls="report-results" id={'report-tab-' + tab.id} className={activeTab === tab.id ? 'report-tab active' : 'report-tab'} onClick={() => { if (!loading) { setActiveTab(tab.id); setReportPage(0); setError(null); } }} disabled={loading}>{tab.label}</button>)}
     </div>
     <form className="report-filters report-center-filters" onSubmit={runReport} aria-label="Filtros del informe">
       {renderFilters()}

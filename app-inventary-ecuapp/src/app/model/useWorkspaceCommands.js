@@ -7,7 +7,10 @@ const WORKFLOW_MODALS = new Set(['product', 'category', 'purchase', 'sale', 'rec
 const WORKFLOW_SECTIONS = { product: 'products', category: 'categories', purchase: 'purchases', sale: 'sales', receive: 'purchases' };
 const MODAL_DETAILS = new Set(['purchase', 'sale']);
 
-function pickId(value) { return value?.id ?? value?.productId ?? value?.categoryId ?? value?.warehouseId ?? ''; }
+function pickId(value) {
+  return value?.id ?? value?.productId ?? value?.categoryId ?? value?.warehouseId ??
+    value?.purchaseOrderId ?? value?.saleId ?? value?.subscriptionId ?? value?.orderId ?? '';
+}
 function pickName(value) { return value?.name ?? value?.description ?? value?.sku ?? String(pickId(value)); }
 
 export default function useWorkspaceCommands(context) {

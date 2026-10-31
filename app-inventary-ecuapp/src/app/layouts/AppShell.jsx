@@ -1,4 +1,4 @@
-import { BrandMark } from '../../components/BrandLogo.jsx';
+import { BrandMark } from '../../shared/ui/branding/BrandLogo.jsx';
 import ecuappLogo from '../../assets/ecuapp-logo.png';
 import { LogOut, RefreshCw } from 'lucide-react';
 import { isPlainLeftClick, sectionPath } from '../router/index.js';

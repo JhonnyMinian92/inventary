@@ -21,8 +21,9 @@ function pageMeta(payload) {
 function totalOf(payload) { return pageMeta(payload).totalElements; }
 
 /**
- * Loads only the datasets needed by the current route/workflow.
- * No whole-history scan is used for operational tables; table pages request bounded server pages.
+ * Loads only the datasets required by the current route/workflow.
+ * Operational lists are server-paginated; large histories are never downloaded into the browser.
+ * A monotonically increasing version prevents slower responses from overwriting a newer view.
  */
 export function useWorkspaceData({ token, section, modal, listPage = 0, expireSession, onError }) {
   const [data, setData] = useState(EMPTY);
@@ -38,6 +39,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
       setData(EMPTY);
       setHasLoadedData(false);
       setLoading(false);
+      setErrors({});
       return;
     }
 
@@ -45,12 +47,17 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
     setRefreshKey(value => value + 1);
     setErrors({});
     const tasks = [];
-    const add = (key, run, map = value => value) => tasks.push({ key, run, map });
+    const taskKeys = new Set();
+    const add = (key, run, map = value => value) => {
+      // A workflow may need a picklist already requested by the parent page.
+      if (taskKeys.has(key)) return;
+      taskKeys.add(key);
+      tasks.push({ key, run, map });
+    };
     const purchaseRefs = modal === 'purchase';
     const saleRefs = modal === 'sale';
     const inventoryRefs = section === 'inventory';
 
-    // Dashboard cards and charts consume summary reports and small, explicitly bounded recent samples.
     if (section === 'overview') {
       add('products', () => api.products({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('warehouses', () => api.warehouses({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
@@ -88,13 +95,18 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
       add('suppliers', () => api.suppliers({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
     }
 
+    if (section === 'reports') {
+      add('products', () => api.products({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
+      add('warehouses', () => api.warehouses({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
+      add('suppliers', () => api.suppliers({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
+    }
+
     if (section === 'subscriptions') {
       add('products', () => api.products({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('warehouses', () => api.warehouses({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('customers', () => api.customers({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
     }
 
-    // Load picklists only when the corresponding write workflow is open.
     if (purchaseRefs || saleRefs) {
       add('products', () => api.products({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('warehouses', () => api.warehouses({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
@@ -109,7 +121,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
       add('units', () => api.units({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
     }
 
-    if (tasks.length === 0) {
+    if (!tasks.length) {
       setData(current => ({ ...EMPTY, pendingCounts: current.pendingCounts, pageInfo: current.pageInfo }));
       setHasLoadedData(true);
       setLoading(false);
@@ -118,8 +130,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
 
     const results = await Promise.allSettled(tasks.map(task => Promise.resolve().then(task.run)));
     if (requestVersion.current !== version) return;
-    const unauthorized = results.some(result => result.status === 'rejected' && result.reason?.status === 401);
-    if (unauthorized) {
+    if (results.some(result => result.status === 'rejected' && result.reason?.status === 401)) {
       setLoading(false);
       expireSession();
       return;
@@ -127,16 +138,27 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
 
     const nextErrors = {};
     const updates = {};
+    const failedKeys = new Set();
     results.forEach((result, index) => {
       const task = tasks[index];
       if (result.status === 'fulfilled') updates[task.key] = task.map(result.value);
-      else if (result.reason?.status === 403) nextErrors[task.key] = { kind: 'forbidden', message: result.reason.message };
-      else nextErrors[task.key] = { kind: 'error', message: result.reason?.message || 'No se pudieron cargar los datos.' };
+      else {
+        failedKeys.add(task.key);
+        nextErrors[task.key] = {
+          kind: result.reason?.status === 403 ? 'forbidden' : 'error',
+          message: result.reason?.message || 'No se pudieron cargar los datos.'
+        };
+      }
     });
 
     setData(current => {
       const next = { ...EMPTY, ...current, ...updates };
-      const count = (key, previous) => nextErrors[key] ? null : (Object.hasOwn(updates, key) ? totalOf(updates[key]) : previous);
+      // Do not keep financial or operational rows from an earlier filter/session after failure.
+      for (const key of failedKeys) {
+        if (Object.hasOwn(EMPTY, key)) next[key] = EMPTY[key];
+      }
+      const count = (key, previous) => nextErrors[key] ? null :
+        (Object.hasOwn(updates, key) ? totalOf(updates[key]) : previous);
       const approved = count('pendingApproved', null);
       const partial = count('pendingPartial', null);
       next.pendingCounts = {
@@ -145,15 +167,16 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
         drafts: count('pendingDraft', current.pendingCounts.drafts),
         cancellationRequests: count('pendingCancellation', current.pendingCounts.cancellationRequests)
       };
-      next.whatsappPending = updates.whatsappPending ? totalOf(updates.whatsappPending) : current.whatsappPending;
+      next.whatsappPending = nextErrors.whatsappPending ? null :
+        (Object.hasOwn(updates, 'whatsappPending') ? totalOf(updates.whatsappPending) : current.whatsappPending);
       next.pageInfo = {
-        purchases: updates.purchasePage || current.pageInfo.purchases,
-        sales: updates.salesPage || current.pageInfo.sales
+        purchases: failedKeys.has('purchasePage') ? null : (updates.purchasePage || current.pageInfo.purchases),
+        sales: failedKeys.has('salesPage') ? null : (updates.salesPage || current.pageInfo.sales)
       };
       return next;
     });
     setErrors(nextErrors);
-    const importantErrors = Object.values(nextErrors).filter(error => error.kind === 'error');
+    const importantErrors = Object.values(nextErrors).filter(item => item.kind === 'error');
     if (importantErrors.length) onError?.(importantErrors[0].message);
     setHasLoadedData(true);
     setLoading(false);

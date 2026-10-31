@@ -21,27 +21,26 @@ npm run dev
 
 Configura `VITE_API_BASE_URL` con la URL base de la API, incluyendo `/api/v1`. El valor predeterminado es `http://localhost:8080/api/v1`. El backend debe permitir el origen de Vite en su configuración CORS, normalmente `http://localhost:5173`.
 
-## Estructura relevante actual
+## Arquitectura del frontend
 
-- `src/main.jsx`: punto de entrada React.
-- `src/App.jsx`: marco de navegación y coordinación de la aplicación.
-- `src/router.js`: resolución de rutas y navegación.
-- `src/api.js`: cliente REST, autenticación, errores e idempotencia.
-- `src/features/dashboard/Dashboard.jsx`: dashboard.
-- `src/features/catalog/ProductsPage.jsx`: pantalla de productos.
-- `src/features/catalog/ProductForm.jsx` y `CategoryForm.jsx`: formularios de catálogo.
-- `src/features/operations/OperationsCatalogs.jsx` y `UnitConversions.jsx`: catálogos operativos.
-- `src/features/purchasing/`: compras, recepciones y devoluciones a proveedores.
-- `src/features/sales/`: ventas y devoluciones de clientes.
-- `src/features/inventory/`: traslados, ajustes, conteos y reposición.
-- `src/features/reports/ReportsCenter.jsx`: informes y exportación CSV.
-- `src/components/`: componentes reutilizables; algunos conocen conceptos de negocio y no son primitivas UI genéricas.
-- `src/hooks/`, `src/security/`, `src/ui/` y `src/utils/`: hooks, seguridad, componentes UI y utilidades.
-- `docs/frontend-roadmap.md`: fases y criterios de cierre.
+El frontend está organizado en capas con dependencias dirigidas hacia módulos de menor nivel:
+
+- `src/main.jsx`: bootstrap de React, migración de URL legacy y estilos globales.
+- `src/app/`: composición raíz, providers, router, navegación, shell y controlador del espacio de trabajo.
+- `src/pages/`: entradas de página por ruta; componen widgets y features, sin implementar acceso HTTP.
+- `src/widgets/`: composiciones de pantalla y overlays del workspace.
+- `src/features/`: casos de uso de catálogo, ventas, compras, inventario, reportes, suscripciones, WhatsApp y dashboard.
+- `src/entities/`: selectores/modelos de producto y transacción, picker de productos y detalles de documentos.
+- `src/shared/ui/`: primitivas de tablas, formularios, stepper, paginación, marca, feedback y diálogos.
+- `src/shared/lib/`, `src/shared/hooks/` y `src/shared/styles/`: URL state, utilidades, hooks accesibles y tokens visuales.
+- `src/shared/api/` y `src/api.js`: núcleo HTTP por dominio y fachada de compatibilidad.
+- `src/security/`: cifrado del login y controles relacionados con credenciales/sesión.
+- `src/utils/`: formato, exportación y utilidades puras que aún están en migración.
+- `docs/frontend-roadmap.md`: alcance, decisiones y criterios de salida.
 - `docs/api-coverage.md`: matriz de consumo de API.
 - `docs/troubleshooting.md`: configuración y resolución de errores.
 
-La estructura anterior describe archivos que existen en el árbol de referencia; no se deben inferir componentes a partir de documentación histórica.
+Las carpetas antiguas `components/`, `hooks/` y `ui/` conservan fachadas de compatibilidad hacia las implementaciones canónicas para evitar cambios masivos de imports. No se deben añadir implementaciones nuevas en esas fachadas. La capa `features/` conserva módulos de negocio existentes y es responsable de sus estados/acciones; el controlador de `app/model/` solo coordina navegación y delega datos/comandos a hooks dedicados.
 
 ## Funciones principales
 
@@ -67,8 +66,8 @@ npm run preview
 
 El workflow de frontend ejecuta instalación reproducible con `npm ci`, pruebas y build de producción. Comprueba el resultado de GitHub Actions para el SHA que deseas desplegar; no asumas que un commit está validado hasta que termine su workflow.
 
-## Arquitectura objetivo
+## Decisiones de arquitectura
 
-La propuesta de reorganización feature-first está documentada en [PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md](docs/PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md). Es una arquitectura objetivo: los movimientos deben realizarse gradualmente, conservando rutas, contratos API, permisos y comportamiento existente, con pruebas entre etapas.
+La jerarquía implementada sigue y concreta la propuesta feature-first descrita en [PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md](docs/PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md). Las fachadas antiguas son transitorias y se mantienen solo por compatibilidad. Los módulos canónicos nuevos deben respetar las dependencias app → pages/widgets → features/entities → shared; las features llaman al cliente REST por dominio y nunca acceden a PostgreSQL ni aplican reglas de inventario en el navegador.
 
 El contrato del backend y su OpenAPI siguen siendo la fuente de verdad para DTOs y permisos. No reemplazar respuestas reales por mocks para ocultar errores de integración.

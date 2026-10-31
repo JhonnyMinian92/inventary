@@ -1,1 +1,42 @@
-:root{font-family:'DM Sans',sans-serif;color:#13241a;background:#f3f6f2;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;font-optical-sizing:auto;font-weight:400;--ink:#13241a;--muted:#758195;--line:#e7ebf1;--accent:#2a8a5c;--accent-dark:#1f6b46;--surface:#fff}
+:root {
+  font-family: 'DM Sans', sans-serif;
+  color: #13241a;
+  background: #f3f6f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+  font-weight: 400;
+
+  /* Semantic palette */
+  --ink: #13241a;
+  --muted: #758195;
+  --line: #e7ebf1;
+  --accent: #2a8a5c;
+  --accent-dark: #1f6b46;
+  --surface: #fff;
+  --surface-muted: #f7f9f7;
+  --danger: #b42318;
+  --warning: #a15c07;
+  --success: #18794e;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Shape, elevation and focus */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --shadow-panel: 0 8px 30px rgb(20 40 28 / 7%);
+  --focus-ring: 0 0 0 3px rgb(42 138 92 / 24%);
+  --content-max-width: 1680px;
+}

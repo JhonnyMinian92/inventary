@@ -8,8 +8,20 @@ import { toast } from '../../ui/feedback.js';
 import { downloadCsv } from '../../utils/csv.js';
 import { dateTime, idOf, isInactive, isoDate, money, movementDirection, movementLabel, number, titleCase } from '../../utils/format.js';
 import './catalog.css';
+import { readSearchValue, updateBrowserQuery } from '../../shared/lib/url-state.js';
 
 const PAGE_SIZE = 20;
+const PRODUCT_SORT_KEYS = new Set(['name', 'category', 'price', 'stock']);
+const PRODUCT_STATUS_FILTERS = new Set(['active', 'inactive', '']);
+function readProductPage() {
+  const value = Number(readSearchValue(window.location.search, 'products.page', '0'));
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+function readProductSort() {
+  const key = readSearchValue(window.location.search, 'products.sortKey', 'name');
+  const dir = readSearchValue(window.location.search, 'products.sortDir', 'asc');
+  return { key: PRODUCT_SORT_KEYS.has(key) ? key : 'name', dir: dir === 'desc' ? 'desc' : 'asc' };
+}
 const KIND_LABELS = { STOCKED_GOOD: 'Inventariable', NON_STOCKED_GOOD: 'No inventariable', SERVICE: 'Servicio' };
 
 function SortHeader({ id, label, sort, onSort, align }) {
@@ -106,12 +118,18 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
 }
 
 function ProductsTab({ products: initialProducts, categories, balances, ready, can, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
-  const [query, setQuery] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [statusFilter, setStatusFilter] = useState('active');
-  const [stockFilter, setStockFilter] = useState('');
-  const [sort, setSort] = useState({ key: 'name', dir: 'asc' });
-  const [page, setPage] = useState(0);
+  const [query, setQuery] = useState(() => readSearchValue(window.location.search, 'products.q', ''));
+  const [categoryId, setCategoryId] = useState(() => readSearchValue(window.location.search, 'products.categoryId', ''));
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const value = readSearchValue(window.location.search, 'products.status', 'active');
+    return PRODUCT_STATUS_FILTERS.has(value) ? value : 'active';
+  });
+  const [stockFilter, setStockFilter] = useState(() => {
+    const value = readSearchValue(window.location.search, 'products.stock', '');
+    return value === 'with' || value === 'without' ? value : '';
+  });
+  const [sort, setSort] = useState(readProductSort);
+  const [page, setPage] = useState(readProductPage);
   const [serverProducts, setServerProducts] = useState(initialProducts || []);
   const [serverTotal, setServerTotal] = useState(Number(initialProducts?.length || 0));
   const [listLoading, setListLoading] = useState(false);
@@ -121,6 +139,37 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
     return () => window.clearTimeout(timer);
   }, [query]);
+
+  // Restore filters when the user navigates with the browser's Back/Forward controls.
+  useEffect(() => {
+    const syncFromLocation = () => {
+      const nextQuery = readSearchValue(window.location.search, 'products.q', '');
+      const nextStatus = readSearchValue(window.location.search, 'products.status', 'active');
+      const nextStock = readSearchValue(window.location.search, 'products.stock', '');
+      setQuery(nextQuery);
+      setDebouncedQuery(nextQuery.trim());
+      setCategoryId(readSearchValue(window.location.search, 'products.categoryId', ''));
+      setStatusFilter(PRODUCT_STATUS_FILTERS.has(nextStatus) ? nextStatus : 'active');
+      setStockFilter(nextStock === 'with' || nextStock === 'without' ? nextStock : '');
+      setSort(readProductSort());
+      setPage(readProductPage());
+    };
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
+  }, []);
+
+  // Keep a shareable, bookmarkable filter state without adding one history entry per keystroke.
+  useEffect(() => {
+    updateBrowserQuery({
+      'products.q': query.trim() || null,
+      'products.categoryId': categoryId || null,
+      'products.status': statusFilter || null,
+      'products.stock': stockFilter || null,
+      'products.sortKey': sort.key === 'name' ? null : sort.key,
+      'products.sortDir': sort.dir === 'asc' ? null : sort.dir,
+      'products.page': page || null
+    }, { replace: true });
+  }, [query, categoryId, statusFilter, stockFilter, sort, page]);
 
   useEffect(() => {
     let active = true;
@@ -177,13 +226,21 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       const order = typeof left === 'number' ? left - right : String(left).localeCompare(String(right), 'es');
       return sort.dir === 'asc' ? order : -order;
     });
-  }, [serverProducts, stockFilter, sort, stock, categoryNames]);
+  }, [serverProducts, query, categoryId, statusFilter, stockFilter, sort, stock, categoryNames]);
 
-  useEffect(() => { setPage(0); }, [debouncedQuery, categoryId, statusFilter, stockFilter, sort]);
-  const visible = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  // The API already returns one server page; applying a second local offset empties page 2+.
+  const visible = rows;
   const active = serverProducts.filter(product => !isInactive(product));
   const withoutStock = active.filter(product => !(stock.get(String(idOf(product)))?.onHand > 0)).length;
-  const toggleSort = key => setSort(current => ({ key, dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc' }));
+  const toggleSort = key => {
+    setSort(current => ({ key, dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc' }));
+    setPage(0);
+  };
+  const changePage = nextPage => {
+    const next = Math.max(0, Number(nextPage) || 0);
+    updateBrowserQuery({ 'products.page': next || null }, { replace: false });
+    setPage(next);
+  };
 
   function exportCsv() {
     downloadCsv('inventary-productos-pagina-' + (page + 1) + '-' + isoDate() + '.csv', [
@@ -203,16 +260,16 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       <span className={withoutStock ? 'warn' : ''}><strong>{number(withoutStock)}</strong> activos sin stock en esta página</span>
     </div>
     <div className="filter-bar">
-      <label className="search-field"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por nombre o SKU" aria-label="Buscar productos" /></label>
-      <select value={categoryId} onChange={event => setCategoryId(event.target.value)} aria-label="Categoría">
+      <label className="search-field"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nombre o SKU" aria-label="Buscar productos" /></label>
+      <select value={categoryId} onChange={event => { setCategoryId(event.target.value); setPage(0); }} aria-label="Categoría">
         <option value="">Todas las categorías</option>
         {categories.map(category => <option key={idOf(category)} value={idOf(category)}>{category.name}</option>)}
       </select>
-      <select value={stockFilter} onChange={event => setStockFilter(event.target.value)} aria-label="Existencias">
+      <select value={stockFilter} onChange={event => { setStockFilter(event.target.value); setPage(0); }} aria-label="Existencias">
         <option value="">Todas las existencias</option><option value="with">Con existencias en esta página</option><option value="without">Sin existencias en esta página</option>
       </select>
       <div className="segmented" role="group" aria-label="Estado">
-        {[['active', 'Activos'], ['inactive', 'Inactivos'], ['', 'Todos']].map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}>{label}</button>)}
+        {[['active', 'Activos'], ['inactive', 'Inactivos'], ['', 'Todos']].map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={statusFilter === value} onClick={() => { setStatusFilter(value); setPage(0); }}>{label}</button>)}
       </div>
       <div className="filter-actions">
         <button type="button" className="button secondary" onClick={exportCsv} disabled={!rows.length}><Download size={15} />CSV</button>
@@ -251,13 +308,21 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       </table>
       {listError && <div className="alert error" role="alert">{listError}</div>}
       {!rows.length && !listError && <div className="empty-block"><PackageSearch size={28} /><strong>Sin resultados</strong><span>{serverTotal ? 'Ajusta la búsqueda o los filtros.' : 'Todavía no hay productos.'}</span></div>}
-      <Pagination page={page} total={serverTotal} onPage={setPage} />
+      <Pagination page={page} total={serverTotal} onPage={changePage} />
     </div>}
   </>;
 }
 
 function CategoriesTab({ categories, products, ready, can, onNew, onEdit, onToggle, onDelete }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => readSearchValue(window.location.search, 'categories.q', ''));
+  useEffect(() => {
+    const syncFromLocation = () => setQuery(readSearchValue(window.location.search, 'categories.q', ''));
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
+  }, []);
+  useEffect(() => {
+    updateBrowserQuery({ 'categories.q': query.trim() || null }, { replace: true });
+  }, [query]);
   const counts = useMemo(() => {
     const totals = new Map();
     products.forEach(product => totals.set(String(product.categoryId), (totals.get(String(product.categoryId)) || 0) + 1));

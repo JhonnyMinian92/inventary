@@ -1,6 +1,6 @@
 import AppProviders from './providers/AppProviders.jsx';
-import AppWorkspace from '../App.jsx';
+import Workspace from './Workspace.jsx';
 
 export default function App() {
-  return <AppProviders><AppWorkspace /></AppProviders>;
+  return <AppProviders><Workspace /></AppProviders>;
 }

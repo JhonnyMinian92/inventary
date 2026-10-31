@@ -1,4 +1,4 @@
-> **Adenda de estado — 2026-10-26:** las fases de código fuente se describen como completadas, pero la fase de validación debe seguir considerándose abierta hasta que build, pruebas frontend y flujo navegador pasen sobre el SHA actual. La acción prioritaria es versionar package-lock.json, cambiar CI a npm ci y añadir pruebas de cliente/componentes/E2E. La evidencia de workflow disponible corresponde a un commit anterior al HEAD de referencia. Ver [plan de cierre](../../microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md).
+> **Estado actualizado — 2026-10-31, rama `implementacion_propuestas`:** se está cerrando la Fase 3 de arquitectura. La compilación y las pruebas de cierre se asocian al SHA final de esta fase; un workflow anterior exitoso no sustituye esa validación.
 
 # Plan de implementación del frontend
 
@@ -35,18 +35,21 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 - Registrar conteos físicos multítem y contabilizar o cancelar los documentos; crear/editar/desactivar reglas de reposición y consultar sugerencias.
 - Centralizar las nuevas rutas bajo el cliente REST, usando claves de idempotencia para operaciones transaccionales que modifican inventario.
 
-## Fase 3 — Reportes, accesibilidad y consistencia de producto
+## Fase 3 — Arquitectura y separación del frontend React
 
-**Estado del código fuente: completada en `master`.** No se han ejecutado compilación ni pruebas, conforme a la secuencia solicitada.
+**Estado de implementación en `implementacion_propuestas`: cambios incorporados; validación CI pendiente del SHA final.**
 
-- Centro de informes conectado a los endpoints reales: balance de inventario, ventas/margen, compras y devoluciones, kardex, valoración y stock bajo.
-- Balance por fechas y almacén con saldo inicial/final, compras y ventas netas, valoración inicial/final, costo de ventas, utilidad y margen bruto, usando los nombres reales de `InventoryBalanceReportRow`.
-- Paginación donde el DTO expone páginas y exportación CSV de los resultados.
-- Estados de carga, vacío, error y falta de permiso `reports:financial`; los fallos no se sustituyen por datos ficticios ni mantienen visibles resultados financieros obsoletos.
-- Vistas de detalle de órdenes y ventas que consultan el documento completo en el backend.
-- Diálogos con navegación por teclado, Escape, foco atrapado/restaurado, etiquetas accesibles, anuncios de error/notificación y confirmaciones para operaciones sensibles.
-- Ajustes responsive y foco visible, incluido el centro de informes, tablas extensas y diálogos en pantallas pequeñas.
-- Refactor de `App.jsx`: dashboard, catálogo de tablas, tablas de compras/ventas, tabla compartida, centro de informes, detalles transaccionales y accesibilidad movidos a módulos por funcionalidad.
+- Punto de entrada reducido a composición de providers y workspace; el root `src/App.jsx` queda como fachada de compatibilidad.
+- Separación explícita de `app`, `pages`, `widgets`, `features`, `entities` y `shared`, con dependencias dirigidas y una navegación declarativa.
+- Controlador del workspace separado de las vistas: navegación/URL en `app/model/useWorkspaceController.js`, consultas por vista en `useWorkspaceData` y operaciones en `useWorkspaceCommands`.
+- Autenticación permanece aislada en `AuthProvider`; conserva el flujo de cifrado, persistencia de token, expiración y consulta del perfil.
+- Componentes UI neutrales movidos a `shared/ui`; selector de producto y detalles de transacción movidos a `entities`. Fachadas antiguas conservan imports existentes sin duplicar implementación.
+- Filtros y paginación de productos, compras, ventas, inventario y reportes se reflejan en query strings; `popstate` restaura el estado de las vistas que lo gestionan.
+- Corrección de paginación doble en catálogo: el backend ya entrega una página, por lo que el cliente no vuelve a aplicar el desplazamiento local.
+- Corrección de dependencias del filtrado memoizado del catálogo; el resultado ahora responde a búsqueda, categoría, estado y existencias.
+- Datos de referencia de reportes se cargan al entrar por URL directa; la capa de datos no retiene registros/contadores/paginación obsoletos ante errores de la consulta correspondiente.
+- Estilos conservan el CSS de la aplicación y establecen tokens semánticos y escala de espacio/radio/foco en `shared/styles/tokens.css`.
+- Se añaden pruebas unitarias de URL state sin instalar dependencias adicionales.
 
 ## Fase 4 — Cierre del código fuente y documentación
 

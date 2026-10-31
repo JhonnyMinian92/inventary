@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, Warehouse, Wrench } from 'lucide-react';
 import { api, listFrom } from '../../api';
 import ServerPagination from '../../ui/ServerPagination.jsx';
-import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
-import StepProgress from '../../components/StepProgress.jsx';
-import ProductPicker from '../../components/ProductPicker.jsx';
+import useAccessibleDialog from '../../shared/hooks/useAccessibleDialog.js';
+import StepProgress from '../../shared/ui/stepper/StepProgress.jsx';
+import ProductPicker from '../../entities/product/ui/ProductPicker.jsx';
 import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
@@ -37,6 +37,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [countPageInfo, setCountPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const requestVersion = useRef(0);
   useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
   useMessageToast(notice, setNotice, 'success');
@@ -55,6 +56,7 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [adjustmentForm, setAdjustmentForm] = useState({ productId: '', warehouseId: warehouses[0]?.id || '', direction: 'INCREASE', quantity: '1', unitCost: '0', reason: '' });
 
   const refresh = useCallback(async () => {
+    const version = ++requestVersion.current;
     setLoading(true);
     setError('');
     let requests = [];
@@ -69,11 +71,22 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
       ];
     }
     const results = await Promise.allSettled(requests.map(([, run]) => run()));
+    if (requestVersion.current !== version) return;
     const failures = [];
     results.forEach((result, index) => {
       const [key] = requests[index];
       if (result.status !== 'fulfilled') {
         failures.push(key + ': ' + (result.reason?.message || 'error'));
+        if (key === 'transfers') {
+          setTransfers([]);
+          setTransferPageInfo({ page: transferPage, size: 20, totalElements: 0, totalPages: 1 });
+        }
+        if (key === 'counts') {
+          setCounts([]);
+          setCountPageInfo({ page: countPage, size: 20, totalElements: 0, totalPages: 1 });
+        }
+        if (key === 'rules') setRules([]);
+        if (key === 'suggestions') setSuggestions([]);
         return;
       }
       const rows = listFrom(result.value);
@@ -86,7 +99,10 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     setLoading(false);
   }, [tab, transferPage, countPage]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    return () => { requestVersion.current += 1; };
+  }, [refresh]);
 
   useEffect(() => {
     const syncWorkflow = () => {
