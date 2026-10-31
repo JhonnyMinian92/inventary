@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.returns;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.UnitOfMeasure;
 import com.ecuapp.inventary.catalog.UnitOfMeasureRepository;
 import com.ecuapp.inventary.common.*;
@@ -28,20 +29,30 @@ public class SalesReturnService {
  private final SaleRepository sales;private final SalesReturnRepository returns;private final SalesReturnLineRepository returnLines;
  private final StockBalanceRepository balances;private final WarehouseLocationRepository locations;private final StockMovementRepository movements;private final OutboxEventRepository outbox;
  private final ObjectMapper mapper;private final AuditService audit;private final IdempotencyRecordRepository idempotencyRecords;private final UnitOfMeasureRepository units;
- private final InventoryCostingService costing;private final StockBalanceLocks balanceLocks;private final SaleService saleService;
+ private final InventoryCostingService costing;private final StockBalanceLocks balanceLocks;private final SaleService saleService;private final WarehouseScopeService scopes;
  private static final Set<String> SORT=Set.of("createdAt","returnNumber");
  public SalesReturnService(SaleRepository sales,SalesReturnRepository returns,SalesReturnLineRepository returnLines,StockBalanceRepository balances,WarehouseLocationRepository locations,
    StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,IdempotencyRecordRepository idempotencyRecords,UnitOfMeasureRepository units,
-   InventoryCostingService costing,StockBalanceLocks balanceLocks,SaleService saleService){
+   InventoryCostingService costing,StockBalanceLocks balanceLocks,SaleService saleService,WarehouseScopeService scopes){
   this.sales=sales;this.returns=returns;this.returnLines=returnLines;this.balances=balances;this.locations=locations;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.idempotencyRecords=idempotencyRecords;this.units=units;
-  this.costing=costing;this.balanceLocks=balanceLocks;this.saleService=saleService;
+  this.costing=costing;this.balanceLocks=balanceLocks;this.saleService=saleService;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public SalesReturnDtos.View get(UUID id){return SalesReturnDtos.View.from(returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución de venta",id)));}
- @Transactional(readOnly=true) public org.springframework.data.domain.Page<SalesReturnDtos.View> list(UUID sourceSaleId,UUID warehouseId,java.time.Instant from,java.time.Instant to,org.springframework.data.domain.Pageable p){
+ @Transactional(readOnly=true) public SalesReturnDtos.View get(UUID id,String actor){
+  SalesReturn r=returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución de venta",id));
+  scopes.requireWarehouseAccess(actor,r.getWarehouse().getId());return SalesReturnDtos.View.from(r);
+ }
+ @Transactional(readOnly=true) public org.springframework.data.domain.Page<SalesReturnDtos.View> list(UUID sourceSaleId,UUID warehouseId,java.time.Instant from,java.time.Instant to,org.springframework.data.domain.Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
-  return returns.search(sourceSaleId,warehouseId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,SORT,org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"createdAt"))).map(SalesReturnDtos.View::from);
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"createdAt"));
+  if(allowed!=null&&allowed.isEmpty())return org.springframework.data.domain.Page.empty(pageable);
+  var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  return (allowed==null?returns.search(sourceSaleId,warehouseId,lower,upper,pageable):
+   returns.searchScoped(sourceSaleId,warehouseId,lower,upper,allowed,pageable)).map(SalesReturnDtos.View::from);
  }
  @Transactional public SalesReturnDtos.View create(String key,SalesReturnDtos.CreateRequest request,String actor){
+  Sale visible=sales.findById(request.sourceSaleId()).orElseThrow(()->new ResourceNotFoundException("Venta",request.sourceSaleId()));
+  scopes.requireWarehouseAccess(actor,visible.getWarehouse().getId());
   String normalizedKey=normalizeKey(key);String hash=canonicalHash(request);
   int claimed=idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"SALES_RETURN_CREATE",normalizedKey,hash);
   IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("SALES_RETURN_CREATE",normalizedKey).orElseThrow(()->new IllegalStateException("No se pudo reservar la clave de idempotencia."));
@@ -54,6 +65,7 @@ public class SalesReturnService {
    return SalesReturnDtos.View.from(returns.findDetailedById(previous.get().getId()).orElseThrow());
   }
   Sale sale=sales.findForUpdateById(request.sourceSaleId()).orElseThrow(()->new ResourceNotFoundException("Venta",request.sourceSaleId()));
+  scopes.requireWarehouseAccess(actor,sale.getWarehouse().getId());
   if(sale.getStatus()!=SaleStatus.COMPLETED)throw new BusinessRuleException("Solo se pueden devolver ventas completadas.");
   if(!sale.getWarehouse().isActive())throw new BusinessRuleException("Reactive el almacén de la venta antes de registrar una devolución para no ingresar mercancía a un almacén inactivo.");
   Map<UUID,SaleItem> saleItems=sale.getItems().stream().collect(Collectors.toMap(SaleItem::getId, i->i));
