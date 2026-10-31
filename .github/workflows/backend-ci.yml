@@ -2,7 +2,7 @@ name: backend-ci
 
 on:
   push:
-    branches: [master]
+    branches: [master, implementacion_propuestas]
     paths:
       - "microservices-inventary-ecuapp/src/**"
       - "microservices-inventary-ecuapp/pom.xml"
