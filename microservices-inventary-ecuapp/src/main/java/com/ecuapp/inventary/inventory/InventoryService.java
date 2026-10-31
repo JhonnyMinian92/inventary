@@ -39,9 +39,10 @@ public class InventoryService {
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   String reference=referenceType==null||referenceType.isBlank()?null:referenceType.trim().toUpperCase(java.util.Locale.ROOT);
   var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  boolean includeCost=scopes.canReadFinancialData(actor);
   return (allowed==null?movements.search(productId,warehouseId,type,reference,referenceId,lower,upper,pageable):
    movements.searchScoped(productId,warehouseId,type,reference,referenceId,lower,upper,allowed,pageable))
-   .map(m->InventoryDtos.MovementView.from(m,scopes.canReadFinancialData(actor)));
+   .map(m->InventoryDtos.MovementView.from(m,includeCost));
  }
  @Transactional(readOnly=true) public InventoryDtos.MovementDetailView movement(UUID id,String actor){
   StockMovement movement=movements.findById(id).orElseThrow(()->new ResourceNotFoundException("Movimiento de inventario",id));
