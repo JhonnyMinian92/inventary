@@ -21,6 +21,7 @@ class InventoryApiTest extends ApiTestSupport {
         String code = "wh" + suffix().toLowerCase();
         JsonNode wh = httpPost(admin, "/api/v1/warehouses", Map.of("code", code, "name", "Central", "address", "Quito"), 201);
         String id = wh.get("id").asText();
+        ensureWarehouseScope("VENDEDOR",id);
         assertEquals(code.toUpperCase(), wh.get("code").asText());
         problem(call(post("/api/v1/warehouses"), admin, Map.of("code", code.toUpperCase(), "name", "dup")), 409, "CONFLICT");
         problem(call(put("/api/v1/warehouses/" + id), admin, Map.of("code", "OTRO" + suffix(), "name", "x")), 409, "CONFLICT");
@@ -78,13 +79,15 @@ class InventoryApiTest extends ApiTestSupport {
     @Test
     void warehousePhysicalDeletionRequiresNoInventoryOrOperationalHistory() {
         String admin = admin();
-        JsonNode unused = warehouse();
+        JsonNode unused = httpPost(admin(), "/api/v1/warehouses",
+            Map.of("code","WH"+suffix(),"name","Almacén sin historial"),201);
         String unusedId = unused.get("id").asText();
         httpPost(admin, "/api/v1/warehouses/" + unusedId + "/deactivate", null, 204);
         httpDelete(admin, "/api/v1/warehouses/" + unusedId, 204);
         problem(call(get("/api/v1/warehouses/" + unusedId), admin, null), 404, "RESOURCE_NOT_FOUND");
 
-        JsonNode used = warehouse();
+        JsonNode used = httpPost(admin(), "/api/v1/warehouses",
+            Map.of("code","WH"+suffix(),"name","Almacén con movimientos"),201);
         String usedId = used.get("id").asText();
         JsonNode product = product("1.00", "2.00");
         stock(product.get("id").asText(), usedId, "1", "1.00");
