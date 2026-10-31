@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, LogOut, MessageCircle, Plus, RefreshCw, Repeat, Search, Warehouse } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, Boxes, Building2, ChartNoAxesCombined, LayoutDashboard, MessageCircle, Plus, Repeat, Search, Warehouse } from 'lucide-react';
 import { api, listFrom, listAllPages } from './api';
-import { currentRoute, detailPath, documentTitle, HOME_ROUTE, isPlainLeftClick, loginPath, navigate, nextFromSearch, pathFor, sectionPath, workflowPath } from './router.js';
+import { currentRoute, detailPath, documentTitle, HOME_ROUTE, loginPath, navigate, nextFromSearch, pathFor, sectionPath, workflowPath } from './router.js';
 import LoginPage from './features/auth/LoginPage.jsx';
-import { BrandMark } from './components/BrandLogo.jsx';
-import ecuappLogo from './assets/ecuapp-logo.png';
 import ProductForm from './features/catalog/ProductForm.jsx';
 import CategoryForm from './features/catalog/CategoryForm.jsx';
 import ProductsPage from './features/catalog/ProductsPage.jsx';
@@ -29,6 +27,7 @@ import { clearToasts, confirmDialog, toast, useMessageToast } from './ui/feedbac
 import { SkeletonTable } from './ui/Skeleton.jsx';
 import { compactMoney, isInactive, number, titleCase } from './utils/format.js';
 import { useAuth } from './app/providers/AuthProvider.jsx';
+import AppShell from './app/layouts/AppShell.jsx';
 
 const NAV_GROUPS = [
   { label: 'General', items: [{ id: 'overview', label: 'Resumen', icon: LayoutDashboard }] },
@@ -498,112 +497,89 @@ function AppWorkspace() {
   const roleLabel = user?.role ? titleCase(user.role) : 'Sesión activa';
   const displayName = user?.username || 'Usuario';
 
-  return <div className="app-shell">
-    <aside className="sidebar">
-      <div className="brand"><BrandMark size={38} className="brand-mark-svg" /><div><strong>inventary</strong><small>CONTROL DE EXISTENCIAS</small></div></div>
-      <nav aria-label="Navegación principal" className="side-nav">{NAV_GROUPS.map(group => {
-        const items = group.items.filter(item => can(item.permission));
-        if (!items.length) return null;
-        return <div className="nav-group" key={group.label}>
-          <span className="nav-group-label">{group.label}</span>
-          {items.map(item => {
-            const current = (item.sections || [item.id]).includes(section);
-            const badge = item.badge === 'whatsapp' && whatsappPending > 0 ? whatsappPending : 0;
-            return <a key={item.id} href={sectionPath(item.id)} title={item.label} aria-current={current ? 'page' : undefined} className={current ? 'nav-item active' : 'nav-item'}
-              onClick={event => { if (!isPlainLeftClick(event)) return; event.preventDefault(); navigateSection(item.id); }}>
-              <item.icon size={18} /><span>{item.label}</span>{badge > 0 && <b className="nav-badge" aria-label={`${badge} pendientes`}>{badge > 99 ? '99+' : badge}</b>}
-            </a>;
-          })}
-        </div>;
-      })}</nav>
-      <div className="sidebar-bottom">
-        <div className="sidebar-profile">
-          <span className="avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span>
-          <span className="profile-copy"><strong>{displayName}</strong><small className={apiStatus === 'error' ? 'offline' : ''}>{apiStatus === 'error' ? 'Sin conexión' : roleLabel}</small></span>
-          <button type="button" className="icon-button ghost" onClick={handleLogout} aria-label="Cerrar sesión" title="Cerrar sesión"><LogOut size={17} /></button>
-        </div>
-        <div className="sidebar-legal"><img src={ecuappLogo} alt="" width="18" height="18" /><span>© {new Date().getFullYear()} EcuApp. Todos los derechos reservados.</span></div>
-      </div>
-    </aside>
-    <main className="main-content">
-      <header className="topbar">
-        <h1>{isWorkflow ? (WORKFLOW_TITLES[modal]?.[editing && WORKFLOW_TITLES[modal][1] ? 1 : 0] || SECTION_TITLES[section]) : SECTION_TITLES[section] || 'Resumen'}</h1>
-        <div className="topbar-actions">
-          {!isWorkflow && headerAction}
-          {!isWorkflow && <button type="button" className={refreshing ? 'icon-button is-loading' : 'icon-button'} onClick={loadData} disabled={loading} aria-busy={loading} title="Actualizar datos" aria-label="Actualizar datos"><RefreshCw size={17} /></button>}
-        </div>
-      </header>
-
-      {!isWorkflow && section === 'overview' && <Dashboard data={dashboardData} ready={hasLoadedData} refreshing={refreshing} refreshKey={refreshKey} whatsappPending={whatsappPending} can={can}
-        onNavigate={navigateSection} onStartWorkflow={workflow => workflow === 'product' ? openProduct() : startWorkflow(workflow)} onOpenProduct={id => openDetail('product', id)} />}
-
-      {!isWorkflow && (section === 'products' || section === 'categories') && <ProductsPage tab={section === 'categories' ? 'categories' : 'products'}
-        products={products} categories={categories} balances={balances} ready={hasLoadedData} refreshing={refreshing} can={can}
-        detailId={detailRoute?.kind === 'product' ? detailRoute.id : ''} onNavigateTab={navigateSection}
-        onOpenDetail={id => openDetail('product', id)} onCloseDetail={closeDetail}
-        product={{ onNew: () => openProduct(), onEdit: openProduct, onToggle: item => toggleStatus('product', item), onDelete: item => deleteItem('product', item) }}
-        category={{ onNew: () => openCategory(), onEdit: openCategory, onToggle: item => toggleStatus('category', item), onDelete: item => deleteItem('category', item) }} />}
-
-      {!isWorkflow && section === 'subscriptions' && <SubscriptionsPage can={can} products={products} customers={customers} warehouses={warehouses}
-        detailId={detailRoute?.kind === 'subscription' ? detailRoute.id : ''} onOpenDetail={id => openDetail('subscription', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
-      {!isWorkflow && section === 'whatsapp' && <WhatsAppOrdersPage can={can} detailId={detailRoute?.kind === 'whatsapp' ? detailRoute.id : ''}
-        onOpenDetail={id => openDetail('whatsapp', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
-
-      {!isWorkflow && !hasLoadedData && ['purchases', 'sales', 'inventory', 'partners', 'reports'].includes(section) && <section className="panel"><SkeletonTable rows={8} columns={6} /></section>}
-      {hasLoadedData && !isWorkflow && section === 'partners' && <OperationsCatalogs onChanged={loadData} />}
-      {hasLoadedData && !isWorkflow && section === 'purchases' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
-        <PurchaseTable rows={purchases} loading={loading} onView={order => openDetail('purchase', order)}
-          onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')}
-          onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')}
-          onCancel={cancelPurchase} onReceive={openReceive} />
-        <PurchaseReturns onChanged={loadData} />
-      </section>}
-      {hasLoadedData && !isWorkflow && section === 'sales' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
-        <SalesTable rows={sales} loading={loading} onView={sale => openDetail('sale', sale)} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation} />
-        <SalesReturns onChanged={loadData} />
-      </section>}
-      {hasLoadedData && !isWorkflow && section === 'inventory' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
-        <form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}>
-          <Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({ ...current, warehouseId: event.target.value }))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field>
-          <Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({ ...current, productId: event.target.value }))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field>
-          <button className="button primary" disabled={loading}><Search size={16} /> Filtrar</button>
-          <button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = { warehouseId: '', productId: '' }; setInventoryFilter(reset); void loadInventoryFilter({ preventDefault: () => {} }, reset); }}>Limpiar</button>
-        </form>
-        <div className="stat-strip"><div><span>Unidades</span><strong>{number(stockTotal)}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos</span><strong>{number(movements.length)}</strong></div></div>
-        <h3 className="subheading">Saldos por producto</h3>
-        <DataTable rows={balances} columns={[['productName', 'Producto'], ['sku', 'SKU'], ['warehouseCode', 'Almacén'], ['onHand', 'Existencia'], ['reserved', 'Reservado'], ['available', 'Disponible']]} empty="No hay saldos de inventario." />
-        <h3 className="subheading">Últimos movimientos</h3>
-        <DataTable rows={movements.slice(0, 30)} columns={[['type', 'Movimiento'], { key: 'productName', label: 'Producto', render: row => row.productName || products.find(product => String(pickId(product)) === String(row.productId))?.name || row.sku || '—' }, ['warehouseCode', 'Almacén'], ['quantity', 'Cantidad'], ['occurredAt', 'Fecha'], ['referenceType', 'Documento']]} empty="No hay movimientos registrados." />
-        <InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData} />
-      </section>}
-      {hasLoadedData && !isWorkflow && section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => expireSession()} />}
-
-      {isWorkflow && <WorkflowPage onCancel={closeWorkflow}>
-        {!hasLoadedData ? <SkeletonTable rows={5} columns={3} /> : <>
-          {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={closeWorkflow} onSubmit={submitProduct} onError={setError}
-            onCategoryCreated={can('catalog:manage') ? category => setCategories(current => [...current, category]) : undefined}
-            onUnitCreated={can('catalog:manage') ? unit => setUnits(current => [...current, unit]) : undefined} />}
-          {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={closeWorkflow} onSubmit={submitCategory} onError={setError} />}
-          {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={closeWorkflow} onSubmit={submitPurchase} onError={setError} />}
-          {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={closeWorkflow} onSubmit={submitSale} onError={setError} />}
-          {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={closeWorkflow} onSubmit={submitReceipt} />}
-          {modal === 'receive' && !selectedOrder && loading && <SkeletonTable rows={4} columns={4} />}
-          {modal === 'receive' && !selectedOrder && !loading && <div className="empty-block"><strong>No se pudo abrir la orden.</strong><button type="button" className="button secondary" onClick={closeWorkflow}>Volver a compras</button></div>}
-        </>}
-      </WorkflowPage>}
-    </main>
-
-    {modal === 'purchaseDetail' && purchaseDetail && <Modal title="Orden de compra" busy={loading} onClose={closeDetail}><PurchaseOrderDetail order={purchaseDetail} /></Modal>}
-    {modal === 'saleDetail' && saleDetail && <Modal title="Venta" busy={loading} onClose={closeDetail}><SaleDetail sale={saleDetail} /></Modal>}
-    {modal === 'cancelSale' && saleToCancel && <Modal title="Solicitar anulación" busy={loading} onClose={() => { setModal(''); setSaleToCancel(null); }}>
-      <form className="form-grid" onSubmit={submitSaleCancellation}>
-        <p className="form-hint wide">Venta <strong>{saleToCancel.saleNumber || pickId(saleToCancel)}</strong>. Las existencias vuelven al aprobarse.</p>
-        <Field label="Motivo" required wide><textarea rows="3" required maxLength="500" value={saleCancelReason} onChange={event => setSaleCancelReason(event.target.value)} placeholder="Describe el motivo" /></Field>
-        <FormActions loading={loading} onCancel={() => { setModal(''); setSaleToCancel(null); }} submitLabel="Solicitar anulación" />
-      </form>
-    </Modal>}
-    <FeedbackHost />
-  </div>;
+  return <AppShell
+    navGroups={NAV_GROUPS} section={section} whatsappPending={whatsappPending} can={can}
+    navigateSection={navigateSection} displayName={displayName} apiStatus={apiStatus} roleLabel={roleLabel}
+    onLogout={handleLogout} isWorkflow={isWorkflow} modal={modal} editing={editing}
+    workflowTitles={WORKFLOW_TITLES} sectionTitles={SECTION_TITLES} headerAction={headerAction}
+    refreshing={refreshing} loading={loading} onRefresh={loadData}
+    overlays={
+      <>
+        
+            {modal === 'purchaseDetail' && purchaseDetail && <Modal title="Orden de compra" busy={loading} onClose={closeDetail}><PurchaseOrderDetail order={purchaseDetail} /></Modal>}
+            {modal === 'saleDetail' && saleDetail && <Modal title="Venta" busy={loading} onClose={closeDetail}><SaleDetail sale={saleDetail} /></Modal>}
+            {modal === 'cancelSale' && saleToCancel && <Modal title="Solicitar anulación" busy={loading} onClose={() => { setModal(''); setSaleToCancel(null); }}>
+              <form className="form-grid" onSubmit={submitSaleCancellation}>
+                <p className="form-hint wide">Venta <strong>{saleToCancel.saleNumber || pickId(saleToCancel)}</strong>. Las existencias vuelven al aprobarse.</p>
+                <Field label="Motivo" required wide><textarea rows="3" required maxLength="500" value={saleCancelReason} onChange={event => setSaleCancelReason(event.target.value)} placeholder="Describe el motivo" /></Field>
+                <FormActions loading={loading} onCancel={() => { setModal(''); setSaleToCancel(null); }} submitLabel="Solicitar anulación" />
+              </form>
+            </Modal>}
+            <FeedbackHost />
+          </div>;
+      </>
+    }
+  >
+    
+          {!isWorkflow && section === 'overview' && <Dashboard data={dashboardData} ready={hasLoadedData} refreshing={refreshing} refreshKey={refreshKey} whatsappPending={whatsappPending} can={can}
+            onNavigate={navigateSection} onStartWorkflow={workflow => workflow === 'product' ? openProduct() : startWorkflow(workflow)} onOpenProduct={id => openDetail('product', id)} />}
+    
+          {!isWorkflow && (section === 'products' || section === 'categories') && <ProductsPage tab={section === 'categories' ? 'categories' : 'products'}
+            products={products} categories={categories} balances={balances} ready={hasLoadedData} refreshing={refreshing} can={can}
+            detailId={detailRoute?.kind === 'product' ? detailRoute.id : ''} onNavigateTab={navigateSection}
+            onOpenDetail={id => openDetail('product', id)} onCloseDetail={closeDetail}
+            product={{ onNew: () => openProduct(), onEdit: openProduct, onToggle: item => toggleStatus('product', item), onDelete: item => deleteItem('product', item) }}
+            category={{ onNew: () => openCategory(), onEdit: openCategory, onToggle: item => toggleStatus('category', item), onDelete: item => deleteItem('category', item) }} />}
+    
+          {!isWorkflow && section === 'subscriptions' && <SubscriptionsPage can={can} products={products} customers={customers} warehouses={warehouses}
+            detailId={detailRoute?.kind === 'subscription' ? detailRoute.id : ''} onOpenDetail={id => openDetail('subscription', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
+          {!isWorkflow && section === 'whatsapp' && <WhatsAppOrdersPage can={can} detailId={detailRoute?.kind === 'whatsapp' ? detailRoute.id : ''}
+            onOpenDetail={id => openDetail('whatsapp', id)} onCloseDetail={closeDetail} onChanged={loadData} />}
+    
+          {!isWorkflow && !hasLoadedData && ['purchases', 'sales', 'inventory', 'partners', 'reports'].includes(section) && <section className="panel"><SkeletonTable rows={8} columns={6} /></section>}
+          {hasLoadedData && !isWorkflow && section === 'partners' && <OperationsCatalogs onChanged={loadData} />}
+          {hasLoadedData && !isWorkflow && section === 'purchases' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
+            <PurchaseTable rows={purchases} loading={loading} onView={order => openDetail('purchase', order)}
+              onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')}
+              onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')}
+              onCancel={cancelPurchase} onReceive={openReceive} />
+            <PurchaseReturns onChanged={loadData} />
+          </section>}
+          {hasLoadedData && !isWorkflow && section === 'sales' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
+            <SalesTable rows={sales} loading={loading} onView={sale => openDetail('sale', sale)} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation} />
+            <SalesReturns onChanged={loadData} />
+          </section>}
+          {hasLoadedData && !isWorkflow && section === 'inventory' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
+            <form className="report-filters inventory-filters" onSubmit={loadInventoryFilter}>
+              <Field label="Almacén"><select value={inventoryFilter.warehouseId} onChange={event => setInventoryFilter(current => ({ ...current, warehouseId: event.target.value }))}><option value="">Todos los almacenes</option>{warehouses.map(warehouse => <option key={pickId(warehouse)} value={pickId(warehouse)}>{pickName(warehouse)}</option>)}</select></Field>
+              <Field label="Producto"><select value={inventoryFilter.productId} onChange={event => setInventoryFilter(current => ({ ...current, productId: event.target.value }))}><option value="">Todos los productos</option>{products.map(product => <option key={pickId(product)} value={pickId(product)}>{product.name} · {product.sku}</option>)}</select></Field>
+              <button className="button primary" disabled={loading}><Search size={16} /> Filtrar</button>
+              <button type="button" className="button secondary" disabled={loading} onClick={() => { const reset = { warehouseId: '', productId: '' }; setInventoryFilter(reset); void loadInventoryFilter({ preventDefault: () => {} }, reset); }}>Limpiar</button>
+            </form>
+            <div className="stat-strip"><div><span>Unidades</span><strong>{number(stockTotal)}</strong></div><div><span>Valor estimado</span><strong>{inventoryValueLabel}</strong></div><div><span>Movimientos</span><strong>{number(movements.length)}</strong></div></div>
+            <h3 className="subheading">Saldos por producto</h3>
+            <DataTable rows={balances} columns={[['productName', 'Producto'], ['sku', 'SKU'], ['warehouseCode', 'Almacén'], ['onHand', 'Existencia'], ['reserved', 'Reservado'], ['available', 'Disponible']]} empty="No hay saldos de inventario." />
+            <h3 className="subheading">Últimos movimientos</h3>
+            <DataTable rows={movements.slice(0, 30)} columns={[['type', 'Movimiento'], { key: 'productName', label: 'Producto', render: row => row.productName || products.find(product => String(pickId(product)) === String(row.productId))?.name || row.sku || '—' }, ['warehouseCode', 'Almacén'], ['quantity', 'Cantidad'], ['occurredAt', 'Fecha'], ['referenceType', 'Documento']]} empty="No hay movimientos registrados." />
+            <InventoryOperations products={products} warehouses={warehouses} suppliers={suppliers} onChanged={loadData} />
+          </section>}
+          {hasLoadedData && !isWorkflow && section === 'reports' && <ReportsCenter warehouses={warehouses} products={products} suppliers={suppliers} onUnauthorized={() => expireSession()} />}
+    
+          {isWorkflow && <WorkflowPage onCancel={closeWorkflow}>
+            {!hasLoadedData ? <SkeletonTable rows={5} columns={3} /> : <>
+              {modal === 'product' && <ProductForm key={'product-' + (pickId(editing) || 'new')} initialValue={editing} categories={categories} units={units} loading={loading} onCancel={closeWorkflow} onSubmit={submitProduct} onError={setError}
+                onCategoryCreated={can('catalog:manage') ? category => setCategories(current => [...current, category]) : undefined}
+                onUnitCreated={can('catalog:manage') ? unit => setUnits(current => [...current, unit]) : undefined} />}
+              {modal === 'category' && <CategoryForm key={'category-' + (pickId(editing) || 'new')} initialValue={editing} loading={loading} onCancel={closeWorkflow} onSubmit={submitCategory} onError={setError} />}
+              {modal === 'purchase' && <PurchaseForm products={products} warehouses={warehouses} suppliers={suppliers} loading={loading} onCancel={closeWorkflow} onSubmit={submitPurchase} onError={setError} />}
+              {modal === 'sale' && <SaleForm products={products} warehouses={warehouses} customers={customers} balances={balances} loading={loading} onCancel={closeWorkflow} onSubmit={submitSale} onError={setError} />}
+              {modal === 'receive' && selectedOrder && <ReceiptForm key={pickId(selectedOrder)} order={selectedOrder} loading={loading} onCancel={closeWorkflow} onSubmit={submitReceipt} />}
+              {modal === 'receive' && !selectedOrder && loading && <SkeletonTable rows={4} columns={4} />}
+              {modal === 'receive' && !selectedOrder && !loading && <div className="empty-block"><strong>No se pudo abrir la orden.</strong><button type="button" className="button secondary" onClick={closeWorkflow}>Volver a compras</button></div>}
+            </>}
+          </WorkflowPage>}
+    
+  </AppShell>;
 }
 
 function WorkflowPage({ onCancel, children }) {
