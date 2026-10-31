@@ -45,9 +45,12 @@ public class InventoryService {
  @Transactional(readOnly=true) public InventoryDtos.MovementDetailView movement(UUID id,String actor){
   StockMovement movement=movements.findById(id).orElseThrow(()->new ResourceNotFoundException("Movimiento de inventario",id));
   scopes.requireWarehouseAccess(actor,movement.getWarehouse().getId());
-  var entries=valuationEntries.findByStockMovementIdOrderByCreatedAtAsc(id).stream().map(InventoryDtos.ValuationEntryView::from).toList();
-  BigDecimal total=entries.stream().map(InventoryDtos.ValuationEntryView::totalCost).reduce(BigDecimal.ZERO.setScale(4),BigDecimal::add);
-  return new InventoryDtos.MovementDetailView(InventoryDtos.MovementView.from(movement),total,entries);
+  boolean includeCost=scopes.canReadFinancialData(actor);
+  var entries=includeCost?valuationEntries.findByStockMovementIdOrderByCreatedAtAsc(id).stream()
+      .map(InventoryDtos.ValuationEntryView::from).toList():List.<InventoryDtos.ValuationEntryView>of();
+  BigDecimal total=includeCost?entries.stream().map(InventoryDtos.ValuationEntryView::totalCost)
+      .reduce(BigDecimal.ZERO.setScale(4),BigDecimal::add):null;
+  return new InventoryDtos.MovementDetailView(InventoryDtos.MovementView.from(movement,includeCost),total,entries);
  }
  @Transactional(readOnly=true) public InventoryDtos.BalanceView balance(UUID productId,UUID warehouseId,String actor){
   scopes.requireWarehouseAccess(actor,warehouseId);
