@@ -69,6 +69,11 @@ public class WarehouseScopeService {
     }
 
     @Transactional(readOnly=true)
+    public boolean hasAnyAssignment(UUID warehouseId) {
+        return scopes.existsAnyForWarehouse(warehouseId);
+    }
+
+    @Transactional(readOnly=true)
     public List<WarehouseScopeDtos.View> list(UUID userId) {
         requireUser(userId);Instant now=Instant.now();
         return scopes.findByUserIdOrderByCreatedAtDesc(userId).stream().map(scope->WarehouseScopeDtos.View.from(scope,now)).toList();
