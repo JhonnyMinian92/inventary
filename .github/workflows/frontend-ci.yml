@@ -23,7 +23,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: app-inventary-ecuapp
@@ -40,3 +40,29 @@ jobs:
         run: npm test
       - name: Build production frontend
         run: npm run build
+      - name: Start production preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/inventary-vite-preview.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --show-error --fail http://127.0.0.1:4173/inventary/iniciar-sesion >/dev/null; then
+              echo "Production preview is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/inventary-vite-preview.log
+          exit 1
+      - name: Install Chromium
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+      - name: Responsive browser E2E (360 / 768 / 1280 px)
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: node scripts/responsive-smoke.mjs
+      - name: Upload responsive browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-responsive-browser-smoke
+          path: app-inventary-ecuapp/test-results/
+          if-no-files-found: warn

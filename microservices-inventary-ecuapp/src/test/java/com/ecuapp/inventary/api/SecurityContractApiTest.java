@@ -188,4 +188,27 @@ class SecurityContractApiTest extends ApiTestSupport {
             .issuedAt(expiresAt.minusSeconds(3600)).expiresAt(expiresAt).claim("ver", version).build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
     }
+
+    @Test
+    void successfulSensitiveReadsAreAuditedWithoutCapturingResponseData() {
+        String requestId = "sensitive-read-" + suffix();
+        MvcResult response = call(get("/api/v1/admin/users"), admin(), null,
+            "X-Request-ID", requestId);
+
+        assertEquals(200, response.getResponse().getStatus());
+        Integer events = jdbc.queryForObject("""
+            select count(*) from audit_event
+            where action='SENSITIVE_DATA_READ' and outcome='SUCCESS'
+              and actor=? and correlation_id=? and metadata->>'path'='/api/v1/admin/users'
+              and metadata->>'method'='GET' and metadata->>'status'='200'
+            """, Integer.class, username("SUPER_ADMIN"), requestId);
+        assertEquals(1, events, "successful sensitive reads must be correlated to the authenticated actor");
+
+        Integer metadataFields = jdbc.queryForObject("""
+            select jsonb_object_length(metadata) from audit_event
+            where action='SENSITIVE_DATA_READ' and correlation_id=?
+            """, Integer.class, requestId);
+        assertEquals(3, metadataFields, "audit metadata must contain only method, path and status; never response or request data");
+    }
+
 }

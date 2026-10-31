@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, getToken, getTokenExpiry, setToken } from '../../api.js';
 import { toast } from '../../ui/feedback.js';
+import { hasPermission } from './permissions.js';
 
 const AuthContext = createContext(null);
 
@@ -79,7 +80,8 @@ export function AuthProvider({ children }) {
     return () => window.clearTimeout(timer);
   }, [token, expireSession]);
 
-  const can = useCallback(permission => !permission || !user || (user.permissions || []).includes(permission), [user]);
+  // Fail closed while the authenticated profile is unknown or lacks the requested permission.
+  const can = useCallback(permission => hasPermission(user, permission), [user]);
   const value = useMemo(() => ({ token, user, apiStatus, authError, can, login, logout, expireSession }),
     [token, user, apiStatus, authError, can, login, logout, expireSession]);
 
