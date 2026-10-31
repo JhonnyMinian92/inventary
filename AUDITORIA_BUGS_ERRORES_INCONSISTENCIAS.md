@@ -159,26 +159,29 @@ El backend tiene más capacidades de catálogo que las presentadas por una panta
 Este documento es un registro de hallazgos estáticos. Las correcciones están propuestas, no ejecutadas.
 
 
-## Seguimiento de implementación — rama `implementacion_propuestas`
 
-> Esta auditoría fue levantada sobre un snapshot anterior de `master`; sus hallazgos no deben interpretarse como estado actual sin contrastarlos con la rama de trabajo. El seguimiento consolidado y la secuencia de ejecución están en [PLAN_EJECUCION_PROPUESTAS_INVENTARY.md](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md).
+## Seguimiento de implementación — rama implementacion_propuestas · 2026-10-30
 
-| Hallazgo | Estado tras Fase 1 | Evidencia / trabajo restante |
+> Esta auditoría corresponde a un snapshot anterior de master. Los hallazgos históricos se mantienen como registro; el estado de ejecución se determina por el código y las pruebas actuales de implementacion_propuestas.
+
+| Hallazgo | Estado tras Fase 1 | Evidencia |
 |---|---|---|
-| P1 — Contraseña bootstrap de CI demasiado larga | Corregido en workflow backend | Se usa una contraseña CI corta y se mantiene el smoke test de base vacía; falta confirmar el run verde del SHA final. |
-| P2 — Contraseña inválida en `.env.example` del backend | Corregido | `BOOTSTRAP_ADMIN_PASSWORD=LocalOnly-123!`; solo para desarrollo local. |
-| P2 — Precio mínimo aplicado en frontend a servicios/no stock | Corregido en backend y frontend | El quote devuelve precio de catálogo y mínimo cero para tipos sin stock; se añadió prueba API. Falta ejecutar Maven verify y la suite frontend. |
-| P3 — CI frontend usa instalación no reproducible | Corregido | Workflow usa `npm ci`, `npm test` y `npm run build`; falta evidencia de ejecución verde. |
-| Artefactos generados Maven versionados | Corregido | Retirados los 19 archivos de la ruta literal `${project.build.directory}` y añadida exclusión a Git. |
-| Documentación raíz/frontend desactualizada | Parcialmente corregido | READMEs actualizados y roadmap maestro añadido. Las referencias históricas de esta auditoría siguen describiendo el snapshot original. |
+| P1 — Contraseña bootstrap de CI demasiado larga | Corregido y validado | Backend CI run 41165468427 pasó el smoke test de Compose con PostgreSQL vacío. |
+| P2 — Contraseña inválida en .env.example del backend | Corregido | BOOTSTRAP_ADMIN_PASSWORD=LocalOnly-123!, valor de ejemplo de desarrollo. |
+| P2 — Mínimo de precio aplicado a servicios/no stock | Corregido y probado | Backend devuelve mínimo cero/precio de catálogo para SERVICE y NON_STOCKED_GOOD; el formulario solo aplica suelo de coste a STOCKED_GOOD; test API cubre ambos tipos no stockeables. |
+| P3 — CI frontend poco reproducible | Corregido y validado | Frontend CI completó npm ci, npm test y npm run build. |
+| Artefactos generados Maven versionados | Corregido | Retirados los 19 archivos generados identificados; .gitignore excluye salidas Maven. |
+| Documentación obsoleta | Parcialmente corregido | READMEs y plan maestro actualizados; esta auditoría permanece como registro histórico. |
 
-Los demás hallazgos de P1/P2 —impuestos y contrato fiscal, snapshots de facturación, asignación de almacén por usuario/caja, devolución monetaria, separación entre cancelación comercial y fiscal, descuentos y logística— permanecen pendientes y se distribuyen en las fases 3, 4 y 5 del plan maestro. No se consideran resueltos por los cambios de estabilización.
+**Ejecuciones CI verificadas**
+- Frontend Build, run 41165392564: success — https://github.com/JhonnyMinian92/inventary/actions/runs/41165392564
+- Backend CI, run 41165468427: success — Maven verify/PostgreSQL 16, Compose normal/Kafka, smoke test desde volumen PostgreSQL vacío y cleanup — https://github.com/JhonnyMinian92/inventary/actions/runs/41165468427
 
+Los demás hallazgos —fiscalidad/impuestos y backend SRI, snapshots históricos, ámbitos usuario/caja, pagos y reembolsos, descuentos, logística/fulfillment, E2E, reportes tributarios y cobertura completa de auditoría— permanecen pendientes y se distribuyen en las Fases 2–10. No se cierran por esta estabilización.
 
-## Adenda de trazabilidad — consolidación completa de propuestas · 2026-10-30
+## Seguimiento consolidado de propuestas
 
-El estado de los hallazgos y las brechas de producto se ejecutará conforme al plan y a la matriz que consolidan los 22 documentos raíz:
-- [Plan maestro de implementación](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md)
-- [Matriz de trazabilidad de propuestas](MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md)
+- [Plan maestro de implementación de las 10 fases](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md)
+- [Matriz de trazabilidad de los 22 documentos raíz](MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md)
 
-Los defectos corregidos en Fase 1 incluyen la regla de precio mínimo aplicada indebidamente a SERVICE/NON_STOCKED_GOOD, la configuración de bootstrap y la reproducibilidad de CI; se añadieron pruebas de regresión y se validaron los workflows. Impuestos/SRI, snapshots fiscales completos, ámbitos de usuario/caja, pagos/reembolsos, descuentos, fulfillment y pruebas E2E permanecen asignados a fases posteriores, no se declaran resueltos por esta Fase 1.
+Fase 1 completada. Restan 9 fases, según el plan maestro. Este registro no declara el producto listo para producción.
