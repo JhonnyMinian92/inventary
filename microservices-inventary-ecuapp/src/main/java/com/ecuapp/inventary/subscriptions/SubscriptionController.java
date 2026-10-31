@@ -24,7 +24,7 @@ public class SubscriptionController {
 
     /** Read-only calendar of charges for a plan; used while configuring a service or a subscription. */
     @PostMapping("/preview") @PreAuthorize("hasAuthority('sales:read') or hasAuthority('catalog:read')")
-    public SubscriptionDtos.PreviewView preview(@Valid @RequestBody SubscriptionDtos.PreviewRequest request,Authentication auth) { return service.preview(request,auth.getName()); }
+    public SubscriptionDtos.PreviewView preview(@Valid @RequestBody SubscriptionDtos.PreviewRequest request) { return service.preview(request); }
 
     @GetMapping @PreAuthorize("hasAuthority('sales:read')")
     public Page<SubscriptionDtos.View> list(@RequestParam(required = false) Subscription.Status status, @RequestParam(required = false) UUID customerId,
