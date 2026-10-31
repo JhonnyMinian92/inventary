@@ -60,7 +60,9 @@ public class StockTransferService {
  }
  @Transactional(readOnly=true)
  public TransferDtos.View get(UUID id,String actor){
-  StockTransfer transfer=requireDetailed(id);requireTransferScope(transfer,actor);return TransferDtos.View.from(transfer);
+  StockTransfer transfer=requireDetailed(id);
+  scopes.requireAnyWarehouseAccess(actor,transfer.getSourceWarehouse().getId(),transfer.getDestinationWarehouse().getId());
+  return TransferDtos.View.from(transfer);
  }
 
  @Transactional
@@ -124,7 +126,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View dispatch(UUID id,String rawKey,String actor){
-  requireTransferScope(id,actor);
+  requireTransferSourceScope(id,actor);
   String key=normalizeKey(rawKey);IdempotencyRecord idem=claim("STOCK_TRANSFER_DISPATCH",key,hash("STOCK_TRANSFER_DISPATCH|"+id));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
   StockTransfer transfer=requireForUpdate(id);
@@ -154,7 +156,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View receive(UUID id,String rawKey,String actor){
-  requireTransferScope(id,actor);
+  requireTransferDestinationScope(id,actor);
   String key=normalizeKey(rawKey);IdempotencyRecord idem=claim("STOCK_TRANSFER_RECEIVE",key,hash("STOCK_TRANSFER_RECEIVE|"+id));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
   StockTransfer transfer=requireForUpdate(id);
@@ -189,7 +191,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View cancel(UUID id,String rawKey,String reason,String actor){
-  requireTransferScope(id,actor);
+  requireTransferSourceScope(id,actor);
   String key=normalizeKey(rawKey);String clean=requiredReason(reason);
   IdempotencyRecord idem=claim("STOCK_TRANSFER_CANCEL",key,hash("STOCK_TRANSFER_CANCEL|"+id+"|"+clean));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
@@ -322,8 +324,16 @@ public class StockTransferService {
   try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
   catch(Exception ex){throw new IllegalStateException("No se pudo calcular el hash de la operación.",ex);}
  }
- private void requireTransferScope(UUID id,String actor){requireTransferScope(requireDetailed(id),actor);}
- private void requireTransferScope(StockTransfer transfer,String actor){
+ private void requireTransferSourceScope(UUID id,String actor){
+  StockTransfer transfer=requireDetailed(id);
+  scopes.requireWarehouseAccess(actor,transfer.getSourceWarehouse().getId());
+ }
+ private void requireTransferDestinationScope(UUID id,String actor){
+  StockTransfer transfer=requireDetailed(id);
+  scopes.requireWarehouseAccess(actor,transfer.getDestinationWarehouse().getId());
+ }
+ private void requireTransferScope(UUID id,String actor){
+  StockTransfer transfer=requireDetailed(id);
   scopes.requireWarehouseAccess(actor,transfer.getSourceWarehouse().getId());
   scopes.requireWarehouseAccess(actor,transfer.getDestinationWarehouse().getId());
  }
