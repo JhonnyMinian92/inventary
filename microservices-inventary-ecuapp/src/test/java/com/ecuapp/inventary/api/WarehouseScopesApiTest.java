@@ -5,6 +5,7 @@ import com.ecuapp.inventary.support.ApiTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,5 +61,28 @@ class WarehouseScopesApiTest extends ApiTestSupport {
         assertThrows(DataAccessException.class,()->jdbc.update("update audit_event set action='TAMPERED' where id=?",eventId));
         assertThrows(DataAccessException.class,()->jdbc.update("delete from audit_event where id=?",eventId));
         assertThrows(DataAccessException.class,()->jdbc.execute("truncate table audit_event"));
+    }
+
+    @Test
+    void expiredWarehouseScopeIsRevokedAndAuditedBeforeAReplacementIsGranted() {
+        String administrator=admin();
+        JsonNode warehouse=warehouse();
+        String username="expiry."+suffix().toLowerCase();
+        AppUser user=users.saveAndFlush(new AppUser(username,encoder.encode(PASSWORD),"VENDEDOR"));
+        Instant validFrom=Instant.now().minusSeconds(300);
+        Instant validUntil=Instant.now().minusSeconds(120);
+
+        JsonNode expired=httpPost(administrator,"/api/v1/admin/users/"+user.getId()+"/warehouse-scopes",
+            Map.of("warehouseId",warehouse.get("id").asText(),"reason","Asignación temporal ya vencida",
+                "validFrom",validFrom.toString(),"validUntil",validUntil.toString()),201);
+        assertFalse(expired.path("effective").asBoolean());
+
+        JsonNode replacement=httpPost(administrator,"/api/v1/admin/users/"+user.getId()+"/warehouse-scopes",
+            Map.of("warehouseId",warehouse.get("id").asText(),"reason","Nueva asignación vigente"),201);
+        assertTrue(replacement.path("effective").asBoolean());
+        assertEquals(1,jdbc.queryForObject("select count(*) from user_warehouse_scope where id=?::uuid and active=false and revoked_by='SYSTEM_EXPIRY'",
+            Integer.class,UUID.fromString(expired.get("id").asText())));
+        assertEquals(1,jdbc.queryForObject("select count(*) from audit_event where resource_id=?::uuid and action='USER_WAREHOUSE_SCOPE_EXPIRED'",
+            Integer.class,UUID.fromString(expired.get("id").asText())));
     }
 }
