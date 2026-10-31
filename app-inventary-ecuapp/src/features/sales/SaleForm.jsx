@@ -284,8 +284,9 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
           const price = Number(line.unitPrice);
           const priceValid = String(line.unitPrice).trim() !== '' && Number.isFinite(price);
           const minimum = Number(pricing?.minimumPrice);
-          const loss = Boolean(pricing) && priceValid && price < minimum;
-          const gain = pricing && priceValid && minimum > 0 ? (price - minimum) / minimum * 100 : null;
+          const hasCostFloor = tracksStock(line.productId);
+          const loss = hasCostFloor && Boolean(pricing) && priceValid && price < minimum;
+          const gain = hasCostFloor && pricing && priceValid && minimum > 0 ? (price - minimum) / minimum * 100 : null;
           return <section className="line-editor workflow-line" key={index} aria-label={`Artículo ${index + 1}`}>
             <div className="line-editor-heading"><strong>Artículo {index + 1}</strong>{lines.length > 1 && <button type="button" className="text-button danger-text" disabled={loading} onClick={() => { setLines(current => current.filter((_, lineIndex) => lineIndex !== index)); setValidationMessage(''); }}><Trash2 size={14}/> Quitar</button>}</div>
             <div className="form-grid compact-grid">
