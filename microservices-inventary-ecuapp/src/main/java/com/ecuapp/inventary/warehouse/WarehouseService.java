@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,21 +27,27 @@ import java.util.UUID;
 public class WarehouseService {
  private static final Set<String> SORT=Set.of("name","code","createdAt","updatedAt","active");
  private final WarehouseRepository repo;private final WarehouseLocationRepository locations;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final AuditService audit;
- private final PurchaseOrderRepository purchaseOrders;private final StockTransferRepository transfers;private final InventoryCountRepository counts;
+ private final PurchaseOrderRepository purchaseOrders;private final StockTransferRepository transfers;private final InventoryCountRepository counts;private final WarehouseScopeService scopes;
  public WarehouseService(WarehouseRepository repo,WarehouseLocationRepository locations,StockBalanceRepository balances,StockMovementRepository movements,AuditService audit,
-  PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts){
-  this.repo=repo;this.locations=locations;this.balances=balances;this.movements=movements;this.audit=audit;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;
+  PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts,WarehouseScopeService scopes){
+  this.repo=repo;this.locations=locations;this.balances=balances;this.movements=movements;this.audit=audit;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public Page<WarehouseDtos.View> list(Boolean active,Pageable p){return repo.search(active,Pages.of(p,SORT,Sort.by("name"))).map(WarehouseDtos.View::from);}
- @Transactional(readOnly=true) public WarehouseDtos.View get(UUID id){return WarehouseDtos.View.from(require(id));}
+ @Transactional(readOnly=true) public Page<WarehouseDtos.View> list(Boolean active,Pageable p,String actor){
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,Sort.by("name"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  return (allowed==null?repo.search(active,pageable):repo.searchScoped(active,allowed,pageable)).map(WarehouseDtos.View::from);
+ }
+ @Transactional(readOnly=true) public WarehouseDtos.View get(UUID id,String actor){scopes.requireWarehouseAccess(actor,id);return WarehouseDtos.View.from(require(id));}
  @Transactional public WarehouseDtos.View create(WarehouseDtos.WriteRequest r,String actor){
   String code=r.code().trim().toUpperCase(Locale.ROOT);if(repo.existsByCodeIgnoreCase(code))throw new ConflictException("Ya existe un almacén con ese código.");
   Warehouse saved=repo.saveAndFlush(new Warehouse(code,r.name().trim(),clean(r.address())));
   locations.save(new WarehouseLocation(saved,"MAIN","Ubicación principal",WarehouseLocation.LocationType.STORAGE));
+  scopes.grantCreatorAccess(actor,saved);
   audit.record(actor,"WAREHOUSE_CREATED","WAREHOUSE",saved.getId(),Map.of("code",saved.getCode()));return WarehouseDtos.View.from(saved);
  }
- @Transactional public WarehouseDtos.View update(UUID id,WarehouseDtos.WriteRequest r,String actor){Warehouse w=require(id);String code=r.code().trim().toUpperCase(Locale.ROOT);if(!w.getCode().equals(code))throw new ConflictException("El código de almacén es inmutable; cree otro almacén para cambiarlo.");w.update(r.name().trim(),clean(r.address()));repo.flush();audit.record(actor,"WAREHOUSE_UPDATED","WAREHOUSE",id,Map.of("code",w.getCode()));return WarehouseDtos.View.from(w);}
+ @Transactional public WarehouseDtos.View update(UUID id,WarehouseDtos.WriteRequest r,String actor){scopes.requireWarehouseAccess(actor,id);Warehouse w=require(id);String code=r.code().trim().toUpperCase(Locale.ROOT);if(!w.getCode().equals(code))throw new ConflictException("El código de almacén es inmutable; cree otro almacén para cambiarlo.");w.update(r.name().trim(),clean(r.address()));repo.flush();audit.record(actor,"WAREHOUSE_UPDATED","WAREHOUSE",id,Map.of("code",w.getCode()));return WarehouseDtos.View.from(w);}
  @Transactional public void deactivate(UUID id,String actor){
+  scopes.requireWarehouseAccess(actor,id);
   Warehouse w=repo.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Almacén",id));if(!w.isActive())return;
   if(balances.warehouseHasStock(id))throw new ConflictException("El almacén tiene existencias o reservas; transfiéralas o ajústelas antes de desactivarlo.");
   if(purchaseOrders.existsForWarehouseInStatuses(id,EnumSet.of(PurchaseOrderStatus.DRAFT,PurchaseOrderStatus.SUBMITTED,PurchaseOrderStatus.APPROVED,PurchaseOrderStatus.PARTIALLY_RECEIVED)))
@@ -52,6 +59,7 @@ public class WarehouseService {
   w.deactivate();audit.record(actor,"WAREHOUSE_DEACTIVATED","WAREHOUSE",id,Map.of("code",w.getCode()));
  }
  @Transactional public void delete(UUID id,String actor){
+  scopes.requireWarehouseAccess(actor,id);
   Warehouse w=repo.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("Almacén",id));
   if(w.isActive())throw new ConflictException("Desactive el almacén antes de intentar su eliminación física.");
   if(balances.existsByWarehouseId(id)||movements.existsByWarehouseId(id))
@@ -72,12 +80,13 @@ public class WarehouseService {
   }
   audit.record(actor,"WAREHOUSE_DELETED","WAREHOUSE",id,Map.of("code",code));
  }
- @Transactional public void activate(UUID id,String actor){Warehouse w=require(id);if(w.isActive())return;w.activate();audit.record(actor,"WAREHOUSE_ACTIVATED","WAREHOUSE",id,Map.of("code",w.getCode()));}
- @Transactional(readOnly=true) public List<WarehouseDtos.LocationView> locations(UUID warehouseId){
-  require(warehouseId);
+ @Transactional public void activate(UUID id,String actor){scopes.requireWarehouseAccess(actor,id);Warehouse w=require(id);if(w.isActive())return;w.activate();audit.record(actor,"WAREHOUSE_ACTIVATED","WAREHOUSE",id,Map.of("code",w.getCode()));}
+ @Transactional(readOnly=true) public List<WarehouseDtos.LocationView> locations(UUID warehouseId,String actor){
+  scopes.requireWarehouseAccess(actor,warehouseId);require(warehouseId);
   return locations.findByWarehouseIdOrderByCodeAsc(warehouseId).stream().map(WarehouseDtos.LocationView::from).toList();
  }
  @Transactional public WarehouseDtos.LocationView createLocation(UUID warehouseId,WarehouseDtos.LocationRequest r,String actor){
+  scopes.requireWarehouseAccess(actor,warehouseId);
   Warehouse w=require(warehouseId);
   if(!w.isActive())throw new BusinessRuleException("No se pueden crear ubicaciones en un almacén inactivo.");
   String code=r.code().trim().toUpperCase(Locale.ROOT);
