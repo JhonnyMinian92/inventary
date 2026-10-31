@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
-import WorkflowPage from '../../shared/ui/forms/WorkflowPage.jsx';
 import { SkeletonTable } from '../../shared/ui/feedback/Skeleton.jsx';
+
+const WorkflowPage = lazy(() => import('../../shared/ui/forms/WorkflowPage.jsx'));
 
 // Route-level loading keeps the initial bundle small and downloads each domain
 // only when the user enters that workspace or starts its workflow.

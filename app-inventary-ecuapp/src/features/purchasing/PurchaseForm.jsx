@@ -3,6 +3,7 @@ import { useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackagePlus, Trash2 } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
 import ProductPicker from '../../components/ProductPicker.jsx';
+import '../operations/operational-forms.css';
 
 const emptyLine = () => ({ productId: '', quantity: '1', unitCost: '0' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackageCheck } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
+import '../operations/operational-forms.css';
 
 function idOf(item) { return item?.id ?? item?.purchaseOrderLineId ?? ''; }
 function lineName(line) { return line?.productName || line?.product?.name || line?.name || line?.sku || ('Producto ' + idOf(line)); }

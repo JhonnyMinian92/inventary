@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Tags } from 'lucide-react';
 import { api } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
 import { LIST_TYPES, PropertiesEditor, SuggestionNote, TemplatePicker, fromDefinition, normalizeCatalog, rowsForTemplate, toRequest, useCategorySuggestion, validateRows } from './CategoryProperties.jsx';
+import './catalog-forms.css';
 
 export default function CategoryForm({ initialValue, loading, onCancel, onSubmit, onError }) {
   const isNew = !initialValue;

@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, ShoppingCart, Trash2 } from 'lucide-react';
 import { api } from '../../api';
 import StepProgress from '../../components/StepProgress.jsx';
 import ProductPicker from '../../components/ProductPicker.jsx';
+import '../operations/operational-forms.css';
 
 // priceEdited: el vendedor cambió el precio; mientras sea false se usa el sugerido por el backend.
 const emptyLine = () => ({ productId: '', quantity: '1', unitPrice: '', priceEdited: false });

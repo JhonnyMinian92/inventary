@@ -4,6 +4,7 @@ import { Activity, CalendarRange, Download, FileSpreadsheet, RefreshCw, Search, 
 import { api, listFrom } from '../../api';
 import { buildCsv } from '../../utils/csv.js';
 import { readSearchValue, updateBrowserQuery } from '../../shared/lib/url-state.js';
+import './reports.css';
 
 const REPORT_TABS = [
   { id: 'balance', label: 'Balance de inventario' },

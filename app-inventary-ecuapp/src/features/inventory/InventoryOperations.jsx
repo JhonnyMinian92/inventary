@@ -7,6 +7,10 @@ import useAccessibleDialog from '../../shared/hooks/useAccessibleDialog.js';
 import StepProgress from '../../shared/ui/stepper/StepProgress.jsx';
 import ProductPicker from '../../entities/product/ui/ProductPicker.jsx';
 import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
+import '../operations/operational-forms.css';
+import '../operations/operation-workspaces.css';
+import '../returns/returns.css';
+import '../../shared/ui/forms/workflow.css';
 
 const emptyLine = () => ({ productId: '', quantity: '1' });
 function idOf(item) { return item?.id ?? item?.productId ?? ''; }

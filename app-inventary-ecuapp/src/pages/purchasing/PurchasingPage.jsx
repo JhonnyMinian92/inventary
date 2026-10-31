@@ -1,5 +1,8 @@
 import PurchaseTable from '../../features/purchasing/PurchaseTable.jsx';
 import PurchaseReturns from '../../features/purchasing/PurchaseReturns.jsx';
+import '../../features/operations/operational-forms.css';
+import '../../features/returns/returns.css';
+import '../../features/operations/operation-workspaces.css';
 
 export default function PurchasingPage({
   rows, loading, pagination, page, onPageChange, onView, onSubmit, onApprove, onCancel, onReceive, onChanged

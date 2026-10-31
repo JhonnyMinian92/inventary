@@ -1,4 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
+import './workflow.css';
 
 export default function WorkflowPage({ onCancel, children }) {
   return <section className="workflow-page">

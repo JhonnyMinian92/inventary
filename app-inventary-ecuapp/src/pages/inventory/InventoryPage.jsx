@@ -4,6 +4,7 @@ import Field from '../../shared/ui/forms/Field.jsx';
 import InventoryOperations from '../../features/inventory/InventoryOperations.jsx';
 import { number } from '../../utils/format.js';
 import { productId, productName, productQuantity } from '../../entities/product/model/product.js';
+import '../../features/operations/operational-forms.css';
 
 export default function InventoryPage({
   products, balances, movements, warehouses, suppliers, inventoryFilter, setInventoryFilter,

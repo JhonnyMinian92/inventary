@@ -1,0 +1,8 @@
+.visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.report-tab:focus-visible,.catalog-tab:focus-visible,.button:focus-visible,.small-action:focus-visible,.icon-button:focus-visible,.quick-action:focus-visible,.text-button:focus-visible{outline:3px solid rgba(42, 138, 92,.55);outline-offset:2px}
+.modal-backdrop{overflow-y:auto;overscroll-behavior:contain}
+.modal-card{max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain}
+.modal-card[role="dialog"]:focus{outline:none}
+.field input:focus-visible,.field select:focus-visible,.field textarea:focus-visible,.search-box input:focus-visible{outline:3px solid rgba(42, 138, 92,.4);outline-offset:1px;border-color:#3f9c6d}
+button:disabled{cursor:not-allowed}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

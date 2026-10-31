@@ -4,6 +4,7 @@ import { api, listFrom } from '../../api';
 import ServerPagination from '../../ui/ServerPagination.jsx';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import UnitConversions from './UnitConversions.jsx';
+import '../returns/returns.css';
 
 const configs = {
   warehouses: {

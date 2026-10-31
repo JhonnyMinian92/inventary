@@ -1,5 +1,6 @@
 import DataTable from '../../../shared/ui/data-table/DataTable.jsx';
 import { statusLabel, statusTone } from '../../../utils/format.js';
+import '../transaction-details.css';
 
 function titleCase(value) { return String(value || '—').replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, char => char.toUpperCase()); }
 function dateTime(value) {

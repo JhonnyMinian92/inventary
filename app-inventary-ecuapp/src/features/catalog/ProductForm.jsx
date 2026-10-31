@@ -5,6 +5,8 @@ import StepProgress from '../../components/StepProgress.jsx';
 import { api, resolveApiUrl } from '../../api';
 import QuickCreateDialog, { SelectWithCreate } from '../../ui/QuickCreateDialog.jsx';
 import CategoryQuickCreate from './CategoryQuickCreate.jsx';
+import './catalog-forms.css';
+import './product-media.css';
 
 const DEFAULT_UNIT_ID = '00000000-0000-0000-0000-000000000001';
 const FRACTION_OPTIONS = [['', 'Según cómo se mide (recomendado)'], ['false', 'No, solo cantidades enteras (1, 2, 3)'], ['true', 'Sí, permite decimales (ej. 1,5)']];

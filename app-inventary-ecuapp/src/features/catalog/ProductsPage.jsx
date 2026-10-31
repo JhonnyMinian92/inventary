@@ -8,6 +8,7 @@ import { toast } from '../../ui/feedback.js';
 import { downloadCsv } from '../../utils/csv.js';
 import { dateTime, idOf, isInactive, isoDate, money, movementDirection, movementLabel, number, titleCase } from '../../utils/format.js';
 import './catalog.css';
+import '../operations/operational-forms.css';
 import { readSearchValue, updateBrowserQuery } from '../../shared/lib/url-state.js';
 
 const PAGE_SIZE = 20;
