@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, Warehouse, Wrench } from 'lucide-react';
-import { api, listFrom, listAllPages } from '../../api';
+import { api, listFrom } from '../../api';
+import ServerPagination from '../../ui/ServerPagination.jsx';
 import useAccessibleDialog from '../../hooks/useAccessibleDialog.js';
 import StepProgress from '../../components/StepProgress.jsx';
 import ProductPicker from '../../components/ProductPicker.jsx';
@@ -30,6 +31,10 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [counts, setCounts] = useState([]);
   const [rules, setRules] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+  const [transferPage, setTransferPage] = useState(0);
+  const [countPage, setCountPage] = useState(0);
+  const [transferPageInfo, setTransferPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
+  const [countPageInfo, setCountPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   useMessageToast(error, setError);
@@ -50,23 +55,38 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
   const [adjustmentForm, setAdjustmentForm] = useState({ productId: '', warehouseId: warehouses[0]?.id || '', direction: 'INCREASE', quantity: '1', unitCost: '0', reason: '' });
 
   const refresh = useCallback(async () => {
-    const results = await Promise.allSettled([
-      listAllPages(api.inventoryTransfers, { size: 100 }),
-      listAllPages(api.inventoryCounts, { size: 100 }),
-      listAllPages(api.reorderRules),
-      api.replenishmentSuggestions()
-    ]);
-    const setters = [setTransfers, setCounts, setRules, setSuggestions];
-    const labels = ['traslados', 'conteos físicos', 'reglas de reposición', 'sugerencias'];
+    setLoading(true);
+    setError('');
+    let requests = [];
+    if (tab === 'transfers') {
+      requests = [['transfers', () => api.inventoryTransfers({ page: transferPage, size: 20, sort: 'createdAt,desc' })]];
+    } else if (tab === 'counts') {
+      requests = [['counts', () => api.inventoryCounts({ page: countPage, size: 20, sort: 'createdAt,desc' })]];
+    } else if (tab === 'reorder') {
+      requests = [
+        ['rules', () => api.reorderRules({ page: 0, size: 100 })],
+        ['suggestions', () => api.replenishmentSuggestions()]
+      ];
+    }
+    const results = await Promise.allSettled(requests.map(([, run]) => run()));
     const failures = [];
     results.forEach((result, index) => {
-      if (result.status === 'fulfilled') setters[index](listFrom(result.value));
-      else failures.push(labels[index] + ': ' + (result.reason?.message || 'error'));
+      const [key] = requests[index];
+      if (result.status !== 'fulfilled') {
+        failures.push(key + ': ' + (result.reason?.message || 'error'));
+        return;
+      }
+      const rows = listFrom(result.value);
+      if (key === 'transfers') { setTransfers(rows); setTransferPageInfo(pageMeta(result.value)); }
+      if (key === 'counts') { setCounts(rows); setCountPageInfo(pageMeta(result.value)); }
+      if (key === 'rules') setRules(rows);
+      if (key === 'suggestions') setSuggestions(rows);
     });
     if (failures.length) setError('Algunas operaciones no se pudieron cargar. ' + failures.join(' · '));
-  }, []);
+    setLoading(false);
+  }, [tab, transferPage, countPage]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   useEffect(() => {
     const syncWorkflow = () => {
@@ -283,8 +303,8 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
     <div className="panel-heading"><div className="panel-title-icon"><span>⇄</span><div><h2>Operaciones de inventario</h2><p>Traslados entre almacenes, conteos físicos y reposición de existencias.</p></div></div><button className="button secondary" onClick={() => void refresh()} disabled={loading}>Actualizar</button></div>
     {!modal && <>
     <div className="catalog-tabs" role="tablist" aria-label="Operaciones de inventario">
-      <button className={tab === 'transfers' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'transfers'} onClick={() => setTab('transfers')}>Traslados <span>{transfers.length}</span></button>
-      <button className={tab === 'counts' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'counts'} onClick={() => setTab('counts')}>Conteos físicos <span>{counts.length}</span></button>
+      <button className={tab === 'transfers' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'transfers'} onClick={() => setTab('transfers')}>Traslados <span>{transferPageInfo.totalElements}</span></button>
+      <button className={tab === 'counts' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'counts'} onClick={() => setTab('counts')}>Conteos físicos <span>{countPageInfo.totalElements}</span></button>
       <button className={tab === 'reorder' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'reorder'} onClick={() => setTab('reorder')}>Reposición <span>{suggestions.length}</span></button>
       <button className={tab === 'adjustments' ? 'catalog-tab active' : 'catalog-tab'} role="tab" aria-selected={tab === 'adjustments'} onClick={() => setTab('adjustments')}>Ajustes</button>
     </div>
@@ -307,7 +327,9 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
             </div></td>
           </tr>;
         })}
-      </tbody></table>{!transfers.length && <div className="empty-state">{loading ? 'Cargando traslados…' : 'No hay traslados registrados.'}</div>}</div>
+      </tbody></table>{!transfers.length && <div className="empty-state">{loading ? 'Cargando traslados…' : 'No hay traslados en esta página.'}</div>}
+      <ServerPagination info={transferPageInfo} page={transferPage} loading={loading} onChange={setTransferPage} />
+      </div>
     </>}
 
     {tab === 'counts' && <>
@@ -320,7 +342,9 @@ export default function InventoryOperations({ products, warehouses, suppliers, o
             {['DRAFT','PENDING','OPEN'].includes(status) && <button className="small-action" disabled={loading} onClick={() => void operate(() => api.cancelInventoryCount(idOf(count)), 'Conteo cancelado.')}>Cancelar</button>}
           </div></td></tr>;
         })}
-      </tbody></table>{!counts.length && <div className="empty-state">{loading ? 'Cargando conteos…' : 'No hay conteos físicos registrados.'}</div>}</div>
+      </tbody></table>{!counts.length && <div className="empty-state">{loading ? 'Cargando conteos…' : 'No hay conteos en esta página.'}</div>}
+      <ServerPagination info={countPageInfo} page={countPage} loading={loading} onChange={setCountPage} />
+      </div>
     </>}
 
     {tab === 'adjustments' && <>
