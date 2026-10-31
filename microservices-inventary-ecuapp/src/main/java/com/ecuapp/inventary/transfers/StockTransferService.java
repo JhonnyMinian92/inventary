@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.transfers;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.inventory.*;
@@ -36,26 +37,36 @@ public class StockTransferService {
  private final ObjectMapper mapper;
  private final AuditService audit;
  private final InventoryCostingService costing;
+ private final WarehouseScopeService scopes;
  private static final Set<String> SORT=Set.of("createdAt","transferNumber","status","dispatchedAt","completedAt");
 
  public StockTransferService(StockTransferRepository transfers,IdempotencyRecordRepository idempotencyRecords,
   ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
   WarehouseLocationRepository locations,UnitOfMeasureRepository units,StockMovementRepository movements,
-  OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,InventoryCostingService costing){
+  OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,InventoryCostingService costing,WarehouseScopeService scopes){
   this.transfers=transfers;this.idempotencyRecords=idempotencyRecords;this.products=products;this.warehouses=warehouses;
   this.balances=balances;this.locations=locations;this.units=units;this.movements=movements;this.outbox=outbox;
-  this.mapper=mapper;this.audit=audit;this.costing=costing;
+  this.mapper=mapper;this.audit=audit;this.costing=costing;this.scopes=scopes;
  }
 
  @Transactional(readOnly=true)
- public Page<TransferDtos.View> list(TransferStatus status,UUID sourceWarehouseId,UUID destinationWarehouseId,Pageable p){
-  return transfers.search(status,sourceWarehouseId,destinationWarehouseId,Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"createdAt"))).map(TransferDtos.View::from);
+ public Page<TransferDtos.View> list(TransferStatus status,UUID sourceWarehouseId,UUID destinationWarehouseId,Pageable p,String actor){
+  if(sourceWarehouseId!=null)scopes.requireWarehouseAccess(actor,sourceWarehouseId);
+  if(destinationWarehouseId!=null)scopes.requireWarehouseAccess(actor,destinationWarehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"createdAt"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  return (allowed==null?transfers.search(status,sourceWarehouseId,destinationWarehouseId,pageable):
+   transfers.searchScoped(status,sourceWarehouseId,destinationWarehouseId,allowed,pageable)).map(TransferDtos.View::from);
  }
  @Transactional(readOnly=true)
- public TransferDtos.View get(UUID id){return TransferDtos.View.from(requireDetailed(id));}
+ public TransferDtos.View get(UUID id,String actor){
+  StockTransfer transfer=requireDetailed(id);requireTransferScope(transfer,actor);return TransferDtos.View.from(transfer);
+ }
 
  @Transactional
  public TransferDtos.View create(String rawKey,TransferDtos.CreateRequest request,String actor){
+  scopes.requireWarehouseAccess(actor,request.sourceWarehouseId());
+  scopes.requireWarehouseAccess(actor,request.destinationWarehouseId());
   String key=normalizeKey(rawKey);
   String hash=hash(canonicalRequest(request));
   Optional<StockTransfer> previous=transfers.findByIdempotencyKey(key);
@@ -113,6 +124,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View dispatch(UUID id,String rawKey,String actor){
+  requireTransferScope(id,actor);
   String key=normalizeKey(rawKey);IdempotencyRecord idem=claim("STOCK_TRANSFER_DISPATCH",key,hash("STOCK_TRANSFER_DISPATCH|"+id));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
   StockTransfer transfer=requireForUpdate(id);
@@ -142,6 +154,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View receive(UUID id,String rawKey,String actor){
+  requireTransferScope(id,actor);
   String key=normalizeKey(rawKey);IdempotencyRecord idem=claim("STOCK_TRANSFER_RECEIVE",key,hash("STOCK_TRANSFER_RECEIVE|"+id));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
   StockTransfer transfer=requireForUpdate(id);
@@ -176,6 +189,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View cancel(UUID id,String rawKey,String reason,String actor){
+  requireTransferScope(id,actor);
   String key=normalizeKey(rawKey);String clean=requiredReason(reason);
   IdempotencyRecord idem=claim("STOCK_TRANSFER_CANCEL",key,hash("STOCK_TRANSFER_CANCEL|"+id+"|"+clean));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
@@ -207,6 +221,7 @@ public class StockTransferService {
 
  @Transactional
  public TransferDtos.View reverse(UUID id,String rawKey,String reason,String actor){
+  requireTransferScope(id,actor);
   String key=normalizeKey(rawKey);String clean=requiredReason(reason);
   IdempotencyRecord idem=claim("STOCK_TRANSFER_REVERSE",key,hash("STOCK_TRANSFER_REVERSE|"+id+"|"+clean));
   if(idem.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED)return replay(idem);
@@ -306,5 +321,10 @@ public class StockTransferService {
  private String hash(String value){
   try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
   catch(Exception ex){throw new IllegalStateException("No se pudo calcular el hash de la operación.",ex);}
+ }
+ private void requireTransferScope(UUID id,String actor){requireTransferScope(requireDetailed(id),actor);}
+ private void requireTransferScope(StockTransfer transfer,String actor){
+  scopes.requireWarehouseAccess(actor,transfer.getSourceWarehouse().getId());
+  scopes.requireWarehouseAccess(actor,transfer.getDestinationWarehouse().getId());
  }
 }
