@@ -44,6 +44,7 @@ function CatalogTabs({ active, productCount, categoryCount, onNavigate }) {
 function ProductDrawer({ product, category, balances, can, onClose, onEdit, onToggle, onDelete }) {
   const canMovements = can('inventory:manage') || can('audit:read');
   const [movements, setMovements] = useState(null);
+  const [productBalances, setProductBalances] = useState(null);
   const productId = idOf(product);
   useEffect(() => {
     if (!canMovements) return undefined;
@@ -54,7 +55,15 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
       .catch(error => { if (active) { setMovements([]); toast.error(error?.message || 'No se pudieron cargar los movimientos.'); } });
     return () => { active = false; };
   }, [productId, canMovements]);
-  const rows = balances.filter(row => String(row.productId) === String(productId));
+  useEffect(() => {
+    let active = true;
+    setProductBalances(null);
+    api.balances({ productId, page: 0, size: 100 })
+      .then(payload => { if (active) setProductBalances(listFrom(payload)); })
+      .catch(error => { if (active) { setProductBalances([]); toast.error(error?.message || 'No se pudieron cargar las existencias del producto.'); } });
+    return () => { active = false; };
+  }, [productId]);
+  const rows = (productBalances ?? balances.filter(row => String(row.productId) === String(productId)));
   const onHand = rows.reduce((sum, row) => sum + Number(row.onHand || 0), 0);
   const available = rows.reduce((sum, row) => sum + Number(row.available ?? row.onHand ?? 0), 0);
   const reserved = rows.reduce((sum, row) => sum + Number(row.reserved || 0), 0);
@@ -200,7 +209,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
         {categories.map(category => <option key={idOf(category)} value={idOf(category)}>{category.name}</option>)}
       </select>
       <select value={stockFilter} onChange={event => setStockFilter(event.target.value)} aria-label="Existencias">
-        <option value="">Todas las existencias</option><option value="with">Con existencias</option><option value="without">Sin existencias</option>
+        <option value="">Todas las existencias</option><option value="with">Con existencias en esta página</option><option value="without">Sin existencias en esta página</option>
       </select>
       <div className="segmented" role="group" aria-label="Estado">
         {[['active', 'Activos'], ['inactive', 'Inactivos'], ['', 'Todos']].map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}>{label}</button>)}
