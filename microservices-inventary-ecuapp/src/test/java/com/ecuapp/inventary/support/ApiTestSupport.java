@@ -75,7 +75,13 @@ public abstract class ApiTestSupport {
     /** Creates a brand-new user with the given role (useful for segregation-of-duties tests). */
     protected String createUser(String role) {
         String username = ("t-" + role.toLowerCase(Locale.ROOT).replace('_', '-') + "-" + suffix()).toLowerCase(Locale.ROOT);
-        users.saveAndFlush(new AppUser(username, encoder.encode(PASSWORD), role));
+        AppUser user=users.saveAndFlush(new AppUser(username, encoder.encode(PASSWORD), role));
+        jdbc.update("""
+            insert into user_warehouse_scope(id,user_id,warehouse_id,reason,granted_by,valid_from,active,created_at)
+            select gen_random_uuid(),?,w.id,'Ámbito de fixture automatizado','TEST_FIXTURE',now(),true,now()
+            from warehouse w
+            on conflict (user_id,warehouse_id) where active=true do nothing
+            """,user.getId());
         return username;
     }
 
@@ -247,7 +253,13 @@ public abstract class ApiTestSupport {
     protected JsonNode product(String cost, String price) { return product(category().get("id").asText(), cost, price); }
 
     protected JsonNode warehouse() {
-        return httpPost(admin(), "/api/v1/warehouses", Map.of("code", "WH" + suffix(), "name", "Almacén " + suffix()), 201);
+        JsonNode created=httpPost(admin(), "/api/v1/warehouses", Map.of("code", "WH" + suffix(), "name", "Almacén " + suffix()), 201);
+        for(String role:List.of("AUDITOR","MANAGER_ALMACEN","VENDEDOR")){
+            UUID userId=users.findByUsername(username(role)).orElseThrow().getId();
+            httpPost(admin(),"/api/v1/admin/users/"+userId+"/warehouse-scopes",
+                Map.of("warehouseId",created.get("id").asText(),"reason","Ámbito explícito de fixture de integración"),201);
+        }
+        return created;
     }
 
     protected JsonNode adjust(String productId, String warehouseId, String direction, String quantity, String unitCost) {
