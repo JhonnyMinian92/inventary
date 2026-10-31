@@ -34,4 +34,10 @@ public interface InventoryCountRepository extends JpaRepository<InventoryCount, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from InventoryCount c where c.id = :id")
     Optional<InventoryCount> findForUpdate(@Param("id") UUID id);
+
+    @EntityGraph(attributePaths = {"warehouse"})
+    @Query("select c from InventoryCount c where (:warehouseId is null or c.warehouse.id = :warehouseId) and (:status is null or c.status = :status) and c.warehouse.id in :warehouseIds")
+    org.springframework.data.domain.Page<InventoryCount> searchScoped(@Param("warehouseId") UUID warehouseId,
+        @Param("status") InventoryCountStatus status,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,
+        org.springframework.data.domain.Pageable pageable);
 }
