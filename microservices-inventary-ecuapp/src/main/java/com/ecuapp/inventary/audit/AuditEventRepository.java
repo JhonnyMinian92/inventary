@@ -19,4 +19,33 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent,UUID>{
  Page<AuditEvent> search(@Param("actor") String actor,@Param("action") String action,
  @Param("resourceType") String resourceType,@Param("outcome") String outcome,
  @Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,Pageable pageable);
+
+ @Query(value="""
+ select e.* from audit_event e
+ where (:actor is null or e.actor=:actor)
+ and (:action is null or e.action=:action)
+ and (:resourceType is null or e.resource_type=:resourceType)
+ and (:outcome is null or e.outcome=:outcome)
+ and e.occurred_at>=:fromTime and e.occurred_at<:toTime
+ and (
+   e.metadata ->> 'warehouseId' in (:warehouseIds)
+   or e.metadata ->> 'sourceWarehouseId' in (:warehouseIds)
+   or e.metadata ->> 'destinationWarehouseId' in (:warehouseIds)
+ )
+ """,countQuery="""
+ select count(*) from audit_event e
+ where (:actor is null or e.actor=:actor)
+ and (:action is null or e.action=:action)
+ and (:resourceType is null or e.resource_type=:resourceType)
+ and (:outcome is null or e.outcome=:outcome)
+ and e.occurred_at>=:fromTime and e.occurred_at<:toTime
+ and (
+   e.metadata ->> 'warehouseId' in (:warehouseIds)
+   or e.metadata ->> 'sourceWarehouseId' in (:warehouseIds)
+   or e.metadata ->> 'destinationWarehouseId' in (:warehouseIds)
+ )
+ """,nativeQuery=true)
+ Page<AuditEvent> searchScoped(@Param("actor") String actor,@Param("action") String action,
+  @Param("resourceType") String resourceType,@Param("outcome") String outcome,@Param("fromTime") Instant fromTime,
+  @Param("toTime") Instant toTime,@Param("warehouseIds") java.util.Collection<String> warehouseIds,Pageable pageable);
 }
