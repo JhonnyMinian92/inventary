@@ -1,79 +1,74 @@
-> **Estado actual — 2026-10-26:** el código fuente cubre los flujos principales, pero el workflow de frontend es manual y las ejecuciones disponibles son de commits anteriores al HEAD observado. El package.json no declara test/lint y no se encontró package-lock.json en el árbol de referencia; por ello, no afirmar que la aplicación frontend está completamente validada. Ver [estado de todo el repositorio](../microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md), [contrato de APIs](../microservices-inventary-ecuapp/docs/25-referencia-apis.md), [guía de consumo](../microservices-inventary-ecuapp/docs/27-guia-consumo-apis.md) y [plan de cierre](../microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md).
-
 # Inventary Web — React
 
-Aplicación web SPA de inventario construida con **React + Vite**. El frontend usa un cliente REST compartido en **src/api.js** y consume directamente el backend bajo **/api/v1**; no mantiene un inventario simulado ni modifica el saldo directamente desde el navegador.
+Aplicación web SPA de inventario construida con **React + Vite**. Consume el backend mediante el cliente REST compartido de `src/api.js`; el navegador no modifica directamente los saldos de inventario.
 
 ## Requisitos
 
-- Node.js 22.12.0 o superior dentro de la línea 22 (versión declarada en .nvmrc).
+- Node.js 22.12.x (línea 22).
 - npm 10 u 11.
 - Backend levantado y accesible desde el navegador.
 - Usuario activo con los permisos correspondientes en el backend.
 
 ## Ejecución local
 
-Desde la raíz del repositorio:
+Desde este directorio:
 
 ```bash
-cd app-inventary-ecuapp
 cp .env.example .env
-npm install
+npm ci
 npm run dev
 ```
 
-Configura **VITE_API_BASE_URL** con la URL base de la API, incluyendo **/api/v1**. El valor predeterminado es **http://localhost:8080/api/v1**. El backend debe permitir el origen de Vite en su configuración CORS, normalmente **http://localhost:5173**.
+Configura `VITE_API_BASE_URL` con la URL base de la API, incluyendo `/api/v1`. El valor predeterminado es `http://localhost:8080/api/v1`. El backend debe permitir el origen de Vite en su configuración CORS, normalmente `http://localhost:5173`.
 
-## Estructura relevante
+## Estructura relevante actual
 
-- **src/App.jsx**: marco de navegación, carga de datos y coordinación de flujos.
-- **src/api.js**: llamadas REST, autenticación Bearer, manejo centralizado de errores e idempotencia para operaciones transaccionales.
-- **src/features/catalog/ProductForm.jsx**: crear/editar productos y renderizar campos a partir del esquema de atributos de la categoría.
-- **src/features/catalog/CategoryForm.jsx**: crear/editar categorías y configurar campos tipados, obligatorios, enumerados y restricciones básicas.
-- **src/features/operations/OperationsCatalogs.jsx** y **UnitConversions.jsx**: almacenes, proveedores, clientes, unidades y conversiones.
-- **src/features/purchasing/PurchaseForm.jsx**, **ReceiptForm.jsx**, **PurchaseTable.jsx** y **PurchaseReturns.jsx**: órdenes multítem, recepción parcial, detalle y devoluciones a proveedores.
-- **src/features/sales/SaleForm.jsx**, **SalesTable.jsx** y **SalesReturns.jsx**: venta transaccional multítem, detalle y devoluciones de clientes.
-- **src/features/inventory/InventoryOperations.jsx**: traslados, ajustes, conteos físicos y reposición.
-- **src/features/reports/ReportsCenter.jsx**: informes con filtros, detalle de DTO, paginación, estados de error/permisos y exportación CSV.
-- **src/features/dashboard/Overview.jsx**, **src/features/catalog/CatalogTables.jsx** y **src/components/DataTable.jsx**: dashboard y tablas reutilizables.
-- **src/components/TransactionDetails.jsx**: vistas de detalle de órdenes y ventas.
-- **src/hooks/useAccessibleDialog.js**: diálogo accesible mediante teclado y gestión de foco.
-- **src/styles.css**: sistema visual responsive y estados de foco.
-- **docs/frontend-roadmap.md**: alcance y criterios de cierre por fase.
-- **docs/api-coverage.md**: matriz de módulos del frontend y rutas REST del backend consumidas.
-- **docs/troubleshooting.md**: configuración de entorno, errores comunes, sesión, permisos e idempotencia.
+- `src/main.jsx`: punto de entrada React.
+- `src/App.jsx`: marco de navegación y coordinación de la aplicación.
+- `src/router.js`: resolución de rutas y navegación.
+- `src/api.js`: cliente REST, autenticación, errores e idempotencia.
+- `src/features/dashboard/Dashboard.jsx`: dashboard.
+- `src/features/catalog/ProductsPage.jsx`: pantalla de productos.
+- `src/features/catalog/ProductForm.jsx` y `CategoryForm.jsx`: formularios de catálogo.
+- `src/features/operations/OperationsCatalogs.jsx` y `UnitConversions.jsx`: catálogos operativos.
+- `src/features/purchasing/`: compras, recepciones y devoluciones a proveedores.
+- `src/features/sales/`: ventas y devoluciones de clientes.
+- `src/features/inventory/`: traslados, ajustes, conteos y reposición.
+- `src/features/reports/ReportsCenter.jsx`: informes y exportación CSV.
+- `src/components/`: componentes reutilizables; algunos conocen conceptos de negocio y no son primitivas UI genéricas.
+- `src/hooks/`, `src/security/`, `src/ui/` y `src/utils/`: hooks, seguridad, componentes UI y utilidades.
+- `docs/frontend-roadmap.md`: fases y criterios de cierre.
+- `docs/api-coverage.md`: matriz de consumo de API.
+- `docs/troubleshooting.md`: configuración y resolución de errores.
 
-## Funciones incorporadas
+La estructura anterior describe archivos que existen en el árbol de referencia; no se deben inferir componentes a partir de documentación histórica.
 
-- Inicio de sesión con token emitido por el backend, cierre de sesión en la API y manejo de sesión vencida.
-- Catálogo de productos y categorías con propiedades derivadas del esquema de atributos (STRING, NUMBER, BOOLEAN, DATE, ENUM).
-- Administración de almacenes, proveedores, clientes y unidades de medida; asignación de unidad y conversiones entre unidades.
-- Órdenes de compra con múltiples líneas, envío a aprobación, recepción parcial y devoluciones a proveedores.
-- Ventas multítem con clientes registrados u ocasionales, solicitud/aprobación de anulaciones y devoluciones de clientes (reincorporación o descarte).
-- Consulta de disponibilidad en tiempo real antes de vender y consulta de saldos/movimientos por almacén y producto.
-- Traslados con despacho/recepción, ajustes con motivo, conteos físicos y reglas/sugerencias de reposición.
-- Centro de informes: balance histórico, ventas netas y margen, compras y devoluciones, kardex, valoración y stock bajo.
-- Exportación CSV y paginación en informes que exponen múltiples páginas.
-- Detalle de órdenes y ventas obtenido directamente desde el backend.
-- Manejo explícito de permisos financieros, carga, errores, resultados vacíos y sesiones vencidas.
-- Diálogos accesibles por teclado, foco administrado, confirmaciones y estilos responsive.
+## Funciones principales
 
-Una orden de compra por sí sola no aumenta las existencias: el stock cambia al registrar la recepción aprobada mediante la API. De forma equivalente, las ventas y devoluciones se procesan transaccionalmente en el backend.
+- Autenticación y gestión de sesión.
+- Catálogo de productos y categorías con atributos dinámicos.
+- Almacenes, proveedores, clientes y unidades de medida.
+- Compras multítem, aprobación, recepción parcial y devoluciones a proveedores.
+- Ventas multítem, aprobación de anulaciones y devoluciones de clientes.
+- Disponibilidad, saldos, movimientos, ajustes, conteos y traslados.
+- Centro de informes, paginación y exportación CSV.
+- Control de permisos, estados de carga/error y diálogos accesibles.
 
-## Fases y pruebas
+Una orden de compra no aumenta las existencias por sí sola: el stock cambia al registrar su recepción aprobada mediante la API. Las ventas y devoluciones también se procesan transaccionalmente en el backend.
 
-Las Fases 1, 2, 3 y 4 tienen el código fuente y su documentación incorporados en `master`. La Fase 4 cubre el mapa de rutas, configuración por entorno, instrucciones para resolver errores, permisos y manejo de idempotencia. Queda pendiente la **fase de validación**: generar el archivo de bloqueo de dependencias con acceso al registro de npm, compilar el frontend, revisar errores estáticos y ejecutar pruebas de componentes y escenarios end-to-end contra el backend y PostgreSQL. Conforme a la secuencia acordada, todavía no he ejecutado compilación ni pruebas.
-
-## Build de producción (para la fase de pruebas)
-
-Al abrir la fase de validación, desde app-inventary-ecuapp ejecutar:
+## Pruebas y build
 
 ```bash
-npm install
+npm ci
+npm test
 npm run build
 npm run preview
 ```
 
-El proyecto fija las versiones directas en package.json. El primer npm install debe generar package-lock.json; guarda ese archivo en el repositorio y usa npm ci en las ejecuciones siguientes.
+El workflow de frontend ejecuta instalación reproducible con `npm ci`, pruebas y build de producción. Comprueba el resultado de GitHub Actions para el SHA que deseas desplegar; no asumas que un commit está validado hasta que termine su workflow.
 
-El contrato del backend y su OpenAPI siguen siendo la fuente de verdad para los DTOs y permisos. Los errores de validación y autorización deben solucionarse en coordinación con ese contrato; no se deben reemplazar por respuestas simuladas.
+## Arquitectura objetivo
+
+La propuesta de reorganización feature-first está documentada en [PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md](docs/PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md). Es una arquitectura objetivo: los movimientos deben realizarse gradualmente, conservando rutas, contratos API, permisos y comportamiento existente, con pruebas entre etapas.
+
+El contrato del backend y su OpenAPI siguen siendo la fuente de verdad para DTOs y permisos. No reemplazar respuestas reales por mocks para ocultar errores de integración.
