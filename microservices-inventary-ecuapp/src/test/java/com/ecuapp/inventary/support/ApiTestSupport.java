@@ -252,13 +252,18 @@ public abstract class ApiTestSupport {
 
     protected JsonNode product(String cost, String price) { return product(category().get("id").asText(), cost, price); }
 
+    protected void ensureWarehouseScope(String role,String warehouseId) {
+        UUID userId=users.findByUsername(username(role)).orElseThrow().getId();
+        jdbc.update("""
+            insert into user_warehouse_scope(id,user_id,warehouse_id,reason,granted_by,valid_from,active,created_at)
+            values(gen_random_uuid(),?,?,'Ámbito explícito de fixture de integración','TEST_FIXTURE',now(),true,now())
+            on conflict (user_id,warehouse_id) where active=true do nothing
+            """,userId,UUID.fromString(warehouseId));
+    }
+
     protected JsonNode warehouse() {
         JsonNode created=httpPost(admin(), "/api/v1/warehouses", Map.of("code", "WH" + suffix(), "name", "Almacén " + suffix()), 201);
-        for(String role:List.of("AUDITOR","MANAGER_ALMACEN","VENDEDOR")){
-            UUID userId=users.findByUsername(username(role)).orElseThrow().getId();
-            httpPost(admin(),"/api/v1/admin/users/"+userId+"/warehouse-scopes",
-                Map.of("warehouseId",created.get("id").asText(),"reason","Ámbito explícito de fixture de integración"),201);
-        }
+        for(String role:List.of("AUDITOR","MANAGER_ALMACEN","VENDEDOR")) ensureWarehouseScope(role,created.get("id").asText());
         return created;
     }
 
