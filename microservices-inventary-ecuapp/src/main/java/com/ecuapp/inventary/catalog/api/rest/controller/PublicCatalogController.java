@@ -1,4 +1,7 @@
-package com.ecuapp.inventary.catalog;
+package com.ecuapp.inventary.catalog.api.rest.controller;
+
+import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.catalog.application.service.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;

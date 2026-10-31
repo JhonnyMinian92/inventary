@@ -16,6 +16,6 @@ public final class CategoryDtos {
   public WriteRequest(String name,String description){this(name,description,null,null);}
  }
  public record View(UUID id,String name,String slug,String description,boolean active,Instant createdAt,Instant updatedAt){
-  static View from(Category c){return new View(c.getId(),c.getName(),c.getSlug(),c.getDescription(),c.isActive(),c.getCreatedAt(),c.getUpdatedAt());}
+  public static View from(Category c){return new View(c.getId(),c.getName(),c.getSlug(),c.getDescription(),c.isActive(),c.getCreatedAt(),c.getUpdatedAt());}
  }
 }

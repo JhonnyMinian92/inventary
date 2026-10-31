@@ -34,17 +34,17 @@ public final class ProductDtos {
   BigDecimal costPrice,BigDecimal salePrice,BigDecimal marginPercent,String currency,String imageUrl,ProductKind kind,UUID unitOfMeasureId,
   Map<String,Object> attributes,int attributeSchemaVersion,ServiceBilling serviceBilling,BillingFrequency billingFrequency,Integer termMonths,
   boolean active,Instant createdAt,Instant updatedAt){
-  static View from(ProductResult p,boolean includeCost){return new View(p.id(),p.sku(),p.name(),p.description(),p.categoryId(),p.categoryName(),
+  public static View from(ProductResult p,boolean includeCost){return new View(p.id(),p.sku(),p.name(),p.description(),p.categoryId(),p.categoryName(),
    includeCost?p.costPrice():null,p.salePrice(),includeCost?p.marginPercent():null,p.currency(),p.imageUrl(),p.kind(),p.unitOfMeasureId(),p.attributes(),p.attributeSchemaVersion(),p.serviceBilling(),p.billingFrequency(),p.termMonths(),p.active(),p.createdAt(),p.updatedAt());}
  }
  public record PublicView(UUID id,String sku,String name,String description,String categoryName,BigDecimal price,String currency,String imageUrl,boolean available){
-  static PublicView from(Product p,boolean available){return new PublicView(p.getId(),p.getSku(),p.getName(),p.getDescription(),p.getCategory().getName(),p.getSalePrice(),p.getCurrency(),p.getImageUrl(),available);}
+  public static PublicView from(Product p,boolean available){return new PublicView(p.getId(),p.getSku(),p.getName(),p.getDescription(),p.getCategory().getName(),p.getSalePrice(),p.getCurrency(),p.getImageUrl(),available);}
  }
  public record PublicVariantView(String sku,String barcode,Map<String,Object> optionValues,BigDecimal price){}
  public record PublicImageView(String url,String altText,boolean primary,int sortOrder){}
  public record PublicDetailView(UUID id,String sku,String name,String description,UUID categoryId,String categoryName,BigDecimal price,String currency,
   String imageUrl,boolean available,Map<String,Object> attributes,List<PublicVariantView> variants,List<PublicImageView> images){}
  public record PublicCategoryView(UUID id,String name,String slug,String description){
-  static PublicCategoryView from(Category c){return new PublicCategoryView(c.getId(),c.getName(),c.getSlug(),c.getDescription());}
+  public static PublicCategoryView from(Category c){return new PublicCategoryView(c.getId(),c.getName(),c.getSlug(),c.getDescription());}
  }
 }

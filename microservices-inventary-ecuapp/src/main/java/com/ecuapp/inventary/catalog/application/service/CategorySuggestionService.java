@@ -1,4 +1,6 @@
-package com.ecuapp.inventary.catalog;
+package com.ecuapp.inventary.catalog.application.service;
+
+import com.ecuapp.inventary.catalog.*;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

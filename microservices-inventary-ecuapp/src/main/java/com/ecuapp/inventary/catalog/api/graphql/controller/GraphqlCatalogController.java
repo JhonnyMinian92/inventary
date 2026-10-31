@@ -1,6 +1,8 @@
-package com.ecuapp.inventary.graphql;
+package com.ecuapp.inventary.catalog.api.graphql.controller;
 
 import com.ecuapp.inventary.catalog.*;
+import com.ecuapp.inventary.catalog.application.service.CategoryService;
+import com.ecuapp.inventary.catalog.application.service.ProductService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -13,7 +15,7 @@ import java.util.UUID;
 
 @Controller
 public class GraphqlCatalogController {
- private final ProductService products;private final CategoryRepository categories;
+ private final ProductService products;private final CategoryService categories;
  public GraphqlCatalogController(ProductService products,CategoryRepository categories){this.products=products;this.categories=categories;}
 
  @QueryMapping
@@ -27,7 +29,7 @@ public class GraphqlCatalogController {
  @QueryMapping
  public CategoryPage activeCategories(@Argument Integer page,@Argument Integer size){
   int safePage=Math.max(0,page==null?0:page);int safeSize=Math.max(1,Math.min(size==null?20:size,100));
-  Page<Category> result=categories.findByActiveTrue(PageRequest.of(safePage,safeSize,Sort.by(Sort.Direction.ASC,"name")));
+  Page<CategoryDtos.View> result=categories.list(true,PageRequest.of(safePage,safeSize,Sort.by(Sort.Direction.ASC,"name")));
   List<CategoryGraphqlView> items=result.getContent().stream().map(CategoryGraphqlView::from).toList();
   return new CategoryPage(items,result.getNumber(),result.getSize(),Long.toString(result.getTotalElements()),result.getTotalPages());
  }
@@ -37,6 +39,6 @@ public class GraphqlCatalogController {
   static ProductGraphqlView from(ProductDtos.PublicView p){return new ProductGraphqlView(p.id().toString(),p.sku(),p.name(),p.description(),p.categoryName(),p.price().toPlainString(),p.currency(),p.imageUrl(),p.available());}
  }
  public record CategoryGraphqlView(String id,String name,String slug,String description){
-  static CategoryGraphqlView from(Category c){return new CategoryGraphqlView(c.getId().toString(),c.getName(),c.getSlug(),c.getDescription());}
+  static CategoryGraphqlView from(CategoryDtos.View c){return new CategoryGraphqlView(c.id().toString(),c.name(),c.slug(),c.description());}
  }
 }

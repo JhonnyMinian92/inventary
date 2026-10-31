@@ -1,4 +1,6 @@
-package com.ecuapp.inventary.catalog;
+package com.ecuapp.inventary.catalog.application.service;
+
+import com.ecuapp.inventary.catalog.*;
 
 import com.ecuapp.inventary.catalog.application.PageQuery;
 import com.ecuapp.inventary.catalog.application.PageResult;

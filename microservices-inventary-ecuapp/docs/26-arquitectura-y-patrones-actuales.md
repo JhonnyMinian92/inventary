@@ -1,5 +1,7 @@
 # 26 — Arquitectura, jerarquía y patrones actuales
 
+> **Actualización — Fase 4, 2026-10-31:** el catálogo tiene ahora los controladores REST en `catalog.api.rest.controller`, el resolver GraphQL en `catalog.api.graphql.controller` y los servicios del catálogo en `catalog.application.service`. El adaptador WhatsApp fue actualizado para el nuevo paquete de `ProductService`. Esta es una primera migración de paquetes, no la finalización de la arquitectura hexagonal: entidades JPA/repositorios y algunas dependencias entre capas continúan en transición. Ver [migración Fase 4 del catálogo](27-migracion-arquitectura-fase4-catalogo.md).
+
 ## 1. Decisión arquitectónica efectiva
 
 El backend es un **monolito modular Spring Boot**, ejecutado como una aplicación conectada a PostgreSQL. El nombre “microservices-inventary-ecuapp” es histórico; no implica despliegues separados por dominio. REST y GraphQL comparten proceso, seguridad, migraciones y persistencia. La SPA React/Vite es un artefacto separado y consume la API; no se observó BFF/gateway interno en este repositorio.
@@ -109,7 +111,7 @@ GraphQL es lectura de catálogo, no una segunda API de comandos. WhatsApp usa un
 
 ## 5. Hexagonal: aplicada parcialmente
 
-El módulo de catálogo incluye ProductUseCases, ProductCommand/ProductResult, puertos y un adaptador de persistencia JPA. El resto de los dominios usa mayormente controlador → servicio → repositorio/entidad al estilo Spring. Por tanto, la arquitectura hexagonal no es uniforme y no debe anunciarse como completamente implementada.
+El módulo de catálogo incluye ProductUseCases, ProductCommand/ProductResult, ProductPersistencePort y JpaProductPersistenceAdapter. La Fase 4 ubicó controladores REST/GraphQL y servicios en paquetes api/application, pero Product sigue siendo una entidad JPA usada por el puerto, varios repositorios permanecen en el paquete raíz y los servicios todavía consultan repositorios de dominios vecinos. El resto de los dominios conserva mayormente el patrón controlador → servicio → repositorio/entidad. Por tanto, la arquitectura hexagonal no es uniforme y no debe anunciarse como completamente implementada.
 
 No se recomienda reescribir módulos solo para crear interfaces. Extraer puertos cuando exista una necesidad verificable de sustitución de infraestructura, testabilidad o aislamiento.
 

@@ -4,7 +4,7 @@
 **Rama de ejecución:** implementacion_propuestas  
 **Corte de análisis:** 31 de octubre de 2026  
 **Alcance:** frontend, backend, datos, seguridad, integraciones, operación y experiencia comercial.  
-**Estado:** Fase 1 completada; Fase 3 implementada y validada por CI en `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`; pendientes la verificación visual E2E de navegador de la Fase 3 y las fases 2 y 4–10.
+**Estado:** Fase 1 completada; Fase 2 en progreso; Fase 3 implementada con smoke E2E responsive de login; Fase 4 en progreso con la primera reorganización vertical del catálogo backend. La verificación browser integral de la Fase 3 y las fases 2 y 4–10 siguen abiertas.
 
 ## 1. Resultado de la consolidación
 
@@ -199,6 +199,23 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - No extraer microservicios como parte de la reorganización.
 
 **Criterios de salida:** arquitectura de dependencias comprobable; Maven verify, tests PostgreSQL, HTTP/security/contract y arranque Spring verde; sin cambio de esquema o contrato no acordado; excepciones documentadas.
+
+**Avance implementado (2026-10-31; piloto vertical inicial):**
+- Los controladores REST de productos, categorías, estructura del catálogo y catálogo público se ubicaron en `catalog.api.rest.controller`.
+- El resolver GraphQL del catálogo se ubicó en `catalog.api.graphql.controller`; para listar categorías delega en `CategoryService`, no accede directamente al repositorio Spring Data.
+- Los servicios de aplicación `ProductService`, `CategoryService`, `CatalogStructureService`, `ProductVariantService` y `CategorySuggestionService` se ubicaron en `catalog.application.service`.
+- Se actualizó el adaptador de integración WhatsApp para consumir el nuevo paquete de `ProductService`.
+- Se hicieron públicos los mappers estáticos de los DTOs del catálogo que ahora se consumen entre paquetes.
+- Los paths REST, los nombres de las operaciones GraphQL, el schema GraphQL, los DTOs serializados, las entidades y los mappings JPA se conservaron. No se añadieron ni editaron migraciones Flyway.
+
+**Brechas que impiden declarar cerrada la Fase 4:**
+- Las entidades JPA y los repositorios Spring Data de catálogo siguen en el paquete raíz heredado; el puerto `ProductPersistencePort` todavía usa la entidad JPA `Product` como modelo.
+- Los servicios del catálogo mantienen dependencias directas a repositorios de otros dominios y a DTOs de presentación en flujos heredados; requieren puertos/contratos de aplicación y mappers específicos antes de cumplir aislamiento estricto.
+- `CategoryDtos` y `CatalogStructureDtos` todavía combinan request/response records; su separación requiere comandos y resultados de aplicación para no invertir las dependencias.
+- Los demás dominios del backend aún no se han migrado a la jerarquía objetivo.
+- La suite Maven/PostgreSQL y el smoke de arranque deben validarse en el SHA resultante de esta reorganización.
+
+**Estado: EN PROGRESO — reorganización inicial del piloto catalog registrada; la arquitectura completa de dominios y sus criterios de salida no se declaran cerrados.**
 
 ### Fase 5 — Datos maestros, catálogo, almacenes y unidades
 
@@ -406,6 +423,7 @@ Una fase no se cierra por “compilar” solamente. Debe:
 - Fase 1: completada y validada por CI.
 - Fase 2: **implementación parcial**; se añadieron auditoría de lecturas sensibles, eventos Outbox para ajustes/conteos/órdenes de compra y maker-checker en conteos físicos. No se declara cerrada por las brechas enumeradas en su sección.
 - Fase 3: **implementación estructural completada y smoke E2E responsive del login validado**; la aceptación browser de todos los flujos autenticados queda pendiente.
+- Fase 4: **en progreso**; se reorganizó la primera rebanada vertical de catálogo (REST/GraphQL y servicios de aplicación), pero persisten las brechas de entidades/repositorios JPA, puertos entre dominios, DTOs y migración del resto de contextos.
 - Fases pendientes de implementación/cierre: **Fase 2 (cierre), 4–10**.
 - Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend del código actual: [run 41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258), success, 106/106 tests, validación Flyway/Hibernate, Compose y smoke test desde volumen vacío.
 - Rama actual de trabajo: implementacion_propuestas; master no fue modificada.
