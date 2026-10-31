@@ -26,4 +26,15 @@ public interface StockMovementRepository extends JpaRepository<StockMovement,UUI
   """)
  Page<StockMovement> search(@Param("productId") UUID productId,@Param("warehouseId") UUID warehouseId,@Param("type") MovementType type,
   @Param("referenceType") String referenceType,@Param("referenceId") UUID referenceId,@Param("fromTime") Instant fromTime,@Param("toTime") Instant toTime,Pageable pageable);
+
+ @EntityGraph(attributePaths={"product","warehouse","fromLocation","toLocation","unitOfMeasure"})
+ @Query("""
+  select m from StockMovement m where (:productId is null or m.product.id=:productId)
+   and (:warehouseId is null or m.warehouse.id=:warehouseId) and m.warehouse.id in :warehouseIds
+   and (:type is null or m.movementType=:type) and (:referenceType is null or m.referenceType=:referenceType)
+   and (:referenceId is null or m.referenceId=:referenceId) and m.occurredAt>=:fromTime and m.occurredAt<:toTime
+  """)
+ Page<StockMovement> searchScoped(@Param("productId") UUID productId,@Param("warehouseId") UUID warehouseId,@Param("type") MovementType type,
+  @Param("referenceType") String referenceType,@Param("referenceId") UUID referenceId,@Param("fromTime") Instant fromTime,
+  @Param("toTime") Instant toTime,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
