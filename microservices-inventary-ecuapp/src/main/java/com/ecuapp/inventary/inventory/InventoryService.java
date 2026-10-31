@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -83,7 +84,7 @@ public class InventoryService {
   var previous=movements.findByIdempotencyKey(key);
   if(previous.isPresent()){
    if(!hash.equals(previous.get().getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
-   return InventoryDtos.MovementView.from(previous.get());
+   return InventoryDtos.MovementView.from(previous.get(),scopes.canReadFinancialData(actor));
   }
   idempotencyRecords.insertIfAbsent(UUID.randomUUID(),"INVENTORY_ADJUSTMENT",key,hash);
   IdempotencyRecord idempotency=idempotencyRecords.findForUpdate("INVENTORY_ADJUSTMENT",key)
@@ -126,7 +127,7 @@ public class InventoryService {
   idempotency.markCompleted("STOCK_MOVEMENT",persisted.getId(),(short) 200);
   idempotencyRecords.save(idempotency);
   audit.record(actor,"STOCK_ADJUSTED","STOCK_MOVEMENT",persisted.getId(),Map.of("productId",product.getId().toString(),"warehouseId",warehouse.getId().toString(),"movementType",type.name(),"quantity",quantity.toPlainString(),"valuedCost",valuation.totalCost().toPlainString()));
-  return InventoryDtos.MovementView.from(persisted);
+  return InventoryDtos.MovementView.from(persisted,scopes.canReadFinancialData(actor));
  }
  private WarehouseLocation mainLocation(Warehouse warehouse){
   locations.insertIfAbsent(UUID.randomUUID(),warehouse.getId(),"MAIN","Ubicación principal","STORAGE");
