@@ -265,31 +265,35 @@ class SalesApiTest extends ApiTestSupport {
     void nonStockedGoodsAndServicesUseCatalogPriceWithoutInventoryCostFloor() {
         String seller = token("VENDEDOR");
         String warehouseId = warehouse().get("id").asText();
-        JsonNode service = httpPost(admin(), "/api/v1/catalog/products", Map.of(
-            "name", "Servicio " + suffix(),
-            "categoryId", category().get("id").asText(),
-            "kind", "SERVICE",
-            "costPrice", new BigDecimal("12.00"),
-            "salePrice", new BigDecimal("5.00")
-        ), 201);
-        String serviceId = service.get("id").asText();
+        String categoryId = category().get("id").asText();
 
-        JsonNode quote = httpPost(seller, "/api/v1/sales/pricing", Map.of(
-            "warehouseId", warehouseId,
-            "items", List.of(Map.of("productId", serviceId, "quantity", 1))
-        ), 200).get(0);
-        assertAmount("0.00", quote.get("minimumPrice"));
-        assertAmount("5.00", quote.get("suggestedPrice"));
+        for (String kind : List.of("SERVICE", "NON_STOCKED_GOOD")) {
+            JsonNode product = httpPost(admin(), "/api/v1/catalog/products", Map.of(
+                "name", kind + " " + suffix(),
+                "categoryId", categoryId,
+                "kind", kind,
+                "costPrice", new BigDecimal("12.00"),
+                "salePrice", new BigDecimal("5.00")
+            ), 201);
+            String productId = product.get("id").asText();
 
-        JsonNode sale = httpPost(seller, "/api/v1/sales", Map.of(
-            "warehouseId", warehouseId,
-            "channel", "POS",
-            "items", List.of(Map.of("productId", serviceId, "quantity", 1, "unitPrice", new BigDecimal("5.00")))
-        ), 201, "Idempotency-Key", key());
-        assertAmount("5.00", sale.get("total"));
-        assertEquals(0, jdbc.queryForObject(
-            "select count(*) from stock_movement where reference_id=?::uuid",
-            Integer.class, sale.get("id").asText()));
+            JsonNode quote = httpPost(seller, "/api/v1/sales/pricing", Map.of(
+                "warehouseId", warehouseId,
+                "items", List.of(Map.of("productId", productId, "quantity", 1))
+            ), 200).get(0);
+            assertAmount("0.00", quote.get("minimumPrice"));
+            assertAmount("5.00", quote.get("suggestedPrice"));
+
+            JsonNode sale = httpPost(seller, "/api/v1/sales", Map.of(
+                "warehouseId", warehouseId,
+                "channel", "POS",
+                "items", List.of(Map.of("productId", productId, "quantity", 1, "unitPrice", new BigDecimal("5.00")))
+            ), 201, "Idempotency-Key", key());
+            assertAmount("5.00", sale.get("total"));
+            assertEquals(0, jdbc.queryForObject(
+                "select count(*) from stock_movement where reference_id=?::uuid",
+                Integer.class, sale.get("id").asText()));
+        }
     }
 
     private static void assertAmount(String expected, BigDecimal actual, String message) {
