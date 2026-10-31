@@ -11,7 +11,7 @@ class InventaryApplicationTests {
  @Autowired JdbcTemplate jdbc;
  @Test void contextLoadsWithAllMigrationsAppliedAndMappingsValidated() {
   // Flyway migrates and Hibernate ddl-auto=validate checks every entity while the context starts.
-  assertEquals("19",jdbc.queryForObject("select max(version::int)::text from flyway_schema_history where success",String.class));
+  assertEquals("20",jdbc.queryForObject("select max(version::int)::text from flyway_schema_history where success",String.class));
   assertEquals(0,jdbc.queryForObject("select count(*) from flyway_schema_history where not success",Integer.class));
  }
 }
