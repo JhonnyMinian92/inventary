@@ -175,6 +175,9 @@ public class InventoryCountService {
         if (count.getStatus() != InventoryCountStatus.OPEN) {
             throw new ConflictException("Solo se puede contabilizar un conteo abierto.");
         }
+        if (actor == null || actor.isBlank() || count.getCreatedBy().equals(actor)) {
+            throw new ConflictException("Quien captura el conteo no puede contabilizarlo; se requiere un segundo operador.");
+        }
 
         List<InventoryCountLine> lines = new ArrayList<>(count.getLines());
         lines.sort(Comparator.comparing(line -> line.getProduct().getId().toString()));

@@ -96,22 +96,40 @@ public class PurchaseOrderService {
   newLines.forEach(order::addLine);orders.save(order);
   idempotency.markCompleted("PURCHASE_ORDER",order.getId(),(short)201);idempotencyRecords.save(idempotency);
   audit.record(actor,"PURCHASE_ORDER_CREATED","PURCHASE_ORDER",order.getId(),Map.of("orderNumber",number,"lineCount",newLines.size()));
+  outbox.save(new OutboxEvent("PURCHASE_ORDER",order.getId(),"PURCHASE_ORDER_CREATED",Map.of(
+   "purchaseOrderId",order.getId().toString(),"orderNumber",number,"supplierId",supplier.getId().toString(),
+   "warehouseId",warehouse.getId().toString(),"lineCount",newLines.size(),"currency",order.getCurrency())));
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
  @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){
   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
-  if(order.submit(actor))audit.record(actor,"PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
-  return detailed(id);
+   if(order.submit(actor)){
+    audit.record(actor,"PURCHASE_ORDER_SUBMITTED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
+    outbox.save(new OutboxEvent("PURCHASE_ORDER",id,"PURCHASE_ORDER_SUBMITTED",Map.of(
+     "purchaseOrderId",id.toString(),"orderNumber",order.getOrderNumber(),"submittedBy",actor,
+     "warehouseId",order.getWarehouse().getId().toString())));
+   }
+   return detailed(id);
  }
  @Transactional public PurchaseDtos.OrderView approve(UUID id,String actor){
   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
-  if(order.approve(actor,requireDistinctApprover))audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
-  return detailed(id);
+   if(order.approve(actor,requireDistinctApprover)){
+    audit.record(actor,"PURCHASE_ORDER_APPROVED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber(),"approvedBy",actor));
+    outbox.save(new OutboxEvent("PURCHASE_ORDER",id,"PURCHASE_ORDER_APPROVED",Map.of(
+     "purchaseOrderId",id.toString(),"orderNumber",order.getOrderNumber(),"approvedBy",actor,
+     "warehouseId",order.getWarehouse().getId().toString())));
+   }
+   return detailed(id);
  }
  @Transactional public PurchaseDtos.OrderView cancel(UUID id,String actor){
   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
-  if(order.cancel(actor))audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
-  return detailed(id);
+   if(order.cancel(actor)){
+    audit.record(actor,"PURCHASE_ORDER_CANCELLED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber(),"cancelledBy",actor));
+    outbox.save(new OutboxEvent("PURCHASE_ORDER",id,"PURCHASE_ORDER_CANCELLED",Map.of(
+     "purchaseOrderId",id.toString(),"orderNumber",order.getOrderNumber(),"cancelledBy",actor,
+     "warehouseId",order.getWarehouse().getId().toString())));
+   }
+   return detailed(id);
  }
  @Transactional(readOnly=true) public PurchaseDtos.ReceiptView getReceipt(UUID id,String actor){
   GoodsReceipt receipt=receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id));

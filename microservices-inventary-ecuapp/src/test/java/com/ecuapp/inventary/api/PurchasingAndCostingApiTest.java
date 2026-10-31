@@ -54,9 +54,17 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         assertAmount("12.50", order.get("total"));
         assertEquals("DRAFT", order.get("status").asText());
         String id = order.get("id").asText();
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='PURCHASE_ORDER'
+              and aggregate_id=?::uuid and event_type='PURCHASE_ORDER_CREATED'
+            """, Integer.class, id));
 
         problem(call(post("/api/v1/purchase-orders/" + id + "/approve"), admin(), null), 409, "CONFLICT");
         assertEquals("SUBMITTED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/submit", null, 200).get("status").asText());
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='PURCHASE_ORDER'
+              and aggregate_id=?::uuid and event_type='PURCHASE_ORDER_SUBMITTED'
+            """, Integer.class, id));
         assertEquals("SUBMITTED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/submit", null, 200).get("status").asText());
         problem(call(post("/api/v1/purchase-orders/" + id + "/approve"), manager, null), 403, "ACCESS_DENIED");
 
@@ -67,12 +75,20 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         httpPost(selfAdmin, "/api/v1/purchase-orders/" + own.get("id").asText() + "/submit", null, 200);
         problem(call(post("/api/v1/purchase-orders/" + own.get("id").asText() + "/approve"), selfAdmin, null), 409, "CONFLICT");
         assertEquals("CANCELLED", httpPost(selfAdmin, "/api/v1/purchase-orders/" + own.get("id").asText() + "/cancel", null, 200).get("status").asText());
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='PURCHASE_ORDER'
+              and aggregate_id=?::uuid and event_type='PURCHASE_ORDER_CANCELLED'
+            """, Integer.class, own.get("id").asText()));
         assertEquals("CANCELLED", httpPost(selfAdmin, "/api/v1/purchase-orders/" + own.get("id").asText() + "/cancel", null, 200).get("status").asText());
 
         JsonNode approved = httpPost(admin(), "/api/v1/purchase-orders/" + id + "/approve", null, 200);
         assertEquals("APPROVED", approved.get("status").asText());
         assertEquals(username("SUPER_ADMIN"), approved.get("approvedBy").asText());
         assertEquals("APPROVED", httpPost(admin(), "/api/v1/purchase-orders/" + id + "/approve", null, 200).get("status").asText());
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='PURCHASE_ORDER'
+              and aggregate_id=?::uuid and event_type='PURCHASE_ORDER_APPROVED'
+            """, Integer.class, id));
         JsonNode list = httpGet(token("AUDITOR"), "/api/v1/purchase-orders?status=APPROVED&supplierId=" + supplierId + "&from=" + Instant.now().minusSeconds(600), 200);
         assertEquals(1, list.get("page").get("totalElements").asInt());
         problem(call(get("/api/v1/purchase-orders?sort=notes"), admin(), null), 400, "INVALID_QUERY");
@@ -80,6 +96,10 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
 
         // An approved order with no receipts can be cancelled; repeating the transition is idempotent.
         assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='PURCHASE_ORDER'
+              and aggregate_id=?::uuid and event_type='PURCHASE_ORDER_CANCELLED'
+            """, Integer.class, id));
         assertEquals("CANCELLED", httpPost(manager, "/api/v1/purchase-orders/" + id + "/cancel", null, 200).get("status").asText());
     }
 
