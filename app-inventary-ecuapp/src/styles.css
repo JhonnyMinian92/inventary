@@ -926,3 +926,13 @@ a.nav-item { text-decoration: none; }
   .sidebar-profile { flex-direction: column; padding: 10px 0; }
   .sidebar-legal { display: flex; justify-content: center; padding: 8px 0 0; }
 }
+
+
+/* Server-side pagination shared by domain tables. */
+.pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 2px;color:var(--muted);font-size:12px}
+.pagination-actions{display:flex;align-items:center;gap:8px}
+.pagination-page{min-width:112px;text-align:center;color:var(--text)}
+.pagination .icon-button{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:20px;line-height:1}
+.pagination .icon-button:disabled{opacity:.4;cursor:not-allowed}
+.pagination .icon-button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+@media(max-width:520px){.pagination{align-items:stretch;flex-direction:column}.pagination-actions{justify-content:space-between}.pagination-page{flex:1}}
