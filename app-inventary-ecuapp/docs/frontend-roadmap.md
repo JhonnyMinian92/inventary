@@ -1,4 +1,4 @@
-> **Estado actualizado — 2026-10-31, rama `implementacion_propuestas`:** la reorganización de código de la Fase 3 está implementada y validada por CI en el SHA `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`. El workflow ejecutó 22 pruebas y el build de producción con éxito. La comprobación visual E2E en navegador queda pendiente y no se presenta como realizada.
+> **Estado actualizado — 2026-10-31, rama `implementacion_propuestas`:** la reorganización de código y estilos de la Fase 3 está implementada y validada por CI en el SHA `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`. El workflow ejecutó 22 pruebas y el build de producción con éxito. La comprobación visual E2E en navegador queda pendiente y no se presenta como realizada.
 
 # Plan de implementación del frontend
 
@@ -37,7 +37,7 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 
 ## Fase 3 — Arquitectura y separación del frontend React
 
-**Estado de implementación en `implementacion_propuestas`: código y CI completados en el SHA `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`; 22 pruebas y build correctos. La inspección responsive/a11y fue estática; falta prueba visual E2E en navegador.**
+**Estado de implementación en `implementacion_propuestas`: código y CI completados en el SHA `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`; 22 pruebas y build correctos. La inspección responsive/a11y fue estática; falta prueba visual E2E en navegador.**
 
 - Punto de entrada reducido a composición de providers y workspace; el root `src/App.jsx` queda como fachada de compatibilidad.
 - Separación explícita de `app`, `pages`, `widgets`, `features`, `entities` y `shared`, con dependencias dirigidas y una navegación declarativa.
@@ -48,7 +48,7 @@ La construcción del frontend se divide por fases de código fuente. Las pruebas
 - Corrección de paginación doble en catálogo: el backend ya entrega una página, por lo que el cliente no vuelve a aplicar el desplazamiento local.
 - Corrección de dependencias del filtrado memoizado del catálogo; el resultado ahora responde a búsqueda, categoría, estado y existencias.
 - Datos de referencia de reportes se cargan al entrar por URL directa; la capa de datos no retiene registros/contadores/paginación obsoletos ante errores de la consulta correspondiente.
-- Estilos conservan el CSS de la aplicación y establecen tokens semánticos y escala de espacio/radio/foco en `shared/styles/tokens.css`.
+- Estilos separados por dominio y componente: catálogo, operaciones, devoluciones, reportes, detalles transaccionales, formularios guiados y accesibilidad; el archivo global conserva layout/base y reglas transversales. Tokens semánticos y escala de espacio/radio/foco en `shared/styles/tokens.css`.
 - Se añaden pruebas unitarias de URL state sin instalar dependencias adicionales.
 
 ## Fase 4 — Cierre del código fuente y documentación
