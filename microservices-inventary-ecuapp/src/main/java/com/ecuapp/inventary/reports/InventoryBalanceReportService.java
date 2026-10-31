@@ -31,6 +31,7 @@ public class InventoryBalanceReportService {
     public InventoryBalanceReport get(LocalDate from, LocalDate to, UUID warehouseId, UUID productId, String zone, Pageable pageable,String actor) {
         if (warehouseId == null) throw new InvalidQueryException("El parámetro warehouseId es obligatorio.");
         scopes.requireWarehouseAccess(actor,warehouseId);
+        scopes.requireFinancialDataAccess(actor);
         ReportPeriod period = ReportPeriod.of(from, to, zone, defaultZone);
         if (pageable.getPageNumber() < 0) throw new InvalidQueryException("El número de página no puede ser negativo.");
         int page = pageable.getPageNumber();
