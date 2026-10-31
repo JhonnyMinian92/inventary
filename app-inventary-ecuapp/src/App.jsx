@@ -516,7 +516,6 @@ function AppWorkspace() {
               </form>
             </Modal>}
             <FeedbackHost />
-          </div>;
       </>
     }
   >
