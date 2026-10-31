@@ -105,4 +105,40 @@ class TransfersApiTest extends ApiTestSupport {
             "items", List.of(Map.of("productId", product, "quantity", 1))), "Idempotency-Key", key()), 403, "ACCESS_DENIED");
         problem(call(get("/api/v1/inventory/transfers?sort=requestHash"), manager, null), 400, "INVALID_QUERY");
     }
+
+    @Test
+    void sourceAndDestinationWarehouseOperatorsCanProcessTheirOwnTransferSide() {
+        String administrator=admin();
+        String sourceWarehouse=warehouse().get("id").asText();
+        String destinationWarehouse=warehouse().get("id").asText();
+        String product=product("1.00","3.00").get("id").asText();
+        stock(product,sourceWarehouse,"4","2.40");
+        JsonNode transfer=httpPost(administrator,"/api/v1/inventory/transfers",
+            Map.of("sourceWarehouseId",sourceWarehouse,"destinationWarehouseId",destinationWarehouse,
+                "items",List.of(Map.of("productId",product,"quantity",new BigDecimal("2")))),
+            201,"Idempotency-Key",key());
+        String id=transfer.get("id").asText();
+
+        String sourceUser="source."+suffix().toLowerCase();
+        String destinationUser="destination."+suffix().toLowerCase();
+        var source=users.saveAndFlush(new com.ecuapp.inventary.auth.AppUser(sourceUser,encoder.encode(PASSWORD),"MANAGER_ALMACEN"));
+        var destination=users.saveAndFlush(new com.ecuapp.inventary.auth.AppUser(destinationUser,encoder.encode(PASSWORD),"MANAGER_ALMACEN"));
+        httpPost(administrator,"/api/v1/admin/users/"+source.getId()+"/warehouse-scopes",
+            Map.of("warehouseId",sourceWarehouse,"reason","Responsable de despacho"),201);
+        httpPost(administrator,"/api/v1/admin/users/"+destination.getId()+"/warehouse-scopes",
+            Map.of("warehouseId",destinationWarehouse,"reason","Responsable de recepción"),201);
+        String sourceToken=login(sourceUser,PASSWORD);
+        String destinationToken=login(destinationUser,PASSWORD);
+
+        httpGet(sourceToken,"/api/v1/inventory/transfers/"+id,200);
+        httpGet(destinationToken,"/api/v1/inventory/transfers/"+id,200);
+        assertEquals(1,httpGet(sourceToken,"/api/v1/inventory/transfers",200).get("page").get("totalElements").asInt());
+        assertEquals(1,httpGet(destinationToken,"/api/v1/inventory/transfers",200).get("page").get("totalElements").asInt());
+
+        httpPost(sourceToken,"/api/v1/inventory/transfers/"+id+"/dispatch",null,200,"Idempotency-Key",key());
+        problem(call(post("/api/v1/inventory/transfers/"+id+"/receive"),sourceToken,null,"Idempotency-Key",key()),404,"RESOURCE_NOT_FOUND");
+        httpPost(destinationToken,"/api/v1/inventory/transfers/"+id+"/receive",null,200,"Idempotency-Key",key());
+        problem(call(post("/api/v1/inventory/transfers/"+id+"/dispatch"),destinationToken,null,"Idempotency-Key",key()),404,"RESOURCE_NOT_FOUND");
+        assertAmount("2",onHand(product,destinationWarehouse));
+    }
 }
