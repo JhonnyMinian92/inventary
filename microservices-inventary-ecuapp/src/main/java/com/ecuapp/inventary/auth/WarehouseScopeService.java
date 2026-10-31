@@ -89,7 +89,7 @@ public class WarehouseScopeService {
         Instant now=Instant.now(),from=request.validFrom()==null?now:request.validFrom(),until=request.validUntil();
         if(until!=null&&!until.isAfter(from))throw new BusinessRuleException("La vigencia final debe ser posterior a la vigencia inicial.");
         String reason=request.reason().trim();
-        scopes.expirePrevious(userId,warehouse.getId(),now);
+        expirePreviousAssignments(userId,warehouse.getId(),now);
         if(scopes.existsByUserIdAndWarehouseIdAndActiveTrue(userId,warehouse.getId()))
             throw new ConflictException("Ya existe una asignación activa para esta bodega.");
         UserWarehouseScope saved=scopes.saveAndFlush(new UserWarehouseScope(user,warehouse,reason,actor,from,until));
@@ -104,7 +104,7 @@ public class WarehouseScopeService {
     public void grantCreatorAccess(String actor,Warehouse warehouse) {
         if(hasGlobalAccess(actor))return;
         AppUser user=requireUserByName(actor);Instant now=Instant.now();
-        scopes.expirePrevious(user.getId(),warehouse.getId(),now);
+        expirePreviousAssignments(user.getId(),warehouse.getId(),now);
         if(scopes.existsByUserIdAndWarehouseIdAndActiveTrue(user.getId(),warehouse.getId()))return;
         UserWarehouseScope saved=scopes.saveAndFlush(new UserWarehouseScope(user,warehouse,
             "Acceso operativo al almacén creado por el propio usuario.",actor,now,null));
@@ -121,6 +121,15 @@ public class WarehouseScopeService {
         scope.revoke(actor);
         audit.record(actor,"USER_WAREHOUSE_SCOPE_REVOKED","USER_WAREHOUSE_SCOPE",scopeId,
             Map.of("userId",userId.toString(),"warehouseId",scope.getWarehouse().getId().toString()));
+    }
+
+    private void expirePreviousAssignments(UUID userId,UUID warehouseId,Instant now) {
+        for(UserWarehouseScope expired:scopes.findExpiredActive(userId,warehouseId,now)) {
+            expired.revoke("SYSTEM_EXPIRY");
+            audit.record("SYSTEM_EXPIRY","USER_WAREHOUSE_SCOPE_EXPIRED","USER_WAREHOUSE_SCOPE",expired.getId(),
+                Map.of("userId",userId.toString(),"warehouseId",warehouseId.toString(),
+                    "validUntil",expired.getValidUntil().toString()));
+        }
     }
 
     private void requireSecurityActor(String actor) {
