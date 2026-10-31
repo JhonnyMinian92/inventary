@@ -4,6 +4,7 @@ import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.warehouse.*;
 import com.ecuapp.inventary.common.*;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,28 +22,39 @@ public class InventoryService {
  private static final Map<String,String> BALANCE_SORT=Map.of("onHand","onHand","reserved","reserved","updatedAt","updatedAt","sku","product.sku","productName","product.name","warehouseCode","warehouse.code");
  private static final Map<String,String> MOVEMENT_SORT=Map.of("occurredAt","occurredAt","quantity","quantity","movementType","movementType");
  private final ProductRepository products;private final IdempotencyRecordRepository idempotencyRecords;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final AuditService audit;
- private final InventoryCostingService costing;private final InventoryValuationEntryRepository valuationEntries;
+ private final InventoryCostingService costing;private final InventoryValuationEntryRepository valuationEntries;private final WarehouseScopeService scopes;
  public InventoryService(ProductRepository products,IdempotencyRecordRepository idempotencyRecords,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,WarehouseLocationRepository locations,UnitOfMeasureRepository units,AuditService audit,
-  InventoryCostingService costing,InventoryValuationEntryRepository valuationEntries){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;this.valuationEntries=valuationEntries;}
- @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(UUID productId,UUID warehouseId,boolean onlyAvailable,Pageable p){
-  return balances.search(productId,warehouseId,onlyAvailable,Pages.of(p,BALANCE_SORT,Sort.by("product.sku"))).map(InventoryDtos.BalanceView::from);
+  InventoryCostingService costing,InventoryValuationEntryRepository valuationEntries,WarehouseScopeService scopes){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;this.valuationEntries=valuationEntries;this.scopes=scopes;}
+ @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(UUID productId,UUID warehouseId,boolean onlyAvailable,Pageable p,String actor){
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,BALANCE_SORT,Sort.by("product.sku"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
+  return (allowed==null?balances.search(productId,warehouseId,onlyAvailable,pageable):balances.searchScoped(productId,warehouseId,onlyAvailable,allowed,pageable)).map(InventoryDtos.BalanceView::from);
  }
- @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(UUID productId,UUID warehouseId,MovementType type,String referenceType,UUID referenceId,Instant from,Instant to,Pageable p){
+ @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(UUID productId,UUID warehouseId,MovementType type,String referenceType,UUID referenceId,Instant from,Instant to,Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,MOVEMENT_SORT,Sort.by(Sort.Direction.DESC,"occurredAt"));
+  if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   String reference=referenceType==null||referenceType.isBlank()?null:referenceType.trim().toUpperCase(java.util.Locale.ROOT);
-  return movements.search(productId,warehouseId,type,reference,referenceId,com.ecuapp.inventary.common.TimeRange.lower(from),com.ecuapp.inventary.common.TimeRange.upper(to),Pages.of(p,MOVEMENT_SORT,Sort.by(Sort.Direction.DESC,"occurredAt"))).map(InventoryDtos.MovementView::from);
+  var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+  return (allowed==null?movements.search(productId,warehouseId,type,reference,referenceId,lower,upper,pageable):
+   movements.searchScoped(productId,warehouseId,type,reference,referenceId,lower,upper,allowed,pageable)).map(InventoryDtos.MovementView::from);
  }
- @Transactional(readOnly=true) public InventoryDtos.MovementDetailView movement(UUID id){
+ @Transactional(readOnly=true) public InventoryDtos.MovementDetailView movement(UUID id,String actor){
   StockMovement movement=movements.findById(id).orElseThrow(()->new ResourceNotFoundException("Movimiento de inventario",id));
+  scopes.requireWarehouseAccess(actor,movement.getWarehouse().getId());
   var entries=valuationEntries.findByStockMovementIdOrderByCreatedAtAsc(id).stream().map(InventoryDtos.ValuationEntryView::from).toList();
   BigDecimal total=entries.stream().map(InventoryDtos.ValuationEntryView::totalCost).reduce(BigDecimal.ZERO.setScale(4),BigDecimal::add);
   return new InventoryDtos.MovementDetailView(InventoryDtos.MovementView.from(movement),total,entries);
  }
- @Transactional(readOnly=true) public InventoryDtos.BalanceView balance(UUID productId,UUID warehouseId){
+ @Transactional(readOnly=true) public InventoryDtos.BalanceView balance(UUID productId,UUID warehouseId,String actor){
+  scopes.requireWarehouseAccess(actor,warehouseId);
   StockBalance b=balances.findByProductIdAndWarehouseId(productId,warehouseId).orElseThrow(()->new ResourceNotFoundException("Saldo de inventario",productId+"/"+warehouseId));
   return InventoryDtos.BalanceView.from(b);
  }
- @Transactional(readOnly=true) public InventoryDtos.AvailabilityView availability(UUID productId,String sku,UUID warehouseId,BigDecimal requested){
+ @Transactional(readOnly=true) public InventoryDtos.AvailabilityView availability(UUID productId,String sku,UUID warehouseId,BigDecimal requested,String actor){
+  scopes.requireWarehouseAccess(actor,warehouseId);
   if(productId==null&&(sku==null||sku.isBlank()))throw new InvalidQueryException("Indique productId o sku.");
   if(requested!=null&&requested.signum()<=0)throw new InvalidQueryException("quantity debe ser mayor que cero.");
   Product product=productId!=null?products.findById(productId).orElseThrow(()->new ResourceNotFoundException("Producto",productId))
@@ -57,6 +69,7 @@ public class InventoryService {
   return new InventoryDtos.AvailabilityView(product.getId(),product.getSku(),warehouse.getId(),warehouse.getCode(),onHand,reserved,available,wanted,sufficient);
  }
  @Transactional public InventoryDtos.MovementView adjust(String key,InventoryDtos.AdjustmentRequest r,String actor){
+  scopes.requireWarehouseAccess(actor,r.warehouseId());
   if(key==null||key.isBlank()||key.trim().length()>120)throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
   key=key.trim();
   BigDecimal quantity=r.quantity().setScale(3,RoundingMode.UNNECESSARY);
