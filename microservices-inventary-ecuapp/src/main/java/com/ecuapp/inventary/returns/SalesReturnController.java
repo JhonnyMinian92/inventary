@@ -13,9 +13,9 @@ public class SalesReturnController {
  public org.springframework.data.domain.Page<SalesReturnDtos.View> list(@RequestParam(required=false) UUID sourceSaleId,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant from,
   @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant to,
-  @org.springframework.data.web.PageableDefault(size=20) org.springframework.data.domain.Pageable p){return service.list(sourceSaleId,warehouseId,from,to,p);}
+  @org.springframework.data.web.PageableDefault(size=20) org.springframework.data.domain.Pageable p,Authentication auth){return service.list(sourceSaleId,warehouseId,from,to,p,auth.getName());}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
- public SalesReturnDtos.View get(@PathVariable UUID id){return service.get(id);}
+ public SalesReturnDtos.View get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
  public SalesReturnDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SalesReturnDtos.CreateRequest request,Authentication auth){return service.create(key,request,auth.getName());}
 }
