@@ -2,7 +2,7 @@ name: Frontend Build
 
 on:
   push:
-    branches: [master]
+    branches: [master, implementacion_propuestas]
     paths:
       - "app-inventary-ecuapp/**"
       - ".github/workflows/frontend-ci.yml"
