@@ -31,4 +31,17 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @Query("select s.id from Subscription s where s.status = com.ecuapp.inventary.subscriptions.Subscription.Status.ACTIVE and s.endDate <= :day " +
         "and not exists (select i.id from SubscriptionInstallment i where i.subscription = s and i.status = com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED)")
     List<UUID> findIdsToComplete(@Param("day") LocalDate day);
+
+    @Query(value = """
+        select s from Subscription s join fetch s.customer join fetch s.product join fetch s.warehouse
+        where (:status is null or s.status=:status) and (:customerId is null or s.customer.id=:customerId)
+          and s.warehouse.id in :warehouseIds
+        """,
+        countQuery = """
+        select count(s) from Subscription s
+        where (:status is null or s.status=:status) and (:customerId is null or s.customer.id=:customerId)
+          and s.warehouse.id in :warehouseIds
+        """)
+    Page<Subscription> searchScoped(@Param("status") Subscription.Status status,@Param("customerId") UUID customerId,
+                                    @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
