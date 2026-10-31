@@ -96,13 +96,44 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
   </Drawer>;
 }
 
-function ProductsTab({ products, categories, balances, ready, can, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
+function ProductsTab({ products: initialProducts, categories, balances, ready, can, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [stockFilter, setStockFilter] = useState('');
   const [sort, setSort] = useState({ key: 'name', dir: 'asc' });
   const [page, setPage] = useState(0);
+  const [serverProducts, setServerProducts] = useState(initialProducts || []);
+  const [serverTotal, setServerTotal] = useState(Number(initialProducts?.length || 0));
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    let active = true;
+    setListLoading(true);
+    setListError('');
+    const params = { page, size: PAGE_SIZE, sort: (sort.key === 'price' ? 'salePrice' : sort.key === 'name' ? 'name' : 'name') + ',' + sort.dir };
+    if (debouncedQuery) params.q = debouncedQuery;
+    if (categoryId) params.categoryId = categoryId;
+    if (statusFilter === 'active') params.active = true;
+    if (statusFilter === 'inactive') params.active = false;
+    api.products(params).then(payload => {
+      if (!active) return;
+      setServerProducts(listFrom(payload));
+      setServerTotal(Number(payload?.totalElements ?? payload?.page?.totalElements ?? listFrom(payload).length));
+    }).catch(error => {
+      if (!active) return;
+      setServerProducts([]);
+      setServerTotal(0);
+      setListError(error?.status === 403 ? 'No tienes permiso para consultar el catálogo.' : (error?.message || 'No se pudieron cargar los productos.'));
+    }).finally(() => { if (active) setListLoading(false); });
+    return () => { active = false; };
+  }, [page, debouncedQuery, categoryId, statusFilter, sort]);
   const categoryNames = useMemo(() => new Map(categories.map(category => [String(idOf(category)), category.name])), [categories]);
   const stock = useMemo(() => {
     const totals = new Map();
@@ -117,7 +148,7 @@ function ProductsTab({ products, categories, balances, ready, can, onOpenDetail,
 
   const rows = useMemo(() => {
     const text = query.trim().toLowerCase();
-    const filtered = products.filter(product => {
+    const filtered = serverProducts.filter(product => {
       const id = String(idOf(product));
       const onHand = stock.get(id)?.onHand || 0;
       if (text && ![product.name, product.sku, product.description].some(value => String(value || '').toLowerCase().includes(text))) return false;
@@ -137,16 +168,16 @@ function ProductsTab({ products, categories, balances, ready, can, onOpenDetail,
       const order = typeof left === 'number' ? left - right : String(left).localeCompare(String(right), 'es');
       return sort.dir === 'asc' ? order : -order;
     });
-  }, [products, query, categoryId, statusFilter, stockFilter, sort, stock, categoryNames]);
+  }, [serverProducts, stockFilter, sort, stock, categoryNames]);
 
-  useEffect(() => { setPage(0); }, [query, categoryId, statusFilter, stockFilter, sort]);
+  useEffect(() => { setPage(0); }, [debouncedQuery, categoryId, statusFilter, stockFilter, sort]);
   const visible = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const active = products.filter(product => !isInactive(product));
+  const active = serverProducts.filter(product => !isInactive(product));
   const withoutStock = active.filter(product => !(stock.get(String(idOf(product)))?.onHand > 0)).length;
   const toggleSort = key => setSort(current => ({ key, dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc' }));
 
   function exportCsv() {
-    downloadCsv('inventary-productos-' + isoDate() + '.csv', [
+    downloadCsv('inventary-productos-pagina-' + (page + 1) + '-' + isoDate() + '.csv', [
       { key: 'sku', label: 'SKU' }, { key: 'name', label: 'Producto' },
       { key: 'category', label: 'Categoría', csvValue: product => categoryNames.get(String(product.categoryId)) || '' },
       { key: 'salePrice', label: 'Precio de venta' },
@@ -158,9 +189,9 @@ function ProductsTab({ products, categories, balances, ready, can, onOpenDetail,
 
   return <>
     <div className="stat-chips">
-      <span><strong>{number(active.length)}</strong> activos</span>
-      <span><strong>{number(products.length - active.length)}</strong> inactivos</span>
-      <span className={withoutStock ? 'warn' : ''}><strong>{number(withoutStock)}</strong> sin existencias</span>
+      <span><strong>{number(serverTotal)}</strong> resultados</span>
+      <span><strong>{number(active.length)}</strong> activos en esta página</span>
+      <span className={withoutStock ? 'warn' : ''}><strong>{number(withoutStock)}</strong> activos sin stock en esta página</span>
     </div>
     <div className="filter-bar">
       <label className="search-field"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar por nombre o SKU" aria-label="Buscar productos" /></label>
@@ -179,7 +210,7 @@ function ProductsTab({ products, categories, balances, ready, can, onOpenDetail,
         {can('catalog:manage') && <button type="button" className="button primary" onClick={onNew}><Plus size={16} />Nuevo producto</button>}
       </div>
     </div>
-    {!ready ? <SkeletonTable rows={8} columns={6} label="Cargando productos" /> : <div className="table-wrap data-table">
+    {!ready || listLoading ? <SkeletonTable rows={8} columns={6} label="Cargando productos" /> : <div className="table-wrap data-table">
       <table aria-label="Productos">
         <thead><tr>
           <SortHeader id="name" label="Producto" sort={sort} onSort={toggleSort} />
@@ -209,8 +240,9 @@ function ProductsTab({ products, categories, balances, ready, can, onOpenDetail,
           </tr>;
         })}</tbody>
       </table>
-      {!rows.length && <div className="empty-block"><PackageSearch size={28} /><strong>Sin resultados</strong><span>{products.length ? 'Ajusta la búsqueda o los filtros.' : 'Todavía no hay productos.'}</span></div>}
-      <Pagination page={page} total={rows.length} onPage={setPage} />
+      {listError && <div className="alert error" role="alert">{listError}</div>}
+      {!rows.length && !listError && <div className="empty-block"><PackageSearch size={28} /><strong>Sin resultados</strong><span>{serverTotal ? 'Ajusta la búsqueda o los filtros.' : 'Todavía no hay productos.'}</span></div>}
+      <Pagination page={page} total={serverTotal} onPage={setPage} />
     </div>}
   </>;
 }
@@ -252,8 +284,16 @@ function CategoriesTab({ categories, products, ready, can, onNew, onEdit, onTogg
   </>;
 }
 
-export default function ProductsPage({ tab, products, categories, balances, ready, refreshing, can, detailId, onNavigateTab, onOpenDetail, onCloseDetail, product: actions, category: categoryActions }) {
-  const detail = detailId ? products.find(product => String(idOf(product)) === String(detailId)) : null;
+export default function ProductsPage({ tab, products = [], categories, balances, ready, refreshing, can, detailId, onNavigateTab, onOpenDetail, onCloseDetail, product: actions, category: categoryActions }) {
+  const [detail, setDetail] = useState(null);
+  useEffect(() => {
+    if (!detailId) { setDetail(null); return undefined; }
+    let active = true;
+    setDetail(null);
+    api.product(detailId).then(value => { if (active) setDetail(value); })
+      .catch(error => { if (active) toast.error(error?.message || 'No se pudo cargar el detalle del producto.'); });
+    return () => { active = false; };
+  }, [detailId]);
   const categoryName = id => categories.find(category => String(idOf(category)) === String(id))?.name || '';
   return <div className={'page' + (refreshing ? ' is-refreshing' : '')}>
     <CatalogTabs active={tab} productCount={products.length} categoryCount={categories.length} onNavigate={onNavigateTab} />
