@@ -21,8 +21,9 @@ import java.util.List;
  * <ul>
  * <li>Minimum price: the cost of the exact units that would leave the warehouse (FIFO layers or moving average),
  * rounded up to the cent. Selling below it is a loss and is rejected.</li>
- * <li>Suggested price: that cost plus the product markup (25% by default), never below the catalog price that the
- * last received purchase set.</li>
+ * <li>Suggested price for stocked goods: that cost plus the product markup (25% by default), never below the
+ * catalog price that the last received purchase set.</li>
+ * <li>Non-stocked goods and services use the catalog sale price and do not receive an inventory cost floor.</li>
  * </ul>
  */
 @Service
