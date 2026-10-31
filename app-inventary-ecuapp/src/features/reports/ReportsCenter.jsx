@@ -129,8 +129,6 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     setError(null);
   }, [error]);
   const [lastRun, setLastRun] = useState({});
-  const [balanceSummaryCache, setBalanceSummaryCache] = useState({ signature: '', rows: [] });
-  const [valuationExportCache, setValuationExportCache] = useState({ signature: '', rows: null });
   const data = results[activeTab];
   const resultReady = Boolean(queried[activeTab] && data !== undefined);
   const today = localDate();
@@ -195,8 +193,6 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     setFilters(current => ({ ...current, [key]: value }));
     setResults(current => ({ ...current, [activeTab]: undefined }));
     setQueried(current => ({ ...current, [activeTab]: false }));
-    if (activeTab === 'balance') setBalanceSummaryCache({ signature: '', rows: [] });
-    if (activeTab === 'valuation') setValuationExportCache({ signature: '', rows: null });
     setError(null);
   }
 
@@ -245,20 +241,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         const params = { ...range, warehouseId: filters.warehouseId, page: requestedPage, size: 100 };
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryBalanceReport(params);
-        const signature = [filters.from, filters.to, filters.zone, filters.warehouseId, filters.productId].join('|');
-        let summaryRows = requestedPage > 0 && balanceSummaryCache.signature === signature ? balanceSummaryCache.rows : null;
-        if (!summaryRows) {
-          const firstPageResponse = requestedPage === 0 ? response : await api.inventoryBalanceReport({ ...params, page: 0 });
-          summaryRows = [...listFrom(firstPageResponse.items)];
-          const totalPages = Number(firstPageResponse.totalPages || 0);
-          for (let firstPage = 1; firstPage < totalPages; firstPage += 5) {
-            const batchPages = Array.from({ length: Math.min(5, totalPages - firstPage) }, (_, offset) => firstPage + offset);
-            const pageResults = await Promise.all(batchPages.map(page => api.inventoryBalanceReport({ ...params, page })));
-            pageResults.forEach(pageResult => summaryRows.push(...listFrom(pageResult.items)));
-          }
-          setBalanceSummaryCache({ signature, rows: summaryRows });
-        }
-        response = { ...response, summaryItems: summaryRows };
+        response = { ...response, pageItems: listFrom(response.items) };
       } else if (activeTab === 'sales') {
         const params = { ...range };
         if (filters.warehouseId) params.warehouseId = filters.warehouseId;
@@ -275,20 +258,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         if (filters.warehouseId) params.warehouseId = filters.warehouseId;
         if (filters.productId) params.productId = filters.productId;
         response = await api.inventoryValuationReport(params);
-        const signature = [filters.warehouseId, filters.productId, 'includeEmpty=false'].join('|');
-        let exportRows = requestedPage > 0 && valuationExportCache.signature === signature ? valuationExportCache.rows : null;
-        if (!exportRows) {
-          const firstPageResponse = requestedPage === 0 ? response : await api.inventoryValuationReport({ ...params, page: 0 });
-          exportRows = [...listFrom(firstPageResponse.items)];
-          const totalPages = Number(firstPageResponse.totalPages || 0);
-          for (let firstPage = 1; firstPage < totalPages; firstPage += 5) {
-            const batchPages = Array.from({ length: Math.min(5, totalPages - firstPage) }, (_, offset) => firstPage + offset);
-            const pageResults = await Promise.all(batchPages.map(page => api.inventoryValuationReport({ ...params, page })));
-            pageResults.forEach(pageResult => exportRows.push(...listFrom(pageResult.items)));
-          }
-          setValuationExportCache({ signature, rows: exportRows });
-        }
-        response = { ...response, exportItems: exportRows };
+        response = { ...response, pageItems: listFrom(response.items) };
       } else {
         response = await api.lowStockReport(filters.warehouseId ? { warehouseId: filters.warehouseId } : {});
       }
@@ -300,8 +270,6 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
       setError(nextError);
       setResults(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: undefined }));
       setQueried(current => nextError.kind === 'permission' ? {} : ({ ...current, [activeTab]: false }));
-      if (activeTab === 'balance' || nextError.kind === 'permission') setBalanceSummaryCache({ signature: '', rows: [] });
-      if (activeTab === 'valuation' || nextError.kind === 'permission') setValuationExportCache({ signature: '', rows: null });
       if (err?.status === 401) onUnauthorized?.();
     } finally {
       setLoading(false);
@@ -315,9 +283,10 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     : activeTab === 'valuation' ? listFrom(data?.items)
     : Array.isArray(data) ? data : listFrom(data);
   const exportData = () => {
-    const prefix = 'inventary-' + activeTab + '-' + localDate();
-    const exportRows = activeTab === 'balance' ? listFrom(data?.summaryItems) : activeTab === 'valuation' ? listFrom(data?.exportItems) : tableRows;
-    downloadCsv(prefix + '.csv', columns, exportRows);
+    const pageScoped = ['balance', 'valuation'].includes(activeTab);
+    const pageSuffix = pageScoped ? '-pagina-' + (Number(data?.page || 0) + 1) : '';
+    const prefix = 'inventary-' + activeTab + pageSuffix + '-' + localDate();
+    downloadCsv(prefix + '.csv', columns, tableRows);
   };
   const exportDailySales = () => downloadCsv('inventary-ventas-diarias-' + localDate() + '.csv', [{ key: 'date', label: 'Fecha' }, { key: 'salesCount', label: 'Ventas' }, { key: 'grossSales', label: 'Ventas brutas' }], listFrom(data?.daily));
 
@@ -336,7 +305,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
     if (!resultReady) return <div className="empty-state report-empty"><CalendarRange size={26}/><strong>Consulta el informe para ver resultados</strong><span>Los datos se solicitan directamente al backend cuando envías los filtros.</span></div>;
     if (activeTab === 'balance') {
       const rows = listFrom(data?.items);
-      const summaryRows = listFrom(data?.summaryItems).length ? listFrom(data.summaryItems) : rows;
+      const summaryRows = rows;
       if (!rows.length) return <div className="empty-state report-empty"><FileSpreadsheet size={26}/><strong>Sin movimientos o saldos en el periodo</strong><span>Prueba otro rango o selecciona otro producto. El backend no inventa filas sin actividad histórica.</span></div>;
       return <>
         <Metrics items={[
@@ -350,7 +319,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         ]}/>
         <div className="report-subheading"><div><h3>Balance por producto</h3><p>Saldo al inicio del periodo, compras y ventas netas, y saldo al cierre. El stock actual puede diferir porque incluye movimientos posteriores al periodo.</p></div><span className="muted">{data.totalElements ?? rows.length} productos</span></div>
         <ReportTable rows={rows} columns={columns} caption="Balance de inventario por producto" empty="Sin filas para los filtros seleccionados."/>
-        <p className="report-footnote">Las métricas resumen todos los productos del periodo; la tabla muestra la página actual. Zona horaria: {data.zone || filters.zone}. Generado: {dateTime(data.generatedAt)}. Página {Number(data.page || 0) + 1} de {data.totalPages || 1}.</p>
+        <p className="report-footnote">Las métricas y el CSV corresponden a los productos de esta página; el total de productos lo calcula el backend. Para consultar el resto usa la paginación. Zona horaria: {data.zone || filters.zone}. Generado: {dateTime(data.generatedAt)}. Página {Number(data.page || 0) + 1} de {data.totalPages || 1}.</p>
       </>;
     }
     if (activeTab === 'sales') {
@@ -402,6 +371,7 @@ export default function ReportsCenter({ warehouses = [], products = [], supplier
         <div className="report-subheading"><div><h3>Valor total por moneda</h3><p>Método de costeo: <strong>{titleCase(data.method)}</strong>. Los importes vienen de la valoración financiera del backend.</p></div><span className="muted">Generado: {dateTime(data.generatedAt)}</span></div>
         <Metrics items={(data?.totals || []).map(item => ({ label: 'Total en ' + item.currency, value: money(item.totalValue, item.currency), detail: 'Existencia: ' + number(item.onHand) }))}/>
         <ReportTable rows={rows} columns={columns} caption="Valoración del inventario por producto y almacén" empty="No hay existencias valoradas que coincidan con los filtros."/>
+        <p className="report-footnote">Los totales por moneda los calcula el backend sobre todas las filas; la tabla y el CSV muestran solo la página actual ({Number(data.page || 0) + 1} de {data.totalPages || 1}).</p>
         {rows.some(row => row.reconciled === false) && <p className="table-note"><ShieldAlert size={14} aria-hidden="true"/><span>Algunas filas no están conciliadas. Revisa los movimientos y el libro de valoración antes de utilizar estos saldos en un cierre financiero.</span></p>}
       </>;
     }
