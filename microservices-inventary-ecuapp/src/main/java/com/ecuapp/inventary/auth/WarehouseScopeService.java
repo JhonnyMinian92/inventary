@@ -38,6 +38,14 @@ public class WarehouseScopeService {
     }
 
     @Transactional(readOnly=true)
+    public boolean canReadFinancialData(String username) {
+        AppUser user=users.findByUsername(username).filter(AppUser::isActive)
+            .orElseThrow(()->new ResourceNotFoundException("Usuario",username));
+        Set<String> permissions=Set.copyOf(roles.findActivePermissionCodes(user.getRole()));
+        return permissions.contains("reports:financial")||permissions.contains("costing:manage");
+    }
+
+    @Transactional(readOnly=true)
     public boolean hasGlobalAccess(String username) {
         AppUser user=users.findByUsername(username).filter(AppUser::isActive)
             .orElseThrow(()->new ResourceNotFoundException("Usuario",username));
