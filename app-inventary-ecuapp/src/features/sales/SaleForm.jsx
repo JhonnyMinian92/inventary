@@ -341,7 +341,7 @@ export default function SaleForm({ products, warehouses, customers, balances, lo
         })}
       </div>
       {availabilityWarning && <p className="inline-warning">{availabilityWarning}</p>}
-      <p className="form-hint">Al registrar, el sistema vuelve a validar existencias y que ningún precio quede por debajo del costo.</p>
+      <p className="form-hint">Al registrar, el sistema vuelve a validar existencias y las reglas de precio aplicables al tipo de producto.</p>
     </section>}
 
     <div className="form-actions workflow-actions">
