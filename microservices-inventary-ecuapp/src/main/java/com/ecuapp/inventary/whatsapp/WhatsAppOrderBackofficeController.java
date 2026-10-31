@@ -28,14 +28,14 @@ public class WhatsAppOrderBackofficeController {
                                              @RequestParam(required = false) String customerRef,
                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
                                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-                                             @PageableDefault(size = 20) Pageable pageable) {
-        return service.list(status, customerRef, from, to, pageable);
+                                             @PageableDefault(size = 20) Pageable pageable,Authentication authentication) {
+        return service.list(status, customerRef, from, to, pageable,authentication.getName());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('sales:read')")
-    public WhatsAppDtos.OrderView get(@PathVariable UUID id) {
-        return service.get(id);
+    public WhatsAppDtos.OrderView get(@PathVariable UUID id,Authentication authentication) {
+        return service.get(id,authentication.getName());
     }
 
     @PostMapping("/{id}/confirm-payment")
