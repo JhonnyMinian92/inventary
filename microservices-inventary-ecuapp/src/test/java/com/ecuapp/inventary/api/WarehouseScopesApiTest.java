@@ -29,7 +29,7 @@ class WarehouseScopesApiTest extends ApiTestSupport {
         httpGet(token,"/api/v1/warehouses/"+first.get("id").asText(),200);
         problem(call(get("/api/v1/warehouses/"+second.get("id").asText()),token,null),404,"RESOURCE_NOT_FOUND");
         problem(call(get("/api/v1/inventory/balances/"+UUID.randomUUID()+"/"+second.get("id").asText()),token,null),404,"RESOURCE_NOT_FOUND");
-        problem(call(get("/api/v1/inventory/availability?warehouseId="+second.get("id")+"&productId="+UUID.randomUUID()+"&sku=unknown"),token,null),404,"RESOURCE_NOT_FOUND");
+        problem(call(get("/api/v1/inventory/availability?warehouseId="+second.get("id").asText()+"&productId="+UUID.randomUUID()+"&sku=unknown"),token,null),404,"RESOURCE_NOT_FOUND");
 
         httpDelete(administrator,"/api/v1/admin/users/"+user.getId()+"/warehouse-scopes/"+grant.get("id"),204);
         problem(call(get("/api/v1/warehouses/"+first.get("id").asText()),token,null),404,"RESOURCE_NOT_FOUND");
