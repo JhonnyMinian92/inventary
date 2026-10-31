@@ -87,8 +87,7 @@ public class SubscriptionService {
             canDiscount);
     }
 
-    public SubscriptionDtos.PreviewView preview(SubscriptionDtos.PreviewRequest request,String actor) {
-        scopes.requireWarehouseAccess(actor,request.warehouseId());
+    public SubscriptionDtos.PreviewView preview(SubscriptionDtos.PreviewRequest request) {
         LocalDate start = request.startDate() == null ? today() : request.startDate();
         List<SubscriptionSchedule.Period> periods = SubscriptionSchedule.build(start, request.termMonths(), request.billingFrequency(), request.monthlyPrice());
         BigDecimal total = SubscriptionSchedule.total(periods);
