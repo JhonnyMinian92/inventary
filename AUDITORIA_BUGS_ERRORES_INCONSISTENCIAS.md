@@ -157,3 +157,19 @@ El backend tiene más capacidades de catálogo que las presentadas por una panta
 - [SRI: ambiente de pruebas/certificación y producción](https://www.sri.gob.ec/web/intersri/facturacion-electronica?p_l_back_url=%2Fbuscador%3Fdelta%3D20%26q%3Dcalculador)
 
 Este documento es un registro de hallazgos estáticos. Las correcciones están propuestas, no ejecutadas.
+
+
+## Seguimiento de implementación — rama `implementacion_propuestas`
+
+> Esta auditoría fue levantada sobre un snapshot anterior de `master`; sus hallazgos no deben interpretarse como estado actual sin contrastarlos con la rama de trabajo. El seguimiento consolidado y la secuencia de ejecución están en [PLAN_EJECUCION_PROPUESTAS_INVENTARY.md](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md).
+
+| Hallazgo | Estado tras Fase 1 | Evidencia / trabajo restante |
+|---|---|---|
+| P1 — Contraseña bootstrap de CI demasiado larga | Corregido en workflow backend | Se usa una contraseña CI corta y se mantiene el smoke test de base vacía; falta confirmar el run verde del SHA final. |
+| P2 — Contraseña inválida en `.env.example` del backend | Corregido | `BOOTSTRAP_ADMIN_PASSWORD=LocalOnly-123!`; solo para desarrollo local. |
+| P2 — Precio mínimo aplicado en frontend a servicios/no stock | Corregido en backend y frontend | El quote devuelve precio de catálogo y mínimo cero para tipos sin stock; se añadió prueba API. Falta ejecutar Maven verify y la suite frontend. |
+| P3 — CI frontend usa instalación no reproducible | Corregido | Workflow usa `npm ci`, `npm test` y `npm run build`; falta evidencia de ejecución verde. |
+| Artefactos generados Maven versionados | Corregido | Retirados los 19 archivos de la ruta literal `${project.build.directory}` y añadida exclusión a Git. |
+| Documentación raíz/frontend desactualizada | Parcialmente corregido | READMEs actualizados y roadmap maestro añadido. Las referencias históricas de esta auditoría siguen describiendo el snapshot original. |
+
+Los demás hallazgos de P1/P2 —impuestos y contrato fiscal, snapshots de facturación, asignación de almacén por usuario/caja, devolución monetaria, separación entre cancelación comercial y fiscal, descuentos y logística— permanecen pendientes y se distribuyen en las fases 3, 4 y 5 del plan maestro. No se consideran resueltos por los cambios de estabilización.
