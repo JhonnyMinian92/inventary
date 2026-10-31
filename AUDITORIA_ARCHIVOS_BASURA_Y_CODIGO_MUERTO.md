@@ -163,3 +163,10 @@ Por eso no se declaran clases Java eliminables sin esa verificación. No se enco
 ## Límite de esta auditoría
 
 La revisión no ejecutó una búsqueda dinámica de clases cargadas, no desplegó el sistema y no examinó bases locales del usuario. Las categorías «candidato» y «requiere comprobación» son intencionales. No se ha borrado ningún archivo ni código.
+
+
+## Adenda de ejecución — limpieza Fase 1 · 2026-10-30
+
+Los 19 artefactos generados identificados en la ruta literal del directorio de build Maven fueron retirados del control de versiones en la rama implementacion_propuestas. Se reforzó .gitignore para excluir las salidas de build y secretos. La limpieza se limitó a esos artefactos duplicados; no se eliminaron archivos operativos de imágenes ni se declararon componentes React o clases Java como código muerto sin pruebas suficientes.
+
+La validación asociada a la Fase 1 y el plan de todas las fases restantes están documentados en [PLAN_EJECUCION_PROPUESTAS_INVENTARY.md](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md) y [MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md](MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md).
