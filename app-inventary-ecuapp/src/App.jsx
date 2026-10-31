@@ -71,6 +71,7 @@ function quantity(x) { return x?.onHand ?? x?.quantity ?? x?.available ?? x?.sto
 function AppWorkspace() {
   const { token, user, apiStatus, can, expireSession, login, logout: logoutSession, authError } = useAuth();
   const [section, setSection] = useState(() => routeState().section);
+  const [listPage, setListPage] = useState(() => Math.max(0, Number(new URLSearchParams(window.location.search).get('page') || 0)));
   const [routeEntityId, setRouteEntityId] = useState(() => routeState().entityId);
   const [detailRoute, setDetailRoute] = useState(() => routeState().detail);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -88,7 +89,7 @@ function AppWorkspace() {
   useMessageToast(error, setError, 'error');
   useMessageToast(notice, setNotice, 'success');
 
-  const workspace = useWorkspaceData({ token, section, modal, expireSession, onError: setError });
+  const workspace = useWorkspaceData({ token, section, modal, listPage, expireSession, onError: setError });
   const {
     products, setProducts, categories, setCategories, units, setUnits, warehouses, suppliers, customers,
     balances, setBalances, movements, purchases, sales, valuation, whatsappPending,
@@ -148,6 +149,7 @@ function AppWorkspace() {
     const targetSection = VALID_SECTIONS.has(nextSection) ? nextSection : 'overview';
     if ((WORKFLOW_MODALS.has(modal) || currentRoute()?.secondary) && !(await confirmDialog({ title: '¿Salir del formulario?', message: 'Los cambios que no hayas guardado se perderán.', confirmLabel: 'Salir', cancelLabel: 'Seguir editando', tone: 'danger' }))) return;
     setSection(targetSection);
+    setListPage(0);
     setModal('');
     setRouteEntityId('');
     setDetailRoute(null);
@@ -156,6 +158,15 @@ function AppWorkspace() {
     navigate(sectionPath(targetSection));
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [modal]);
+
+  function changeListPage(page) {
+    const next = Math.max(0, Number(page) || 0);
+    setListPage(next);
+    const url = new URL(window.location.href);
+    if (next === 0) url.searchParams.delete('page');
+    else url.searchParams.set('page', String(next));
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  }
 
   function startWorkflow(workflow, entityId = '') {
     const targetSection = WORKFLOW_SECTIONS[workflow] || 'overview';
@@ -501,14 +512,14 @@ function AppWorkspace() {
           {!isWorkflow && !hasLoadedData && ['purchases', 'sales', 'inventory', 'partners', 'reports'].includes(section) && <section className="panel"><SkeletonTable rows={8} columns={6} /></section>}
           {hasLoadedData && !isWorkflow && section === 'partners' && <OperationsCatalogs onChanged={loadData} />}
           {hasLoadedData && !isWorkflow && section === 'purchases' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
-            <PurchaseTable rows={purchases} loading={loading} onView={order => openDetail('purchase', order)}
+            <PurchaseTable rows={purchases} loading={loading} pagination={pageInfo.purchases} page={listPage} onPageChange={changeListPage} onView={order => openDetail('purchase', order)}
               onSubmit={order => runAction(() => api.submitPurchaseOrder(pickId(order)), 'Orden enviada para aprobación.')}
               onApprove={order => runAction(() => api.approvePurchaseOrder(pickId(order)), 'Orden aprobada. Ya puedes registrar la recepción.')}
               onCancel={cancelPurchase} onReceive={openReceive} />
             <PurchaseReturns onChanged={loadData} />
           </section>}
           {hasLoadedData && !isWorkflow && section === 'sales' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
-            <SalesTable rows={sales} loading={loading} onView={sale => openDetail('sale', sale)} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation} />
+            <SalesTable rows={sales} loading={loading} pagination={pageInfo.sales} page={listPage} onPageChange={changeListPage} onView={sale => openDetail('sale', sale)} onRequestCancel={requestSaleCancellation} onApproveCancellation={approveSaleCancellation} />
             <SalesReturns onChanged={loadData} />
           </section>}
           {hasLoadedData && !isWorkflow && section === 'inventory' && <section className={'panel' + (refreshing ? ' is-refreshing' : '')}>
