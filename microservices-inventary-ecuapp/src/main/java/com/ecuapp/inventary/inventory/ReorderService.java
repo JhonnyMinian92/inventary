@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.inventory;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.partners.*;
@@ -14,17 +15,23 @@ import java.util.*;
 @Service
 public class ReorderService {
  private final ReorderRuleRepository rules;private final ProductRepository products;private final WarehouseRepository warehouses;private final BusinessPartnerRepository partners;
- private final StockBalanceRepository balances;private final AuditService audit;
- public ReorderService(ReorderRuleRepository rules,ProductRepository products,WarehouseRepository warehouses,BusinessPartnerRepository partners,StockBalanceRepository balances,AuditService audit){
-  this.rules=rules;this.products=products;this.warehouses=warehouses;this.partners=partners;this.balances=balances;this.audit=audit;
+ private final StockBalanceRepository balances;private final AuditService audit;private final WarehouseScopeService scopes;
+ public ReorderService(ReorderRuleRepository rules,ProductRepository products,WarehouseRepository warehouses,BusinessPartnerRepository partners,StockBalanceRepository balances,AuditService audit,WarehouseScopeService scopes){
+  this.rules=rules;this.products=products;this.warehouses=warehouses;this.partners=partners;this.balances=balances;this.audit=audit;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public List<ReorderDtos.View> list(UUID warehouseId,Boolean active){
-  return rules.findAll().stream().filter(r->warehouseId==null||r.getWarehouse().getId().equals(warehouseId)).filter(r->active==null||r.isActive()==active)
+ @Transactional(readOnly=true) public List<ReorderDtos.View> list(UUID warehouseId,Boolean active,String actor){
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);
+  if(allowed!=null&&allowed.isEmpty())return List.of();
+  var source=allowed==null?rules.findAll():rules.findByWarehouseIdIn(allowed);
+  return source.stream().filter(r->warehouseId==null||r.getWarehouse().getId().equals(warehouseId)).filter(r->active==null||r.isActive()==active)
    .sorted(Comparator.comparing((ReorderRule r)->r.getWarehouse().getCode()).thenComparing(r->r.getProduct().getSku())).map(ReorderDtos.View::from).toList();
  }
- @Transactional(readOnly=true) public List<ReorderDtos.Suggestion> suggestions(){
+ @Transactional(readOnly=true) public List<ReorderDtos.Suggestion> suggestions(String actor){
+  var allowed=scopes.accessibleWarehouseIds(actor);
+  if(allowed!=null&&allowed.isEmpty())return List.of();
   List<ReorderDtos.Suggestion> result=new ArrayList<>();
-  for(ReorderRule rule:rules.findByActiveTrue()){
+  for(ReorderRule rule:(allowed==null?rules.findByActiveTrue():rules.findByActiveTrueAndWarehouseIdIn(allowed))){
    Product product=rule.getProduct();Warehouse warehouse=rule.getWarehouse();BusinessPartner preferred=rule.getPreferredSupplier();
    if(!product.isActive()||!product.getCategory().isActive()||product.getKind()!=ProductKind.STOCKED_GOOD||!warehouse.isActive()
       ||(preferred!=null&&!preferred.isActive()))continue;
@@ -39,6 +46,7 @@ public class ReorderService {
   return result;
  }
  @Transactional public ReorderDtos.View create(ReorderDtos.WriteRequest r,String actor){
+  scopes.requireWarehouseAccess(actor,r.warehouseId());
   if(r.targetQuantity().compareTo(r.minimumQuantity())<0)throw new BusinessRuleException("La cantidad objetivo debe ser igual o superior al mínimo.");
   Product product=products.findForUpdate(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
   Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
@@ -53,12 +61,13 @@ public class ReorderService {
  @Transactional public ReorderDtos.View update(UUID id,ReorderDtos.WriteRequest r,String actor){
   if(r.targetQuantity().compareTo(r.minimumQuantity())<0)throw new BusinessRuleException("La cantidad objetivo debe ser igual o superior al mínimo.");
   ReorderRule rule=rules.findById(id).orElseThrow(()->new ResourceNotFoundException("Regla de reposición",id));
+  scopes.requireWarehouseAccess(actor,rule.getWarehouse().getId());
   if(!rule.getProduct().getId().equals(r.productId())||!rule.getWarehouse().getId().equals(r.warehouseId()))throw new ConflictException("Producto y almacén de una regla existente son inmutables.");
   rule.update(scale(r.minimumQuantity()),scale(r.targetQuantity()),r.leadTimeDays(),supplier(r.preferredSupplierId()));
   audit.record(actor,"REORDER_RULE_UPDATED","REORDER_RULE",id,Map.of("productId",r.productId().toString(),"warehouseId",r.warehouseId().toString()));
   return ReorderDtos.View.from(rule);
  }
- @Transactional public void deactivate(UUID id,String actor){ReorderRule rule=rules.findById(id).orElseThrow(()->new ResourceNotFoundException("Regla de reposición",id));if(!rule.isActive())return;rule.deactivate();audit.record(actor,"REORDER_RULE_DEACTIVATED","REORDER_RULE",id,Map.of());}
+ @Transactional public void deactivate(UUID id,String actor){ReorderRule rule=rules.findById(id).orElseThrow(()->new ResourceNotFoundException("Regla de reposición",id));scopes.requireWarehouseAccess(actor,rule.getWarehouse().getId());if(!rule.isActive())return;rule.deactivate();audit.record(actor,"REORDER_RULE_DEACTIVATED","REORDER_RULE",id,Map.of());}
  private BusinessPartner supplier(UUID id){
   if(id==null)return null;
   BusinessPartner p=partners.findByIdAndTypeIn(id,List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",id));
