@@ -24,16 +24,16 @@ public class SubscriptionController {
 
     /** Read-only calendar of charges for a plan; used while configuring a service or a subscription. */
     @PostMapping("/preview") @PreAuthorize("hasAuthority('sales:read') or hasAuthority('catalog:read')")
-    public SubscriptionDtos.PreviewView preview(@Valid @RequestBody SubscriptionDtos.PreviewRequest request) { return service.preview(request); }
+    public SubscriptionDtos.PreviewView preview(@Valid @RequestBody SubscriptionDtos.PreviewRequest request,Authentication auth) { return service.preview(request,auth.getName()); }
 
     @GetMapping @PreAuthorize("hasAuthority('sales:read')")
     public Page<SubscriptionDtos.View> list(@RequestParam(required = false) Subscription.Status status, @RequestParam(required = false) UUID customerId,
-                                            @PageableDefault(size = 20) Pageable pageable) {
-        return service.list(status, customerId, pageable);
+                                            @PageableDefault(size = 20) Pageable pageable,Authentication auth) {
+        return service.list(status, customerId, pageable,auth.getName());
     }
 
     @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
-    public SubscriptionDtos.View get(@PathVariable UUID id) { return service.get(id); }
+    public SubscriptionDtos.View get(@PathVariable UUID id,Authentication auth) { return service.get(id,auth.getName()); }
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
     public SubscriptionDtos.View create(@RequestHeader("Idempotency-Key") String key, @Valid @RequestBody SubscriptionDtos.CreateRequest request, Authentication auth) {
@@ -41,7 +41,7 @@ public class SubscriptionController {
     }
 
     @GetMapping("/{id}/cancellation-preview") @PreAuthorize("hasAuthority('sales:read')")
-    public SubscriptionDtos.CancellationPreview cancellationPreview(@PathVariable UUID id) { return service.cancellationPreview(id); }
+    public SubscriptionDtos.CancellationPreview cancellationPreview(@PathVariable UUID id,Authentication auth) { return service.cancellationPreview(id,auth.getName()); }
 
     @PostMapping("/{id}/cancel") @PreAuthorize("hasAuthority('sales:manage')")
     public SubscriptionDtos.View cancel(@PathVariable UUID id, @Valid @RequestBody SubscriptionDtos.CancelRequest request, Authentication auth) {
