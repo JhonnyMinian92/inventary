@@ -53,6 +53,21 @@ public class WarehouseScopeService {
             throw new ResourceNotFoundException("Almacén",warehouseId);
     }
 
+    /**
+     * Transfers are visible to operators responsible for either endpoint warehouse.
+     * Mutations still require the specific source/destination side they change.
+     */
+    @Transactional(readOnly=true)
+    public void requireAnyWarehouseAccess(String username,UUID firstWarehouseId,UUID secondWarehouseId) {
+        if(firstWarehouseId==null||secondWarehouseId==null)
+            throw new ResourceNotFoundException("Transferencia","no disponible");
+        if(SYSTEM_ACTOR_SUBSCRIPTION_BILLING.equals(username)||hasGlobalAccess(username))return;
+        Instant now=Instant.now();
+        if(!scopes.existsEffective(username,firstWarehouseId,now)
+            &&!scopes.existsEffective(username,secondWarehouseId,now))
+            throw new ResourceNotFoundException("Transferencia","no disponible");
+    }
+
     @Transactional(readOnly=true)
     public List<WarehouseScopeDtos.View> list(UUID userId) {
         requireUser(userId);Instant now=Instant.now();
