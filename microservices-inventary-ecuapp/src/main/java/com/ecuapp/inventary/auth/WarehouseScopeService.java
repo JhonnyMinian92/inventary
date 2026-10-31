@@ -46,6 +46,12 @@ public class WarehouseScopeService {
     }
 
     @Transactional(readOnly=true)
+    public void requireFinancialDataAccess(String username) {
+        if(!canReadFinancialData(username))
+            throw new AccessDeniedException("Se requiere el permiso de acceso a información financiera.");
+    }
+
+    @Transactional(readOnly=true)
     public boolean hasGlobalAccess(String username) {
         AppUser user=users.findByUsername(username).filter(AppUser::isActive)
             .orElseThrow(()->new ResourceNotFoundException("Usuario",username));
