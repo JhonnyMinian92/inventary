@@ -160,6 +160,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
   }, [token, section, modal, listPage, expireSession, onError]);
 
   useEffect(() => {
+    setHasLoadedData(false);
     void loadData();
     return () => { requestVersion.current += 1; };
   }, [loadData]);

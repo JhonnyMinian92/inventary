@@ -500,7 +500,7 @@ function AppWorkspace() {
     }
   >
     
-          {!isWorkflow && section === 'overview' && <Dashboard data={dashboardData} ready={hasLoadedData} refreshing={refreshing} refreshKey={refreshKey} whatsappPending={whatsappPending} can={can}
+          {!isWorkflow && section === 'overview' && <Dashboard data={dashboardData} pendingCounts={pendingCounts} ready={hasLoadedData} refreshing={refreshing} refreshKey={refreshKey} whatsappPending={whatsappPending} can={can}
             onNavigate={navigateSection} onStartWorkflow={workflow => workflow === 'product' ? openProduct() : startWorkflow(workflow)} onOpenProduct={id => openDetail('product', id)} />}
     
           {!isWorkflow && (section === 'products' || section === 'categories') && <ProductsPage tab={section === 'categories' ? 'categories' : 'products'}
