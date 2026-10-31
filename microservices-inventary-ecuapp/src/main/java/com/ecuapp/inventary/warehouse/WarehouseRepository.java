@@ -16,4 +16,6 @@ public interface WarehouseRepository extends com.ecuapp.inventary.common.Flushab
  Optional<Warehouse> findForUpdate(@Param("id") UUID id);
  @Query("select w from Warehouse w where (:active is null or w.active=:active)")
  Page<Warehouse> search(@Param("active") Boolean active,Pageable pageable);
+    @Query("select w from Warehouse w where (:active is null or w.active=:active) and w.id in :warehouseIds")
+    Page<Warehouse> searchScoped(@Param("active") Boolean active,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
