@@ -31,6 +31,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent,UUID>{
    e.metadata ->> 'warehouseId' in (:warehouseIds)
    or e.metadata ->> 'sourceWarehouseId' in (:warehouseIds)
    or e.metadata ->> 'destinationWarehouseId' in (:warehouseIds)
+   or (e.resource_type='HTTP_REQUEST' and e.outcome='DENIED')
  )
  """,countQuery="""
  select count(*) from audit_event e
@@ -43,6 +44,7 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent,UUID>{
    e.metadata ->> 'warehouseId' in (:warehouseIds)
    or e.metadata ->> 'sourceWarehouseId' in (:warehouseIds)
    or e.metadata ->> 'destinationWarehouseId' in (:warehouseIds)
+   or (e.resource_type='HTTP_REQUEST' and e.outcome='DENIED')
  )
  """,nativeQuery=true)
  Page<AuditEvent> searchScoped(@Param("actor") String actor,@Param("action") String action,
