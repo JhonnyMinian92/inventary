@@ -22,9 +22,9 @@ public class SalesController {
   @RequestParam(required=false) UUID customerId,@RequestParam(required=false) SaleChannel channel,
   @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant from,
   @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) java.time.Instant to,
-  @PageableDefault(size=20) Pageable p){return service.list(status,warehouseId,customerId,channel,from,to,p);}
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(status,warehouseId,customerId,channel,from,to,p,auth.getName());}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
- public SaleDtos.View get(@PathVariable UUID id){return service.get(id);}
+ public SaleDtos.View get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('sales:manage')")
  public SaleDtos.View create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody SaleDtos.CreateRequest request,Authentication auth){
   if(request.channel()==SaleChannel.SUBSCRIPTION)throw new com.ecuapp.inventary.common.BusinessRuleException("Las facturas de suscripción las genera el sistema; registre la suscripción en Suscripciones.");
