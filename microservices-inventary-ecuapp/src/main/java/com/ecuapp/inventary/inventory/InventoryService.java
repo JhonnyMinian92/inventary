@@ -93,7 +93,8 @@ public class InventoryService {
   if(!hash.equals(idempotency.getRequestHash()))throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
   if(idempotency.getStatus()==IdempotencyRecord.RecordStatus.COMPLETED && idempotency.getResourceId()!=null)
    return InventoryDtos.MovementView.from(movements.findById(idempotency.getResourceId())
-    .orElseThrow(()->new ResourceNotFoundException("Movimiento de inventario",idempotency.getResourceId())));
+    .orElseThrow(()->new ResourceNotFoundException("Movimiento de inventario",idempotency.getResourceId())),
+    scopes.canReadFinancialData(actor));
   if(idempotency.getStatus()!=IdempotencyRecord.RecordStatus.IN_PROGRESS)
    throw new ConflictException("La clave de idempotencia no está disponible para una nueva operación.");
   Product product=products.findForUpdate(r.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",r.productId()));
