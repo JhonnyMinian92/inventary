@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.Set;
+import java.util.Map;
 @RestController
 @Validated
 @RequestMapping("/api/v1/audit-events")
@@ -72,7 +73,7 @@ public class AuditController {
    Object value=metadata.get(key);
    if(value!=null)try{if(allowed.contains(UUID.fromString(value.toString())))return true;}catch(IllegalArgumentException ignored){}
   }
-  return false;
+  return "HTTP_REQUEST".equals(event.getResourceType())&&"DENIED".equals(event.getOutcome());
  }
  private String blankToNull(String value){return value==null||value.isBlank()?null:value.trim();}
 }
