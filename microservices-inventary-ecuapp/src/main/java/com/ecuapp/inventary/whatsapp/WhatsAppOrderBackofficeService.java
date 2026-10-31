@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.whatsapp;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.UnitOfMeasure;
 import com.ecuapp.inventary.catalog.UnitOfMeasureRepository;
 import com.ecuapp.inventary.common.*;
@@ -38,11 +39,12 @@ public class WhatsAppOrderBackofficeService {
     private final IdempotencyRecordRepository idempotencyRecords;
     private final OutboxEventRepository outbox;
     private final AuditService audit;
+    private final WarehouseScopeService scopes;
 
     public WhatsAppOrderBackofficeService(WhatsAppOrderRepository orders, SaleRepository sales, StockBalanceRepository balances,
                                           StockMovementRepository movements, UnitOfMeasureRepository units,
                                           InventoryCostingService costing, IdempotencyRecordRepository idempotencyRecords,
-                                          OutboxEventRepository outbox, AuditService audit) {
+                                          OutboxEventRepository outbox, AuditService audit,WarehouseScopeService scopes) {
         this.orders = orders;
         this.sales = sales;
         this.balances = balances;
@@ -52,23 +54,32 @@ public class WhatsAppOrderBackofficeService {
         this.idempotencyRecords = idempotencyRecords;
         this.outbox = outbox;
         this.audit = audit;
+        this.scopes = scopes;
     }
 
     @Transactional(readOnly = true)
-    public Page<WhatsAppDtos.OrderView> list(WhatsAppOrderStatus status, String customerRef, Instant from, Instant to, Pageable pageable) {
+    public Page<WhatsAppDtos.OrderView> list(WhatsAppOrderStatus status, String customerRef, Instant from, Instant to, Pageable pageable,String actor) {
         if (from != null && to != null && !from.isBefore(to)) throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
+        var allowed=scopes.accessibleWarehouseIds(actor);
+        Pageable limited=Pages.of(pageable,SORT,Sort.by(Sort.Direction.DESC,"createdAt"));
+        if(allowed!=null&&allowed.isEmpty())return Page.empty(limited);
         String ref = customerRef == null || customerRef.isBlank() ? null : customerRef.trim().replaceAll("\\s+", "");
-        return orders.search(status, ref, com.ecuapp.inventary.common.TimeRange.lower(from), com.ecuapp.inventary.common.TimeRange.upper(to), Pages.of(pageable, SORT, Sort.by(Sort.Direction.DESC, "createdAt")))
+        var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
+        return (allowed==null?orders.search(status,ref,lower,upper,limited):orders.searchScoped(status,ref,lower,upper,allowed,limited))
             .map(WhatsAppDtos.OrderView::from);
     }
 
     @Transactional(readOnly = true)
-    public WhatsAppDtos.OrderView get(UUID id) {
-        return WhatsAppDtos.OrderView.from(orders.findDetailedById(id).orElseThrow(() -> new ResourceNotFoundException("Orden WhatsApp", id)));
+    public WhatsAppDtos.OrderView get(UUID id,String actor) {
+        WhatsAppOrder order=orders.findDetailedById(id).orElseThrow(() -> new ResourceNotFoundException("Orden WhatsApp", id));
+        scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
+        return WhatsAppDtos.OrderView.from(order);
     }
 
     @Transactional
     public WhatsAppDtos.OrderView confirmPayment(UUID orderId, String rawKey, WhatsAppDtos.ConfirmPaymentRequest request, String actor) {
+        WhatsAppOrder visible=orders.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Orden WhatsApp",orderId));
+        scopes.requireWarehouseAccess(actor,visible.getWarehouse().getId());
         String key = normalizeKey(rawKey);
         String reference = request.paymentReference().trim();
         String method = request.paymentMethod().trim();
@@ -78,15 +89,16 @@ public class WhatsAppOrderBackofficeService {
             .orElseThrow(() -> new IllegalStateException("No se pudo reservar la clave de idempotencia."));
         if (!hash.equals(record.getRequestHash())) throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
         if (claimed == 0) {
-            if (record.getStatus() == IdempotencyRecord.RecordStatus.COMPLETED) return get(record.getResourceId());
+            if (record.getStatus() == IdempotencyRecord.RecordStatus.COMPLETED) return get(record.getResourceId(),actor);
             throw new ConflictException("Ya existe una operación con esta clave de idempotencia y aún no puede reproducirse.");
         }
 
         WhatsAppOrder order = orders.findForUpdate(orderId).orElseThrow(() -> new ResourceNotFoundException("Orden WhatsApp", orderId));
+        scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
         if (order.getStatus() == WhatsAppOrderStatus.CONFIRMED) {
             if (!reference.equals(order.getPaymentReference())) throw new ConflictException("La orden ya fue confirmada con otra referencia de pago.");
             complete(record, order);
-            return get(orderId);
+            return get(orderId,actor);
         }
         if (order.getStatus() != WhatsAppOrderStatus.AWAITING_PAYMENT) throw new ConflictException("La orden ya no puede confirmarse en su estado actual.");
         if (!order.getExpiresAt().isAfter(Instant.now())) throw new ConflictException("La orden venció y su reserva será liberada; genere un nuevo pedido.");
@@ -134,7 +146,7 @@ public class WhatsAppOrderBackofficeService {
         audit.record(actor, "WHATSAPP_ORDER_CONFIRMED", "WHATSAPP_ORDER", order.getId(), Map.of("orderNumber", order.getOrderNumber(),
             "saleNumber", saleNumber, "paymentMethod", method, "total", order.getTotal().toPlainString()));
         complete(record, order);
-        return get(orderId);
+        return get(orderId,actor);
     }
 
     private void complete(IdempotencyRecord record, WhatsAppOrder order) {
