@@ -22,13 +22,13 @@ public class InventoryCountController {
     @GetMapping
     public Page<InventoryCountDtos.View> list(@RequestParam(required = false) UUID warehouseId,
                                               @RequestParam(required = false) InventoryCountStatus status,
-                                              @PageableDefault(size = 20) Pageable pageable) {
-        return service.list(warehouseId, status, pageable);
+                                              @PageableDefault(size = 20) Pageable pageable,Authentication authentication) {
+        return service.list(warehouseId, status, pageable,authentication.getName());
     }
 
     @GetMapping("/{id}")
-    public InventoryCountDtos.View get(@PathVariable UUID id) {
-        return service.get(id);
+    public InventoryCountDtos.View get(@PathVariable UUID id,Authentication authentication) {
+        return service.get(id,authentication.getName());
     }
 
     @PostMapping
