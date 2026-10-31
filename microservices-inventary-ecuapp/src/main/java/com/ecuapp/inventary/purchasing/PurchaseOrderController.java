@@ -20,9 +20,9 @@ public class PurchaseOrderController {
  public Page<PurchaseDtos.OrderView> list(@RequestParam(required=false) PurchaseOrderStatus status,@RequestParam(required=false) UUID supplierId,
   @RequestParam(required=false) UUID warehouseId,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant from,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,
-  @PageableDefault(size=20) Pageable p){return service.list(status,supplierId,warehouseId,from,to,p);}
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(status,supplierId,warehouseId,from,to,p,auth.getName());}
  @GetMapping("/api/v1/purchase-orders/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
- public PurchaseDtos.OrderView get(@PathVariable UUID id){return service.get(id);}
+ public PurchaseDtos.OrderView get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('purchasing:manage')")
  public PurchaseDtos.OrderView create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody PurchaseDtos.CreateOrderRequest r,Authentication auth){return service.create(key,r,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/submit") @PreAuthorize("hasAuthority('purchasing:manage')")
@@ -37,7 +37,7 @@ public class PurchaseOrderController {
  public Page<PurchaseDtos.ReceiptView> receipts(@RequestParam(required=false) UUID purchaseOrderId,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant from,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,
-  @PageableDefault(size=20) Pageable p){return service.listReceipts(purchaseOrderId,warehouseId,from,to,p);}
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.listReceipts(purchaseOrderId,warehouseId,from,to,p,auth.getName());}
  @GetMapping("/api/v1/goods-receipts/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
- public PurchaseDtos.ReceiptView getReceipt(@PathVariable UUID id){return service.getReceipt(id);}
+ public PurchaseDtos.ReceiptView getReceipt(@PathVariable UUID id,Authentication auth){return service.getReceipt(id,auth.getName());}
 }
