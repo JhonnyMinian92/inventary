@@ -26,4 +26,16 @@ public interface SaleRepository extends JpaRepository<Sale,UUID>{
   """)
  Page<Sale> search(@Param("status") SaleStatus status,@Param("warehouseId") UUID warehouseId,@Param("customerId") UUID customerId,
   @Param("channel") SaleChannel channel,@Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,Pageable pageable);
+
+ @EntityGraph(attributePaths={"warehouse","customer"})
+ @Query("""
+  select s from Sale s where (:status is null or s.status=:status)
+   and (:warehouseId is null or s.warehouse.id=:warehouseId)
+   and (:customerId is null or s.customer.id=:customerId)
+   and (:channel is null or s.channel=:channel)
+   and s.warehouse.id in :warehouseIds and s.soldAt>=:fromTime and s.soldAt<:toTime
+  """)
+ Page<Sale> searchScoped(@Param("status") SaleStatus status,@Param("warehouseId") UUID warehouseId,@Param("customerId") UUID customerId,
+  @Param("channel") SaleChannel channel,@Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,
+  @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }
