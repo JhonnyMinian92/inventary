@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { confirmDialog, useMessageToast } from '../../ui/feedback.js';
 import { ArrowLeft, ArrowRight, PackageMinus, X } from 'lucide-react';
-import { api, listFrom, listAllPages } from '../../api';
+import { api, listFrom } from '../../api';
+import ServerPagination from '../../ui/ServerPagination.jsx';
 import StepProgress from '../../components/StepProgress.jsx';
 import { currentRoute, navigate, secondaryPath, sectionPath } from '../../router.js';
 
@@ -14,6 +15,8 @@ function readPurchaseReturnFromUrl() {
 
 export default function PurchaseReturns({ onChanged }) {
   const [returns, setReturns] = useState([]);
+  const [returnsPage, setReturnsPage] = useState(0);
+  const [returnsPageInfo, setReturnsPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,17 +36,23 @@ export default function PurchaseReturns({ onChanged }) {
     setLoading(true);
     setError('');
     const [returnResult, receiptResult] = await Promise.allSettled([
-      listAllPages(api.purchaseReturns, { size: 100 }),
-      listAllPages(api.goodsReceipts, { size: 100 })
+      api.purchaseReturns({ page: returnsPage, size: 20, sort: 'createdAt,desc' }),
+      api.goodsReceipts({ page: 0, size: 100, sort: 'receivedAt,desc' })
     ]);
     const failures = [];
-    if (returnResult.status === 'fulfilled') setReturns(listFrom(returnResult.value));
-    else failures.push('devoluciones a proveedores: ' + (returnResult.reason?.message || 'error'));
+    if (returnResult.status === 'fulfilled') {
+      setReturns(listFrom(returnResult.value));
+      setReturnsPageInfo({
+        page: Number(returnResult.value?.number ?? 0), size: Number(returnResult.value?.size ?? 20),
+        totalElements: Number(returnResult.value?.totalElements ?? listFrom(returnResult.value).length),
+        totalPages: Number(returnResult.value?.totalPages ?? 1)
+      });
+    } else failures.push('devoluciones a proveedores: ' + (returnResult.reason?.message || 'error'));
     if (receiptResult.status === 'fulfilled') setReceipts(listFrom(receiptResult.value).filter(item => String(item.status || '').toUpperCase() === 'POSTED'));
     else failures.push('recepciones: ' + (receiptResult.reason?.message || 'error'));
     if (failures.length) setError('No se pudieron cargar todos los datos. ' + failures.join(' · '));
     setLoading(false);
-  }, []);
+  }, [returnsPage]);
 
   // Reload on open too: receipts posted since the list was mounted must be selectable.
   useEffect(() => { void refresh(); }, [refresh, formOpen]);
@@ -72,7 +81,7 @@ export default function PurchaseReturns({ onChanged }) {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.goodsReceipt(receiptId), listAllPages(api.purchaseReturns, { goodsReceiptId: receiptId, size: 100 })])
+    Promise.all([api.goodsReceipt(receiptId), api.purchaseReturns({ goodsReceiptId: receiptId, page: 0, size: 100 })])
       .then(([receiptDetail, returnPayload]) => {
         if (!active) return;
         const priorReturns = listFrom(returnPayload).filter(item => String(item.status || '').toUpperCase() !== 'CANCELLED');
@@ -235,7 +244,8 @@ export default function PurchaseReturns({ onChanged }) {
         <td>{row.receiptNumber || row.receiptId || '—'}</td><td><span className={'pill ' + (row.status === 'POSTED' ? 'active' : 'inactive')}>{row.status || '—'}</span></td>
         <td>{date(row.createdAt)}</td><td>{row.reason || '—'}</td><td>{money(row.total)}</td>
       </tr>)}
-    </tbody></table>{!returns.length && <div className="empty-state">{loading ? 'Cargando devoluciones…' : 'Todavía no hay devoluciones a proveedores.'}</div>}</div>}
+    </tbody></table>{!returns.length && <div className="empty-state">{loading ? 'Cargando devoluciones…' : 'No hay devoluciones en esta página.'}</div>}
+      <ServerPagination info={returnsPageInfo} page={returnsPage} loading={loading} onChange={setReturnsPage} /></div>}
 
     {formOpen && <section className="return-workspace" aria-labelledby="purchase-return-title">
       <div className="return-workspace-heading">
