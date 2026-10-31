@@ -358,6 +358,7 @@ public class OperationalReportService {
      * A single assigned warehouse is a safe default; several require an explicit filter.
      */
     private UUID resolveWarehouseScope(UUID requested,String actor) {
+        scopes.requireFinancialDataAccess(actor);
         var allowed=scopes.accessibleWarehouseIds(actor);
         if(allowed==null)return requested;
         if(requested!=null) {
