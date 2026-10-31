@@ -2,9 +2,9 @@
 
 **Repositorio:** JhonnyMinian92/inventary  
 **Rama de ejecución:** implementacion_propuestas  
-**Corte de análisis:** 30 de octubre de 2026  
+**Corte de análisis:** 31 de octubre de 2026  
 **Alcance:** frontend, backend, datos, seguridad, integraciones, operación y experiencia comercial.  
-**Estado:** Fase 1 completada y validada por CI; fases 2–10 pendientes.
+**Estado:** Fase 1 completada; Fase 3 implementada y validada por CI en `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`; pendientes la verificación visual E2E de navegador de la Fase 3 y las fases 2 y 4–10.
 
 ## 1. Resultado de la consolidación
 
@@ -146,6 +146,14 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Conservar Node test como suite actual; ampliar gradualmente componentes y browser E2E después de evaluar Vitest/Testing Library/Playwright.
 
 **Criterios de salida:** cada ruta existente sigue funcionando; App.jsx no orquesta operaciones; ninguna tabla descarga el historial completo; filtros/página viven en URL; cada vista tiene estado independiente; test, build, responsive, accesibilidad y base /inventary/ validados.
+
+**Implementación y evidencia (2026-10-31):**
+- Reorganización registrada en `implementacion_propuestas`; commit de arquitectura `0148e061b848418e9c633a6742f78a3000f3a762` y optimización de carga por ruta `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`.
+- GitHub Actions [Frontend Build #41209006673](https://github.com/JhonnyMinian92/inventary/actions/runs/41209006673): **success** sobre el SHA final exacto.
+- `npm test`: 22 pruebas aprobadas, 0 fallidas. `npm run build`: correcto.
+- La división por demanda redujo el chunk inicial de JavaScript de 586.47 kB (155.64 kB gzip antes de la división) a 309.24 kB (95.82 kB gzip); los módulos de página y formularios se generan como chunks separados.
+- Revisión estática confirmó base Vite `/inventary/`, fallback SPA de Nginx, breakpoints responsive, `:focus-visible` y `prefers-reduced-motion`. No se ejecutó una prueba visual automatizada en navegador a 360/768/escritorio; esa comprobación queda explícitamente pendiente y no se declara como validada.
+
 
 ### Fase 4 — Arquitectura modular del backend Spring Boot
 
@@ -367,8 +375,9 @@ Una fase no se cierra por “compilar” solamente. Debe:
 ## 6. Estado final del plan
 
 - Fases totales: **10**.
-- Fases completadas: **1** (Fase 1).
-- Fases pendientes: **9** (Fases 2 a 10).
-- Rama actual de trabajo: implementacion_propuestas.
-- master no fue modificada.
+- Fase 1: completada y validada por CI.
+- Fase 3: reorganización de código, pruebas unitarias y build completados; queda pendiente la verificación visual E2E en navegador indicada en su evidencia.
+- Fases pendientes de implementación: **2 y 4–10** (8 fases).
+- Rama actual de trabajo: `implementacion_propuestas`; último SHA validado por CI: `1ec1e4f7a7b3ae9d9e0730a455451e4748a79667`.
+- `master` no fue modificada.
 - Este plan es la fuente viva de secuencia; la matriz de cobertura complementaria detalla cada uno de los 22 documentos y su asignación por fase.
