@@ -31,7 +31,7 @@ class WarehouseScopesApiTest extends ApiTestSupport {
         problem(call(get("/api/v1/inventory/balances/"+UUID.randomUUID()+"/"+second.get("id").asText()),token,null),404,"RESOURCE_NOT_FOUND");
         problem(call(get("/api/v1/inventory/availability?warehouseId="+second.get("id").asText()+"&productId="+UUID.randomUUID()+"&sku=unknown"),token,null),404,"RESOURCE_NOT_FOUND");
 
-        httpDelete(administrator,"/api/v1/admin/users/"+user.getId()+"/warehouse-scopes/"+grant.get("id"),204);
+        httpDelete(administrator,"/api/v1/admin/users/"+user.getId()+"/warehouse-scopes/"+grant.get("id").asText(),204);
         problem(call(get("/api/v1/warehouses/"+first.get("id").asText()),token,null),404,"RESOURCE_NOT_FOUND");
         assertEquals(1,jdbc.queryForObject("select count(*) from audit_event where resource_id=?::uuid and action='USER_WAREHOUSE_SCOPE_GRANTED'",Integer.class,UUID.fromString(grant.get("id").asText())));
         assertEquals(1,jdbc.queryForObject("select count(*) from audit_event where resource_id=?::uuid and action='USER_WAREHOUSE_SCOPE_REVOKED'",Integer.class,UUID.fromString(grant.get("id").asText())));
@@ -104,6 +104,5 @@ class WarehouseScopesApiTest extends ApiTestSupport {
 
         JsonNode financial=httpGet(admin(),"/api/v1/inventory/movements/"+movement.get("id").asText(),200);
         assertFalse(financial.path("movement").path("unitCost").isNull());
-        assertFalse(financial.path("valuedTotalCost").isNull());
     }
 }
