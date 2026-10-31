@@ -2,6 +2,8 @@ package com.ecuapp.inventary.inventory;
 
 import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.auth.WarehouseScopeService;
+import com.ecuapp.inventary.sales.OutboxEvent;
+import com.ecuapp.inventary.sales.OutboxEventRepository;
 import com.ecuapp.inventary.catalog.Product;
 import com.ecuapp.inventary.catalog.ProductKind;
 import com.ecuapp.inventary.catalog.ProductRepository;
@@ -40,12 +42,13 @@ public class InventoryCountService {
     private final UnitOfMeasureRepository units;
     private final AuditService audit;
     private final InventoryCostingService costing;
+    private final OutboxEventRepository outbox;
     private final WarehouseScopeService scopes;
 
     public InventoryCountService(InventoryCountRepository counts, IdempotencyRecordRepository idempotencyRecords, ProductRepository products,
                                  WarehouseRepository warehouses, StockBalanceRepository balances,
                                  StockMovementRepository movements, WarehouseLocationRepository locations,
-                                 UnitOfMeasureRepository units, AuditService audit, InventoryCostingService costing,WarehouseScopeService scopes) {
+                                 UnitOfMeasureRepository units, AuditService audit, InventoryCostingService costing,WarehouseScopeService scopes,OutboxEventRepository outbox) {
         this.counts = counts;
         this.idempotencyRecords = idempotencyRecords;
         this.products = products;
@@ -57,6 +60,7 @@ public class InventoryCountService {
         this.audit = audit;
         this.costing = costing;
         this.scopes = scopes;
+        this.outbox = outbox;
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +158,9 @@ public class InventoryCountService {
         idempotencyRecords.save(idempotency);
         audit.record(actor, "INVENTORY_COUNT_CREATED", "INVENTORY_COUNT", saved.getId(),
             Map.of("countNumber", number, "warehouseId", warehouse.getId().toString(), "lineCount", ordered.size()));
+        outbox.save(new OutboxEvent("INVENTORY_COUNT", saved.getId(), "INVENTORY_COUNT_CREATED",
+            Map.of("countId", saved.getId().toString(), "countNumber", number,
+                "warehouseId", warehouse.getId().toString(), "lineCount", ordered.size())));
         return InventoryCountDtos.View.from(requireDetailed(saved.getId()));
     }
 
@@ -218,8 +225,13 @@ public class InventoryCountService {
         }
 
         count.post();
+        long adjustedLines = lines.stream().filter(line -> line.getDifference().signum() != 0).count();
         audit.record(actor, "INVENTORY_COUNT_POSTED", "INVENTORY_COUNT", id,
             Map.of("countNumber", count.getCountNumber(), "lineCount", lines.size()));
+        outbox.save(new OutboxEvent("INVENTORY_COUNT", id, "INVENTORY_COUNT_POSTED",
+            Map.of("countId", id.toString(), "countNumber", count.getCountNumber(),
+                "warehouseId", count.getWarehouse().getId().toString(),
+                "lineCount", lines.size(), "adjustedLineCount", adjustedLines)));
         return InventoryCountDtos.View.from(requireDetailed(id));
     }
 
@@ -234,6 +246,9 @@ public class InventoryCountService {
         count.cancel();
         audit.record(actor, "INVENTORY_COUNT_CANCELLED", "INVENTORY_COUNT", id,
             Map.of("countNumber", count.getCountNumber()));
+        outbox.save(new OutboxEvent("INVENTORY_COUNT", id, "INVENTORY_COUNT_CANCELLED",
+            Map.of("countId", id.toString(), "countNumber", count.getCountNumber(),
+                "warehouseId", count.getWarehouse().getId().toString())));
         return InventoryCountDtos.View.from(requireDetailed(id));
     }
 

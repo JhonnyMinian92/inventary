@@ -5,6 +5,8 @@ import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.warehouse.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.auth.WarehouseScopeService;
+import com.ecuapp.inventary.sales.OutboxEvent;
+import com.ecuapp.inventary.sales.OutboxEventRepository;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +25,9 @@ public class InventoryService {
  private static final Map<String,String> BALANCE_SORT=Map.of("onHand","onHand","reserved","reserved","updatedAt","updatedAt","sku","product.sku","productName","product.name","warehouseCode","warehouse.code");
  private static final Map<String,String> MOVEMENT_SORT=Map.of("occurredAt","occurredAt","quantity","quantity","movementType","movementType");
  private final ProductRepository products;private final IdempotencyRecordRepository idempotencyRecords;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final AuditService audit;
- private final InventoryCostingService costing;private final InventoryValuationEntryRepository valuationEntries;private final WarehouseScopeService scopes;
+ private final InventoryCostingService costing;private final InventoryValuationEntryRepository valuationEntries;private final WarehouseScopeService scopes;private final OutboxEventRepository outbox;
  public InventoryService(ProductRepository products,IdempotencyRecordRepository idempotencyRecords,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,WarehouseLocationRepository locations,UnitOfMeasureRepository units,AuditService audit,
-  InventoryCostingService costing,InventoryValuationEntryRepository valuationEntries,WarehouseScopeService scopes){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;this.valuationEntries=valuationEntries;this.scopes=scopes;}
+  InventoryCostingService costing,InventoryValuationEntryRepository valuationEntries,WarehouseScopeService scopes,OutboxEventRepository outbox){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;this.valuationEntries=valuationEntries;this.scopes=scopes;this.outbox=outbox;}
  @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(UUID productId,UUID warehouseId,boolean onlyAvailable,Pageable p,String actor){
   if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,BALANCE_SORT,Sort.by("product.sku"));
@@ -129,6 +131,9 @@ public class InventoryService {
   idempotency.markCompleted("STOCK_MOVEMENT",persisted.getId(),(short) 200);
   idempotencyRecords.save(idempotency);
   audit.record(actor,"STOCK_ADJUSTED","STOCK_MOVEMENT",persisted.getId(),Map.of("productId",product.getId().toString(),"warehouseId",warehouse.getId().toString(),"movementType",type.name(),"quantity",quantity.toPlainString(),"valuedCost",valuation.totalCost().toPlainString()));
+  outbox.save(new OutboxEvent("STOCK_MOVEMENT",persisted.getId(),"INVENTORY_ADJUSTMENT_POSTED",Map.of(
+   "movementId",persisted.getId().toString(),"productId",product.getId().toString(),"warehouseId",warehouse.getId().toString(),
+   "movementType",type.name(),"quantity",quantity.toPlainString(),"onHandAfter",balance.getOnHand().toPlainString())));
   return InventoryDtos.MovementView.from(persisted,scopes.canReadFinancialData(actor));
  }
  private WarehouseLocation mainLocation(Warehouse warehouse){

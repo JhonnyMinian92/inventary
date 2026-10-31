@@ -112,6 +112,11 @@ class InventoryApiTest extends ApiTestSupport {
         problem(call(post("/api/v1/inventory/adjustments"), admin, Map.of("productId", productId, "warehouseId", warehouseId, "direction", "INCREASE",
             "quantity", 1, "reason", "otro"), "Idempotency-Key", key), 409, "CONFLICT");
         assertEquals(1, jdbc.queryForObject("select count(*) from stock_movement where idempotency_key=?", Integer.class, key));
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event
+            where aggregate_type='STOCK_MOVEMENT' and aggregate_id=?::uuid
+              and event_type='INVENTORY_ADJUSTMENT_POSTED'
+            """, Integer.class, first.get("id").asText()));
 
         problem(call(post("/api/v1/inventory/adjustments"), admin, Map.of("productId", productId, "warehouseId", warehouseId, "direction", "DECREASE",
             "quantity", new BigDecimal("7.126"), "reason", "x"), "Idempotency-Key", key()), 422, "BUSINESS_RULE_VIOLATION");
@@ -202,13 +207,21 @@ class InventoryApiTest extends ApiTestSupport {
         assertEquals(count.get("id").asText(), httpPost(admin, "/api/v1/inventory/counts", request, 201, "Idempotency-Key", countKey).get("id").asText());
         assertEquals("OPEN", count.get("status").asText());
         assertEquals(3, count.get("items").size());
+        String id = count.get("id").asText();
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='INVENTORY_COUNT'
+              and aggregate_id=?::uuid and event_type='INVENTORY_COUNT_CREATED'
+            """, Integer.class, id));
         problem(call(post("/api/v1/inventory/counts"), admin, Map.of("warehouseId", warehouseId, "items", List.of(
             Map.of("productId", a, "countedQuantity", 1), Map.of("productId", a, "countedQuantity", 2))), "Idempotency-Key", key()), 422, "BUSINESS_RULE_VIOLATION");
 
-        String id = count.get("id").asText();
         JsonNode posted = httpPost(admin, "/api/v1/inventory/counts/" + id + "/post", null, 200);
         assertEquals("POSTED", posted.get("status").asText());
         assertEquals("POSTED", httpPost(admin, "/api/v1/inventory/counts/" + id + "/post", null, 200).get("status").asText(), "posting is idempotent");
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='INVENTORY_COUNT'
+              and aggregate_id=?::uuid and event_type='INVENTORY_COUNT_POSTED'
+            """, Integer.class, id), "posting must emit a single event even when the command is retried");
         assertAmount("8", onHand(a, warehouseId));
         assertAmount("4", onHand(b, warehouseId));
         assertAmount("2", onHand(c, warehouseId));
@@ -220,6 +233,10 @@ class InventoryApiTest extends ApiTestSupport {
         adjust(a, warehouseId, "DECREASE", "1", null);
         problem(call(post("/api/v1/inventory/counts/" + stale.get("id").asText() + "/post"), admin, null), 409, "CONFLICT");
         assertEquals("CANCELLED", httpPost(admin, "/api/v1/inventory/counts/" + stale.get("id").asText() + "/cancel", null, 200).get("status").asText());
+        assertEquals(1, jdbc.queryForObject("""
+            select count(*) from outbox_event where aggregate_type='INVENTORY_COUNT'
+              and aggregate_id=?::uuid and event_type='INVENTORY_COUNT_CANCELLED'
+            """, Integer.class, stale.get("id").asText()));
 
         assertTrue(httpGet(token("AUDITOR"), "/api/v1/inventory/counts?warehouseId=" + warehouseId + "&status=POSTED", 200).get("page").get("totalElements").asInt() >= 1);
         problem(call(post("/api/v1/inventory/counts"), token("AUDITOR"), request, "Idempotency-Key", key()), 403, "ACCESS_DENIED");
