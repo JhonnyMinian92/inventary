@@ -17,6 +17,8 @@ import java.util.UUID;
 
 @Service
 public class WarehouseScopeService {
+    /** Reserved non-human principal used exclusively by the server-side recurring subscription billing job. */
+    public static final String SYSTEM_ACTOR_SUBSCRIPTION_BILLING = "system:subscription-billing";
     private final AppUserRepository users;
     private final AppRoleRepository roles;
     private final UserWarehouseScopeRepository scopes;
@@ -45,6 +47,7 @@ public class WarehouseScopeService {
     @Transactional(readOnly=true)
     public void requireWarehouseAccess(String username,UUID warehouseId) {
         if(warehouseId==null)throw new ResourceNotFoundException("Almacén","no disponible");
+        if(SYSTEM_ACTOR_SUBSCRIPTION_BILLING.equals(username))return;
         if(hasGlobalAccess(username))return;
         if(!scopes.existsEffective(username,warehouseId,Instant.now()))
             throw new ResourceNotFoundException("Almacén",warehouseId);
