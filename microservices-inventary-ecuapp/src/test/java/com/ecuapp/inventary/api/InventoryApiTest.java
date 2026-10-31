@@ -215,9 +215,13 @@ class InventoryApiTest extends ApiTestSupport {
         problem(call(post("/api/v1/inventory/counts"), admin, Map.of("warehouseId", warehouseId, "items", List.of(
             Map.of("productId", a, "countedQuantity", 1), Map.of("productId", a, "countedQuantity", 2))), "Idempotency-Key", key()), 422, "BUSINESS_RULE_VIOLATION");
 
-        JsonNode posted = httpPost(admin, "/api/v1/inventory/counts/" + id + "/post", null, 200);
+        String operator = token("MANAGER_ALMACEN");
+        problem(call(post("/api/v1/inventory/counts/" + id + "/post"), admin, null), 409, "CONFLICT");
+        JsonNode posted = httpPost(operator, "/api/v1/inventory/counts/" + id + "/post", null, 200);
         assertEquals("POSTED", posted.get("status").asText());
-        assertEquals("POSTED", httpPost(admin, "/api/v1/inventory/counts/" + id + "/post", null, 200).get("status").asText(), "posting is idempotent");
+        JsonNode replayedPost = httpPost(operator, "/api/v1/inventory/counts/" + id + "/post", null, 200);
+        assertEquals("POSTED", replayedPost.get("status").asText(), "posting is idempotent");
+        assertEquals(username("MANAGER_ALMACEN"), posted.get("postedBy").asText());
         assertEquals(1, jdbc.queryForObject("""
             select count(*) from outbox_event where aggregate_type='INVENTORY_COUNT'
               and aggregate_id=?::uuid and event_type='INVENTORY_COUNT_POSTED'
@@ -231,7 +235,7 @@ class InventoryApiTest extends ApiTestSupport {
         JsonNode stale = httpPost(admin, "/api/v1/inventory/counts", Map.of("warehouseId", warehouseId, "items", List.of(Map.of("productId", a, "countedQuantity", 8))),
             201, "Idempotency-Key", key());
         adjust(a, warehouseId, "DECREASE", "1", null);
-        problem(call(post("/api/v1/inventory/counts/" + stale.get("id").asText() + "/post"), admin, null), 409, "CONFLICT");
+        problem(call(post("/api/v1/inventory/counts/" + stale.get("id").asText() + "/post"), operator, null), 409, "CONFLICT");
         assertEquals("CANCELLED", httpPost(admin, "/api/v1/inventory/counts/" + stale.get("id").asText() + "/cancel", null, 200).get("status").asText());
         assertEquals(1, jdbc.queryForObject("""
             select count(*) from outbox_event where aggregate_type='INVENTORY_COUNT'

@@ -45,6 +45,9 @@ public class InventoryCount {
     @Column(name = "posted_at")
     private Instant postedAt;
 
+    @Column(name = "posted_by", length = 80)
+    private String postedBy;
+
     @OneToMany(mappedBy = "inventoryCount", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     private List<InventoryCountLine> lines = new ArrayList<>();
@@ -69,11 +72,14 @@ public class InventoryCount {
         lines.add(line);
     }
 
-    public void post() {
+    public void post(String actor) {
         if (status != InventoryCountStatus.OPEN) throw new ConflictException("Solo se puede contabilizar un conteo abierto.");
+        if (actor == null || actor.isBlank()) throw new ConflictException("Se requiere un actor autenticado para contabilizar el conteo.");
+        if (createdBy.equals(actor)) throw new ConflictException("Quien captura el conteo no puede contabilizarlo; se requiere un segundo operador.");
         if (lines.isEmpty()) throw new ConflictException("No se puede contabilizar un conteo sin líneas.");
         status = InventoryCountStatus.POSTED;
         postedAt = Instant.now();
+        postedBy = actor;
     }
 
     public void cancel() {
@@ -90,5 +96,6 @@ public class InventoryCount {
     public String getCreatedBy() { return createdBy; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getPostedAt() { return postedAt; }
+    public String getPostedBy() { return postedBy; }
     public List<InventoryCountLine> getLines() { return lines; }
 }

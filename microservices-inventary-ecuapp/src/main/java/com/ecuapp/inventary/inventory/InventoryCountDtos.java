@@ -26,11 +26,11 @@ public final class InventoryCountDtos {
     }
 
     public record View(UUID id, String countNumber, UUID warehouseId, String warehouseCode,
-                       InventoryCountStatus status, String createdBy, Instant createdAt, Instant postedAt,
+                       InventoryCountStatus status, String createdBy, String postedBy, Instant createdAt, Instant postedAt,
                        List<LineView> items) {
         static View from(InventoryCount count) {
             return new View(count.getId(), count.getCountNumber(), count.getWarehouse().getId(),
-                count.getWarehouse().getCode(), count.getStatus(), count.getCreatedBy(), count.getCreatedAt(),
+                count.getWarehouse().getCode(), count.getStatus(), count.getCreatedBy(), count.getPostedBy(), count.getCreatedAt(),
                 count.getPostedAt(), count.getLines().stream().map(LineView::from).toList());
         }
     }

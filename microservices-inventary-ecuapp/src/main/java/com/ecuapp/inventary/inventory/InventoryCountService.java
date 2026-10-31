@@ -224,14 +224,15 @@ public class InventoryCountService {
             costing.post(movements.save(movement), valuation);
         }
 
-        count.post();
+        count.post(actor);
         long adjustedLines = lines.stream().filter(line -> line.getDifference().signum() != 0).count();
         audit.record(actor, "INVENTORY_COUNT_POSTED", "INVENTORY_COUNT", id,
-            Map.of("countNumber", count.getCountNumber(), "lineCount", lines.size()));
+            Map.of("countNumber", count.getCountNumber(), "lineCount", lines.size(),
+                "createdBy", count.getCreatedBy(), "postedBy", actor));
         outbox.save(new OutboxEvent("INVENTORY_COUNT", id, "INVENTORY_COUNT_POSTED",
             Map.of("countId", id.toString(), "countNumber", count.getCountNumber(),
-                "warehouseId", count.getWarehouse().getId().toString(),
-                "lineCount", lines.size(), "adjustedLineCount", adjustedLines)));
+                "warehouseId", count.getWarehouse().getId().toString(), "createdBy", count.getCreatedBy(),
+                "postedBy", actor, "lineCount", lines.size(), "adjustedLineCount", adjustedLines)));
         return InventoryCountDtos.View.from(requireDetailed(id));
     }
 
