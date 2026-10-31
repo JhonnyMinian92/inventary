@@ -46,7 +46,6 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
     setErrors({});
     const tasks = [];
     const add = (key, run, map = value => value) => tasks.push({ key, run, map });
-    const catalogRefs = modal === 'product' || modal === 'purchase' || modal === 'sale';
     const purchaseRefs = modal === 'purchase';
     const saleRefs = modal === 'sale';
     const inventoryRefs = section === 'inventory';
@@ -96,7 +95,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, expireSe
     }
 
     // Load picklists only when the corresponding write workflow is open.
-    if (catalogRefs) {
+    if (purchaseRefs || saleRefs) {
       add('products', () => api.products({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('warehouses', () => api.warehouses({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
     }

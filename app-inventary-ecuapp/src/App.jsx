@@ -192,12 +192,17 @@ function AppWorkspace() {
   }
 
   useEffect(() => {
-    if (modal === 'product' && routeEntityId && products.length) {
-      setEditing(products.find(item => String(pickId(item)) === String(routeEntityId)) || null);
-    } else if (modal === 'category' && routeEntityId && categories.length) {
-      setEditing(categories.find(item => String(pickId(item)) === String(routeEntityId)) || null);
-    }
-  }, [modal, routeEntityId, products, categories]);
+    if (!routeEntityId || !['product', 'category'].includes(modal)) return undefined;
+    let active = true;
+    const load = modal === 'product' ? api.product(routeEntityId) : api.category(routeEntityId);
+    load.then(item => { if (active) setEditing(item); })
+      .catch(error => {
+        if (!active) return;
+        if (error?.status === 401) expireSession();
+        else setError(error?.message || 'No se pudo cargar el registro para editar.');
+      });
+    return () => { active = false; };
+  }, [modal, routeEntityId, expireSession]);
 
   useEffect(() => {
     if (modal !== 'receive' || !routeEntityId || String(pickId(selectedOrder)) === String(routeEntityId)) return undefined;
