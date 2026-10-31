@@ -20,6 +20,7 @@ export const catalogApi = {
   activateProduct: id => request('/catalog/products/' + encodeURIComponent(id) + '/activate', { method: 'POST' }),
   deactivateProduct: id => request('/catalog/products/' + encodeURIComponent(id) + '/deactivate', { method: 'POST' }),
   categories: (params = {}) => request('/catalog/categories' + query(params)),
+  category: id => request('/catalog/categories/' + encodeURIComponent(id)),
   createCategory: data => request('/catalog/categories', { method: 'POST', body: data }),
   updateCategory: (id, data) => request('/catalog/categories/' + encodeURIComponent(id), { method: 'PUT', body: data }),
   deleteCategory: id => request('/catalog/categories/' + encodeURIComponent(id), { method: 'DELETE' }),
