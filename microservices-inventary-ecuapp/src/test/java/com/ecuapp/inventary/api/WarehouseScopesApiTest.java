@@ -49,7 +49,7 @@ class WarehouseScopesApiTest extends ApiTestSupport {
         var invalid=call(post("/api/v1/admin/users/"+user.getId()+"/warehouse-scopes")
             .contentType("application/json").content(json.writeValueAsString(Map.of(
                 "warehouseId",warehouse.get("id").asText(),"reason","Vigencia incorrecta",
-                "validFrom":"2026-10-30T00:00:00Z","validUntil":"2026-10-29T00:00:00Z"))),administrator,null);
+                "validFrom","2026-10-30T00:00:00Z","validUntil","2026-10-29T00:00:00Z"))),administrator,null);
         problem(invalid,422,"BUSINESS_RULE_VIOLATION");
     }
 
