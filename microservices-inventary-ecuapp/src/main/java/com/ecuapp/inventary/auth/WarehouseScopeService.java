@@ -82,7 +82,7 @@ public class WarehouseScopeService {
     @Transactional
     public WarehouseScopeDtos.View grant(UUID userId,WarehouseScopeDtos.GrantRequest request,String actor) {
         requireSecurityActor(actor);
-        AppUser user=requireUser(userId);
+        AppUser user=users.findForUpdate(userId).orElseThrow(()->new ResourceNotFoundException("Usuario",userId));
         if(!user.isActive())throw new BusinessRuleException("No se pueden asignar ámbitos a un usuario inactivo.");
         Warehouse warehouse=warehouses.findById(request.warehouseId())
             .orElseThrow(()->new ResourceNotFoundException("Almacén",request.warehouseId()));
