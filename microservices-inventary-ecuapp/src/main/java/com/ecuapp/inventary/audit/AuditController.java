@@ -43,7 +43,7 @@ public class AuditController {
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
   if(pageable.getPageNumber()<0)throw new InvalidQueryException("El número de página no puede ser negativo.");
   int page=pageable.getPageNumber(),size=Math.max(1,Math.min(pageable.getPageSize(),100));
-  Pageable limited=PageRequest.of(page,size,Sort.by(Sort.Direction.DESC,"occurredAt"));
+  Pageable limited=PageRequest.of(page,size);
   var allowed=scopes.accessibleWarehouseIds(authentication.getName());
   boolean includeFinancial=scopes.canReadFinancialData(authentication.getName());
   if(allowed!=null&&allowed.isEmpty())return Page.empty(limited);
