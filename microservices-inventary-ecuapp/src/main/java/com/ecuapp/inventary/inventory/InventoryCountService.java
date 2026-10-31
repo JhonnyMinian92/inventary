@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.inventory;
 
 import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.auth.WarehouseScopeService;
 import com.ecuapp.inventary.catalog.Product;
 import com.ecuapp.inventary.catalog.ProductKind;
 import com.ecuapp.inventary.catalog.ProductRepository;
@@ -39,11 +40,12 @@ public class InventoryCountService {
     private final UnitOfMeasureRepository units;
     private final AuditService audit;
     private final InventoryCostingService costing;
+    private final WarehouseScopeService scopes;
 
     public InventoryCountService(InventoryCountRepository counts, IdempotencyRecordRepository idempotencyRecords, ProductRepository products,
                                  WarehouseRepository warehouses, StockBalanceRepository balances,
                                  StockMovementRepository movements, WarehouseLocationRepository locations,
-                                 UnitOfMeasureRepository units, AuditService audit, InventoryCostingService costing) {
+                                 UnitOfMeasureRepository units, AuditService audit, InventoryCostingService costing,WarehouseScopeService scopes) {
         this.counts = counts;
         this.idempotencyRecords = idempotencyRecords;
         this.products = products;
@@ -54,22 +56,28 @@ public class InventoryCountService {
         this.units = units;
         this.audit = audit;
         this.costing = costing;
+        this.scopes = scopes;
     }
 
     @Transactional(readOnly = true)
-    public Page<InventoryCountDtos.View> list(UUID warehouseId, InventoryCountStatus status, Pageable pageable) {
+    public Page<InventoryCountDtos.View> list(UUID warehouseId, InventoryCountStatus status, Pageable pageable,String actor) {
+        if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+        var allowed=scopes.accessibleWarehouseIds(actor);
         Pageable limited = com.ecuapp.inventary.common.Pages.of(pageable, Set.of("createdAt", "postedAt", "countNumber", "status"),
             Sort.by(Sort.Direction.DESC, "createdAt"));
-        return counts.search(warehouseId, status, limited).map(InventoryCountDtos.View::from);
+        if(allowed!=null&&allowed.isEmpty())return Page.empty(limited);
+        return (allowed==null?counts.search(warehouseId,status,limited):counts.searchScoped(warehouseId,status,allowed,limited)).map(InventoryCountDtos.View::from);
     }
 
     @Transactional(readOnly = true)
-    public InventoryCountDtos.View get(UUID id) {
-        return InventoryCountDtos.View.from(requireDetailed(id));
+    public InventoryCountDtos.View get(UUID id,String actor) {
+        InventoryCount count=requireDetailed(id);scopes.requireWarehouseAccess(actor,count.getWarehouse().getId());
+        return InventoryCountDtos.View.from(count);
     }
 
     @Transactional
     public InventoryCountDtos.View create(String rawKey, InventoryCountDtos.CreateRequest request, String actor) {
+        scopes.requireWarehouseAccess(actor,request.warehouseId());
         String key = normalizeKey(rawKey);
         String hash = requestHash(request);
         // Reserve the key atomically in PostgreSQL so concurrent retries converge on one count.
@@ -153,6 +161,7 @@ public class InventoryCountService {
     public InventoryCountDtos.View post(UUID id, String actor) {
         InventoryCount count = counts.findForUpdate(id)
             .orElseThrow(() -> new ResourceNotFoundException("Conteo de inventario", id));
+        scopes.requireWarehouseAccess(actor,count.getWarehouse().getId());
         if (count.getStatus() == InventoryCountStatus.POSTED) {
             return InventoryCountDtos.View.from(requireDetailed(id));
         }
@@ -218,6 +227,7 @@ public class InventoryCountService {
     public InventoryCountDtos.View cancel(UUID id, String actor) {
         InventoryCount count = counts.findForUpdate(id)
             .orElseThrow(() -> new ResourceNotFoundException("Conteo de inventario", id));
+        scopes.requireWarehouseAccess(actor,count.getWarehouse().getId());
         if (count.getStatus() == InventoryCountStatus.CANCELLED) {
             return InventoryCountDtos.View.from(requireDetailed(id));
         }
