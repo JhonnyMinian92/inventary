@@ -111,6 +111,7 @@ function AppWorkspace() {
     if (!route || route.name === 'login') return;
     const next = routeState();
     setSection(next.section);
+    setListPage(Math.max(0, Number(new URLSearchParams(window.location.search).get('page') || 0)));
     setModal(next.workflow);
     setRouteEntityId(next.entityId);
     setDetailRoute(next.detail);
