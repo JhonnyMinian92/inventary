@@ -4,7 +4,7 @@
 **Rama de ejecución:** implementacion_propuestas  
 **Corte de análisis:** 31 de octubre de 2026  
 **Alcance:** frontend, backend, datos, seguridad, integraciones, operación y experiencia comercial.  
-**Estado:** Fase 1 completada; Fase 2 en progreso; Fase 3 implementada con smoke E2E responsive de login; Fase 4 en progreso con la primera reorganización vertical del catálogo backend; Fase 5 en progreso con datos tributarios manuales trazables; Fase 6 en progreso con búsqueda server-side inicial en Compras. La verificación browser integral de la Fase 3 y las fases 2 y 4–10 siguen abiertas.
+**Estado:** Fase 1 completada; Fase 2 en progreso; Fase 3 implementada con smoke E2E responsive de login; Fase 4 en progreso con la primera reorganización vertical del catálogo backend; Fase 5 en progreso con datos tributarios manuales trazables; Fase 6 en progreso con búsqueda server-side de órdenes, recepciones y devoluciones; Fase 7 en progreso con envelope Outbox/Inbox versionado y trazabilidad de correlación. La verificación browser integral de la Fase 3 y las fases 2 y 4–10 siguen abiertas.
 
 ## 1. Resultado de la consolidación
 
@@ -339,6 +339,17 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Jobs scheduler multiinstancia con lease/lock, recuperación y no doble facturación/caducidad.
 - Caffeine con maximumSize y TTL explícito no mayor a 60 minutos; TTL específico más corto donde aplique. Nunca cachear stock transaccional, reservas, precio de cotización ni estado fiscal como fuente de verdad.
 - Invalidación coherente con múltiples réplicas; medir freshness/hit/miss/lag y no asumir que Kafka entrega un evento a cada instancia del mismo consumer group.
+
+**Avance de implementación (2026-11-01):**
+- Se añadió la migración V24 para versionar el envelope Outbox y persistir `schema_version`, `correlation_id`, `causation_id` y `aggregate_version`; filas históricas quedan como versión 1 sin reescribir payloads.
+- Outbox captura el requestId HTTP propagado por MDC, permite causation/aggregate version explícitos y Relay publica el envelope con schemaVersion, eventId, agregado, tipo, timestamp, payload y metadatos disponibles.
+- Inbox valida la versión y metadatos antes de persistir; conserva compatibilidad con envelopes legacy sin versión como v1, rechaza versiones desconocidas y mantiene deduplicación por hash canónico.
+- La API de operaciones muestra versión y metadatos de trazabilidad sin exponer payloads.
+- Se añadieron pruebas para migración, envelope, correlación/causalidad, versión desconocida y deduplicación.
+
+**Bloqueos para completar Fase 7:** no existe en el repositorio un contrato aprobado del backend fiscal externo (proveedor, URL, autenticación, payload, idempotencia, operationId, callback/polling y errores). Tampoco hay catálogo tributario con vigencias y aprobación fiscal para el emisor/establecimientos. Las ventas conservan `tax=0`; no se inventarán tasas, XML, firmas, secuenciales, RIDE ni autorizaciones. Kafka sigue opt-in y no se declara configurado en producción.
+
+**Estado: EN PROGRESO — contrato de eventos durable versionado implementado; cliente fiscal, snapshots/cálculo tributario y conciliación con sandbox real pendientes. Evidencia y lista exacta de dependencias: `microservices-inventary-ecuapp/docs/31-implementacion-fase7-integraciones-durables.md`.**
 
 ### Fase 8 — Logística, Pedidos WhatsApp y automatización n8n
 
