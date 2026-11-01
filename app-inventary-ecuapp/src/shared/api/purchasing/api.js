@@ -11,6 +11,7 @@ export const purchasingApi = {
   createReceipt: (purchaseOrderId, data) => request('/purchase-orders/' + encodeURIComponent(purchaseOrderId) + '/receipts', { method: 'POST', body: data, idempotent: true }),
   goodsReceipts: (params = {}) => request('/goods-receipts' + query(params)),
   goodsReceipt: id => request('/goods-receipts/' + encodeURIComponent(id)),
+  goodsReceiptReturnable: id => request('/goods-receipts/' + encodeURIComponent(id) + '/returnable-lines'),
   purchaseReturns: (params = {}) => request('/purchase-returns' + query(params)),
   purchaseReturn: id => request('/purchase-returns/' + encodeURIComponent(id)),
   createPurchaseReturn: data => request('/purchase-returns', { method: 'POST', body: data, idempotent: true })
