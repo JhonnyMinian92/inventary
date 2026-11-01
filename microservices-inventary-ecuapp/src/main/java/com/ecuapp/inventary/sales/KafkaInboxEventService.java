@@ -91,7 +91,15 @@ public class KafkaInboxEventService {
         // before hashing so a legitimate redelivery with reordered keys is still recognized.
         final String hash;
         try {
-            hash = sha256(mapper.writeValueAsString(canonicalize(envelope)));
+            // Normalize legacy envelopes without a version to v1 before hashing. A replay that
+            // adds the explicit schemaVersion: 1 field must remain the same logical event.
+            JsonNode normalizedEnvelope = envelope;
+            if (schemaVersion == null) {
+                ObjectNode withLegacyVersion = (ObjectNode) envelope.deepCopy();
+                withLegacyVersion.put("schemaVersion", 1);
+                normalizedEnvelope = withLegacyVersion;
+            }
+            hash = sha256(mapper.writeValueAsString(canonicalize(normalizedEnvelope)));
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("No se pudo normalizar el envelope Kafka.");
         }
