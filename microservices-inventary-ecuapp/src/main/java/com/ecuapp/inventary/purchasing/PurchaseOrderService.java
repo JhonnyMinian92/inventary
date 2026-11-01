@@ -48,8 +48,7 @@ public class PurchaseOrderService {
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,ORDER_SORT,Sort.by(Sort.Direction.DESC,"orderedAt"));
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
-  String query=q==null?null:q.trim().toLowerCase(Locale.ROOT).replaceAll("[%_]"," ").trim();
-  if(query!=null&&query.isEmpty())query=null;
+  String query=q==null?"":q.trim().toLowerCase(Locale.ROOT).replaceAll("[%_]"," ").trim();
   return (allowed==null?orders.search(status,supplierId,warehouseId,lower,upper,query,pageable):
    orders.searchScoped(status,supplierId,warehouseId,lower,upper,allowed,query,pageable)).map(PurchaseDtos.OrderView::from);
  }
