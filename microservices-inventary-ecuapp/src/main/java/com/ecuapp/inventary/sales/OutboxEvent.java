@@ -1,6 +1,7 @@
 package com.ecuapp.inventary.sales;
 
 import jakarta.persistence.*;
+import org.slf4j.MDC;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.Instant;
@@ -19,6 +20,10 @@ public class OutboxEvent {
  @Column(name="aggregate_type",nullable=false,length=80) private String aggregateType;
  @Column(name="aggregate_id",nullable=false) private UUID aggregateId;
  @Column(name="event_type",nullable=false,length=120) private String eventType;
+ @Column(name="schema_version",nullable=false) private int schemaVersion=1;
+ @Column(name="correlation_id",length=80) private String correlationId;
+ @Column(name="causation_id",length=80) private String causationId;
+ @Column(name="aggregate_version") private Long aggregateVersion;
  @JdbcTypeCode(SqlTypes.JSON) @Column(nullable=false,columnDefinition="jsonb") private Map<String,Object> payload;
  @Column(nullable=false,length=20) private String status="PENDING";
  @Column(nullable=false) private int attempts=0;
@@ -29,8 +34,21 @@ public class OutboxEvent {
  @Column(name="last_error",length=500) private String lastError;
  protected OutboxEvent(){}
  public OutboxEvent(String aggregateType,UUID aggregateId,String eventType,Map<String,Object> payload){
+  this(aggregateType,aggregateId,eventType,payload,MDC.get("requestId"),null,null);
+ }
+ public OutboxEvent(String aggregateType,UUID aggregateId,String eventType,Map<String,Object> payload,
+                    String correlationId,String causationId,Long aggregateVersion){
   this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=Map.copyOf(payload);
+  this.schemaVersion=1;this.correlationId=normalizeContext(correlationId);this.causationId=normalizeContext(causationId);
+  if(aggregateVersion!=null&&aggregateVersion<0)throw new IllegalArgumentException("aggregateVersion cannot be negative.");
+  this.aggregateVersion=aggregateVersion;
   this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
+ }
+ private String normalizeContext(String value){
+  if(value==null||value.isBlank())return null;
+  String normalized=value.trim();
+  if(normalized.length()>80)throw new IllegalArgumentException("Event correlation identifiers cannot exceed 80 characters.");
+  return normalized;
  }
  public void markPublished(){this.status="PUBLISHED";this.publishedAt=Instant.now();this.lockedUntil=null;this.lastError=null;}
  public void markFailed(String error){
@@ -47,7 +65,7 @@ public class OutboxEvent {
   this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.lockedUntil=null;
   return true;
  }
- public UUID getId(){return id;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
+ public UUID getId(){return id;} public int getSchemaVersion(){return schemaVersion;} public String getCorrelationId(){return correlationId;} public String getCausationId(){return causationId;} public Long getAggregateVersion(){return aggregateVersion;} public String getAggregateType(){return aggregateType;} public UUID getAggregateId(){return aggregateId;}
  public String getEventType(){return eventType;} public Map<String,Object> getPayload(){return payload;} public String getStatus(){return status;}
  public int getAttempts(){return attempts;} public Instant getNextAttemptAt(){return nextAttemptAt;} public Instant getCreatedAt(){return createdAt;} public Instant getPublishedAt(){return publishedAt;}
  public Instant getLockedUntil(){return lockedUntil;} public String getLastError(){return lastError;}
