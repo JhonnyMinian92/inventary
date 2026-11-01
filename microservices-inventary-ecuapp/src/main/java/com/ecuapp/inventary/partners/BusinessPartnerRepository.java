@@ -8,6 +8,9 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 public interface BusinessPartnerRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<BusinessPartner,UUID>{
+ @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+ @Query("select p from BusinessPartner p where p.id=:id")
+ Optional<BusinessPartner> findForUpdateById(@Param("id") UUID id);
  boolean existsByCode(String code);
  boolean existsByCodeIgnoreCase(String code);
  boolean existsByTaxId(String taxId);
