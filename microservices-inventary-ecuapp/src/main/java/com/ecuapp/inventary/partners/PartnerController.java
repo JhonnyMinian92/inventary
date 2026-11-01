@@ -19,6 +19,10 @@ public class PartnerController {
  private final PartnerService service;
  public PartnerController(PartnerService service){this.service=service;}
 
+ @PutMapping("/api/v1/partners/{id}/roles") @PreAuthorize("hasAuthority('partners:manage')")
+ public PartnerDtos.View updateRoles(@PathVariable UUID id,@Valid @RequestBody PartnerDtos.RolesRequest request,Authentication auth){
+  return service.updateRoles(id,request,auth.getName());
+ }
  @GetMapping("/api/v1/suppliers") @PreAuthorize("hasAuthority('purchasing:read')")
  public Page<PartnerDtos.View> suppliers(@RequestParam(required=false) String q,@RequestParam(required=false) Boolean active,@PageableDefault(size=20,sort="name") Pageable p){return service.list(PartnerType.SUPPLIER,q,active,p);}
  @GetMapping("/api/v1/suppliers/{id}") @PreAuthorize("hasAuthority('purchasing:read')") public PartnerDtos.View supplier(@PathVariable UUID id){return service.get(PartnerType.SUPPLIER,id);}
