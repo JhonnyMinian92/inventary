@@ -28,10 +28,12 @@ import java.util.UUID;
 @RequestMapping("/api/v1/operations/outbox")
 @PreAuthorize("hasAuthority('operations:manage')")
 public class OutboxOperationsController {
-    public record EventView(UUID id, String aggregateType, UUID aggregateId, String eventType, String status, int attempts,
+    public record EventView(UUID id, String aggregateType, UUID aggregateId, String eventType, int schemaVersion,
+                            String correlationId, String causationId, Long aggregateVersion, String status, int attempts,
                             Instant nextAttemptAt, Instant createdAt, Instant publishedAt, Instant lockedUntil, String lastError) {
         static EventView from(OutboxEvent e) {
-            return new EventView(e.getId(), e.getAggregateType(), e.getAggregateId(), e.getEventType(), e.getStatus(), e.getAttempts(),
+            return new EventView(e.getId(), e.getAggregateType(), e.getAggregateId(), e.getEventType(), e.getSchemaVersion(),
+                e.getCorrelationId(), e.getCausationId(), e.getAggregateVersion(), e.getStatus(), e.getAttempts(),
                 e.getNextAttemptAt(), e.getCreatedAt(), e.getPublishedAt(), e.getLockedUntil(), e.getLastError());
         }
     }
