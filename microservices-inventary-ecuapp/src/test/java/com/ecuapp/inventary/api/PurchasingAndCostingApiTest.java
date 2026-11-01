@@ -135,6 +135,12 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         JsonNode detail = httpGet(token("AUDITOR"), "/api/v1/goods-receipts/" + receipt.get("id").asText(), 200);
         assertAmount("4.00", detail.get("total"));
         assertEquals(supplierId, detail.get("supplierId").asText());
+        JsonNode receiptSearch = httpGet(token("AUDITOR"), "/api/v1/goods-receipts?q=" + orderId, 200);
+        assertEquals(2, receiptSearch.get("page").get("totalElements").asInt());
+        JsonNode returnable = httpGet(token("AUDITOR"), "/api/v1/goods-receipts/" + receipt.get("id").asText() + "/returnable-lines", 200);
+        assertAmount("2", returnable.get("items").get(0).get("receivedQuantity"));
+        assertAmount("0", returnable.get("items").get(0).get("returnedQuantity"));
+        assertAmount("2", returnable.get("items").get(0).get("remainingQuantity"));
         assertEquals(2, jdbc.queryForObject("select count(*) from outbox_event where event_type='GOODS_RECEIPT_POSTED' and payload->>'purchaseOrderId'=?", Integer.class, orderId));
     }
 
