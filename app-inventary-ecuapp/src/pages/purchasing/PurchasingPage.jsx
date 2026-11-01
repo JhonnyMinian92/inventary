@@ -5,10 +5,10 @@ import '../../features/returns/returns.css';
 import '../../features/operations/operation-workspaces.css';
 
 export default function PurchasingPage({
-  rows, loading, pagination, page, onPageChange, onView, onSubmit, onApprove, onCancel, onReceive, onChanged
+  rows, loading, pagination, page, query, onSearch, onPageChange, onView, onSubmit, onApprove, onCancel, onReceive, onChanged
 }) {
   return <section className={'panel' + (loading ? ' is-refreshing' : '')}>
-    <PurchaseTable rows={rows} loading={loading} pagination={pagination} page={page}
+    <PurchaseTable rows={rows} loading={loading} pagination={pagination} page={page} query={query} onSearch={onSearch}
       onPageChange={onPageChange} onView={onView} onSubmit={onSubmit} onApprove={onApprove}
       onCancel={onCancel} onReceive={onReceive} />
     <PurchaseReturns onChanged={onChanged} />
