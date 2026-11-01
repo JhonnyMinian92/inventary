@@ -4,7 +4,7 @@
 **Rama de ejecución:** implementacion_propuestas  
 **Corte de análisis:** 31 de octubre de 2026  
 **Alcance:** frontend, backend, datos, seguridad, integraciones, operación y experiencia comercial.  
-**Estado:** Fase 1 completada; Fase 2 en progreso; Fase 3 implementada con smoke E2E responsive de login; Fase 4 en progreso con la primera reorganización vertical del catálogo backend. La verificación browser integral de la Fase 3 y las fases 2 y 4–10 siguen abiertas.
+**Estado:** Fase 1 completada; Fase 2 en progreso; Fase 3 implementada con smoke E2E responsive de login; Fase 4 en progreso con la primera reorganización vertical del catálogo backend; Fase 5 en progreso con datos tributarios manuales trazables; Fase 6 en progreso con búsqueda server-side inicial en Compras. La verificación browser integral de la Fase 3 y las fases 2 y 4–10 siguen abiertas.
 
 ## 1. Resultado de la consolidación
 
