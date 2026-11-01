@@ -2,10 +2,8 @@ package com.ecuapp.inventary.partners;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import java.util.Set;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import java.util.Set;
 import java.time.Instant;
 import java.util.UUID;
 public final class PartnerDtos {
