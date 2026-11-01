@@ -39,7 +39,7 @@ public class OutboxEvent {
  public OutboxEvent(String aggregateType,UUID aggregateId,String eventType,Map<String,Object> payload,
                     String correlationId,String causationId,Long aggregateVersion){
   this.aggregateType=aggregateType;this.aggregateId=aggregateId;this.eventType=eventType;this.payload=Map.copyOf(payload);
-  this.schemaVersion=1;this.correlationId=normalizeContext(correlationId);this.causationId=normalizeContext(causationId);
+  this.schemaVersion=1;this.correlationId=normalizeContext(correlationId==null?MDC.get("requestId"):correlationId);this.causationId=normalizeContext(causationId);
   if(aggregateVersion!=null&&aggregateVersion<0)throw new IllegalArgumentException("aggregateVersion cannot be negative.");
   this.aggregateVersion=aggregateVersion;
   this.status="PENDING";this.attempts=0;this.nextAttemptAt=Instant.now();this.createdAt=Instant.now();
