@@ -91,6 +91,8 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
             """, Integer.class, id));
         JsonNode list = httpGet(token("AUDITOR"), "/api/v1/purchase-orders?status=APPROVED&supplierId=" + supplierId + "&from=" + Instant.now().minusSeconds(600), 200);
         assertEquals(1, list.get("page").get("totalElements").asInt());
+        JsonNode searched = httpGet(token("AUDITOR"), "/api/v1/purchase-orders?q=" + order.get("orderNumber").asText(), 200);
+        assertEquals(1, searched.get("page").get("totalElements").asInt());
         problem(call(get("/api/v1/purchase-orders?sort=notes"), admin(), null), 400, "INVALID_QUERY");
         assertEquals(1, jdbc.queryForObject("select count(*) from audit_event where resource_id=?::uuid and action='PURCHASE_ORDER_APPROVED'", Integer.class, id));
 
