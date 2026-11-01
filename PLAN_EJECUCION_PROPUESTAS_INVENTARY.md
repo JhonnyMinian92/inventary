@@ -302,12 +302,14 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 **Avance de implementación (2026-11-01):**
 - Se verificaron las capacidades existentes de compras, recepciones parciales, devoluciones físicas, ventas, cancelaciones segregadas y calendario de suscripciones.
 - Se agregó búsqueda server-side por número de orden/proveedor en `GET /api/v1/purchase-orders`, con el mismo scope de almacenes y paginación. Se conectó el filtro de la pantalla Compras y se persiste en la URL.
-- Se agregó prueba de integración para la búsqueda. Las ejecuciones iniciales de CI detectaron un parámetro nullable mal tipado por Hibernate/PostgreSQL; se cambió a texto no nulo y el último SHA debe confirmar el resultado.
+- Se extendió `q` server-side a recepciones y devoluciones a proveedores, manteniendo paginación y scope por almacén.
+- Se añadió `GET /api/v1/goods-receipts/{id}/returnable-lines`, que calcula en el servidor cantidad recibida, devuelta y restante por línea; la UI dejó de descargar hasta 100 devoluciones para reconstruir elegibilidad y ahora busca/pagina recepciones y devoluciones.
+- Se agregaron pruebas de integración para búsqueda de órdenes, recepciones, devoluciones y saldos retornables. Las ejecuciones intermedias detectaron fallos durante la aplicación secuencial de cambios; el SHA final debe confirmar el resultado.
 - Se corrigió la expectativa de versión de Flyway en la prueba de bootstrap (V22).
 
-**Pendiente para cerrar Fase 6:** separar Compras en pestañas de órdenes/recepciones/devoluciones, completar búsqueda y DTOs ligeros de recepciones/devoluciones, filtros URL y permisos/estados por fila; completar el flujo de venta con snapshots de comprador/destinatario/fulfillment y resolución server-side de almacén; separar ventas y devoluciones en la UI; crear libro de pagos/reembolsos con estados de verificación, idempotencia, aprobación y conciliación; y completar búsqueda/contadores de suscripciones distinguiendo programado/facturado/cobrado. No existe contrato de gateway aprobado ni modelo de factura de proveedor/cuentas por pagar; no se simularán pagos verificados ni deuda al proveedor.
+**Pendiente para cerrar Fase 6:** separar Compras en pestañas de órdenes/recepciones/devoluciones, completar DTOs ligeros, filtros URL y permisos/estados por fila; completar el flujo de venta con snapshots de comprador/destinatario/fulfillment y resolución server-side de almacén; separar ventas y devoluciones en la UI; crear libro de pagos/reembolsos con estados de verificación, idempotencia, aprobación y conciliación; y completar búsqueda/contadores de suscripciones distinguiendo programado/facturado/cobrado. No existe contrato de gateway aprobado ni modelo de factura de proveedor/cuentas por pagar; no se simularán pagos verificados ni deuda al proveedor.
 
-**Estado: EN PROGRESO — se implementó búsqueda de órdenes de compra y su integración UI; el resto de brechas está documentado en `microservices-inventary-ecuapp/docs/30-implementacion-fase6-operaciones-comerciales.md`.**
+**Estado: EN PROGRESO — búsqueda server-side de órdenes, recepciones y devoluciones, endpoint de cantidades retornables y UI paginada implementados; pagos/reembolsos, ventas, suscripciones y cierre integral pendientes. El resto de brechas está documentado en `microservices-inventary-ecuapp/docs/30-implementacion-fase6-operaciones-comerciales.md`.**
 
 ### Fase 7 — Facturación SRI e integración distribuida durable
 
