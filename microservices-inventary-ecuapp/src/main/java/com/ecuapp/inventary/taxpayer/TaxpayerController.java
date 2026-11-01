@@ -16,7 +16,7 @@ public class TaxpayerController {
     private final TaxpayerService service;
     public TaxpayerController(TaxpayerService service){this.service=service;}
 
-    // Restricted to inventory managers until dedicated tax-data permissions/scopes are introduced.
+    // Dedicated tax-data permissions; read and mutation capabilities are intentionally separated.
     @GetMapping("/api/v1/taxpayers") @PreAuthorize("hasAuthority('taxpayer:read')")
     public Page<TaxpayerDtos.ProfileView> list(@RequestParam(required=false) String q,@PageableDefault(size=20) Pageable pageable) {
         return service.list(q,pageable);
