@@ -82,7 +82,7 @@ function WorkspaceContentView({ model }) {
       return <PartnersPage onChanged={data.loadData} />;
     case 'purchases':
       return <PurchasingPage rows={data.purchases} loading={state.loading} pagination={data.pageInfo.purchases}
-        page={state.listPage} onPageChange={actions.changeListPage} onView={order => actions.openDetail('purchase', order)}
+        query={state.listQuery} onSearch={actions.changeListQuery} page={state.listPage} onPageChange={actions.changeListPage} onView={order => actions.openDetail('purchase', order)}
         onSubmit={commands.submitPurchaseOrder} onApprove={commands.approvePurchaseOrder}
         onCancel={commands.cancelPurchase} onReceive={commands.openReceive} onChanged={data.loadData} />;
     case 'sales':
