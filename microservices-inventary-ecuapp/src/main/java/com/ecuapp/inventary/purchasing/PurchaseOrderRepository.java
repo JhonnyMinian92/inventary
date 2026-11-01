@@ -26,20 +26,22 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
   where (:status is null or p.status=:status)
   and (:supplierId is null or p.supplier.id=:supplierId)
   and (:warehouseId is null or p.warehouse.id=:warehouseId)
+  and (:q is null or lower(concat(p.orderNumber, ' ', p.supplier.name)) like concat('%', :q, '%'))
   and p.orderedAt>=:fromTime
   and p.orderedAt<:toTime
   """)
  Page<PurchaseOrder> search(@Param("status") PurchaseOrderStatus status,@Param("supplierId") UUID supplierId,@Param("warehouseId") UUID warehouseId,
-  @Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,Pageable pageable);
+  @Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,@Param("q") String q,Pageable pageable);
 
  @EntityGraph(attributePaths={"supplier","warehouse"})
  @Query("""
   select p from PurchaseOrder p where (:status is null or p.status=:status)
    and (:supplierId is null or p.supplier.id=:supplierId)
    and (:warehouseId is null or p.warehouse.id=:warehouseId)
+   and (:q is null or lower(concat(p.orderNumber, ' ', p.supplier.name)) like concat('%', :q, '%'))
    and p.warehouse.id in :warehouseIds and p.orderedAt>=:fromTime and p.orderedAt<:toTime
   """)
  Page<PurchaseOrder> searchScoped(@Param("status") PurchaseOrderStatus status,@Param("supplierId") UUID supplierId,
   @Param("warehouseId") UUID warehouseId,@Param("fromTime") java.time.Instant fromTime,@Param("toTime") java.time.Instant toTime,
-  @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
+  @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,@Param("q") String q,Pageable pageable);
 }
