@@ -56,14 +56,28 @@ public class PurchaseOrderService {
   PurchaseOrder order=orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id));
   scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());return PurchaseDtos.OrderView.from(order);
  }
- @Transactional(readOnly=true) public Page<PurchaseDtos.ReceiptView> listReceipts(UUID purchaseOrderId,UUID warehouseId,Instant from,Instant to,Pageable p,String actor){
+ @Transactional(readOnly=true) public Page<PurchaseDtos.ReceiptView> listReceipts(UUID purchaseOrderId,UUID warehouseId,Instant from,Instant to,String q,Pageable p,String actor){
   validateRange(from,to);
   if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,RECEIPT_SORT,Sort.by(Sort.Direction.DESC,"receivedAt"));
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
-  return (allowed==null?receipts.search(purchaseOrderId,warehouseId,lower,upper,pageable):
-   receipts.searchScoped(purchaseOrderId,warehouseId,lower,upper,allowed,pageable)).map(PurchaseDtos.ReceiptView::from);
+  String query=q==null?"":q.trim().toLowerCase(Locale.ROOT).replaceAll("[%_]"," ").trim();
+  return (allowed==null?receipts.search(purchaseOrderId,warehouseId,lower,upper,query,pageable):
+   receipts.searchScoped(purchaseOrderId,warehouseId,lower,upper,allowed,query,pageable)).map(PurchaseDtos.ReceiptView::from);
+ }
+ @Transactional(readOnly=true) public PurchaseDtos.ReturnableReceiptView getReturnableReceipt(UUID id,String actor){
+  GoodsReceipt receipt=receipts.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Recepción",id));
+  scopes.requireWarehouseAccess(actor,receipt.getWarehouse().getId());
+  if(!"POSTED".equals(receipt.getStatus()))throw new BusinessRuleException("Solo se puede consultar elegibilidad de una recepción contabilizada.");
+  List<PurchaseDtos.ReturnableReceiptLineView> lines=receipt.getLines().stream().map(line->{
+   BigDecimal returned=receiptLines.sumReturned(line.getId());
+   BigDecimal remaining=line.getQuantity().subtract(returned).max(BigDecimal.ZERO);
+   return new PurchaseDtos.ReturnableReceiptLineView(line.getId(),line.getPurchaseOrderLine().getId(),
+    line.getProduct().getId(),line.getProduct().getSku(),line.getProduct().getName(),line.getQuantity(),returned,remaining,line.getUnitCost());
+  }).toList();
+  return new PurchaseDtos.ReturnableReceiptView(receipt.getId(),receipt.getReceiptNumber(),receipt.getPurchaseOrder().getOrderNumber(),
+   receipt.getWarehouse().getId(),receipt.getWarehouse().getCode(),lines);
  }
  @Transactional public PurchaseDtos.OrderView create(String key,PurchaseDtos.CreateOrderRequest r,String actor){
   scopes.requireWarehouseAccess(actor,r.warehouseId());
