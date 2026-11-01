@@ -26,7 +26,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
   where (:status is null or p.status=:status)
   and (:supplierId is null or p.supplier.id=:supplierId)
   and (:warehouseId is null or p.warehouse.id=:warehouseId)
-  and (:q is null or lower(concat(p.orderNumber, ' ', p.supplier.name)) like concat('%', :q, '%'))
+  and lower(concat(p.orderNumber, ' ', p.supplier.name)) like concat('%', :q, '%')
   and p.orderedAt>=:fromTime
   and p.orderedAt<:toTime
   """)
