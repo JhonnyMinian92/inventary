@@ -38,7 +38,7 @@ export default function TaxpayerRegistry({ canManage = false }) {
     setLoading(true);
     setError('');
     try {
-      const result = await api.taxpayers({ q: debouncedQuery || undefined, page, size: 20, sort: 'legalName,asc' });
+      const result = await api.taxpayers({ ...(debouncedQuery ? { q: debouncedQuery } : {}), page, size: 20, sort: 'legalName,asc' });
       setRows(listFrom(result));
       setPagination(pageMeta(result));
     } catch (err) {
