@@ -2,6 +2,12 @@
 import { request } from '../http/request.js';
 const query = params => new URLSearchParams(params).size ? '?' + new URLSearchParams(params) : '';
 export const partnersApi = {
+  taxpayers: (params = {}) => request('/taxpayers' + query(params)),
+  taxpayer: id => request('/taxpayers/' + encodeURIComponent(id)),
+  taxpayerEstablishments: id => request('/taxpayers/' + encodeURIComponent(id) + '/establishments'),
+  taxpayerSnapshots: (id, params = {}) => request('/taxpayers/' + encodeURIComponent(id) + '/snapshots' + query(params)),
+  importTaxpayer: data => request('/taxpayers/import', { method: 'POST', body: data }),
+
   warehouses: (params = {}) => request('/warehouses' + query(params)),
   warehouse: id => request('/warehouses/' + encodeURIComponent(id)),
   createWarehouse: data => request('/warehouses', { method: 'POST', body: data }),
