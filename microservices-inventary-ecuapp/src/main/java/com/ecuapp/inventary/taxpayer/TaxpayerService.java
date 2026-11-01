@@ -80,7 +80,7 @@ public class TaxpayerService {
         }
         snapshots.save(new TaxpayerSnapshot(profile,request.sourceReference().trim(),hash,snapshotMap,observedAt,actor));
         audit.record(actor,"TAXPAYER_MANUAL_IMPORT","TAXPAYER_PROFILE",profile.getId(),
-            Map.of("taxId",taxId,"sourceType","MANUAL_IMPORT","establishmentCount",request.establishments().size(),"payloadHash",hash));
+            Map.of("sourceType","MANUAL_IMPORT","establishmentCount",request.establishments().size(),"payloadHash",hash));
         return TaxpayerDtos.ProfileView.from(profile);
     }
 
@@ -102,7 +102,8 @@ public class TaxpayerService {
     @Transactional
     public TaxpayerDtos.AssignmentView assign(UUID warehouseId,TaxpayerDtos.AssignmentRequest request,String actor) {
         warehouseService.get(warehouseId,actor); // enforces the caller's warehouse scope before any association read/write
-        Warehouse warehouse=warehouses.findById(warehouseId).orElseThrow(()->new ResourceNotFoundException("Almacén",warehouseId));
+        Warehouse warehouse=warehouses.findForUpdate(warehouseId).orElseThrow(()->new ResourceNotFoundException("Almacén",warehouseId));
+        if(!warehouse.isActive())throw new ConflictException("No se puede asociar información tributaria a un almacén inactivo.");
         SriEstablishment establishment=establishments.findById(request.establishmentId())
             .orElseThrow(()->new ResourceNotFoundException("Establecimiento SRI",request.establishmentId()));
         taxpayerScopes.requireTaxpayerAccess(actor,establishment.getTaxpayer().getId());
@@ -130,7 +131,7 @@ public class TaxpayerService {
 
     @Transactional
     public void closeAssignment(UUID assignmentId,TaxpayerDtos.CloseAssignmentRequest request,String actor) {
-        WarehouseEstablishmentAssignment assignment=assignments.findById(assignmentId)
+        WarehouseEstablishmentAssignment assignment=assignments.findForUpdateById(assignmentId)
             .orElseThrow(()->new ResourceNotFoundException("Asignación fiscal de almacén",assignmentId));
         warehouseService.get(assignment.getWarehouse().getId(),actor);
         taxpayerScopes.requireTaxpayerAccess(actor,assignment.getEstablishment().getTaxpayer().getId());

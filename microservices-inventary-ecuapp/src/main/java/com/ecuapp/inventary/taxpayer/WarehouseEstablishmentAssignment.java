@@ -18,6 +18,7 @@ public class WarehouseEstablishmentAssignment {
     @Column(length=80) private String responsible;
     @Column(name="created_by",nullable=false,length=80) private String createdBy;
     @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
+    @Version @Column(nullable=false) private long version;
     protected WarehouseEstablishmentAssignment() {}
     public WarehouseEstablishmentAssignment(Warehouse warehouse,SriEstablishment establishment,
             WarehouseEstablishmentAssignmentType relationshipType,Instant validFrom,int priority,String responsible,String createdBy) {
