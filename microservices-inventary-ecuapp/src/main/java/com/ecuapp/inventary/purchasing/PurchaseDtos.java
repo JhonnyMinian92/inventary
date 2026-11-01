@@ -25,6 +25,11 @@ public final class PurchaseDtos {
    p.getLines().stream().map(l->new OrderLineView(l.getId(),l.getProduct().getId(),l.getSkuSnapshot(),l.getProductNameSnapshot(),l.getOrderedQuantity(),l.getReceivedQuantity(),l.remaining(),l.getUnitCost(),l.getLineTotal())).toList());}
  }
  public record ReceiptLineView(UUID id,UUID purchaseOrderLineId,UUID productId,String sku,BigDecimal quantity,BigDecimal unitCost,BigDecimal lineTotal){}
+ public record ReturnableReceiptLineView(UUID id,UUID purchaseOrderLineId,UUID productId,String sku,String productName,
+  BigDecimal receivedQuantity,BigDecimal returnedQuantity,BigDecimal remainingQuantity,BigDecimal unitCost){}
+ public record ReturnableReceiptView(UUID id,String receiptNumber,String purchaseOrderNumber,UUID warehouseId,String warehouseCode,
+  List<ReturnableReceiptLineView> items){}
+
  public record ReceiptView(UUID id,String receiptNumber,String status,UUID purchaseOrderId,String purchaseOrderNumber,UUID supplierId,UUID warehouseId,String warehouseCode,
   String createdBy,Instant receivedAt,BigDecimal total,List<ReceiptLineView> items){
   static ReceiptView from(GoodsReceipt r){BigDecimal total=r.getLines().stream().map(GoodsReceiptLine::getLineTotal).reduce(BigDecimal.ZERO.setScale(2),BigDecimal::add);
