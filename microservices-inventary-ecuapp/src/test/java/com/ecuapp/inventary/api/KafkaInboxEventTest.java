@@ -31,7 +31,7 @@ class KafkaInboxEventTest extends ApiTestSupport {
         if (publicProducts != null) publicProducts.put("fresh", "keep");
         assertEquals(KafkaInboxEventService.Result.DUPLICATE, inbox.process(original));
         String reordered = """
-            {"payload":{"total":12.5,"saleId":"%s"},"occurredAt":"2026-10-27T00:00:00Z","eventType":"SALE_CREATED","aggregateId":"%s","aggregateType":"SALE","eventId":"%s"}
+            {"payload":{"total":12.5,"saleId":"%s"},"occurredAt":"2026-10-27T00:00:00Z","eventType":"SALE_CREATED","aggregateId":"%s","aggregateType":"SALE","eventId":"%s","schemaVersion":1}
             """.formatted(aggregateId, aggregateId, eventId).trim();
         assertEquals(KafkaInboxEventService.Result.DUPLICATE, inbox.process(reordered),
             "Reordering JSON object keys must not be interpreted as a changed event.");
@@ -65,7 +65,7 @@ class KafkaInboxEventTest extends ApiTestSupport {
 
     private String envelope(UUID eventId, UUID aggregateId, double amount) {
         return """
-            {"eventId":"%s","aggregateType":"SALE","aggregateId":"%s","eventType":"SALE_CREATED","occurredAt":"2026-10-27T00:00:00Z","payload":{"saleId":"%s","total":%s}}
+            {"schemaVersion":1,"eventId":"%s","aggregateType":"SALE","aggregateId":"%s","eventType":"SALE_CREATED","occurredAt":"2026-10-27T00:00:00Z","payload":{"saleId":"%s","total":%s}}
             """.formatted(eventId, aggregateId, aggregateId, amount).trim();
     }
 }
