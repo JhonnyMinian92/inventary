@@ -36,8 +36,10 @@ public class PurchaseOrderController {
  @GetMapping("/api/v1/goods-receipts") @PreAuthorize("hasAuthority('purchasing:read')")
  public Page<PurchaseDtos.ReceiptView> receipts(@RequestParam(required=false) UUID purchaseOrderId,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant from,
-  @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,
-  @PageableDefault(size=20) Pageable p,Authentication auth){return service.listReceipts(purchaseOrderId,warehouseId,from,to,p,auth.getName());}
+  @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,@RequestParam(required=false,defaultValue="") String q,
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.listReceipts(purchaseOrderId,warehouseId,from,to,q,p,auth.getName());}
  @GetMapping("/api/v1/goods-receipts/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
  public PurchaseDtos.ReceiptView getReceipt(@PathVariable UUID id,Authentication auth){return service.getReceipt(id,auth.getName());}
+ @GetMapping("/api/v1/goods-receipts/{id}/returnable-lines") @PreAuthorize("hasAuthority('purchasing:read')")
+ public PurchaseDtos.ReturnableReceiptView returnableReceipt(@PathVariable UUID id,Authentication auth){return service.getReturnableReceipt(id,auth.getName());}
 }
