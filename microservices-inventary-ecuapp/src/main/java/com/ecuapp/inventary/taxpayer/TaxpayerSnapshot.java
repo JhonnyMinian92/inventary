@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -21,7 +23,7 @@ public class TaxpayerSnapshot {
     protected TaxpayerSnapshot() {}
     public TaxpayerSnapshot(TaxpayerProfile taxpayer,String sourceReference,String payloadHash,Map<String,Object> snapshot,Instant observedAt,String actor) {
         this.id=UUID.randomUUID(); this.taxpayer=taxpayer; this.sourceReference=sourceReference; this.payloadHash=payloadHash;
-        this.snapshot=Map.copyOf(snapshot); this.observedAt=observedAt; this.actor=actor;
+        this.snapshot=Collections.unmodifiableMap(new LinkedHashMap<>(snapshot)); this.observedAt=observedAt; this.actor=actor;
     }
     public UUID getId(){return id;} public String getSourceType(){return sourceType;} public String getSourceReference(){return sourceReference;}
     public String getPayloadHash(){return payloadHash;} public Map<String,Object> getSnapshot(){return snapshot;}
