@@ -20,7 +20,8 @@
   - `GET /api/v1/taxpayers/{id}/snapshots?page=&size=`
   - `GET|POST /api/v1/warehouses/{warehouseId}/establishment-assignments`
   - `POST /api/v1/establishment-assignments/{assignmentId}/close`
-- Todos los endpoints están restringidos temporalmente a `inventory:manage` hasta definir permisos y scopes tributarios propios.
+- Se incorporó V23 con permisos `taxpayer:read` y `taxpayer:manage`: SUPER_ADMIN administra; AUDITOR consulta; los perfiles operativos de almacén y ventas no heredan acceso fiscal por sus permisos de inventario. La cadena HTTP y `@PreAuthorize` aplican ambos controles.
+- La interfaz de Datos tributarios está integrada en Almacenes y contactos: consulta paginada, búsqueda, detalle de establecimientos/snapshots e importación manual con varias sedes. Solo aparece con `taxpayer:read` y solo permite importar con `taxpayer:manage`.
 
 ## Contrato de importación
 
@@ -33,10 +34,10 @@ No se incluye cliente HTTP de terceros. La referencia de fuente es metadato de p
 - No se conoce ni se ha autorizado un proveedor/API estable del SRI; no se implementó scraping ni se asumió un JSON público.
 - No se modela todavía propietario legal del inventario. Por seguridad, las bodegas no pueden vincularse activamente a perfiles de RUC distintos.
 - No se implementó aún la interfaz SRI ni la visualización de asociaciones en la ficha de almacén.
-- Siguen pendientes roles CUSTOMER/SUPPLIER modificables sobre un único socio, tipo de identificación, formularios contextuales en Compras/Ventas y búsqueda remota en esos formularios.
+- Siguen pendientes scopes fiscales por contribuyente/establecimiento, roles CUSTOMER/SUPPLIER modificables sobre un único socio, tipo de identificación, formularios contextuales en Compras/Ventas y búsqueda remota en esos formularios.
 - La configuración de unidades sigue en el catálogo existente. No se cambió la interpretación de documentos históricos ni se habilitaron unidades alternativas por línea sin un contrato de cantidad base, precio, redondeo y factor snapshot.
 - Los permisos tributarios usan temporalmente `inventory:manage`; antes de producción deben existir permisos y scopes específicos y pruebas de aislamiento.
 
 ## Validación requerida
 
-El workflow backend CI se debe asociar al SHA final. Debe comprobar Maven/Java 21, Flyway V1–V21 sobre PostgreSQL, Hibernate validation, pruebas HTTP/security y smoke de arranque desde volumen vacío. La prueba actual no sustituye la aceptación de los flujos UI y la integración externa.
+El workflow backend CI se debe asociar al SHA final. Debe comprobar Maven/Java 21, Flyway V1–V23 sobre PostgreSQL, Hibernate validation, pruebas HTTP/security (incluido aislamiento de permisos fiscales) y smoke de arranque desde volumen vacío. El workflow frontend debe validar el módulo de registro tributario. La prueba actual no sustituye la aceptación de los flujos UI y la integración externa.
