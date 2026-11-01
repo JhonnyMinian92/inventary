@@ -83,7 +83,7 @@ function freshData(kind, item = null) {
   return values;
 }
 
-export default function OperationsCatalogs({ onChanged }) {
+export default function OperationsCatalogs({ onChanged, can = () => false }) {
   const [kind, setKind] = useState('warehouses');
   const [records, setRecords] = useState({ warehouses: [], suppliers: [], customers: [], units: [] });
   const [recordCounts, setRecordCounts] = useState({ warehouses: 0, suppliers: 0, customers: 0, units: 0 });
@@ -101,6 +101,9 @@ export default function OperationsCatalogs({ onChanged }) {
   useMessageToast(notice, setNotice, 'success');
   const dialogRef = useAccessibleDialog(modal, () => setModal(false));
   const [optionSources, setOptionSources] = useState({ dimensions: [] });
+  const [roleModal, setRoleModal] = useState(false);
+  const [roleSelection, setRoleSelection] = useState([]);
+  const canManagePartnerRoles = Boolean(can('partners:manage'));
 
   useEffect(() => {
     let active = true;
@@ -161,6 +164,32 @@ export default function OperationsCatalogs({ onChanged }) {
     setError('');
     setNotice('');
     setModal(true);
+  }
+
+  function openRoles(item) {
+    setEditing(item);
+    const type = String(item?.type || '').toUpperCase();
+    setRoleSelection(type === 'BOTH' ? ['CUSTOMER', 'SUPPLIER'] : type === 'CUSTOMER' ? ['CUSTOMER'] : ['SUPPLIER']);
+    setError('');
+    setNotice('');
+    setRoleModal(true);
+  }
+
+  async function saveRoles() {
+    if (!editing || !roleSelection.length || loading) return;
+    setLoading(true);
+    setError('');
+    setNotice('');
+    try {
+      await api.updatePartnerRoles(idOf(editing), { roles: roleSelection });
+      setRoleModal(false);
+      setEditing(null);
+      setNotice('Se actualizaron los roles del contacto comercial.');
+      await refresh();
+      await onChanged?.();
+    } catch (err) {
+      setError(err?.message || 'No se pudieron actualizar los roles.');
+    } finally { setLoading(false); }
   }
 
   async function save(event) {
@@ -260,12 +289,23 @@ export default function OperationsCatalogs({ onChanged }) {
       {visible.map((item, index) => <tr key={idOf(item) || index}>
         {config.fields.map(field => <td key={field.key}>{item?.[field.display || field.key] ?? item?.[field.key] ?? '—'}</td>)}
         <td><span className={'pill ' + (inactive(item) ? 'inactive' : 'active')}>{inactive(item) ? 'Inactivo' : 'Activo'}</span></td>
-        <td><div className="row-actions"><button className="small-action" disabled={loading} onClick={() => open(item)}>Editar</button>{config.activate && config.deactivate && <button className="small-action" disabled={loading} onClick={() => toggle(item)}>{inactive(item) ? 'Activar' : 'Desactivar'}</button>}{inactive(item) && config.delete && <button type="button" className="small-action danger" disabled={loading} onClick={() => remove(item)}>Eliminar</button>}</div></td>
+        <td><div className="row-actions"><button className="small-action" disabled={loading} onClick={() => open(item)}>Editar</button>{(kind === 'suppliers' || kind === 'customers') && canManagePartnerRoles && <button type="button" className="small-action" disabled={loading} onClick={() => openRoles(item)}>Roles</button>}{config.activate && config.deactivate && <button className="small-action" disabled={loading} onClick={() => toggle(item)}>{inactive(item) ? 'Activar' : 'Desactivar'}</button>}{inactive(item) && config.delete && <button type="button" className="small-action danger" disabled={loading} onClick={() => remove(item)}>Eliminar</button>}</div></td>
       </tr>)}
     </tbody></table>{!visible.length && <div className="empty-state">{loading ? 'Cargando registros…' : error ? 'No se pudieron cargar los registros.' : 'No hay registros que coincidan con la búsqueda.'}</div>}</div>
     {pageInfo && <ServerPagination info={pageInfo} page={page} loading={loading} onChange={setPage} />}
     {kind === 'units' && <UnitConversions units={records.units} />}
 
+    {roleModal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setRoleModal(false); }}>
+      <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="partner-roles-title" tabIndex={-1}>
+        <div className="modal-heading"><h2 id="partner-roles-title">Roles de {editing?.name || 'contacto'}</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setRoleModal(false)}>×</button></div>
+        <p className="form-hint">Un mismo registro puede actuar como cliente, proveedor o ambos. No se crea una identidad duplicada.</p>
+        <div className="form-grid">
+          <label className="field"><span><input type="checkbox" checked={roleSelection.includes('CUSTOMER')} onChange={event => setRoleSelection(current => event.target.checked ? [...current, 'CUSTOMER'] : current.filter(value => value !== 'CUSTOMER'))}/> Cliente</span></label>
+          <label className="field"><span><input type="checkbox" checked={roleSelection.includes('SUPPLIER')} onChange={event => setRoleSelection(current => event.target.checked ? [...current, 'SUPPLIER'] : current.filter(value => value !== 'SUPPLIER'))}/> Proveedor</span></label>
+        </div>
+        <div className="form-actions wide"><button type="button" className="button secondary" disabled={loading} onClick={() => setRoleModal(false)}>Cancelar</button><button type="button" className="button primary" disabled={loading || !roleSelection.length} onClick={() => void saveRoles()}>{loading ? 'Guardando…' : 'Guardar roles'}</button></div>
+      </section>
+    </div>}
     {modal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setModal(false); }}>
       <section ref={dialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="operations-catalog-modal-title" tabIndex={-1}>
         <div className="modal-heading"><h2 id="operations-catalog-modal-title">{editing ? 'Editar ' : 'Crear '}{config.singular}</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setModal(false)}>×</button></div>
