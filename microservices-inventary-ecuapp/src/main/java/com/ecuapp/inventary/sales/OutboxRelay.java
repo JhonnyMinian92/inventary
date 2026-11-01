@@ -92,11 +92,15 @@ public class OutboxRelay {
 
     String envelope(OutboxEvent event) throws Exception {
         Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("schemaVersion", event.getSchemaVersion());
         envelope.put("eventId", event.getId().toString());
         envelope.put("aggregateType", event.getAggregateType());
         envelope.put("aggregateId", event.getAggregateId().toString());
+        if (event.getAggregateVersion() != null) envelope.put("aggregateVersion", event.getAggregateVersion());
         envelope.put("eventType", event.getEventType());
         envelope.put("occurredAt", event.getCreatedAt().toString());
+        if (event.getCorrelationId() != null) envelope.put("correlationId", event.getCorrelationId());
+        if (event.getCausationId() != null) envelope.put("causationId", event.getCausationId());
         envelope.put("payload", event.getPayload());
         return mapper.writeValueAsString(envelope);
     }
