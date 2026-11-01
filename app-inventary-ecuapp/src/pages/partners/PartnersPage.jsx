@@ -10,7 +10,7 @@ export default function PartnersPage({ onChanged, can = () => false }) {
       <button type="button" role="tab" aria-selected={tab === 'operations'} className={tab === 'operations' ? 'catalog-tab active' : 'catalog-tab'} onClick={() => setTab('operations')}>Almacenes y contactos</button>
       {canReadTax && <button type="button" role="tab" aria-selected={tab === 'taxpayer'} className={tab === 'taxpayer' ? 'catalog-tab active' : 'catalog-tab'} onClick={() => setTab('taxpayer')}>Datos tributarios</button>}
     </div>
-    {tab === 'operations' ? <OperationsCatalogs onChanged={onChanged} /> :
+    {tab === 'operations' ? <OperationsCatalogs can={can} onChanged={onChanged} /> :
       canReadTax ? <TaxpayerRegistry canManage={Boolean(can('taxpayer:manage'))} /> : null}
   </section>;
 }
