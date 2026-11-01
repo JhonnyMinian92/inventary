@@ -19,6 +19,22 @@ class AuditAndOutboxApiTest extends ApiTestSupport {
     @Autowired OutboxRelay relay;
 
     @Test
+    void outboxCapturesRequestCorrelationAndExplicitCausationMetadata() {
+        org.slf4j.MDC.put("requestId", "phase7-correlation-001");
+        com.ecuapp.inventary.sales.OutboxEvent correlated;
+        try {
+            correlated = new com.ecuapp.inventary.sales.OutboxEvent("SALE", UUID.randomUUID(), "SALE_COMPLETED",
+                Map.of("saleId", UUID.randomUUID().toString()), null, "command-123", 7L);
+        } finally {
+            org.slf4j.MDC.remove("requestId");
+        }
+        assertEquals(1, correlated.getSchemaVersion());
+        assertEquals("phase7-correlation-001", correlated.getCorrelationId());
+        assertEquals("command-123", correlated.getCausationId());
+        assertEquals(7L, correlated.getAggregateVersion());
+    }
+
+    @Test
     void auditEventsAreFilterableReadOnlyAndNeverContainSecrets() {
         String warehouseCode = "AUD" + suffix();
         JsonNode warehouse = httpPost(admin(), "/api/v1/warehouses", Map.of("code", warehouseCode, "name", "Auditado"), 201);
