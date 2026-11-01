@@ -18,8 +18,8 @@ public class PurchaseReturnController {
  @GetMapping @PreAuthorize("hasAuthority('purchasing:read')")
  public Page<PurchaseReturnDtos.View> list(@RequestParam(required=false) UUID goodsReceiptId,@RequestParam(required=false) UUID warehouseId,
   @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant from,
-  @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,
-  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(goodsReceiptId,warehouseId,from,to,p,auth.getName());}
+  @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,@RequestParam(required=false,defaultValue="") String q,
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(goodsReceiptId,warehouseId,from,to,q,p,auth.getName());}
  @GetMapping("/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
  public PurchaseReturnDtos.View get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('purchasing:manage')")
