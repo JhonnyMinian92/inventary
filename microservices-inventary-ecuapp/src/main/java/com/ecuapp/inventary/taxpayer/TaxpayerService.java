@@ -20,6 +20,7 @@ import java.util.*;
 public class TaxpayerService {
     private static final Set<String> SORT=Set.of("taxId","legalName","observedAt");
     private final TaxpayerRepository taxpayers;
+    private final com.ecuapp.inventary.auth.TaxpayerScopeService taxpayerScopes;
     private final SriEstablishmentRepository establishments;
     private final TaxpayerSnapshotRepository snapshots;
     private final WarehouseEstablishmentAssignmentRepository assignments;
@@ -29,17 +30,19 @@ public class TaxpayerService {
     private final ObjectMapper mapper;
     public TaxpayerService(TaxpayerRepository taxpayers,SriEstablishmentRepository establishments,TaxpayerSnapshotRepository snapshots,
             WarehouseEstablishmentAssignmentRepository assignments,WarehouseRepository warehouses,WarehouseService warehouseService,
-            AuditService audit,ObjectMapper mapper) {
+            AuditService audit,ObjectMapper mapper,com.ecuapp.inventary.auth.TaxpayerScopeService taxpayerScopes) {
         this.taxpayers=taxpayers;this.establishments=establishments;this.snapshots=snapshots;this.assignments=assignments;
-        this.warehouses=warehouses;this.warehouseService=warehouseService;this.audit=audit;this.mapper=mapper;
+        this.warehouses=warehouses;this.warehouseService=warehouseService;this.audit=audit;this.mapper=mapper;this.taxpayerScopes=taxpayerScopes;
     }
 
     @Transactional(readOnly=true)
-    public Page<TaxpayerDtos.ProfileView> list(String q,Pageable pageable) {
+    public Page<TaxpayerDtos.ProfileView> list(String q,Pageable pageable,String actor) {
         String pattern=q==null||q.isBlank()?null:"%"+q.trim().toLowerCase(Locale.ROOT).replace("%","").replace("_","").replace("\\\\","")+"%";
         Pageable safe=PageRequest.of(Math.max(0,pageable.getPageNumber()),Math.min(100,Math.max(1,pageable.getPageSize())),
             Sort.by(Sort.Direction.ASC,"legalName"));
-        return taxpayers.search(pattern,safe).map(TaxpayerDtos.ProfileView::from);
+        Set<UUID> allowed=taxpayerScopes.accessibleTaxpayerIds(actor);
+        if(allowed!=null&&allowed.isEmpty())return Page.empty(safe);
+        return (allowed==null?taxpayers.search(pattern,safe):taxpayers.searchScoped(pattern,allowed,safe)).map(TaxpayerDtos.ProfileView::from);
     }
 
     @Transactional
@@ -82,15 +85,15 @@ public class TaxpayerService {
     }
 
     @Transactional(readOnly=true)
-    public TaxpayerDtos.ProfileView get(UUID id) {return TaxpayerDtos.ProfileView.from(requireTaxpayer(id));}
+    public TaxpayerDtos.ProfileView get(UUID id,String actor) {taxpayerScopes.requireTaxpayerAccess(actor,id);return TaxpayerDtos.ProfileView.from(requireTaxpayer(id));}
     @Transactional(readOnly=true)
-    public List<TaxpayerDtos.EstablishmentView> establishments(UUID id) {
-        requireTaxpayer(id);
+    public List<TaxpayerDtos.EstablishmentView> establishments(UUID id,String actor) {
+        taxpayerScopes.requireTaxpayerAccess(actor,id);requireTaxpayer(id);
         return establishments.findByTaxpayerIdOrderByCodeAsc(id).stream().map(TaxpayerDtos.EstablishmentView::from).toList();
     }
     @Transactional(readOnly=true)
-    public Page<TaxpayerDtos.SnapshotView> snapshots(UUID id,Pageable pageable) {
-        requireTaxpayer(id);
+    public Page<TaxpayerDtos.SnapshotView> snapshots(UUID id,Pageable pageable,String actor) {
+        taxpayerScopes.requireTaxpayerAccess(actor,id);requireTaxpayer(id);
         Pageable safe=PageRequest.of(Math.max(0,pageable.getPageNumber()),Math.min(100,Math.max(1,pageable.getPageSize())),
             Sort.by(Sort.Direction.DESC,"observedAt"));
         return snapshots.findByTaxpayerIdOrderByObservedAtDesc(id,safe).map(TaxpayerDtos.SnapshotView::from);
@@ -102,6 +105,7 @@ public class TaxpayerService {
         Warehouse warehouse=warehouses.findById(warehouseId).orElseThrow(()->new ResourceNotFoundException("Almacén",warehouseId));
         SriEstablishment establishment=establishments.findById(request.establishmentId())
             .orElseThrow(()->new ResourceNotFoundException("Establecimiento SRI",request.establishmentId()));
+        taxpayerScopes.requireTaxpayerAccess(actor,establishment.getTaxpayer().getId());
         if(assignments.existsByWarehouseIdAndEstablishmentIdAndRelationshipTypeAndValidToIsNull(
                 warehouseId,establishment.getId(),request.relationshipType()))
             throw new ConflictException("Ya existe una asignación vigente del mismo tipo para este almacén y establecimiento.");
@@ -121,7 +125,7 @@ public class TaxpayerService {
     @Transactional(readOnly=true)
     public List<TaxpayerDtos.AssignmentView> assignments(UUID warehouseId,String actor) {
         warehouseService.get(warehouseId,actor);
-        return assignments.findByWarehouseIdOrderByValidFromDesc(warehouseId).stream().map(TaxpayerDtos.AssignmentView::from).toList();
+        return assignments.findByWarehouseIdOrderByValidFromDesc(warehouseId).stream().peek(a -> taxpayerScopes.requireTaxpayerAccess(actor,a.getEstablishment().getTaxpayer().getId())).map(TaxpayerDtos.AssignmentView::from).toList();
     }
 
     @Transactional
@@ -129,6 +133,7 @@ public class TaxpayerService {
         WarehouseEstablishmentAssignment assignment=assignments.findById(assignmentId)
             .orElseThrow(()->new ResourceNotFoundException("Asignación fiscal de almacén",assignmentId));
         warehouseService.get(assignment.getWarehouse().getId(),actor);
+        taxpayerScopes.requireTaxpayerAccess(actor,assignment.getEstablishment().getTaxpayer().getId());
         try {assignment.close(request.validTo());}
         catch(IllegalArgumentException|IllegalStateException invalid){throw new ConflictException(invalid.getMessage());}
         audit.record(actor,"WAREHOUSE_SRI_ESTABLISHMENT_ASSIGNMENT_CLOSED","WAREHOUSE",assignment.getWarehouse().getId(),

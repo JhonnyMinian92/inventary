@@ -18,8 +18,8 @@ public class TaxpayerController {
 
     // Dedicated tax-data permissions; read and mutation capabilities are intentionally separated.
     @GetMapping("/api/v1/taxpayers") @PreAuthorize("hasAuthority('taxpayer:read')")
-    public Page<TaxpayerDtos.ProfileView> list(@RequestParam(required=false) String q,@PageableDefault(size=20) Pageable pageable) {
-        return service.list(q,pageable);
+    public Page<TaxpayerDtos.ProfileView> list(@RequestParam(required=false) String q,@PageableDefault(size=20) Pageable pageable,Authentication auth) {
+        return service.list(q,pageable,auth.getName());
     }
     @PostMapping("/api/v1/taxpayers/import") @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('taxpayer:manage')")
@@ -27,12 +27,12 @@ public class TaxpayerController {
         return service.importManual(request,auth.getName());
     }
     @GetMapping("/api/v1/taxpayers/{id}") @PreAuthorize("hasAuthority('taxpayer:read')")
-    public TaxpayerDtos.ProfileView get(@PathVariable UUID id){return service.get(id);}
+    public TaxpayerDtos.ProfileView get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
     @GetMapping("/api/v1/taxpayers/{id}/establishments") @PreAuthorize("hasAuthority('taxpayer:read')")
-    public List<TaxpayerDtos.EstablishmentView> establishments(@PathVariable UUID id){return service.establishments(id);}
+    public List<TaxpayerDtos.EstablishmentView> establishments(@PathVariable UUID id,Authentication auth){return service.establishments(id,auth.getName());}
     @GetMapping("/api/v1/taxpayers/{id}/snapshots") @PreAuthorize("hasAuthority('taxpayer:read')")
-    public Page<TaxpayerDtos.SnapshotView> snapshots(@PathVariable UUID id,@PageableDefault(size=20) Pageable pageable) {
-        return service.snapshots(id,pageable);
+    public Page<TaxpayerDtos.SnapshotView> snapshots(@PathVariable UUID id,@PageableDefault(size=20) Pageable pageable,Authentication auth) {
+        return service.snapshots(id,pageable,auth.getName());
     }
     @PostMapping("/api/v1/warehouses/{warehouseId}/establishment-assignments") @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('taxpayer:manage')")

@@ -14,4 +14,6 @@ public interface TaxpayerRepository extends JpaRepository<TaxpayerProfile,UUID> 
     Optional<TaxpayerProfile> findForUpdateByTaxId(@Param("taxId") String taxId);
     @Query("select t from TaxpayerProfile t where (:pattern is null or lower(t.taxId) like :pattern or lower(t.legalName) like :pattern)")
     Page<TaxpayerProfile> search(@Param("pattern") String pattern, Pageable pageable);
+    @Query("select t from TaxpayerProfile t where t.id in :allowedIds and (:pattern is null or lower(t.taxId) like :pattern or lower(t.legalName) like :pattern)")
+    Page<TaxpayerProfile> searchScoped(@Param("pattern") String pattern,@Param("allowedIds") java.util.Set<UUID> allowedIds,Pageable pageable);
 }

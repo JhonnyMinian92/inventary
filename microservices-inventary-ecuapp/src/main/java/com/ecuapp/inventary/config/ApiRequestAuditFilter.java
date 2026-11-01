@@ -35,6 +35,7 @@ public class ApiRequestAuditFilter extends OncePerRequestFilter {
         "/api/v1/costing",
         "/api/v1/customers",
         "/api/v1/suppliers",
+        "/api/v1/taxpayers",
         "/api/v1/sales",
         "/api/v1/sales-returns",
         "/api/v1/purchase-orders",
