@@ -45,6 +45,15 @@ class KafkaInboxEventTest extends ApiTestSupport {
     }
 
     @Test
+    void unsupportedEnvelopeVersionsAreRejectedBeforeInboxPersistence() {
+        UUID eventId = UUID.randomUUID();
+        UUID aggregateId = UUID.randomUUID();
+        String unsupported = envelope(eventId, aggregateId, 5.0).replace("\"schemaVersion\":1", "\"schemaVersion\":99");
+        assertThrows(IllegalArgumentException.class, () -> inbox.process(unsupported));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM kafka_inbox_event WHERE event_id = ?", Integer.class, eventId));
+    }
+
+    @Test
     void malformedOrOversizedEventsAreRejectedBeforeTheyCanMutateTheInbox() {
         assertThrows(IllegalArgumentException.class, () -> inbox.process("{not-json"));
         UUID eventId = UUID.randomUUID();
