@@ -21,9 +21,12 @@ La fase cubre órdenes de compra, recepciones, devoluciones a proveedores, venta
 
 - Se agregó búsqueda server-side `q` en `GET /api/v1/purchase-orders`, buscando por número de orden y nombre de proveedor y manteniendo la paginación y el filtro por almacenes autorizados.
 - Se añadió prueba de integración para la búsqueda de órdenes.
+- Se extendió la búsqueda server-side a `GET /api/v1/goods-receipts` (número de recepción, orden y proveedor) y `GET /api/v1/purchase-returns` (número de devolución, recepción, orden y proveedor), manteniendo scope y paginación.
+- Se añadió `GET /api/v1/goods-receipts/{id}/returnable-lines`, que calcula en servidor cantidad recibida, devuelta y restante por línea. La UI ya no descarga hasta 100 devoluciones para reconstruir elegibilidad ni confía en agregados parciales del navegador.
+- La UI de devoluciones a proveedores usa búsqueda paginada para recepciones y devoluciones, y consume el saldo retornable calculado por el backend.
 - Se conectó el filtro de búsqueda de la pantalla Compras al parámetro server-side y se persiste como `purchases.q` en la URL. La búsqueda no descarga el historial completo ni filtra solo la página visible.
 - Se corrigió la prueba de bootstrap Flyway que aún esperaba la versión 20; la rama ya contiene 22 migraciones incrementales.
-- La CI del commit que añade búsqueda server-side aún debe terminar en verde; las primeras ejecuciones detectaron y se corrigió el problema de tipado de parámetro nulo en PostgreSQL.
+- La CI del commit que amplía la búsqueda y elegibilidad de devoluciones debe terminar en verde; las primeras ejecuciones intermedias fallaron porque los cambios de repositorio, servicio, controlador y pruebas se estaban aplicando secuencialmente. Se debe validar el SHA final.
 
 ## Pendientes que impiden cerrar la fase
 
