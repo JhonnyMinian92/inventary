@@ -34,9 +34,9 @@ No se incluye cliente HTTP de terceros. La referencia de fuente es metadato de p
 - No se conoce ni se ha autorizado un proveedor/API estable del SRI; no se implementó scraping ni se asumió un JSON público.
 - No se modela todavía propietario legal del inventario. Por seguridad, las bodegas no pueden vincularse activamente a perfiles de RUC distintos.
 - No se implementó aún la interfaz SRI ni la visualización de asociaciones en la ficha de almacén.
-- Siguen pendientes scopes fiscales por contribuyente/establecimiento, roles CUSTOMER/SUPPLIER modificables sobre un único socio, tipo de identificación, formularios contextuales en Compras/Ventas y búsqueda remota en esos formularios.
+- Se añadió transición auditada de roles de un BusinessPartner (`CUSTOMER`, `SUPPLIER`, `BOTH`) sin duplicar identidad, protegida por `partners:manage` y disponible desde el catálogo de contactos. Siguen pendientes scopes fiscales por contribuyente/establecimiento, tipo de identificación, formularios contextuales en Compras/Ventas y búsqueda remota en esos formularios.
 - La configuración de unidades sigue en el catálogo existente. No se cambió la interpretación de documentos históricos ni se habilitaron unidades alternativas por línea sin un contrato de cantidad base, precio, redondeo y factor snapshot.
-- Los permisos tributarios usan temporalmente `inventory:manage`; antes de producción deben existir permisos y scopes específicos y pruebas de aislamiento.
+- Los endpoints del registro tributario usan `taxpayer:read`/`taxpayer:manage`. Los endpoints de asignación fiscal están bajo rutas de almacén y exigen además el permiso de inventario correspondiente, además del permiso fiscal de método. Los scopes por contribuyente/establecimiento aún no están modelados.
 
 ## Validación requerida
 
