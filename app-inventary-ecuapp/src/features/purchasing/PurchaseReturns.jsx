@@ -16,6 +16,12 @@ function readPurchaseReturnFromUrl() {
 export default function PurchaseReturns({ onChanged }) {
   const [returns, setReturns] = useState([]);
   const [returnsPage, setReturnsPage] = useState(0);
+  const [returnsQuery, setReturnsQuery] = useState('');
+  const [debouncedReturnsQuery, setDebouncedReturnsQuery] = useState('');
+  const [receiptQuery, setReceiptQuery] = useState('');
+  const [debouncedReceiptQuery, setDebouncedReceiptQuery] = useState('');
+  const [receiptPage, setReceiptPage] = useState(0);
+  const [receiptPageInfo, setReceiptPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
   const [returnsPageInfo, setReturnsPageInfo] = useState({ page: 0, size: 20, totalElements: 0, totalPages: 1 });
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,12 +38,21 @@ export default function PurchaseReturns({ onChanged }) {
   const [lines, setLines] = useState([]);
   const [reason, setReason] = useState('');
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setDebouncedReturnsQuery(returnsQuery.trim()); setReturnsPage(0); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [returnsQuery]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setDebouncedReceiptQuery(receiptQuery.trim()); setReceiptPage(0); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [receiptQuery]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
     const [returnResult, receiptResult] = await Promise.allSettled([
-      api.purchaseReturns({ page: returnsPage, size: 20, sort: 'createdAt,desc' }),
-      api.goodsReceipts({ page: 0, size: 100, sort: 'receivedAt,desc' })
+      api.purchaseReturns({ ...(debouncedReturnsQuery ? { q: debouncedReturnsQuery } : {}), page: returnsPage, size: 20, sort: 'createdAt,desc' }),
+      api.goodsReceipts({ ...(debouncedReceiptQuery ? { q: debouncedReceiptQuery } : {}), page: receiptPage, size: 20, sort: 'receivedAt,desc' })
     ]);
     const failures = [];
     if (returnResult.status === 'fulfilled') {
@@ -48,11 +63,18 @@ export default function PurchaseReturns({ onChanged }) {
         totalPages: Number(returnResult.value?.totalPages ?? 1)
       });
     } else failures.push('devoluciones a proveedores: ' + (returnResult.reason?.message || 'error'));
-    if (receiptResult.status === 'fulfilled') setReceipts(listFrom(receiptResult.value).filter(item => String(item.status || '').toUpperCase() === 'POSTED'));
+    if (receiptResult.status === 'fulfilled') {
+      setReceipts(listFrom(receiptResult.value).filter(item => String(item.status || '').toUpperCase() === 'POSTED'));
+      setReceiptPageInfo({
+        page: Number(receiptResult.value?.number ?? 0), size: Number(receiptResult.value?.size ?? 20),
+        totalElements: Number(receiptResult.value?.totalElements ?? listFrom(receiptResult.value).length),
+        totalPages: Number(receiptResult.value?.totalPages ?? 1)
+      });
+    }
     else failures.push('recepciones: ' + (receiptResult.reason?.message || 'error'));
     if (failures.length) setError('No se pudieron cargar todos los datos. ' + failures.join(' · '));
     setLoading(false);
-  }, [returnsPage]);
+  }, [returnsPage, debouncedReturnsQuery, debouncedReceiptQuery, receiptPage]);
 
   // Reload on open too: receipts posted since the list was mounted must be selectable.
   useEffect(() => { void refresh(); }, [refresh, formOpen]);
@@ -81,31 +103,22 @@ export default function PurchaseReturns({ onChanged }) {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.goodsReceipt(receiptId), api.purchaseReturns({ goodsReceiptId: receiptId, page: 0, size: 100 })])
-      .then(([receiptDetail, returnPayload]) => {
+    api.goodsReceiptReturnable(receiptId)
+      .then(receiptDetail => {
         if (!active) return;
-        const priorReturns = listFrom(returnPayload).filter(item => String(item.status || '').toUpperCase() !== 'CANCELLED');
-        const returnedByReceiptLine = new Map();
-        priorReturns.forEach(ret => (Array.isArray(ret.items) ? ret.items : []).forEach(line => {
-          const key = String(line.receiptLineId || '');
-          if (key) returnedByReceiptLine.set(key, (returnedByReceiptLine.get(key) || 0) + Number(line.quantity || 0));
-        }));
         const receiptLines = Array.isArray(receiptDetail.items) ? receiptDetail.items : [];
         setReceipt(receiptDetail);
-        setLines(receiptLines.map(line => {
-          const original = Number(line.quantity || 0);
-          const alreadyReturned = returnedByReceiptLine.get(String(idOf(line))) || 0;
-          return {
-            receiptLineId: idOf(line),
-            sku: line.sku || '',
-            productId: line.productId || '',
-            productName: line.productName || line.name || line.sku || 'Producto',
-            quantity: '0',
-            receivedQuantity: original,
-            remainingQuantity: Math.max(0, original - alreadyReturned),
-            unitCost: Number(line.unitCost || 0)
-          };
-        }));
+        setLines(receiptLines.map(line => ({
+          receiptLineId: idOf(line),
+          sku: line.sku || '',
+          productId: line.productId || '',
+          productName: line.productName || line.sku || 'Producto',
+          quantity: '0',
+          receivedQuantity: Number(line.receivedQuantity || 0),
+          returnedQuantity: Number(line.returnedQuantity || 0),
+          remainingQuantity: Number(line.remainingQuantity || 0),
+          unitCost: Number(line.unitCost || 0)
+        })));
       })
       .catch(err => {
         if (active) {
@@ -238,6 +251,7 @@ export default function PurchaseReturns({ onChanged }) {
       <div><h3>Devoluciones a proveedores</h3><p>Registra mercancía devuelta desde una recepción contabilizada.</p></div>
       <button type="button" className="button primary" onClick={openForm} disabled={formOpen}>+ Nueva devolución</button>
     </div>
+    {!formOpen && <div className="toolbar"><div className="search-box"><input aria-label="Buscar devoluciones a proveedores" value={returnsQuery} onChange={event => setReturnsQuery(event.target.value)} placeholder="Buscar por devolución, recepción, orden o proveedor…"/></div><span className="muted">{returnsPageInfo.totalElements} registros</span></div>
     {!formOpen && <div className="table-wrap"><table><thead><tr><th>Devolución</th><th>Orden</th><th>Recepción</th><th>Estado</th><th>Fecha</th><th>Motivo</th><th>Total</th></tr></thead><tbody>
       {returns.map((row,index) => <tr key={idOf(row)||index}>
         <td><strong>{row.returnNumber || idOf(row)}</strong></td><td>{row.purchaseOrderNumber || row.purchaseOrderId || '—'}</td>
@@ -256,7 +270,9 @@ export default function PurchaseReturns({ onChanged }) {
       <form className="workflow-form" onSubmit={submit} noValidate>
         {step === 0 && <section className="workflow-stage">
           <div className="workflow-stage-heading"><span className="workflow-stage-icon"><PackageMinus size={20}/></span><div><h2>¿De qué recepción sale la devolución?</h2><p>Solo se muestran recepciones contabilizadas.</p></div></div>
+          <label className="field"><span>Buscar recepción</span><input value={receiptQuery} onChange={event => setReceiptQuery(event.target.value)} placeholder="Número de recepción, orden o proveedor…"/></label>
           <label className="field"><span>Recepción<b> *</b></span><select required value={receiptId} disabled={loading} onChange={event => { setReceiptId(event.target.value); setValidationMessage(''); }}><option value="">Seleccionar recepción</option>{receipts.map(item => <option key={idOf(item)} value={idOf(item)}>{item.receiptNumber || idOf(item)} · {item.purchaseOrderNumber || 'Orden'} · {item.warehouseCode || item.warehouseName || 'Almacén'}</option>)}</select></label>
+          <ServerPagination info={receiptPageInfo} page={receiptPage} loading={loading} onChange={setReceiptPage}/>
           {!receipts.length && <p className="form-hint">No hay recepciones contabilizadas disponibles para devolver.</p>}
           {receiptId && loading && <p className="form-hint" role="status">Cargando artículos y cantidades que todavía puedes devolver…</p>}
           {receipt && <div className="workflow-review-grid"><div className="workflow-review-card"><small>Recepción</small><strong>{selectedReceipt}</strong></div><div className="workflow-review-card"><small>Productos devueltos posibles</small><strong>{lines.filter(line => line.remainingQuantity > 0).length}</strong></div></div>}
