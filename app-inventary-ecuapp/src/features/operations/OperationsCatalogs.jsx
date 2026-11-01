@@ -100,6 +100,7 @@ export default function OperationsCatalogs({ onChanged, can = () => false }) {
   const [notice, setNotice] = useState('');
   useMessageToast(notice, setNotice, 'success');
   const dialogRef = useAccessibleDialog(modal, () => setModal(false));
+  const roleDialogRef = useAccessibleDialog(roleModal, () => setRoleModal(false));
   const [optionSources, setOptionSources] = useState({ dimensions: [] });
   const [roleModal, setRoleModal] = useState(false);
   const [roleSelection, setRoleSelection] = useState([]);
@@ -296,7 +297,7 @@ export default function OperationsCatalogs({ onChanged, can = () => false }) {
     {kind === 'units' && <UnitConversions units={records.units} />}
 
     {roleModal && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !loading) setRoleModal(false); }}>
-      <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="partner-roles-title" tabIndex={-1}>
+      <section ref={roleDialogRef} className="modal-card" role="dialog" aria-modal="true" aria-labelledby="partner-roles-title" tabIndex={-1}>
         <div className="modal-heading"><h2 id="partner-roles-title">Roles de {editing?.name || 'contacto'}</h2><button type="button" className="icon-button" aria-label="Cerrar ventana" onClick={() => setRoleModal(false)}>×</button></div>
         <p className="form-hint">Un mismo registro puede actuar como cliente, proveedor o ambos. No se crea una identidad duplicada.</p>
         <div className="form-grid">
