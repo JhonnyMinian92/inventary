@@ -296,6 +296,16 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Vincular venta interna y cuota a documento fiscal en Fase 7.
 - No habilitar auto-renovación, prueba gratis, créditos, derechos, acceso o sector médico sin modelo y pruebas específicos.
 
+**Avance de implementación (2026-11-01):**
+- Se verificaron las capacidades existentes de compras, recepciones parciales, devoluciones físicas, ventas, cancelaciones segregadas y calendario de suscripciones.
+- Se agregó búsqueda server-side por número de orden/proveedor en `GET /api/v1/purchase-orders`, con el mismo scope de almacenes y paginación. Se conectó el filtro de la pantalla Compras y se persiste en la URL.
+- Se agregó prueba de integración para la búsqueda. Las ejecuciones iniciales de CI detectaron un parámetro nullable mal tipado por Hibernate/PostgreSQL; se cambió a texto no nulo y el último SHA debe confirmar el resultado.
+- Se corrigió la expectativa de versión de Flyway en la prueba de bootstrap (V22).
+
+**Pendiente para cerrar Fase 6:** separar Compras en pestañas de órdenes/recepciones/devoluciones, completar búsqueda y DTOs ligeros de recepciones/devoluciones, filtros URL y permisos/estados por fila; completar el flujo de venta con snapshots de comprador/destinatario/fulfillment y resolución server-side de almacén; separar ventas y devoluciones en la UI; crear libro de pagos/reembolsos con estados de verificación, idempotencia, aprobación y conciliación; y completar búsqueda/contadores de suscripciones distinguiendo programado/facturado/cobrado. No existe contrato de gateway aprobado ni modelo de factura de proveedor/cuentas por pagar; no se simularán pagos verificados ni deuda al proveedor.
+
+**Estado: EN PROGRESO — se implementó búsqueda de órdenes de compra y su integración UI; el resto de brechas está documentado en `microservices-inventary-ecuapp/docs/30-implementacion-fase6-operaciones-comerciales.md`.**
+
 ### Fase 7 — Facturación SRI e integración distribuida durable
 
 **Contrato fiscal**
@@ -436,6 +446,7 @@ Una fase no se cierra por “compilar” solamente. Debe:
 - Fase 3: **implementación estructural completada y smoke E2E responsive del login validado**; la aceptación browser de todos los flujos autenticados queda pendiente.
 - Fase 4: **en progreso**; se reorganizó la primera rebanada vertical de catálogo (REST/GraphQL y servicios de aplicación), pero persisten las brechas de entidades/repositorios JPA, puertos entre dominios, DTOs y migración del resto de contextos.
 - Fase 5: **implementación parcial**; V21 agrega registro tributario manual con snapshots y asociación N:M tipada bodega–establecimiento. No hay proveedor SRI automático ni UI completa; continúan pendientes los elementos listados en la sección de Fase 5.
+- Fase 6: **en progreso**; búsqueda server-side de órdenes y filtro UI implementados; pagos/reembolsos, UX de recepciones/devoluciones y cierre integral pendientes.
 - Fases pendientes de implementación/cierre: **Fase 2 (cierre), 4–10**.
 - Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend del código actual: [run 41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258), success, 106/106 tests, validación Flyway/Hibernate, Compose y smoke test desde volumen vacío.
 - Rama actual de trabajo: implementacion_propuestas; master no fue modificada.
