@@ -251,7 +251,7 @@ export default function PurchaseReturns({ onChanged }) {
       <div><h3>Devoluciones a proveedores</h3><p>Registra mercancía devuelta desde una recepción contabilizada.</p></div>
       <button type="button" className="button primary" onClick={openForm} disabled={formOpen}>+ Nueva devolución</button>
     </div>
-    {!formOpen && <div className="toolbar"><div className="search-box"><input aria-label="Buscar devoluciones a proveedores" value={returnsQuery} onChange={event => setReturnsQuery(event.target.value)} placeholder="Buscar por devolución, recepción, orden o proveedor…"/></div><span className="muted">{returnsPageInfo.totalElements} registros</span></div>
+    {!formOpen && <div className="toolbar"><div className="search-box"><input aria-label="Buscar devoluciones a proveedores" value={returnsQuery} onChange={event => setReturnsQuery(event.target.value)} placeholder="Buscar por devolución, recepción, orden o proveedor…"/></div><span className="muted">{returnsPageInfo.totalElements} registros</span></div>}
     {!formOpen && <div className="table-wrap"><table><thead><tr><th>Devolución</th><th>Orden</th><th>Recepción</th><th>Estado</th><th>Fecha</th><th>Motivo</th><th>Total</th></tr></thead><tbody>
       {returns.map((row,index) => <tr key={idOf(row)||index}>
         <td><strong>{row.returnNumber || idOf(row)}</strong></td><td>{row.purchaseOrderNumber || row.purchaseOrderId || '—'}</td>
