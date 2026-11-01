@@ -45,6 +45,17 @@ class KafkaInboxEventTest extends ApiTestSupport {
     }
 
     @Test
+    void legacyEnvelopeWithoutVersionDeduplicatesAgainstExplicitVersionOne() {
+        UUID eventId = UUID.randomUUID();
+        UUID aggregateId = UUID.randomUUID();
+        String versioned = envelope(eventId, aggregateId, 12.50);
+        String legacy = versioned.replace("\"schemaVersion\":1,", "");
+        assertEquals(KafkaInboxEventService.Result.PROCESSED, inbox.process(legacy));
+        assertEquals(KafkaInboxEventService.Result.DUPLICATE, inbox.process(versioned));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM kafka_inbox_event WHERE event_id = ?", Integer.class, eventId));
+    }
+
+    @Test
     void unsupportedEnvelopeVersionsAreRejectedBeforeInboxPersistence() {
         UUID eventId = UUID.randomUUID();
         UUID aggregateId = UUID.randomUUID();
