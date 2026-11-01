@@ -12,6 +12,6 @@ public interface TaxpayerRepository extends JpaRepository<TaxpayerProfile,UUID> 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from TaxpayerProfile t where t.taxId=:taxId")
     Optional<TaxpayerProfile> findForUpdateByTaxId(@Param("taxId") String taxId);
-    @Query("select t from TaxpayerProfile t where (:pattern is null or lower(t.taxId) like :pattern escape '\\\\' or lower(t.legalName) like :pattern escape '\\\\')")
+    @Query("select t from TaxpayerProfile t where (:pattern is null or lower(t.taxId) like :pattern or lower(t.legalName) like :pattern)")
     Page<TaxpayerProfile> search(@Param("pattern") String pattern, Pageable pageable);
 }

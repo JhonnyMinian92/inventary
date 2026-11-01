@@ -36,7 +36,7 @@ public class TaxpayerService {
 
     @Transactional(readOnly=true)
     public Page<TaxpayerDtos.ProfileView> list(String q,Pageable pageable) {
-        String pattern=q==null||q.isBlank()?null:"%"+escape(q.trim().toLowerCase(Locale.ROOT))+"%";
+        String pattern=q==null||q.isBlank()?null:"%"+q.trim().toLowerCase(Locale.ROOT).replace("%","").replace("_","").replace("\\\\","")+"%";
         Pageable safe=PageRequest.of(Math.max(0,pageable.getPageNumber()),Math.min(100,Math.max(1,pageable.getPageSize())),
             Sort.by(Sort.Direction.ASC,"legalName"));
         return taxpayers.search(pattern,safe).map(TaxpayerDtos.ProfileView::from);
