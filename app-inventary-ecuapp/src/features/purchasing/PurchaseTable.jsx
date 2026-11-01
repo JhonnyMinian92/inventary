@@ -1,4 +1,5 @@
-import { CheckCircle2, Eye, Send, XCircle, PackageCheck } from 'lucide-react';
+import { CheckCircle2, Eye, Send, XCircle, PackageCheck, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { statusLabel, statusTone } from '../../utils/format.js';
 import ServerPagination from '../../ui/ServerPagination.jsx';
 
@@ -9,8 +10,18 @@ function date(value) {
   return Number.isNaN(parsed.valueOf()) ? String(value) : parsed.toLocaleDateString('es-EC');
 }
 
-export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, onCancel, onReceive, loading = false, pagination, page = 0, onPageChange }) {
+export default function PurchaseTable({ rows = [], onView, onSubmit, onApprove, onCancel, onReceive, loading = false, pagination, page = 0, query = '', onSearch, onPageChange }) {
+  const [draftQuery, setDraftQuery] = useState(query);
+  useEffect(() => setDraftQuery(query), [query]);
   return <div className="table-wrap">
+    <form className="filter-bar" role="search" onSubmit={event => { event.preventDefault(); onSearch?.(draftQuery); }}>
+      <label className="visually-hidden" htmlFor="purchase-order-search">Buscar órdenes por número o proveedor</label>
+      <input id="purchase-order-search" type="search" maxLength={120} value={draftQuery}
+        onChange={event => setDraftQuery(event.target.value)} placeholder="Buscar por número o proveedor…" />
+      <button type="submit" className="button secondary" disabled={loading}><Search size={15}/> Buscar</button>
+      {query && <button type="button" className="button secondary" disabled={loading}
+        onClick={() => { setDraftQuery(''); onSearch?.(''); }}>Limpiar</button>}
+    </form>
     <table aria-label="Órdenes de compra">
       <caption className="visually-hidden">Órdenes de compra y sus estados de aprobación y recepción</caption>
       <thead><tr><th scope="col">Documento</th><th scope="col">Estado</th><th scope="col">Proveedor</th><th scope="col">Almacén</th><th scope="col">Líneas</th><th scope="col">Fecha</th><th scope="col">Acciones</th></tr></thead>
