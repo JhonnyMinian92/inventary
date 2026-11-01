@@ -68,6 +68,17 @@ public class KafkaInboxEventService {
             throw new IllegalArgumentException("El evento Kafka no contiene un envelope JSON válido.");
         }
         if (envelope == null || !envelope.isObject()) throw new IllegalArgumentException("El envelope Kafka debe ser un objeto JSON.");
+        JsonNode schemaVersion = envelope.get("schemaVersion");
+        // Missing version is accepted only as the legacy v1 envelope during the migration window.
+        if (schemaVersion != null && (!schemaVersion.isIntegralNumber() || schemaVersion.intValue() != 1)) {
+            throw new IllegalArgumentException("La versión del envelope Kafka no está soportada.");
+        }
+        optionalText(envelope, "correlationId", 80);
+        optionalText(envelope, "causationId", 80);
+        JsonNode aggregateVersion = envelope.get("aggregateVersion");
+        if (aggregateVersion != null && (!aggregateVersion.isIntegralNumber() || aggregateVersion.longValue() < 0)) {
+            throw new IllegalArgumentException("aggregateVersion debe ser un entero no negativo.");
+        }
 
         UUID eventId = uuid(envelope, "eventId");
         UUID aggregateId = uuid(envelope, "aggregateId");
@@ -126,6 +137,14 @@ public class KafkaInboxEventService {
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException("El campo " + field + " debe contener un UUID válido.");
         }
+    }
+
+    private void optionalText(JsonNode envelope, String field, int maxLength) {
+        JsonNode value = envelope.get(field);
+        if (value == null) return;
+        if (!value.isTextual()) throw new IllegalArgumentException("El campo " + field + " debe ser texto.");
+        String text = value.asText().trim();
+        if (text.isEmpty() || text.length() > maxLength) throw new IllegalArgumentException("El campo " + field + " no es válido.");
     }
 
     private String requiredText(JsonNode envelope, String field, int maxLength) {
