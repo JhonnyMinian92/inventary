@@ -23,6 +23,18 @@ public class PartnerService {
   return repo.search(List.of(type,PartnerType.BOTH),pattern,active,Pages.of(p,SORT,Sort.by("name"))).map(PartnerDtos.View::from);
  }
  @Transactional(readOnly=true) public PartnerDtos.View get(PartnerType type,UUID id){return PartnerDtos.View.from(require(type,id));}
+ @Transactional public PartnerDtos.View updateRoles(UUID id,PartnerDtos.RolesRequest request,String actor){
+  Set<PartnerType> requested=request.roles();
+  if(requested.contains(PartnerType.BOTH))throw new com.ecuapp.inventary.common.BusinessRuleException("Indique CUSTOMER, SUPPLIER o ambos roles; BOTH no se combina con otros valores.");
+  PartnerType next=requested.size()==2?PartnerType.BOTH:requested.iterator().next();
+  BusinessPartner partner=repo.findForUpdateById(id).orElseThrow(()->new ResourceNotFoundException("Contacto comercial",id));
+  PartnerType previous=partner.getType();
+  if(previous==next)return PartnerDtos.View.from(partner);
+  partner.changeType(next);repo.flush();
+  audit.record(actor,"BUSINESS_PARTNER_ROLES_UPDATED","BUSINESS_PARTNER",id,
+   java.util.Map.of("previousType",previous.name(),"newType",next.name(),"code",partner.getCode()));
+  return PartnerDtos.View.from(partner);
+ }
  @Transactional public PartnerDtos.View create(PartnerType type,PartnerDtos.WriteRequest r,String actor){
   String code=r.code().trim().toUpperCase(Locale.ROOT);String tax=clean(r.taxId());
   if(repo.existsByCodeIgnoreCase(code))throw new ConflictException("Ya existe un contacto comercial con ese código.");
