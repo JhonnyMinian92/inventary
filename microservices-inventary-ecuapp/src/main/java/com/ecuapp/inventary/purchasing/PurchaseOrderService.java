@@ -42,14 +42,16 @@ public class PurchaseOrderService {
   this.orders=orders;this.receipts=receipts;this.receiptLines=receiptLines;this.idempotencyRecords=idempotencyRecords;this.partners=partners;this.warehouses=warehouses;this.products=products;this.balanceLocks=balanceLocks;this.units=units;this.movements=movements;this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.costing=costing;
   this.requireDistinctApprover=requireDistinctApprover;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(PurchaseOrderStatus status,UUID supplierId,UUID warehouseId,Instant from,Instant to,Pageable p,String actor){
+ @Transactional(readOnly=true) public Page<PurchaseDtos.OrderView> list(PurchaseOrderStatus status,UUID supplierId,UUID warehouseId,Instant from,Instant to,String q,Pageable p,String actor){
   validateRange(from,to);
   if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,ORDER_SORT,Sort.by(Sort.Direction.DESC,"orderedAt"));
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
-  return (allowed==null?orders.search(status,supplierId,warehouseId,lower,upper,pageable):
-   orders.searchScoped(status,supplierId,warehouseId,lower,upper,allowed,pageable)).map(PurchaseDtos.OrderView::from);
+  String query=q==null?null:q.trim().toLowerCase(Locale.ROOT).replaceAll("[%_]"," ").trim();
+  if(query!=null&&query.isEmpty())query=null;
+  return (allowed==null?orders.search(status,supplierId,warehouseId,lower,upper,query,pageable):
+   orders.searchScoped(status,supplierId,warehouseId,lower,upper,allowed,query,pageable)).map(PurchaseDtos.OrderView::from);
  }
  @Transactional(readOnly=true) public PurchaseDtos.OrderView get(UUID id,String actor){
   PurchaseOrder order=orders.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Orden de compra",id));
