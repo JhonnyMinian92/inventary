@@ -2,6 +2,7 @@
 import { request } from '../http/request.js';
 const query = params => new URLSearchParams(params).size ? '?' + new URLSearchParams(params) : '';
 export const partnersApi = {
+  updatePartnerRoles: (id, data) => request('/partners/' + encodeURIComponent(id) + '/roles', { method: 'PUT', body: data }),
   taxpayers: (params = {}) => request('/taxpayers' + query(params)),
   taxpayer: id => request('/taxpayers/' + encodeURIComponent(id)),
   taxpayerEstablishments: id => request('/taxpayers/' + encodeURIComponent(id) + '/establishments'),
