@@ -19,8 +19,8 @@ public class PurchaseOrderController {
  @GetMapping("/api/v1/purchase-orders") @PreAuthorize("hasAuthority('purchasing:read')")
  public Page<PurchaseDtos.OrderView> list(@RequestParam(required=false) PurchaseOrderStatus status,@RequestParam(required=false) UUID supplierId,
   @RequestParam(required=false) UUID warehouseId,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant from,
-  @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,
-  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(status,supplierId,warehouseId,from,to,p,auth.getName());}
+  @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE_TIME) Instant to,@RequestParam(required=false) String q,
+  @PageableDefault(size=20) Pageable p,Authentication auth){return service.list(status,supplierId,warehouseId,from,to,q,p,auth.getName());}
  @GetMapping("/api/v1/purchase-orders/{id}") @PreAuthorize("hasAuthority('purchasing:read')")
  public PurchaseDtos.OrderView get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders") @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('purchasing:manage')")
