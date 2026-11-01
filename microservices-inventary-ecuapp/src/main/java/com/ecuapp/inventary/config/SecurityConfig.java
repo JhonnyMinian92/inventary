@@ -91,6 +91,8 @@ public class SecurityConfig {
     .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
     .requestMatchers("/api/v1/audit-events/**").hasAuthority("audit:read")
     .requestMatchers("/api/v1/operations/**").hasAuthority("operations:manage")
+    .requestMatchers(HttpMethod.GET,"/api/v1/taxpayers/**").hasAuthority("taxpayer:read")
+    .requestMatchers("/api/v1/taxpayers/**").hasAuthority("taxpayer:manage")
     .requestMatchers(HttpMethod.GET,"/api/v1/reports/**").hasAuthority("reports:financial")
     .requestMatchers(HttpMethod.GET,"/api/v1/costing/**").hasAnyAuthority("reports:financial","costing:manage")
     .requestMatchers("/api/v1/costing/**").hasAuthority("costing:manage")
