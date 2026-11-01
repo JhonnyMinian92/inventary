@@ -247,6 +247,17 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Edición masiva con previsualización antes/después, validación por fila, control de concurrencia y reintento parcial.
 - Asistencia IA de descripción/normalización en borrador, con fuentes verificables y aprobación humana; no inventar compatibilidad, medidas, certificaciones, garantía, precio o stock.
 
+**Avance de implementación (2026-10-31/11-01; primer corte backend):**
+- Se agregó la migración incremental V21 para perfiles tributarios, establecimientos SRI, snapshots de importación y asignaciones N:M bodega–establecimiento; V1–V20 no se modificaron.
+- Se incorporaron entidades y repositorios para conservar RUC como texto de 13 dígitos, código de establecimiento como texto de tres dígitos (incluido `001`), nombre comercial nulo, estado recibido y estado normalizado `UNKNOWN` cuando no se reconoce.
+- Se agregó importación manual trazable, con hash SHA-256, snapshots históricos y auditoría. El estado queda explícitamente `MANUAL_REVIEW`; no se presenta como consulta automática ni verificación directa del SRI.
+- Se agregaron endpoints de lectura/importación restringidos a `inventory:manage`, historial paginado y asociación tipada con vigencia. El servicio valida el ámbito de la bodega mediante `WarehouseService` y bloquea asociaciones activas entre RUC diferentes mientras no exista propietario legal del stock.
+- La asociación fiscal no cambia el estado de la bodega, no define propiedad de stock y no autoriza emisión fiscal. Las importaciones parciales no eliminan establecimientos previos.
+
+**Pendiente para cerrar Fase 5:** integrar una fuente/proveedor SRI aprobado (o UI de importación controlada), completar permisos/scopes tributarios específicos, CRUD/paginación y roles/tipos de identificación de socios, formularios contextuales de Compras/Ventas, mover la configuración de unidades en UI, robustecer reglas de conversión, y pruebas integrales HTTP/DB/frontend. Las conversiones por línea siguen deshabilitadas hasta acordar unidad de captura, precio, redondeo y snapshots históricos. No se inventó un endpoint público SRI ni se habilitó scraping.
+
+**Estado: EN PROGRESO — primer corte de modelo tributario y relación fiscal de almacenes implementado; no se declara completa la fase.**
+
 ### Fase 6 — Operaciones comerciales y estados financieros completos
 
 **Compras**
@@ -424,6 +435,7 @@ Una fase no se cierra por “compilar” solamente. Debe:
 - Fase 2: **implementación parcial**; se añadieron auditoría de lecturas sensibles, eventos Outbox para ajustes/conteos/órdenes de compra y maker-checker en conteos físicos. No se declara cerrada por las brechas enumeradas en su sección.
 - Fase 3: **implementación estructural completada y smoke E2E responsive del login validado**; la aceptación browser de todos los flujos autenticados queda pendiente.
 - Fase 4: **en progreso**; se reorganizó la primera rebanada vertical de catálogo (REST/GraphQL y servicios de aplicación), pero persisten las brechas de entidades/repositorios JPA, puertos entre dominios, DTOs y migración del resto de contextos.
+- Fase 5: **implementación parcial**; V21 agrega registro tributario manual con snapshots y asociación N:M tipada bodega–establecimiento. No hay proveedor SRI automático ni UI completa; continúan pendientes los elementos listados en la sección de Fase 5.
 - Fases pendientes de implementación/cierre: **Fase 2 (cierre), 4–10**.
 - Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend del código actual: [run 41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258), success, 106/106 tests, validación Flyway/Hibernate, Compose y smoke test desde volumen vacío.
 - Rama actual de trabajo: implementacion_propuestas; master no fue modificada.
