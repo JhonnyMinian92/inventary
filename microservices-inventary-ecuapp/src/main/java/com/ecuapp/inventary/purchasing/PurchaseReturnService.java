@@ -41,14 +41,15 @@ public class PurchaseReturnService {
   PurchaseReturn r=returns.findDetailedById(id).orElseThrow(()->new ResourceNotFoundException("Devolución a proveedor",id));
   scopes.requireWarehouseAccess(actor,r.getWarehouse().getId());return PurchaseReturnDtos.View.from(r);
  }
- @Transactional(readOnly=true) public Page<PurchaseReturnDtos.View> list(UUID goodsReceiptId,UUID warehouseId,Instant from,Instant to,Pageable p,String actor){
+ @Transactional(readOnly=true) public Page<PurchaseReturnDtos.View> list(UUID goodsReceiptId,UUID warehouseId,Instant from,Instant to,String q,Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
   if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,Sort.by(Sort.Direction.DESC,"createdAt"));
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   var lower=com.ecuapp.inventary.common.TimeRange.lower(from);var upper=com.ecuapp.inventary.common.TimeRange.upper(to);
-  return (allowed==null?returns.search(goodsReceiptId,warehouseId,lower,upper,pageable):
-   returns.searchScoped(goodsReceiptId,warehouseId,lower,upper,allowed,pageable)).map(PurchaseReturnDtos.View::from);
+  String query=q==null?"":q.trim().toLowerCase(Locale.ROOT).replaceAll("[%_]"," ").trim();
+  return (allowed==null?returns.search(goodsReceiptId,warehouseId,lower,upper,query,pageable):
+   returns.searchScoped(goodsReceiptId,warehouseId,lower,upper,allowed,query,pageable)).map(PurchaseReturnDtos.View::from);
  }
  @Transactional public PurchaseReturnDtos.View create(String key,PurchaseReturnDtos.CreateRequest request,String actor){
   GoodsReceipt visible=receipts.findDetailedById(request.goodsReceiptId()).orElseThrow(()->new ResourceNotFoundException("Recepción",request.goodsReceiptId()));
