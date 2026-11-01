@@ -135,7 +135,7 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         JsonNode detail = httpGet(token("AUDITOR"), "/api/v1/goods-receipts/" + receipt.get("id").asText(), 200);
         assertAmount("4.00", detail.get("total"));
         assertEquals(supplierId, detail.get("supplierId").asText());
-        JsonNode receiptSearch = httpGet(token("AUDITOR"), "/api/v1/goods-receipts?q=" + orderId, 200);
+        JsonNode receiptSearch = httpGet(token("AUDITOR"), "/api/v1/goods-receipts?q=" + order.get("orderNumber").asText(), 200);
         assertEquals(2, receiptSearch.get("page").get("totalElements").asInt());
         JsonNode returnable = httpGet(token("AUDITOR"), "/api/v1/goods-receipts/" + receipt.get("id").asText() + "/returnable-lines", 200);
         assertAmount("2", returnable.get("items").get(0).get("receivedQuantity"));
@@ -254,6 +254,13 @@ class PurchasingAndCostingApiTest extends ApiTestSupport {
         assertAmount("1", onHand(productId, warehouseId));
         assertAmount("3", jdbc.queryForObject("select coalesce(sum(quantity),0) from purchase_return_line where source_goods_receipt_line_id=?::uuid",
             BigDecimal.class, receiptLineId));
-        assertTrue(httpGet(token("AUDITOR"), "/api/v1/purchase-returns?goodsReceiptId=" + receiptId, 200).get("page").get("totalElements").asInt() == 1);
+        JsonNode returnPage = httpGet(token("AUDITOR"), "/api/v1/purchase-returns?goodsReceiptId=" + receiptId, 200);
+        assertEquals(1, returnPage.get("page").get("totalElements").asInt());
+        JsonNode returnSearch = httpGet(token("AUDITOR"), "/api/v1/purchase-returns?q=" + returnPage.get("content").get(0).get("returnNumber").asText(), 200);
+        assertEquals(1, returnSearch.get("page").get("totalElements").asInt());
+        JsonNode returnable = httpGet(token("AUDITOR"), "/api/v1/goods-receipts/" + receiptId + "/returnable-lines", 200);
+        assertAmount("4", returnable.get("items").get(0).get("receivedQuantity"));
+        assertAmount("3", returnable.get("items").get(0).get("returnedQuantity"));
+        assertAmount("1", returnable.get("items").get(0).get("remainingQuantity"));
     }
 }
