@@ -27,6 +27,7 @@ public class BusinessPartner {
  @PrePersist void onCreate(){Instant now=Instant.now();createdAt=now;updatedAt=now;}
  @PreUpdate void onUpdate(){updatedAt=Instant.now();}
  public void update(String name,String taxId,String email,String phone,String address){this.name=name;this.taxId=taxId;this.email=email;this.phone=phone;this.address=address;}
+ public void changeType(PartnerType type){this.type=type;}
  public void deactivate(){active=false;}
  public void activate(){active=true;}
  public UUID getId(){return id;} public String getCode(){return code;} public PartnerType getType(){return type;}
