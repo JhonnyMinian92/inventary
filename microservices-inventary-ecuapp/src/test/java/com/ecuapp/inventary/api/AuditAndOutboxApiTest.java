@@ -88,6 +88,8 @@ class AuditAndOutboxApiTest extends ApiTestSupport {
                 JsonNode envelope = this.json.readTree(json);
                 assertEquals(1, envelope.get("schemaVersion").asInt());
                 assertEquals(eventId.toString(), envelope.get("eventId").asText());
+                assertEquals("SALE", envelope.get("aggregateType").asText());
+                assertEquals(saleId, envelope.get("aggregateId").asText());
                 assertEquals("SALE_COMPLETED", envelope.get("eventType").asText());
                 assertTrue(envelope.has("occurredAt"));
                 assertTrue(envelope.has("payload"));
