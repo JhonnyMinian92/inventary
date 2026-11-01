@@ -79,7 +79,7 @@ function WorkspaceContentView({ model }) {
       return <WhatsAppOrdersPage can={auth.can} detailId={state.detailRoute?.kind === 'whatsapp' ? state.detailRoute.id : ''}
         onOpenDetail={id => actions.openDetail('whatsapp', id)} onCloseDetail={actions.closeDetail} onChanged={data.loadData} />;
     case 'partners':
-      return <PartnersPage onChanged={data.loadData} />;
+      return <PartnersPage can={auth.can} onChanged={data.loadData} />;
     case 'purchases':
       return <PurchasingPage rows={data.purchases} loading={state.loading} pagination={data.pageInfo.purchases}
         query={state.listQuery} onSearch={actions.changeListQuery} page={state.listPage} onPageChange={actions.changeListPage} onView={order => actions.openDetail('purchase', order)}
