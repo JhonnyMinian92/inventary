@@ -55,3 +55,11 @@ CREATE TABLE auth_mfa_login_challenge (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX ix_auth_mfa_login_user ON auth_mfa_login_challenge(user_id, expires_at DESC);
+
+CREATE TABLE auth_rate_limit_window (
+    key_hash CHAR(64) PRIMARY KEY,
+    window_started_at TIMESTAMPTZ NOT NULL,
+    requests INTEGER NOT NULL CHECK (requests >= 0),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX ix_auth_rate_limit_updated ON auth_rate_limit_window(updated_at);
