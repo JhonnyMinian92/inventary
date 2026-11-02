@@ -1,0 +1,36 @@
+groups:
+  - name: inventary-auth-security
+    interval: 1m
+    rules:
+      - alert: InventaryAuthenticationFailuresHigh
+        expr: sum(increase(inventary_auth_authentication_total{outcome="failed"}[5m])) > 20
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Aumento de autenticaciones fallidas"
+          description: "Se registraron más de 20 fallos de autenticación en cinco minutos."
+      - alert: InventaryAccountLockoutsHigh
+        expr: sum(increase(inventary_auth_lockouts_total[10m])) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Aumento de bloqueos de cuentas"
+          description: "Se detectaron más de 10 eventos de bloqueo en diez minutos."
+      - alert: InventaryRateLimitEventsHigh
+        expr: sum(increase(inventary_auth_rate_limited_total[5m])) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Picos de solicitudes limitadas"
+          description: "La API está rechazando un volumen anómalo de solicitudes por límite."
+      - alert: InventaryAuthenticationEmailDeliveryFailures
+        expr: sum(increase(inventary_auth_email_total{outcome="failed"}[10m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Falló la entrega de correo de autenticación"
+          description: "Revisar SMTP y la entrega de recuperación/verificación de cuentas."
