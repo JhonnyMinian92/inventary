@@ -1,6 +1,6 @@
 # Estado y roadmap del frontend Inventary
 
-**Código auditado:** dc028a346ccf7b94cfbb60b4fb6cd5493518b481 en implementacion_propuestas.
+**Código auditado:** revisión de login y sesión en `implementacion_propuestas` (validación CI pendiente). Detalle: [auditoría de login y sesión](login-session-audit.md).
 
 Este documento sustituye el calendario histórico de implementación por una descripción del código actual y de las brechas que siguen abiertas.
 
@@ -8,7 +8,7 @@ Este documento sustituye el calendario histórico de implementación por una des
 
 | Área | Estado del código |
 |---|---|
-| Fundación, login y sesión | Implementado; unit tests y smoke browser responsive del login pasan en CI. |
+| Fundación, login y sesión | Flujo de login cifrado, perfil/permisos, expiración y logout implementados; se corrigió el fallback de Storage y el feedback accesible. Tests añadidos; pendiente validar el CI del commit final y E2E browser completo. Recuperación automática y MFA no implementados. |
 | Catálogo | Productos, categorías, atributos, unidades, conversiones, imágenes y variantes tienen pantallas/workflows. |
 | Contactos y datos fiscales | Clientes/proveedores/almacenes y registro tributario manual están en UI. La importación sigue en revisión manual; la gestión de tarifas tiene una API con excepción de autorización pública. |
 | Inventario | Centro de mando con KPIs/alertas/acciones; pestañas de existencias, movimientos, operaciones y auditoría; consumos de endpoint command-center. |
@@ -46,6 +46,8 @@ Esto no equivale a E2E autenticado del producto. Siguen pendientes pruebas brows
 No existe script lint en package.json. No presentar la suite actual como cobertura completa de UI.
 
 ## Trabajo frontend pendiente
+
+0. Cerrar la validación del login según [la matriz de aceptación y brechas de sesión](login-session-audit.md): CI final, E2E autenticado, accesibilidad, recuperación de contraseña y evaluación de MFA.
 
 1. Automatizar E2E autenticado con datos efímeros y distintos roles.
 2. Cubrir los recorridos comerciales y los casos de error/resultado incierto.
