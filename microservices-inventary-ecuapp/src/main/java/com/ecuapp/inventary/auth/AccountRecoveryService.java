@@ -57,6 +57,7 @@ public class AccountRecoveryService {
     @Transactional
     public void requestPasswordReset(String rawEmail) {
         String email=normalizeEmail(rawEmail);
+        jdbc.update("DELETE FROM auth_password_reset WHERE expires_at < CURRENT_TIMESTAMP - INTERVAL '7 days' OR consumed_at < CURRENT_TIMESTAMP - INTERVAL '7 days'");
         users.findByEmailIgnoreCaseAndEmailVerifiedTrue(email).filter(AppUser::isActive).ifPresent(user -> {
             String token=newToken();
             jdbc.update("UPDATE auth_password_reset SET consumed_at=CURRENT_TIMESTAMP WHERE user_id=? AND consumed_at IS NULL",user.getId());
@@ -97,6 +98,7 @@ public class AccountRecoveryService {
         AppUser user=users.findByUsername(username).filter(AppUser::isActive)
                 .orElseThrow(()->new BusinessRuleException("No se pudo actualizar el correo de recuperación."));
         String email=normalizeEmail(rawEmail);
+        jdbc.update("DELETE FROM auth_email_verification WHERE expires_at < CURRENT_TIMESTAMP - INTERVAL '7 days' OR consumed_at < CURRENT_TIMESTAMP - INTERVAL '7 days'");
         if(users.findByEmailIgnoreCase(email).filter(existing->!existing.getId().equals(user.getId())).isPresent())
             throw new BusinessRuleException("No se pudo utilizar ese correo electrónico.");
         user.setEmail(email);
