@@ -4,8 +4,11 @@
 .dash-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .dash-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-.kpi-tile { position: relative; display: grid; gap: 8px; align-content: start; min-width: 0; padding: 16px 18px; overflow: hidden; border: 1px solid #e3e9e4; border-radius: 14px; background: #fff; }
+.dashboard { perspective: 1400px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; perspective: 1000px; }
+.kpi-tile { position: relative; display: grid; gap: 8px; align-content: start; min-width: 0; padding: 16px 18px; overflow: visible; border: 1px solid #dfe9e3; border-radius: 14px; background: linear-gradient(145deg, #fff 10%, #f8fbf9 100%); box-shadow: 0 18px 24px rgba(19, 36, 26, .08), 7px 7px 0 #e7eee9; transform: rotateX(1.5deg) translateY(0); transform-origin: center bottom; transition: transform .18s ease, box-shadow .18s ease; }
+.kpi-tile::after { content: ''; position: absolute; right: -8px; bottom: -8px; width: 18px; height: calc(100% - 12px); border-radius: 0 14px 14px 0; background: #dce6df; transform: skewY(-45deg) translateY(4px); transform-origin: left bottom; z-index: -1; }
+.kpi-tile:hover { transform: rotateX(0) translateY(-3px); box-shadow: 0 22px 28px rgba(19, 36, 26, .12), 9px 9px 0 #e0e9e3; }
 .kpi-label { color: #5d6d63; font-size: 12.5px; font-weight: 600; }
 .kpi-value { color: #13241a; font: 800 26px/1.1 Manrope, sans-serif; letter-spacing: -.6px; overflow-wrap: anywhere; }
 .kpi-detail { display: inline-flex; align-items: center; gap: 5px; color: #6b7a70; font-size: 11.5px; }
@@ -15,7 +18,7 @@
 
 .dash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .dash-grid.two-one { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.dash-card { display: flex; flex-direction: column; min-width: 0; padding: 16px 18px; border: 1px solid #e3e9e4; border-radius: 14px; background: #fff; }
+.dash-card { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 16px 18px; border: 1px solid #e1e9e4; border-radius: 14px; background: linear-gradient(145deg, #fff, #fbfcfb); box-shadow: 0 14px 28px rgba(19, 36, 26, .06), 5px 6px 0 rgba(226, 235, 229, .85); }
 .dash-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; margin-bottom: 12px; }
 .dash-card-head h2 { margin: 0; color: #13241a; font: 700 14.5px Manrope, sans-serif; }
 .dash-card .text-button { color: #1f6b46; }

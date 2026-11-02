@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, listFrom } from '../../api.js';
 import { toast } from '../../ui/feedback.js';
 
@@ -8,12 +8,12 @@ export default function RefundsPanel({ canManage = false }) {
   const [pendingAction, setPendingAction] = useState(null);
   const [providerReference, setProviderReference] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try { setRows(listFrom(await api.refunds())); } catch (error) { toast.error(error?.message || 'No se pudieron cargar los reembolsos.'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { void load(); }, []);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
   const act = async (row, action, reference = '') => {
     if (!canManage) return;
     if (actionLoading) return;
@@ -37,15 +37,18 @@ export default function RefundsPanel({ canManage = false }) {
     <div className="table-card-header"><h3>Reembolsos</h3><button type="button" className="button secondary" disabled={loading} onClick={load}>Actualizar</button></div>
     {loading ? <p className="muted">Cargando reembolsos...</p> : rows.length === 0 ? <p className="muted">No hay reembolsos registrados.</p> : <div className="responsive-table">
       <table><thead><tr><th>Número</th><th>Estado</th><th>Monto</th><th>Motivo</th><th>Referencia</th><th></th></tr></thead>
-      <tbody>{rows.map(row => <tr key={row.id}>
+      <tbody>{rows.map((row, index) => {
+        const status = String(row.status || '').toUpperCase();
+        return <tr key={row.id || row.refundNumber || index}>
         <td>{row.refundNumber}</td><td>{row.status}</td><td>{row.currency} {Number(row.amount).toFixed(2)}</td><td>{row.reason}</td><td>{row.providerReference || '-'}</td>
         <td>{canManage && <>
-          {row.status === 'REQUESTED' && <button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'approve')}>Aprobar</button>}
-          {row.status === 'APPROVED' && <><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'processing')}>Procesar</button><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'cancel')}>Cancelar</button></>}
-          {row.status === 'PROCESSING' && <><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'complete')}>Completar</button><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'fail')}>Fallido</button><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'cancel')}>Cancelar</button></>}
-          {row.status === 'FAILED' && <button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'cancel')}>Cancelar</button>}
+          {status === 'REQUESTED' && <button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'approve')}>Aprobar</button>}
+          {status === 'APPROVED' && <><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'processing')}>Procesar</button><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'cancel')}>Cancelar</button></>}
+          {status === 'PROCESSING' && <><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'complete')}>Completar</button><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'fail')}>Fallido</button><button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'cancel')}>Cancelar</button></>}
+          {status === 'FAILED' && <button type="button" className="button secondary small" disabled={actionLoading} onClick={() => requestAction(row, 'cancel')}>Cancelar</button>}
         </>}</td>
-      </tr>)}</tbody></table>
+      </tr>;
+      })}</tbody></table>
     </div>}
     {pendingAction && <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (!actionLoading && event.target === event.currentTarget) setPendingAction(null); }}>
       <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="refund-complete-title">
