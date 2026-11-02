@@ -46,6 +46,7 @@ public class UserManagementService {
  }
  @Transactional public void resetPassword(UUID id,UserDtos.PasswordResetRequest request,String actor){
   AppUser user=require(id);passwordPolicy.validateForUser(request.newPassword(),user.getUsername());user.updatePasswordHash(encoder.encode(request.newPassword()));
+  users.consumePendingPasswordResets(user.getId());
   audit.record(actor,"USER_PASSWORD_RESET","APP_USER",id,Map.of("username",user.getUsername()));
  }
  private String activeRole(String raw){
