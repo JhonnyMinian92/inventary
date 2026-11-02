@@ -61,13 +61,13 @@
 
 ## Evidencia CI
 
-<badge>success</badge> **Frontend Build:** [ejecución 41448177000](https://github.com/JhonnyMinian92/inventary/actions/runs/41448177000), commit `890e9f78545012f5aba584692192d04cb5838352`.
+**PASS — Frontend Build:** [ejecución 41448177000](https://github.com/JhonnyMinian92/inventary/actions/runs/41448177000), commit `890e9f78545012f5aba584692192d04cb5838352`.
 - 37/37 pruebas Node aprobadas.
 - Build de producción correcto.
 - Smoke browser responsive aprobado a 360, 768 y 1280 px.
 - El smoke browser automatizado de este workflow verifica la pantalla de login y el desbordamiento general; no equivale a E2E funcional de Productos.
 
-<badge>success</badge> **Backend CI:** [ejecución 41447393333](https://github.com/JhonnyMinian92/inventary/actions/runs/41447393333), commit `a55daf2fd5ef9394d83e9c2fa76efaa35af1eb6a`.
+**PASS — Backend CI:** [ejecución 41447393333](https://github.com/JhonnyMinian92/inventary/actions/runs/41447393333), commit `a55daf2fd5ef9394d83e9c2fa76efaa35af1eb6a`.
 - 123/123 pruebas Maven aprobadas con PostgreSQL 16.
 - Incluye `CatalogApiTest` (15 pruebas): filtros/orden, conteo por categoría, fiscalidad, SKU, variantes, búsqueda por SKU/código de barras, imágenes y sincronización de imagen principal.
 - Docker Compose validado y smoke de arranque desde volumen PostgreSQL vacío aprobado.
