@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Boxes, ChevronLeft, ChevronRight, Download, PackageSearch, Pencil, Plus, Power, Search, Tags, Trash2 } from 'lucide-react';
-import { api, listFrom } from '../../api';
+import { api, listFrom, resolveApiUrl } from '../../api';
 import { isPlainLeftClick, sectionPath } from '../../router.js';
 import Drawer from '../../ui/Drawer.jsx';
 import { Skeleton, SkeletonTable } from '../../ui/Skeleton.jsx';
@@ -70,6 +70,8 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
   const canMovements = can('inventory:manage') || can('audit:read');
   const [movements, setMovements] = useState(null);
   const [productBalances, setProductBalances] = useState(null);
+  const [images, setImages] = useState([]);
+  const [variants, setVariants] = useState([]);
   const productId = idOf(product);
   useEffect(() => {
     if (!canMovements) return undefined;
@@ -86,6 +88,17 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
     api.balances({ productId, page: 0, size: 100 })
       .then(payload => { if (active) setProductBalances(listFrom(payload)); })
       .catch(error => { if (active) { setProductBalances([]); toast.error(error?.message || 'No se pudieron cargar las existencias del producto.'); } });
+    return () => { active = false; };
+  }, [productId]);
+  useEffect(() => {
+    let active = true;
+    setImages([]);
+    setVariants([]);
+    Promise.allSettled([api.productImages(productId), api.productVariants(productId)]).then(results => {
+      if (!active) return;
+      if (results[0].status === 'fulfilled') setImages(Array.isArray(results[0].value) ? results[0].value : []);
+      if (results[1].status === 'fulfilled') setVariants(Array.isArray(results[1].value) ? results[1].value : []);
+    });
     return () => { active = false; };
   }, [productId]);
   const rows = (productBalances ?? balances.filter(row => String(row.productId) === String(productId)));
@@ -111,6 +124,28 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
       {product.marginPercent !== undefined && product.marginPercent !== null && <div><dt>Ganancia sugerida</dt><dd>{Number(product.marginPercent)} %</dd></div>}
     </dl>
     {product.description && <p className="drawer-text">{product.description}</p>}
+    <h3 className="drawer-subtitle">Clasificación y datos fiscales</h3>
+    <dl className="product-detail-attributes">
+      <div><dt>Unidad de medida</dt><dd>{product.unitOfMeasure?.name || product.unitOfMeasureName || 'Unidad'}</dd></div>
+      <div><dt>Código fiscal</dt><dd>{product.taxCode || '—'}</dd></div>
+      <div><dt>Tratamiento tributario</dt><dd>{({ TAXABLE: 'Gravado', ZERO_RATED: 'Tarifa 0%', EXEMPT: 'Exento', NOT_SUBJECT: 'No sujeto' })[product.taxTreatment] || product.taxTreatment || '—'}</dd></div>
+      <div><dt>Unidad / SKU</dt><dd>{product.sku}</dd></div>
+    </dl>
+    {Object.keys(product.attributes || {}).length > 0 && <>
+      <h3 className="drawer-subtitle">Propiedades del producto</h3>
+      <dl className="product-detail-attributes">{Object.entries(product.attributes).map(([key, value]) => <div key={key}><dt>{titleCase(key.replaceAll('_', ' '))}</dt><dd>{Array.isArray(value) ? value.join(', ') : String(value)}</dd></div>)}</dl>
+    </>}
+    {images.length > 0 && <>
+      <h3 className="drawer-subtitle">Imágenes</h3>
+      <div className="product-detail-images">{images.map(image => <img key={image.id} src={resolveApiUrl(image.imageUrl)} alt={image.altText || product.name} loading="lazy" />)}</div>
+    </>}
+    {variants.length > 0 && <>
+      <h3 className="drawer-subtitle">Variantes</h3>
+      <ul className="product-detail-variants">{variants.map(variant => <li key={variant.id}>
+        <span><strong>{variant.sku}</strong><small>{Object.entries(variant.optionValues || {}).map(([key, value]) => titleCase(key.replaceAll('_', ' ')) + ': ' + String(value)).join(' · ')}</small></span>
+        <strong>{money(variant.effectivePrice)}</strong><span className={'pill ' + (variant.active ? 'active' : 'inactive')}>{variant.active ? 'Activa' : 'Inactiva'}</span>
+      </li>)}</ul>
+    </>}
     <h3 className="drawer-subtitle">Existencias por almacén</h3>
     {rows.length ? <ul className="stock-rows">{rows.map(row => <li key={row.warehouseId}>
       <span>{row.warehouseCode}</span>
