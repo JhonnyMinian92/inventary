@@ -4,6 +4,8 @@ import BrandLogo from '../../components/BrandLogo.jsx';
 import LoginIllustration from './LoginIllustration.jsx';
 import ecuappLogo from '../../assets/ecuapp-logo.png';
 import './login.css';
+import { authApi } from '../../shared/api/auth/api.js';
+import PasswordResetPage from './PasswordResetPage.jsx';
 
 function loginErrorMessage(error) {
   const code = error?.code || error?.details?.code;
@@ -29,6 +31,10 @@ export default function LoginPage({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryNotice, setRecoveryNotice] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const resetToken = new URLSearchParams(window.location.search).get('token') || '';
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const usernameRef = useRef(null);
@@ -60,9 +66,18 @@ export default function LoginPage({ onLogin }) {
     }
   }
 
+  async function requestRecovery(event) {
+    event.preventDefault(); setRecoveryBusy(true); setRecoveryNotice('');
+    try { await authApi.requestPasswordReset(recoveryEmail.trim()); setRecoveryNotice('Si existe una cuenta activa con ese correo verificado, recibirás un enlace de recuperación.'); }
+    catch (error) { setRecoveryNotice(error?.message || 'No se pudo procesar la solicitud. Inténtalo más tarde.'); }
+    finally { setRecoveryBusy(false); }
+  }
+
   function trackCapsLock(event) {
     if (typeof event.getModifierState === 'function') setCapsLock(event.getModifierState('CapsLock'));
   }
+
+  if (resetToken) return <PasswordResetPage token={resetToken} />;
 
   return <main className="auth-page">
     <div className="auth-card">
@@ -100,7 +115,7 @@ export default function LoginPage({ onLogin }) {
               </button>
             </div>
             {capsLock && <p id={`${ids}-caps`} className="auth-hint warning">Bloq Mayús activado</p>}
-            {showRecovery && <p id={`${ids}-recovery`} className="auth-hint">El restablecimiento automático aún no está habilitado. Contacta al administrador de tu empresa para recuperar el acceso.</p>}
+            {showRecovery && <form id={`${ids}-recovery`} className="auth-recovery-form" onSubmit={requestRecovery}><label htmlFor={`${ids}-recovery-email`}>Correo electrónico verificado</label><input id={`${ids}-recovery-email`} type="email" autoComplete="email" maxLength={254} required value={recoveryEmail} onChange={event => setRecoveryEmail(event.target.value)} placeholder="correo@ejemplo.com" /><button type="submit" className="auth-link" disabled={recoveryBusy}>{recoveryBusy ? 'Enviando…' : 'Enviar enlace de recuperación'}</button>{recoveryNotice && <p className="auth-hint" role="status">{recoveryNotice}</p>}</form>}
           </div>
 
           {errorMessage && <p id={`${ids}-error`} className="auth-error" role="alert" aria-live="assertive">{errorMessage}</p>}
