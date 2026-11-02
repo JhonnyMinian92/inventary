@@ -45,7 +45,7 @@ public class AuthService {
   if(user==null||!passwordMatches||!user.isActive()||roles.findByCodeAndActiveTrue(user.getRole()).isEmpty()){
    metrics.counter("inventary.auth.authentication","outcome","failed").increment();
    boolean locked=attempts.recordFailure(username);
-   // Audit events use their own transaction (this one is read-only). Unknown names are not stored: they are often mistyped passwords.
+   // Audit and lockout writes use independent transactions so failed logins survive rollback. Unknown names are not stored: they are often mistyped passwords.
    audit.recordOutcome(user==null?"anonymous":user.getUsername(),locked?"USER_LOGIN_LOCKED":"USER_LOGIN_FAILED","APP_USER",user==null?null:user.getId(),"DENIED",
     MDC.get("requestId"),Map.of("knownUser",user!=null,"encrypted",request.encrypted()!=null));
    throw new BadCredentialsException("Credenciales inválidas");
