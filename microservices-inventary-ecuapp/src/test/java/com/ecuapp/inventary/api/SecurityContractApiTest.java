@@ -183,6 +183,23 @@ class SecurityContractApiTest extends ApiTestSupport {
             assertTrue(api.get("paths").has(path), "OpenAPI must document " + path);
     }
 
+    @Test
+    void taxAndRefundEndpointsRequireAuthenticationAndAppropriatePermissions() {
+        // No route under these financial domains may be publicly accessible.
+        problem(call(get("/api/v1/tax/rates"), null, null), 401, "AUTHENTICATION_REQUIRED");
+        problem(call(post("/api/v1/tax/rates"), null, Map.of()), 401, "AUTHENTICATION_REQUIRED");
+        problem(call(get("/api/v1/refunds"), null, null), 401, "AUTHENTICATION_REQUIRED");
+        problem(call(post("/api/v1/refunds"), null, Map.of()), 401, "AUTHENTICATION_REQUIRED");
+
+        // Sales users may consult refunds, but cannot administer fiscal configuration.
+        String seller = token("VENDEDOR");
+        problem(call(get("/api/v1/tax/rates"), seller, null), 403, "ACCESS_DENIED");
+        expect(call(get("/api/v1/refunds"), seller, null), 200);
+
+        // Security administrators retain access to fiscal configuration.
+        expect(call(get("/api/v1/tax/rates"), admin(), null), 200);
+    }
+
     private String token(JwtEncoder encoder, String subject, int version, String audience, Instant expiresAt) {
         JwtClaimsSet claims = JwtClaimsSet.builder().issuer("inventary").audience(List.of(audience)).subject(subject)
             .issuedAt(expiresAt.minusSeconds(3600)).expiresAt(expiresAt).claim("ver", version).build();
