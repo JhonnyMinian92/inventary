@@ -27,7 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/catalog/products")
 public class ProductController {
- private static final Set<String> ALLOWED_SORT_PROPERTIES=Set.of("name","sku","createdAt","updatedAt","active","salePrice");
+ private static final Set<String> ALLOWED_SORT_PROPERTIES=Set.of("name","sku","createdAt","updatedAt","active","salePrice","category.name");
  private final ProductUseCases products;
  public ProductController(ProductUseCases products){this.products=products;}
  @GetMapping public Page<ProductDtos.View> list(@RequestParam(required=false) String q,@RequestParam(required=false) UUID categoryId,
