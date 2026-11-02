@@ -51,6 +51,7 @@ public class MfaService {
     public Enrollment beginEnrollment(String username) {
         requireEncryptionKey();
         AppUser user=activeUser(username);
+        if(isEnabled(user.getId())) throw new BusinessRuleException("La autenticación en dos pasos ya está activa. Desactívala con tu código actual antes de reinscribirla.");
         byte[] bytes=new byte[20]; RANDOM.nextBytes(bytes);
         String secret=base32(bytes);
         jdbc.update("""
