@@ -339,6 +339,10 @@ class CatalogApiTest extends ApiTestSupport {
         assertEquals("Imagen principal", view.get("altText").asText());
         assertTrue(view.get("primaryImage").asBoolean());
         assertEquals(publicUrl, httpGet(admin, "/api/v1/catalog/products/" + product.get("id").asText(), 200).get("imageUrl").asText());
+        httpPut(admin, "/api/v1/catalog/products/" + product.get("id").asText(),
+            productBody(product.get("categoryId").asText(), product.get("sku").asText()), 200);
+        assertEquals(publicUrl, httpGet(admin, "/api/v1/catalog/products/" + product.get("id").asText(), 200).get("imageUrl").asText(),
+            "ordinary product edits must not clear the primary gallery image");
 
         MvcResult served = mvc.perform(get(publicUrl).with(randomIp())).andReturn();
         assertEquals(200, served.getResponse().getStatus());
