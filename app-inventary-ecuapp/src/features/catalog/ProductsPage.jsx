@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Boxes, ChevronLeft, ChevronRight, Download, PackageSearch, Pencil, Plus, Power, Search, Tags, Trash2 } from 'lucide-react';
-import { api, listFrom, resolveApiUrl } from '../../api';
+import { api, listAllPages, listFrom, resolveApiUrl } from '../../api';
 import { isPlainLeftClick, sectionPath } from '../../router.js';
 import Drawer from '../../ui/Drawer.jsx';
 import { Skeleton, SkeletonTable } from '../../ui/Skeleton.jsx';
@@ -183,6 +183,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
   const [serverTotal, setServerTotal] = useState(Number(initialProducts?.length || 0));
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [debouncedQuery, setDebouncedQuery] = useState(query);
   useEffect(() => { onCountChange?.(serverTotal); }, [serverTotal, onCountChange]);
   useEffect(() => {
@@ -297,17 +298,49 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     setPage(next);
   };
 
-  function exportCsv() {
-    downloadCsv('inventary-productos-pagina-' + (page + 1) + '-' + isoDate() + '.csv', [
-      { key: 'sku', label: 'SKU' }, { key: 'name', label: 'Producto' },
-      { key: 'category', label: 'Categoría', csvValue: product => categoryNames.get(String(product.categoryId)) || '' },
-      { key: 'kind', label: 'Tipo', csvValue: product => KIND_LABELS[product.kind] || 'Inventariable' },
-      { key: 'salePrice', label: 'Precio de venta' },
-      { key: 'taxCode', label: 'Código fiscal' },
-      { key: 'onHand', label: 'Existencia', csvValue: product => stock.get(String(idOf(product)))?.onHand || 0 },
-      { key: 'available', label: 'Disponible', csvValue: product => stock.get(String(idOf(product)))?.available || 0 },
-      { key: 'active', label: 'Estado', csvValue: product => isInactive(product) ? 'Inactivo' : 'Activo' }
-    ], rows);
+  async function exportCsv() {
+    if (exporting || serverTotal === 0) return;
+    setExporting(true);
+    try {
+      const serverSort = sort.key === 'price' ? 'salePrice' : sort.key === 'category' ? 'category.name' : 'name';
+      const params = { sort: serverSort + ',' + sort.dir };
+      if (debouncedQuery) params.q = debouncedQuery;
+      if (categoryId) params.categoryId = categoryId;
+      if (kindFilter) params.kind = kindFilter;
+      if (statusFilter === 'active') params.active = true;
+      if (statusFilter === 'inactive') params.active = false;
+      const productsPromise = listAllPages(api.products, params, 100);
+      const canReadStock = can('inventory:read') || can('inventory:manage');
+      const balancesPromise = canReadStock ? listAllPages(api.balances, {}, 100) : Promise.resolve([]);
+      const [allProducts, allBalances] = await Promise.all([productsPromise, balancesPromise]);
+      const totals = new Map();
+      allBalances.forEach(row => {
+        const key = String(row.productId);
+        const value = totals.get(key) || { onHand: 0, available: 0 };
+        value.onHand += Number(row.onHand || 0);
+        value.available += Number(row.available ?? row.onHand ?? 0);
+        totals.set(key, value);
+      });
+      const columns = [
+        { key: 'sku', label: 'SKU' }, { key: 'name', label: 'Producto' },
+        { key: 'category', label: 'Categoría', csvValue: product => categoryNames.get(String(product.categoryId)) || product.category?.name || '' },
+        { key: 'kind', label: 'Tipo', csvValue: product => KIND_LABELS[product.kind] || 'Inventariable' },
+        { key: 'salePrice', label: 'Precio de venta' },
+        { key: 'taxCode', label: 'Código fiscal' },
+        { key: 'taxTreatment', label: 'Tratamiento tributario' },
+        { key: 'active', label: 'Estado', csvValue: product => isInactive(product) ? 'Inactivo' : 'Activo' }
+      ];
+      if (canReadStock) columns.splice(6, 0,
+        { key: 'onHand', label: 'Existencia', csvValue: product => totals.get(String(idOf(product)))?.onHand || 0 },
+        { key: 'available', label: 'Disponible', csvValue: product => totals.get(String(idOf(product)))?.available || 0 }
+      );
+      downloadCsv('inventary-productos-' + isoDate() + '.csv', columns, allProducts);
+      toast.success('CSV exportado: ' + number(allProducts.length) + ' productos.');
+    } catch (error) {
+      toast.error(error?.message || 'No se pudo exportar el catálogo completo.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   return <>
@@ -335,7 +368,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
         {[['active', 'Activos'], ['inactive', 'Inactivos'], ['', 'Todos']].map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={statusFilter === value} onClick={() => { setStatusFilter(value); setPage(0); }}>{label}</button>)}
       </div>
       <div className="filter-actions">
-        <button type="button" className="button secondary" onClick={exportCsv} disabled={!rows.length} aria-label="Exportar productos de esta página a CSV"><Download size={15} />CSV página</button>
+        <button type="button" className="button secondary" onClick={exportCsv} disabled={exporting || serverTotal === 0} title="Exporta todos los resultados de búsqueda, categoría, tipo y estado. El filtro de existencia solo afecta la página visible." aria-label="Exportar todos los productos filtrados a CSV"><Download size={15}/>{exporting ? "Preparando CSV…" : "Exportar CSV"}</button>
         {can('catalog:manage') && <button type="button" className="button primary" onClick={onNew}><Plus size={16} />Nuevo producto</button>}
       </div>
     </div>
