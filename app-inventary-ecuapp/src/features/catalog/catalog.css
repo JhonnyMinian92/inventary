@@ -78,3 +78,11 @@ th[aria-sort="ascending"] .sort-button svg, th[aria-sort="descending"] .sort-but
 .product-detail-variants li small { color:#6b7a70; font-size:11px; overflow-wrap:anywhere; }
 .product-detail-variants li > strong { color:#26382d; font-size:12px; white-space:nowrap; }
 @media (max-width:520px) { .product-detail-attributes { grid-template-columns:1fr; } }
+
+
+.product-row-identity { display:flex; align-items:center; gap:10px; min-width:180px; }
+.product-row-thumbnail { display:block; flex:0 0 42px; width:42px; height:42px; object-fit:cover; border:1px solid #e3e9e4; border-radius:8px; background:#f7faf8; }
+.product-row-thumbnail.placeholder { display:grid; place-items:center; color:#829187; }
+.product-row-identity .row-title { min-width:0; }
+.product-row-identity .row-title strong { display:block; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:520px) { .product-row-thumbnail { flex-basis:36px; width:36px; height:36px; } }
