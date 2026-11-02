@@ -8,7 +8,7 @@
 - El token es aleatorio de 256 bits, se almacena como SHA-256, vence en 30 minutos por defecto y se consume una sola vez.
 - Al restablecer la contraseña se incrementa `token_version`, revocando todas las sesiones activas.
 - Configurar `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS`, `AUTH_MAIL_FROM` y `PASSWORD_RECOVERY_FRONTEND_URL`.
-- El frontend usa `/reset-password?token=...` (la vista de login procesa el token de query string).
+- El frontend usa `/inventary/iniciar-sesion?token=...` (la vista de login procesa el token de query string).
 
 ## MFA TOTP
 
