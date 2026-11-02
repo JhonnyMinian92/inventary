@@ -29,6 +29,8 @@ public record ProductResult(
     ServiceBilling serviceBilling,
     BillingFrequency billingFrequency,
     Integer termMonths,
+    String taxCode,
+    String taxTreatment,
     boolean active,
     Instant createdAt,
     Instant updatedAt

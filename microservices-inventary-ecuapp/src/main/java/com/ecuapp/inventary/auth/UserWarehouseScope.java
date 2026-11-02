@@ -18,6 +18,7 @@ public class UserWarehouseScope {
     @Column(nullable=false) private boolean active=true;
     @Column(name="revoked_at") private Instant revokedAt;
     @Column(name="revoked_by",length=80) private String revokedBy;
+    @Column(name="is_default",nullable=false) private boolean defaultWarehouse=false;
     @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
     protected UserWarehouseScope() {}
     public UserWarehouseScope(AppUser user,Warehouse warehouse,String reason,String grantedBy,Instant validFrom,Instant validUntil) {
@@ -28,6 +29,8 @@ public class UserWarehouseScope {
     public void revoke(String actor){if(!active)return;active=false;revokedAt=Instant.now();revokedBy=actor;}
     public boolean isEffectiveAt(Instant now){return active&&!validFrom.isAfter(now)&&(validUntil==null||validUntil.isAfter(now));}
     public UUID getId(){return id;} public AppUser getUser(){return user;} public Warehouse getWarehouse(){return warehouse;}
+    public boolean isDefaultWarehouse(){return defaultWarehouse;}
+    public void setDefaultWarehouse(boolean defaultWarehouse){this.defaultWarehouse=defaultWarehouse;}
     public String getReason(){return reason;} public String getGrantedBy(){return grantedBy;} public Instant getValidFrom(){return validFrom;}
     public Instant getValidUntil(){return validUntil;} public boolean isActive(){return active;} public Instant getRevokedAt(){return revokedAt;}
     public String getRevokedBy(){return revokedBy;} public Instant getCreatedAt(){return createdAt;}

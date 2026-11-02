@@ -66,11 +66,11 @@ class ReportsApiTest extends ApiTestSupport {
         JsonNode sales = httpGet(admin(), "/api/v1/reports/sales?from=" + today + "&to=" + today + "&warehouseId=" + warehouseId, 200);
         JsonNode summary = sales.get("summary");
         assertEquals(1, summary.get("salesCount").asInt());
-        assertAmount("100.00", summary.get("grossSales"));
+        assertAmount("115.0", summary.get("grossSales"));
         assertAmount("20.00", summary.get("returns"));
-        assertAmount("80.00", summary.get("netSales"));
+        assertAmount("95.0", summary.get("netSales"));
         assertAmount("32.00", summary.get("costOfSales"));
-        assertAmount("48.00", summary.get("grossProfit"));
+        assertAmount("63.0", summary.get("grossProfit"));
         assertEquals(today.toString(), sales.get("daily").get(0).get("date").asText());
         assertAmount("8", sales.get("products").get(0).get("netQuantity"));
 

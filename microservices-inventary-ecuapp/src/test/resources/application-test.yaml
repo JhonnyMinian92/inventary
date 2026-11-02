@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${TEST_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inventary_test}
     username: ${TEST_DB_USERNAME:${DB_USERNAME:postgres}}
-    password: ${TEST_DB_PASSWORD:${DB_PASSWORD:postgres}}
+    password: ${TEST_DB_PASSWORD:${DB_PASSWORD:admin1234}}
     hikari:
       maximum-pool-size: 20
 app:

@@ -26,18 +26,21 @@ public final class ProductDtos {
   @Size(max=2048) @Pattern(regexp="https://[^\\s]+",message="imageUrl debe ser una URL HTTPS") String imageUrl,
   ProductKind kind,UUID unitOfMeasureId,@Size(max=50) Map<String,Object> attributes,
   @DecimalMin("0.00") @DecimalMax("1000.00") @Digits(integer=4,fraction=2) BigDecimal marginPercent,
-  ServiceBilling serviceBilling,BillingFrequency billingFrequency,Integer termMonths){
+  ServiceBilling serviceBilling,BillingFrequency billingFrequency,Integer termMonths,
+  @Size(max=24) String taxCode,
+  @Pattern(regexp="TAXABLE|ZERO_RATED|EXEMPT|NOT_SUBJECT") String taxTreatment){
   public WriteRequest(String sku,String name,String description,UUID categoryId,BigDecimal costPrice,BigDecimal salePrice,String currency,String imageUrl){
-   this(sku,name,description,categoryId,costPrice,salePrice,currency,imageUrl,null,null,null,null,null,null,null);
+   this(sku,name,description,categoryId,costPrice,salePrice,currency,imageUrl,null,null,null,null,null,null,null,null,null);
   }
  }
  /** costPrice is only populated for callers allowed to see costs (catalog:manage or reports:financial). */
  public record View(UUID id,String sku,String name,String description,UUID categoryId,String categoryName,
   BigDecimal costPrice,BigDecimal salePrice,BigDecimal marginPercent,String currency,String imageUrl,ProductKind kind,UUID unitOfMeasureId,
   Map<String,Object> attributes,int attributeSchemaVersion,ServiceBilling serviceBilling,BillingFrequency billingFrequency,Integer termMonths,
+  String taxCode,String taxTreatment,
   boolean active,Instant createdAt,Instant updatedAt){
   public static View from(ProductResult p,boolean includeCost){return new View(p.id(),p.sku(),p.name(),p.description(),p.categoryId(),p.categoryName(),
-   includeCost?p.costPrice():null,p.salePrice(),includeCost?p.marginPercent():null,p.currency(),p.imageUrl(),p.kind(),p.unitOfMeasureId(),p.attributes(),p.attributeSchemaVersion(),p.serviceBilling(),p.billingFrequency(),p.termMonths(),p.active(),p.createdAt(),p.updatedAt());}
+   includeCost?p.costPrice():null,p.salePrice(),   includeCost?p.marginPercent():null,p.currency(),p.imageUrl(),p.kind(),p.unitOfMeasureId(),p.attributes(),p.attributeSchemaVersion(),p.serviceBilling(),p.billingFrequency(),p.termMonths(),p.taxCode(),p.taxTreatment(),p.active(),p.createdAt(),p.updatedAt());}
  }
  public record PublicView(UUID id,String sku,String name,String description,String categoryName,BigDecimal price,String currency,String imageUrl,boolean available){
   public static PublicView from(Product p,boolean available){return new PublicView(p.getId(),p.getSku(),p.getName(),p.getDescription(),p.getCategory().getName(),p.getSalePrice(),p.getCurrency(),p.getImageUrl(),available);}

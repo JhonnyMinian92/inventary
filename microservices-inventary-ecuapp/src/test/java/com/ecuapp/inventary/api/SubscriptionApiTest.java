@@ -41,7 +41,7 @@ class SubscriptionApiTest extends ApiTestSupport {
         JsonNode oneTime = service("15.00", Map.of("serviceBilling", "ONE_TIME"));
         assertEquals("ONE_TIME", oneTime.get("serviceBilling").asText());
         JsonNode sale = sale(token("VENDEDOR"), warehouseId, oneTime.get("id").asText(), "1");
-        assertAmount("15.00", sale.get("total"));
+        assertAmount("17.25", sale.get("total"));
         assertEquals(0, httpGet(admin(), "/api/v1/inventory/movements?productId=" + oneTime.get("id").asText(), 200).get("content").size());
 
         JsonNode plan = service("20.00", Map.of("serviceBilling", "SUBSCRIPTION", "billingFrequency", "MONTHLY", "termMonths", 3));
@@ -79,7 +79,7 @@ class SubscriptionApiTest extends ApiTestSupport {
         String id = created.get("id").asText();
         assertEquals("ACTIVE", created.get("status").asText());
         assertAmount("60.00", created.get("totalAmount"));
-        assertAmount("20.00", created.get("invoicedAmount"));
+        assertAmount("23.0", created.get("invoicedAmount"));
         assertEquals("INVOICED", created.get("installments").get(0).get("status").asText());
         assertTrue(created.get("installments").get(0).get("saleNumber").asText().startsWith("VTA-"));
         assertEquals(today.plusMonths(1).toString(), created.get("nextBillingDate").asText());
@@ -87,7 +87,7 @@ class SubscriptionApiTest extends ApiTestSupport {
         // The billing job generates the next invoice on its date, and running it twice never bills twice.
         assertTrue(billingJob.runFor(today.plusMonths(1)) >= 1);
         billingJob.runFor(today.plusMonths(1));
-        assertAmount("40.00", httpGet(admin(), "/api/v1/subscriptions/" + id, 200).get("invoicedAmount"));
+        assertAmount("46.0", httpGet(admin(), "/api/v1/subscriptions/" + id, 200).get("invoicedAmount"));
 
         JsonNode preview = httpGet(admin(), "/api/v1/subscriptions/" + id + "/cancellation-preview", 200);
         assertEquals(1, preview.get("cancelledCount").asInt());
@@ -95,14 +95,14 @@ class SubscriptionApiTest extends ApiTestSupport {
         JsonNode cancelled = httpPost(token("VENDEDOR"), "/api/v1/subscriptions/" + id + "/cancel", Map.of("reason", "Cliente se muda"), 200);
         assertEquals("CANCELLED", cancelled.get("status").asText());
         assertEquals("CANCELLED", cancelled.get("installments").get(2).get("status").asText());
-        assertAmount("40.00", cancelled.get("invoicedAmount"));
+        assertAmount("46.0", cancelled.get("invoicedAmount"));
 
         // Paid at the end: cancelling mid-plan invoices the current (and only) charge.
         String atEnd = service("10.00", Map.of("serviceBilling", "SUBSCRIPTION", "billingFrequency", "AT_END", "termMonths", 6)).get("id").asText();
         JsonNode atEndSub = subscribe(atEnd, customerId, warehouseId, Map.of());
         assertAmount("0.00", atEndSub.get("invoicedAmount"));
         assertAmount("60.00", httpGet(admin(), "/api/v1/subscriptions/" + atEndSub.get("id").asText() + "/cancellation-preview", 200).get("amountChargedNow"));
-        assertAmount("60.00", httpPost(admin(), "/api/v1/subscriptions/" + atEndSub.get("id").asText() + "/cancel", Map.of("reason", "x"), 200).get("invoicedAmount"));
+        assertAmount("69.0", httpPost(admin(), "/api/v1/subscriptions/" + atEndSub.get("id").asText() + "/cancel", Map.of("reason", "x"), 200).get("invoicedAmount"));
 
         // Starting in the future: nothing is billed yet and cancelling charges nothing.
         JsonNode future = subscribe(productId, customerId, warehouseId, Map.of("startDate", today.plusDays(10).toString()));
@@ -124,12 +124,12 @@ class SubscriptionApiTest extends ApiTestSupport {
         assertFalse(httpGet(token("VENDEDOR"), "/api/v1/subscriptions/options", 200).get("canDiscount").asBoolean());
 
         JsonNode noDiscount = subscribe(productId, customerId, warehouseId, Map.of("termMonths", 12, "prepay", true));
-        assertAmount("360.00", noDiscount.get("invoicedAmount"));
+        assertAmount("414.0", noDiscount.get("invoicedAmount"));
         assertTrue(noDiscount.get("prepaid").asBoolean());
 
         Map<String, Object> body = Map.of("productId", productId, "customerId", customerId, "warehouseId", warehouseId, "termMonths", 12, "prepay", true, "discountPercent", 10);
         JsonNode discounted = httpPost(admin(), "/api/v1/subscriptions", body, 201, "Idempotency-Key", key());
-        assertAmount("324.00", discounted.get("invoicedAmount"));
+        assertAmount("372.6", discounted.get("invoicedAmount"));
         assertEquals(24, discounted.get("installmentCount").asInt());
         Set<String> sales = new HashSet<>();
         discounted.get("installments").forEach(i -> sales.add(i.get("saleId").asText()));

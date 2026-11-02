@@ -26,6 +26,8 @@ public final class ProductResultMapper {
             product.getServiceBilling(),
             product.getBillingFrequency(),
             product.getTermMonths(),
+            product.getTaxCode(),
+            product.getTaxTreatment(),
             product.isActive(),
             product.getCreatedAt(),
             product.getUpdatedAt()

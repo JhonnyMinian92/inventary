@@ -6,6 +6,16 @@
 
 # Auditoría técnica de Inventary — pendientes, defectos y plan de cierre
 
+## Verificación ejecutada el 2026-11-01
+
+- Backend: suite Maven completa aprobada.
+- Frontend: 26 pruebas aprobadas y build de producción aprobado.
+- Docker: `docker compose build` aprobado.
+- Docker Compose: API, web y n8n levantados; API saludable y ambas aplicaciones accesibles.
+- Catálogo fiscal: contrato de producto ampliado para persistir y devolver `taxCode` y `taxTreatment`.
+- Prueba de catálogo público corregida para validar categorías paginadas sin depender de un único bloque.
+- Pendiente externo: emisión/firma/autorización SRI, pagos de terceros, credenciales reales, validaciones profesionales fiscal/jurídica, protección de rama y despliegue productivo.
+
 > **Objetivo:** documento operativo para que un agente local audite, complete, corrija y pruebe el backend y sus APIs REST/GraphQL hasta obtener una entrega reproducible.
 >
 > **Repositorio:** `JhonnyMinian92/inventary`  

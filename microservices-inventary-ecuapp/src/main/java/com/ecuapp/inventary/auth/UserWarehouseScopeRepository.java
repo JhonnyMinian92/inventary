@@ -16,6 +16,9 @@ public interface UserWarehouseScopeRepository extends JpaRepository<UserWarehous
           and (s.validUntil is null or s.validUntil>:now)
         """)
     Set<UUID> findEffectiveWarehouseIds(@Param("username") String username,@Param("now") Instant now);
+    @EntityGraph(attributePaths={"warehouse"})
+    Optional<UserWarehouseScope> findFirstByUserUsernameAndDefaultWarehouseTrueAndActiveTrueAndUserActiveTrue(
+        String username);
     @Query("""
         select case when count(s)>0 then true else false end from UserWarehouseScope s
         where s.user.username=:username and s.user.active=true and s.warehouse.id=:warehouseId

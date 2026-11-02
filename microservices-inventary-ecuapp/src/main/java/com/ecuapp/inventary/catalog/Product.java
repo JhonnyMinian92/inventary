@@ -36,6 +36,8 @@ public class Product {
  /** Only for services: one-time sale or subscription with its default plan (frequency and length in months). */
  @Enumerated(EnumType.STRING) @Column(name="service_billing",length=16) private ServiceBilling serviceBilling;
  @Enumerated(EnumType.STRING) @Column(name="billing_frequency",length=16) private BillingFrequency billingFrequency;
+ @Column(name="tax_code",nullable=false,length=24) private String taxCode="IVA_15";
+ @Column(name="tax_treatment",nullable=false,length=24) private String taxTreatment="TAXABLE";
  @Column(name="term_months") private Integer termMonths;
  @Column(nullable=false) private boolean active=true;
  @Column(name="created_at",nullable=false,updatable=false) private Instant createdAt;
@@ -76,6 +78,13 @@ public class Product {
  public boolean isSubscription(){return serviceBilling==ServiceBilling.SUBSCRIPTION;}
  public ServiceBilling getServiceBilling(){return serviceBilling;} public BillingFrequency getBillingFrequency(){return billingFrequency;} public Integer getTermMonths(){return termMonths;}
  public void deactivate(){active=false;}
+ public void updateTax(String taxCode,String taxTreatment){
+  String code=taxCode==null?"":taxCode.trim().toUpperCase();
+  if(code.isBlank()||code.length()>24)throw new IllegalArgumentException("El código fiscal del producto es inválido.");
+  if(taxTreatment==null||!java.util.Set.of("TAXABLE","ZERO_RATED","EXEMPT","NOT_SUBJECT").contains(taxTreatment))
+   throw new IllegalArgumentException("El tratamiento fiscal del producto es inválido.");
+  this.taxCode=code;this.taxTreatment=taxTreatment;
+ }
  public void activate(){active=true;}
  public ProductKind getKind(){return kind;} public UUID getUnitOfMeasureId(){return unitOfMeasureId;} public Map<String,Object> getAttributes(){return attributes;} public int getAttributeSchemaVersion(){return attributeSchemaVersion;}
  public void configureClassification(ProductKind kind,UUID unitOfMeasureId,Map<String,Object> attributes,int schemaVersion){
@@ -89,5 +98,6 @@ public class Product {
  public String getDescription(){return description;} public Category getCategory(){return category;}
  public BigDecimal getCostPrice(){return costPrice;} public BigDecimal getSalePrice(){return salePrice;}
  public String getCurrency(){return currency;} public String getImageUrl(){return imageUrl;} public boolean isActive(){return active;}
+ public String getTaxCode(){return taxCode;} public String getTaxTreatment(){return taxTreatment;}
  public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
 }

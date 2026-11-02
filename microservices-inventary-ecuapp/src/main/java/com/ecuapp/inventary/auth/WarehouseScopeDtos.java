@@ -8,12 +8,16 @@ import java.util.UUID;
 
 public final class WarehouseScopeDtos {
     private WarehouseScopeDtos() {}
-    public record GrantRequest(@NotNull UUID warehouseId,@NotBlank @Size(min=3,max=500) String reason,Instant validFrom,Instant validUntil) {}
+    public record GrantRequest(@NotNull UUID warehouseId,@NotBlank @Size(min=3,max=500) String reason,Instant validFrom,Instant validUntil,Boolean defaultWarehouse) {
+        public GrantRequest(UUID warehouseId,String reason,Instant validFrom,Instant validUntil) {
+            this(warehouseId,reason,validFrom,validUntil,false);
+        }
+    }
     public record View(UUID id,UUID warehouseId,String warehouseCode,String warehouseName,String reason,String grantedBy,
-                       Instant validFrom,Instant validUntil,boolean active,boolean effective,Instant revokedAt,String revokedBy) {
+                       Instant validFrom,Instant validUntil,boolean active,boolean effective,boolean defaultWarehouse,Instant revokedAt,String revokedBy) {
         static View from(UserWarehouseScope s,Instant now) {
             return new View(s.getId(),s.getWarehouse().getId(),s.getWarehouse().getCode(),s.getWarehouse().getName(),s.getReason(),
-                s.getGrantedBy(),s.getValidFrom(),s.getValidUntil(),s.isActive(),s.isEffectiveAt(now),s.getRevokedAt(),s.getRevokedBy());
+                s.getGrantedBy(),s.getValidFrom(),s.getValidUntil(),s.isActive(),s.isEffectiveAt(now),s.isDefaultWarehouse(),s.getRevokedAt(),s.getRevokedBy());
         }
     }
 }

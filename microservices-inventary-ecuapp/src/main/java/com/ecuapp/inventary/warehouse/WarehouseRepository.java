@@ -11,6 +11,7 @@ import java.util.UUID;
 public interface WarehouseRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<Warehouse,UUID>{
  boolean existsByCode(String code);
  boolean existsByCodeIgnoreCase(String code);
+ java.util.List<Warehouse> findByActiveTrue();
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select w from Warehouse w where w.id=:id")
  Optional<Warehouse> findForUpdate(@Param("id") UUID id);

@@ -25,7 +25,6 @@ import com.ecuapp.inventary.transfers.StockTransferRepository;
 import com.ecuapp.inventary.transfers.TransferStatus;
 import com.ecuapp.inventary.media.ProductImageRepository;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -49,7 +48,8 @@ public class ProductService implements ProductUseCases {
   this.variants=variants;this.movements=movements;this.images=images;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;this.codes=codes;
  }
 
- @Cacheable(cacheNames="publicProductList",key="'q=' + #query + '|c=' + #categoryId + '|' + #pageable.pageNumber + ':' + #pageable.pageSize + ':' + #pageable.sort.toString()")
+ // Stock availability is transactional and can change outside catalog commands; it
+ // must never be served from a stale product catalog cache.
  @Transactional(readOnly=true) public Page<ProductDtos.PublicView> publicList(String query,UUID categoryId,Pageable pageable){
   Pageable safe=com.ecuapp.inventary.common.Pages.of(pageable,PUBLIC_SORT,Sort.by("name"));
   PageResult<Product> page=products.findActivePublic(query,categoryId,pageQuery(safe));
@@ -101,6 +101,9 @@ public class ProductService implements ProductUseCases {
   product.changeMarginPercent(margin,false);
   product.configureClassification(kind,unit.getId(),attributes,schemaVersion(category.getId(),schema));
   configureService(product,command,true);
+  if(command.taxCode()!=null||command.taxTreatment()!=null)product.updateTax(
+   command.taxCode()==null?product.getTaxCode():command.taxCode(),
+   command.taxTreatment()==null?product.getTaxTreatment():command.taxTreatment());
   Product saved=products.save(product);
   audit.record(actor,"PRODUCT_CREATED","PRODUCT",saved.getId(),Map.of("sku",saved.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
   return ProductResultMapper.from(saved);
@@ -126,6 +129,9 @@ public class ProductService implements ProductUseCases {
   product.changeMarginPercent(command.marginPercent(),command.salePrice()==null);
   configureService(product,command,false);
   product.configureClassification(kind,unitId,attributes,schemaVersion(category.getId(),schema));
+  if(command.taxCode()!=null||command.taxTreatment()!=null)product.updateTax(
+   command.taxCode()==null?product.getTaxCode():command.taxCode(),
+   command.taxTreatment()==null?product.getTaxTreatment():command.taxTreatment());
   audit.record(actor,"PRODUCT_UPDATED","PRODUCT",id,Map.of("sku",product.getSku(),"categoryId",category.getId().toString(),"kind",kind.name()));
   return ProductResultMapper.from(product);
  }

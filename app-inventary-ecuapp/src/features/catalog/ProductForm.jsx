@@ -59,6 +59,8 @@ function normalizeProduct(product) {
     serviceBilling: product?.serviceBilling || 'ONE_TIME',
     billingFrequency: product?.billingFrequency || 'MONTHLY',
     termMonths: String(product?.termMonths || 1),
+    taxCode: product?.taxCode || 'IVA_15',
+    taxTreatment: product?.taxTreatment || 'TAXABLE',
     attributes: objectValue(product?.attributes)
   };
 }
@@ -499,6 +501,23 @@ export default function ProductForm({ initialValue, categories, units = [], load
       <div><small>Precio sugerido</small><strong>{Number(form.costPrice) > 0 ? new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Math.ceil(Number(form.costPrice) * (1 + Number(form.marginPercent || 0) / 100) * 100 - 1e-9) / 100) : 'Se calculará con la primera compra'}</strong></div>
     </div>
     </>}
+    <label className="field wide">
+      <span>Código fiscal</span>
+      <select value={form.taxCode} onChange={event => changeField('taxCode', event.target.value)}>
+        <option value="IVA_15">IVA 15%</option>
+        <option value="IVA_0">IVA 0%</option>
+      </select>
+      <small className="field-help">La tarifa se resuelve en el servidor según la vigencia de la fecha de venta.</small>
+    </label>
+    <label className="field wide">
+      <span>Tratamiento tributario</span>
+      <select value={form.taxTreatment} onChange={event => changeField('taxTreatment', event.target.value)}>
+        <option value="TAXABLE">Gravado</option>
+        <option value="ZERO_RATED">Tarifa 0%</option>
+        <option value="EXEMPT">Exento</option>
+        <option value="NOT_SUBJECT">No sujeto</option>
+      </select>
+    </label>
     <label className="field wide">
       <span>Descripción</span>
       <textarea rows="2" maxLength="2000" value={form.description} onChange={event => changeField('description', event.target.value)} />

@@ -9,6 +9,7 @@ import com.ecuapp.inventary.partners.BusinessPartner;
 import com.ecuapp.inventary.partners.BusinessPartnerRepository;
 import com.ecuapp.inventary.partners.PartnerType;
 import com.ecuapp.inventary.returns.SalesReturnLineRepository;
+import com.ecuapp.inventary.tax.TaxCalculationService;
 import com.ecuapp.inventary.warehouse.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,14 +37,15 @@ public class SaleService {
  private final ObjectMapper mapper;private final AuditService audit;private final SalesReturnLineRepository returnLines;
  private final BusinessPartnerRepository partners;private final IdempotencyRecordRepository idempotencyRecords;
  private final UnitOfMeasureRepository units;private final InventoryCostingService costing;private final SalePricingService pricing;private final WarehouseScopeService scopes;
+ private final TaxCalculationService taxes;
  private static final Set<String> SORT=Set.of("soldAt","saleNumber","total","status");
  public SaleService(SaleRepository sales,ProductRepository products,WarehouseRepository warehouses,StockBalanceRepository balances,
   StockMovementRepository movements,OutboxEventRepository outbox,ObjectMapper mapper,AuditService audit,
   SalesReturnLineRepository returnLines,BusinessPartnerRepository partners,IdempotencyRecordRepository idempotencyRecords,
-  UnitOfMeasureRepository units,InventoryCostingService costing,SalePricingService pricing,WarehouseScopeService scopes){
+  UnitOfMeasureRepository units,InventoryCostingService costing,SalePricingService pricing,WarehouseScopeService scopes,TaxCalculationService taxes){
   this.sales=sales;this.products=products;this.warehouses=warehouses;this.balances=balances;this.movements=movements;
   this.outbox=outbox;this.mapper=mapper;this.audit=audit;this.returnLines=returnLines;this.partners=partners;
-  this.idempotencyRecords=idempotencyRecords;this.units=units;this.costing=costing;this.pricing=pricing;this.scopes=scopes;
+  this.idempotencyRecords=idempotencyRecords;this.units=units;  this.costing=costing;this.pricing=pricing;this.scopes=scopes;this.taxes=taxes;
  }
  @Transactional(readOnly=true) public Page<SaleDtos.View> list(SaleStatus status,UUID warehouseId,UUID customerId,SaleChannel channel,java.time.Instant from,java.time.Instant to,Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");
@@ -62,9 +64,10 @@ public class SaleService {
 
  @Transactional
  public SaleDtos.View create(String suppliedKey,SaleDtos.CreateRequest request,String actor){
-  scopes.requireWarehouseAccess(actor,request.warehouseId());
+  UUID requestedWarehouse=request.warehouseId()==null?scopes.resolveDefaultWarehouseId(actor):request.warehouseId();
+  scopes.requireWarehouseAccess(actor,requestedWarehouse);
   String key=normalizeIdempotencyKey(suppliedKey);
-  String hash=requestHash(request);
+  String hash=requestHash(request,requestedWarehouse);
 
   // INSERT ... ON CONFLICT serializes concurrent requests for the same key in PostgreSQL.
   // The idempotency record and every business write commit or roll back together.
@@ -85,15 +88,15 @@ public class SaleService {
   Optional<Sale> legacy=sales.findByIdempotencyKey(key);
   if(legacy.isPresent()){
    Sale previous=legacy.get();
-   if(!hash.equals(previous.getRequestHash())&&!legacyRequestHash(request).equals(previous.getRequestHash()))
+   if(!hash.equals(previous.getRequestHash())&&!legacyRequestHash(request,requestedWarehouse).equals(previous.getRequestHash()))
     throw new ConflictException("La clave Idempotency-Key ya se usó con una solicitud distinta.");
    record.markCompleted("SALE",previous.getId(),(short)201);
    idempotencyRecords.saveAndFlush(record);
    return SaleDtos.View.from(sales.findDetailedById(previous.getId()).orElseThrow());
   }
 
-  Warehouse warehouse=warehouses.findById(request.warehouseId())
-   .orElseThrow(()->new ResourceNotFoundException("Almacén",request.warehouseId()));
+  Warehouse warehouse=warehouses.findById(requestedWarehouse)
+   .orElseThrow(()->new ResourceNotFoundException("Almacén",requestedWarehouse));
   if(!warehouse.isActive())throw new BusinessRuleException("El almacén está inactivo.");
 
   Set<UUID> uniqueProducts=new HashSet<>();
@@ -148,6 +151,11 @@ public class SaleService {
   }
   if(lines.isEmpty())throw new BusinessRuleException("La venta debe contener al menos una línea.");
 
+   LocalDate fiscalDate=LocalDate.now(ZoneOffset.UTC);
+   BigDecimal taxTotal=BigDecimal.ZERO.setScale(2,RoundingMode.HALF_UP);
+   for(CalculatedLine line:lines)
+    taxTotal=taxTotal.add(taxes.calculate(line.product(),line.lineTotal(),fiscalDate).tax());
+
   BusinessPartner customer=null;
   String customerName=clean(request.customerName()),customerPhone=clean(request.customerPhone());
   if(request.customerId()!=null){
@@ -160,7 +168,7 @@ public class SaleService {
   String saleNumber="VTA-"+LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+
    UUID.randomUUID().toString().substring(0,8).toUpperCase(Locale.ROOT);
   Sale sale=sales.saveAndFlush(new Sale(saleNumber,customerName,customerPhone,request.channel(),warehouse,
-   subtotal,BigDecimal.ZERO.setScale(2),subtotal,saleCurrency==null?"USD":saleCurrency,key,hash,actor,customer));
+   subtotal,taxTotal,subtotal.add(taxTotal),saleCurrency==null?"USD":saleCurrency,key,hash,actor,customer));
 
   Map<UUID,SaleItem> itemsByProduct=new HashMap<>();
   for(CalculatedLine line:lines){
@@ -264,7 +272,7 @@ public class SaleService {
    throw new BusinessRuleException("El header Idempotency-Key es obligatorio y debe tener hasta 120 caracteres.");
   return key.trim();
  }
- private String requestHash(SaleDtos.CreateRequest request){
+ private String requestHash(SaleDtos.CreateRequest request,UUID warehouseId){
   if(request==null||request.items()==null||request.items().isEmpty())
    throw new BusinessRuleException("La venta debe contener al menos una línea.");
   try{
@@ -272,14 +280,14 @@ public class SaleService {
     .map(line->new CanonicalLine(line.productId(),line.quantity().setScale(3,RoundingMode.UNNECESSARY).toPlainString(),
      line.unitPrice()==null?null:line.unitPrice().setScale(2,RoundingMode.UNNECESSARY).toPlainString()))
     .sorted(Comparator.comparing(line->line.productId().toString())).toList();
-   CanonicalSaleRequest canonical=new CanonicalSaleRequest(request.warehouseId(),clean(request.customerName()),
+   CanonicalSaleRequest canonical=new CanonicalSaleRequest(warehouseId,clean(request.customerName()),
     clean(request.customerPhone()),request.channel(),request.customerId(),canonicalLines);
    return sha256(mapper.writeValueAsString(canonical));
   }catch(JsonProcessingException ex){
    throw new BusinessRuleException("No se pudo validar el contenido de la solicitud.");
   }
  }
- private String legacyRequestHash(SaleDtos.CreateRequest request){
+ private String legacyRequestHash(SaleDtos.CreateRequest request,UUID warehouseId){
   try{return sha256(mapper.writeValueAsString(request));}
   catch(JsonProcessingException ex){throw new BusinessRuleException("No se pudo validar el contenido de la solicitud.");}
  }

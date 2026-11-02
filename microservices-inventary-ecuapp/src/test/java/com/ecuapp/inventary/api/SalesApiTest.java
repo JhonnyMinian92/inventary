@@ -26,8 +26,8 @@ class SalesApiTest extends ApiTestSupport {
         Map<String, Object> body = Map.of("warehouseId", warehouseId, "channel", "POS", "customerId", customerId,
             "items", List.of(Map.of("productId", productId, "quantity", new BigDecimal("1.500"))));
         JsonNode sale = httpPost(seller, "/api/v1/sales", body, 201, "Idempotency-Key", key);
-        assertAmount("11.03", sale.get("total"));
-        assertAmount("0.00", sale.get("tax"));
+        assertAmount("12.68", sale.get("total"));
+        assertAmount("1.65", sale.get("tax"));
         assertEquals(customerId, sale.get("customerId").asText());
         assertEquals(sale.get("id").asText(), httpPost(seller, "/api/v1/sales", body, 201, "Idempotency-Key", key).get("id").asText());
         assertAmount("8.5", onHand(productId, warehouseId));
@@ -234,10 +234,10 @@ class SalesApiTest extends ApiTestSupport {
         assertAmount("10.00", quote.get("suggestedPrice"));
 
         // Without a price the suggested one is used; the seller may go up or down, but never below cost.
-        assertAmount("20.00", sale(seller, warehouseId, productId, "2").get("total"));
+        assertAmount("23.0", sale(seller, warehouseId, productId, "2").get("total"));
         Map<String, Object> discounted = Map.of("warehouseId", warehouseId, "channel", "POS",
             "items", List.of(Map.of("productId", productId, "quantity", 1, "unitPrice", new BigDecimal("8.50"))));
-        assertAmount("8.50", httpPost(seller, "/api/v1/sales", discounted, 201, "Idempotency-Key", key()).get("total"));
+        assertAmount("9.78", httpPost(seller, "/api/v1/sales", discounted, 201, "Idempotency-Key", key()).get("total"));
         Map<String, Object> loss = Map.of("warehouseId", warehouseId, "channel", "POS",
             "items", List.of(Map.of("productId", productId, "quantity", 1, "unitPrice", new BigDecimal("7.99"))));
         JsonNode rejected = problem(call(post("/api/v1/sales"), seller, loss, "Idempotency-Key", key()), 422, "BUSINESS_RULE_VIOLATION");
@@ -289,7 +289,7 @@ class SalesApiTest extends ApiTestSupport {
                 "channel", "POS",
                 "items", List.of(Map.of("productId", productId, "quantity", 1, "unitPrice", new BigDecimal("5.00")))
             ), 201, "Idempotency-Key", key());
-            assertAmount("5.00", sale.get("total"));
+            assertAmount("5.75", sale.get("total"));
             assertEquals(0, jdbc.queryForObject(
                 "select count(*) from stock_movement where reference_id=?::uuid",
                 Integer.class, sale.get("id").asText()));

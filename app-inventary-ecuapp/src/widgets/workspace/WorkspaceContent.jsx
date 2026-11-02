@@ -89,7 +89,7 @@ function WorkspaceContentView({ model }) {
       return <SalesPage rows={data.sales} loading={state.loading} pagination={data.pageInfo.sales}
         page={state.listPage} onPageChange={actions.changeListPage} onView={sale => actions.openDetail('sale', sale)}
         onRequestCancel={commands.requestSaleCancellation} onApproveCancellation={commands.approveSaleCancellation}
-        onChanged={data.loadData} />;
+        onChanged={data.loadData} can={auth.can} />;
     case 'inventory':
       return <InventoryPage products={data.products} balances={data.balances} movements={data.movements}
         warehouses={data.warehouses} suppliers={data.suppliers} inventoryFilter={state.inventoryFilter}

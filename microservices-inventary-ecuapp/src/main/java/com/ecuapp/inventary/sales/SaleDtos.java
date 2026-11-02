@@ -18,7 +18,7 @@ public final class SaleDtos {
  public record PricingRequest(@NotNull UUID warehouseId,@NotEmpty @Size(max=100) List<@Valid PricingLine> items){}
  /** minimumPrice is the no-loss floor for stocked goods; it is zero for non-stocked goods and services. */
  public record PriceView(UUID productId,BigDecimal quantity,BigDecimal minimumPrice,BigDecimal suggestedPrice,BigDecimal marginPercent,String currency){}
- public record CreateRequest(@NotNull UUID warehouseId,@Size(max=160) String customerName,@Size(max=40) String customerPhone,
+ public record CreateRequest(UUID warehouseId,@Size(max=160) String customerName,@Size(max=40) String customerPhone,
   @NotNull SaleChannel channel,@NotEmpty @Size(max=100) List<@Valid LineRequest> items,UUID customerId){
   public CreateRequest(UUID warehouseId,String customerName,String customerPhone,SaleChannel channel,List<LineRequest> items){
    this(warehouseId,customerName,customerPhone,channel,items,null);

@@ -365,7 +365,14 @@ class CatalogApiTest extends ApiTestSupport {
 
         problem(call(get("/api/v1/public/catalog/products/" + hidden.get("id").asText()), null, null), 404, "RESOURCE_NOT_FOUND");
         problem(call(get("/api/v1/public/catalog/products?sort=costPrice"), null, null), 400, "INVALID_QUERY");
-        assertTrue(httpGet(null, "/api/v1/public/catalog/categories?size=100", 200).toString().contains(categoryId));
+        boolean categoryVisible = false;
+        int categoryPage = 0;
+        while (!categoryVisible && categoryPage < 10) {
+            JsonNode categories = httpGet(null, "/api/v1/public/catalog/categories?size=100&page=" + categoryPage++, 200);
+            categoryVisible = categories.toString().contains(categoryId);
+            if (categoryPage >= categories.get("page").get("totalPages").asInt()) break;
+        }
+        assertTrue(categoryVisible, "public category list must expose the active category");
         // A product with available stock cannot be deactivated; first reconcile its stock,
         // then confirm that deactivation invalidates the public catalog cache.
         adjust(visible.get("id").asText(), warehouseId, "DECREASE", "3", null);

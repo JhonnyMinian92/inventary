@@ -11,4 +11,10 @@ export const salesApi = {
   approveSaleCancellation: id => request('/sales/' + encodeURIComponent(id) + '/approve-cancellation', { method: 'POST', idempotent: true }),
   createSale: data => request('/sales', { method: 'POST', body: data, idempotent: true }),
   salePricing: data => request('/sales/pricing', { method: 'POST', body: data })
+  ,
+  refunds: (params = {}) => request('/refunds' + query(params)),
+  refundAction: (id, action, providerReference = '') => request('/refunds/' + encodeURIComponent(id) + '/' + action +
+    (providerReference && action === 'complete' ? '?providerReference=' + encodeURIComponent(providerReference) :
+      providerReference && action === 'processing' ? '?providerReference=' + encodeURIComponent(providerReference) : ''),
+    { method: 'POST', idempotent: true })
 };

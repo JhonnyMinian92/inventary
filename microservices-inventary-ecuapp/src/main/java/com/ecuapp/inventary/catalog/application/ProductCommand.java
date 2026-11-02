@@ -27,16 +27,18 @@ public record ProductCommand(
     BigDecimal marginPercent,
     ServiceBilling serviceBilling,
     BillingFrequency billingFrequency,
-    Integer termMonths
+    Integer termMonths,
+    String taxCode,
+    String taxTreatment
 ) {
     public ProductCommand(String sku, String name, String description, UUID categoryId, BigDecimal costPrice,
                           BigDecimal salePrice, String currency, String imageUrl) {
-        this(sku, name, description, categoryId, costPrice, salePrice, currency, imageUrl, null, null, null, null, null, null, null);
+        this(sku, name, description, categoryId, costPrice, salePrice, currency, imageUrl, null, null, null, null, null, null, null, null, null);
     }
 
     public ProductCommand(String sku, String name, String description, UUID categoryId, BigDecimal costPrice,
                           BigDecimal salePrice, String currency, String imageUrl, ProductKind kind, UUID unitOfMeasureId,
                           Map<String, Object> attributes) {
-        this(sku, name, description, categoryId, costPrice, salePrice, currency, imageUrl, kind, unitOfMeasureId, attributes, null, null, null, null);
+        this(sku, name, description, categoryId, costPrice, salePrice, currency, imageUrl, kind, unitOfMeasureId, attributes, null, null, null, null, null, null);
     }
 }

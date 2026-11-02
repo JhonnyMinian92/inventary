@@ -67,6 +67,25 @@ public class WarehouseScopeService {
             throw new ResourceNotFoundException("Almacén",warehouseId);
     }
 
+    @Transactional(readOnly=true)
+    public UUID resolveDefaultWarehouseId(String username) {
+        if(hasGlobalAccess(username)) {
+            Set<UUID> accessible=accessibleWarehouseIds(username);
+            if(accessible==null || accessible.isEmpty()) {
+                List<Warehouse> active=warehouses.findByActiveTrue();
+                if(active.size()==1)return active.get(0).getId();
+            }
+        }
+        return scopes.findFirstByUserUsernameAndDefaultWarehouseTrueAndActiveTrueAndUserActiveTrue(username)
+            .filter(scope -> scope.isEffectiveAt(Instant.now()) && scope.getWarehouse().isActive())
+            .map(scope -> scope.getWarehouse().getId())
+            .orElseGet(() -> {
+                Set<UUID> ids=accessibleWarehouseIds(username);
+                if(ids!=null && ids.size()==1)return ids.iterator().next();
+                throw new BusinessRuleException("El usuario no tiene un almacén predeterminado único. Seleccione un almacén autorizado.");
+            });
+    }
+
     /**
      * Transfers are visible to operators responsible for either endpoint warehouse.
      * Mutations still require the specific source/destination side they change.
@@ -107,6 +126,13 @@ public class WarehouseScopeService {
         if(scopes.existsByUserIdAndWarehouseIdAndActiveTrue(userId,warehouse.getId()))
             throw new ConflictException("Ya existe una asignación activa para esta bodega.");
         UserWarehouseScope saved=scopes.saveAndFlush(new UserWarehouseScope(user,warehouse,reason,actor,from,until));
+        if(Boolean.TRUE.equals(request.defaultWarehouse())) {
+            scopes.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .filter(scope -> scope.isActive() && scope.getId()!=null && !scope.getId().equals(saved.getId()))
+                .forEach(scope -> scope.setDefaultWarehouse(false));
+            saved.setDefaultWarehouse(true);
+            scopes.save(saved);
+        }
         audit.record(actor,"USER_WAREHOUSE_SCOPE_GRANTED","USER_WAREHOUSE_SCOPE",saved.getId(),
             Map.of("userId",userId.toString(),"warehouseId",warehouse.getId().toString(),"validFrom",from.toString(),
                 "validUntil",until==null?"UNBOUNDED":until.toString(),"reason",reason));
