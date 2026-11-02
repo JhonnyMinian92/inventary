@@ -24,8 +24,9 @@ export function identifier(item) {
 export async function listAllPages(fetchPage, params = {}, pageSize = 100) {
   const size = Math.max(1, Math.min(100, Number(params.size) || pageSize));
   const first = await fetchPage({ ...params, page: 0, size });
-  if (Array.isArray(first) || !Number.isFinite(Number(first?.totalPages))) return listFrom(first);
-  const totalPages = Math.max(1, Number(first.totalPages) || 1);
+  const declaredPages = first?.totalPages ?? first?.page?.totalPages;
+  if (Array.isArray(first) || !Number.isFinite(Number(declaredPages))) return listFrom(first);
+  const totalPages = Math.max(1, Number(declaredPages) || 1);
   if (totalPages > 1000) throw new ApiError('El catálogo supera los 100.000 registros; usa filtros más específicos para evitar cargar un volumen excesivo en el navegador.', 413);
   const all = [...listFrom(first)];
   for (let page = 1; page < totalPages; page++) {
