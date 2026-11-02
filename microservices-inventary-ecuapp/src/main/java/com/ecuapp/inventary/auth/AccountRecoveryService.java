@@ -3,14 +3,8 @@ package com.ecuapp.inventary.auth;
 import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.BusinessRuleException;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +25,9 @@ import java.util.UUID;
  */
 @Service
 public class AccountRecoveryService {
-    private static final Logger log = LoggerFactory.getLogger(AccountRecoveryService.class);
     private final AppUserRepository users;
     private final JdbcTemplate jdbc;
-    private final JavaMailSender mail;
+    private final AuthEmailSender mail;
     private final PasswordEncoder encoder;
     private final PasswordPolicy policy;
     private final AuditService audit;
@@ -44,7 +37,7 @@ public class AccountRecoveryService {
     private final String frontendUrl;
     private final String from;
 
-    public AccountRecoveryService(AppUserRepository users, JdbcTemplate jdbc, JavaMailSender mail,
+    public AccountRecoveryService(AppUserRepository users, JdbcTemplate jdbc, AuthEmailSender mail,
             PasswordEncoder encoder, PasswordPolicy policy, AuditService audit, MeterRegistry metrics,
             @Value("${app.security.password-recovery.ttl-minutes:30}") long ttlMinutes,
             @Value("${app.security.password-recovery.frontend-url}") String frontendUrl,
@@ -63,10 +56,10 @@ public class AccountRecoveryService {
             jdbc.update("UPDATE auth_password_reset SET consumed_at=CURRENT_TIMESTAMP WHERE user_id=? AND consumed_at IS NULL",user.getId());
             jdbc.update("INSERT INTO auth_password_reset(id,user_id,token_hash,expires_at) VALUES(?,?,?,CURRENT_TIMESTAMP + (? * INTERVAL '1 minute'))",
                     UUID.randomUUID(),user.getId(),hash(token),ttlMinutes);
-            boolean delivered=send(user.getEmail(),"Restablecer contraseña de Inventary",
+            mail.sendAsync(user.getEmail(),"Restablecer contraseña de Inventary",
                     "Para restablecer tu contraseña abre este enlace (válido durante "+ttlMinutes+" minutos):\n\n"+
                     frontendUrl+"?token="+token+"\n\nSi no solicitaste este cambio, ignora este mensaje.");
-            audit.recordOutcome(user.getUsername(),"PASSWORD_RESET_REQUESTED","APP_USER",user.getId(),delivered?"SUCCESS":"FAILURE",null,Map.of());
+            audit.recordOutcome(user.getUsername(),"PASSWORD_RESET_REQUESTED","APP_USER",user.getId(),"QUEUED",null,Map.of());
         });
         metrics.counter("inventary.auth.password_recovery","event","requested").increment();
     }
@@ -107,10 +100,10 @@ public class AccountRecoveryService {
         String token=newToken();
         jdbc.update("INSERT INTO auth_email_verification(id,user_id,token_hash,expires_at) VALUES(?,?,?,CURRENT_TIMESTAMP + INTERVAL '24 hours')",
                 UUID.randomUUID(),user.getId(),hash(token));
-        boolean delivered=send(email,"Verifica tu correo de Inventary",
+        mail.sendAsync(email,"Verifica tu correo de Inventary",
                 "Confirma tu correo de recuperación con este código de un solo uso:\n\n"+token+
                 "\n\nEl código vence en 24 horas. Si no solicitaste esta operación, ignora este mensaje.");
-        audit.recordOutcome(username,"RECOVERY_EMAIL_VERIFICATION_REQUESTED","APP_USER",user.getId(),delivered?"SUCCESS":"FAILURE",null,Map.of());
+        audit.recordOutcome(username,"RECOVERY_EMAIL_VERIFICATION_REQUESTED","APP_USER",user.getId(),"QUEUED",null,Map.of());
     }
 
     @Transactional
@@ -124,21 +117,6 @@ public class AccountRecoveryService {
         if(consumed!=1) throw new BusinessRuleException("El código de verificación no es válido o ha expirado.");
         user.verifyEmail();
         audit.record(username,"RECOVERY_EMAIL_VERIFIED","APP_USER",user.getId(),Map.of());
-    }
-
-    private boolean send(String recipient,String subject,String body) {
-        try {
-            SimpleMailMessage message=new SimpleMailMessage();
-            message.setFrom(from); message.setTo(recipient); message.setSubject(subject); message.setText(body);
-            mail.send(message);
-            metrics.counter("inventary.auth.email","outcome","sent").increment();
-            return true;
-        } catch (RuntimeException failure) {
-            metrics.counter("inventary.auth.email","outcome","failed").increment();
-            log.error("Authentication email delivery failed; recipient omitted from log",failure);
-            // Keep the public response generic to avoid account enumeration; the metric/alert carries the operational signal.
-            return false;
-        }
     }
 
     private String normalizeEmail(String email) { return email.trim().toLowerCase(Locale.ROOT); }
