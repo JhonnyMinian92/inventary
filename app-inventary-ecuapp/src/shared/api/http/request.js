@@ -11,6 +11,7 @@ const sessionEndListeners = new Set();
 const logoutChannel = typeof BroadcastChannel !== 'undefined'
   ? new BroadcastChannel('inventary-auth-session')
   : null;
+logoutChannel?.unref?.();
 
 function publishSessionEnd() {
   for (const listener of sessionEndListeners) listener();
