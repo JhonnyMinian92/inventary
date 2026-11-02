@@ -338,9 +338,9 @@ export default function ProductForm({ initialValue, categories, units = [], load
     setImageError(''); setImageNotice(''); setImageBusy(true);
     try {
       await api.updateProductImage(productId, image.id, {
-        altText: image.altText || '', sortOrder: Number(image.sortOrder || 0), primaryImage: true
+        altText: String(imageAltDrafts[image.id] ?? image.altText ?? '').trim(), sortOrder: Number(image.sortOrder || 0), primaryImage: true
       });
-      setImages(current => current.map(item => ({ ...item, primaryImage: String(item.id) === String(image.id) })));
+      setImages(current => current.map(item => ({ ...item, altText: String(imageAltDrafts[item.id] ?? item.altText ?? '').trim(), primaryImage: String(item.id) === String(image.id) })));
       setImageNotice('Imagen principal actualizada.');
     } catch (error) {
       setImageError(error?.message || 'No se pudo cambiar la imagen principal.');
@@ -356,10 +356,10 @@ export default function ProductForm({ initialValue, categories, units = [], load
     setImageError(''); setImageNotice(''); setImageBusy(true);
     try {
       await api.updateProductImage(productId, image.id, {
-        altText: image.altText || '', sortOrder: Number(neighbor.sortOrder || 0), primaryImage: Boolean(image.primaryImage)
+        altText: String(imageAltDrafts[image.id] ?? image.altText ?? '').trim(), sortOrder: Number(neighbor.sortOrder || 0), primaryImage: Boolean(image.primaryImage)
       });
       await api.updateProductImage(productId, neighbor.id, {
-        altText: neighbor.altText || '', sortOrder: Number(image.sortOrder || 0), primaryImage: Boolean(neighbor.primaryImage)
+        altText: String(imageAltDrafts[neighbor.id] ?? neighbor.altText ?? '').trim(), sortOrder: Number(image.sortOrder || 0), primaryImage: Boolean(neighbor.primaryImage)
       });
       const refreshed = await api.productImages(productId);
       setImages(Array.isArray(refreshed) ? refreshed : []);
