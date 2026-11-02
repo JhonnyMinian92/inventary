@@ -355,7 +355,10 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
           const totals = stock.get(id);
           const inactive = isInactive(product);
           return <tr key={id} className="clickable" onClick={() => onOpenDetail(id)}>
-            <td><button type="button" className="row-title" onClick={event => { event.stopPropagation(); onOpenDetail(id); }}><strong>{product.name}</strong><small>{product.sku}</small></button></td>
+            <td><div className="product-row-identity">
+              {product.imageUrl ? <img className="product-row-thumbnail" src={resolveApiUrl(product.imageUrl)} alt="" loading="lazy" /> : <span className="product-row-thumbnail placeholder" aria-hidden="true"><Boxes size={17}/></span>}
+              <button type="button" className="row-title" onClick={event => { event.stopPropagation(); onOpenDetail(id); }}><strong>{product.name}</strong><small>{product.sku}</small></button>
+            </div></td>
             <td>{categoryNames.get(String(product.categoryId)) || product.category?.name || '—'}</td>
             <td className="num">{money(product.salePrice)}</td>
             <td className="num"><span className={'stock-value' + (!(totals?.onHand > 0) && !inactive ? ' empty' : '')}>{number(totals?.onHand || 0)}</span>{totals && totals.available !== totals.onHand && <small className="cell-note">{number(totals.available)} disp.</small>}</td>
