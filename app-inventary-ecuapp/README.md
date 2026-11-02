@@ -58,9 +58,9 @@ La confirmación manual de pago en WhatsApp registra que un usuario autorizado v
 
 ## Pruebas y evidencia
 
-El script npm test ejecuta Node Test Runner. En la revisión actual, CI reportó **31 pruebas aprobadas**, build Vite correcto y smoke browser de login a 360/768/1280 px:
+El script npm test ejecuta Node Test Runner. En la revisión actual, CI reportó **37 pruebas aprobadas**, build Vite correcto y smoke browser de login a 360/768/1280 px:
 
-[Frontend Build 41394184467](https://github.com/JhonnyMinian92/inventary/actions/runs/41394184467). El backend también pasó Maven Verify, Compose config y smoke de arranque desde volumen vacío en [Backend CI 41394216160](https://github.com/JhonnyMinian92/inventary/actions/runs/41394216160).
+[Frontend Build 41449330376](https://github.com/JhonnyMinian92/inventary/actions/runs/41449330376). El backend también pasó Maven Verify, Compose config y smoke de arranque desde volumen vacío en [Backend CI 41394216160](https://github.com/JhonnyMinian92/inventary/actions/runs/41394216160).
 
 Las pruebas unitarias cubren, entre otros, permisos del cliente, modelo de producto, router, cifrado de login, estado URL y exportación CSV. El smoke responsive comprueba login y desbordamiento/tamaño a tres anchuras; no ejecuta los flujos autenticados de compras, ventas, inventario, suscripciones o WhatsApp.
 
