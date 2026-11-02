@@ -7,12 +7,12 @@
 ## Cambios implementados
 
 ### Listado y navegación
-- Se conserva paginación real del backend, con filtros por texto, categoría, tipo de producto y estado.
+- Se conserva paginación real del backend, con filtros por texto, categoría, tipo de producto y estado. La búsqueda también encuentra el producto padre por SKU o código de barras de cualquiera de sus variantes.
 - Se agrega filtro por tipo: inventariable, no inventariable y servicio.
 - El estado de filtros, orden y página queda reflejado en la URL y se restaura con Atrás/Adelante.
 - El orden por categoría ahora se ejecuta en el servidor con una ruta de ordenamiento permitida (`category.name`), en vez de ordenar solo la página visible.
 - El orden por existencia y el filtro por existencia permanecen explícitamente limitados a la página cargada, porque el endpoint no implementa todavía orden/filtro global por stock.
-- El CSV se identifica como exportación de la página actual y su nombre incluye el número de página; no se presenta como exportación global.
+- El CSV exporta todos los resultados que coinciden con texto, categoría, tipo y estado, recorriendo páginas del servidor; incorpora saldos agregados si el usuario tiene permiso de lectura de inventario. El filtro/orden por existencia siguen siendo de alcance página y no se aplican al conjunto exportado.
 - El contador de Productos usa el total de resultados del servidor. El listado de categorías recibe `productCount` con el total de productos activos de cada categoría.
 
 ### Formulario y reglas del producto
@@ -32,8 +32,9 @@
 - No permite crear variantes para un producto inactivo.
 
 ### Detalle e imágenes
-- El detalle muestra clasificación, datos fiscales, atributos, galería de imágenes, variantes, saldos por almacén y últimos movimientos cuando el permiso lo permite.
+- El listado muestra la miniatura de la imagen principal. El detalle muestra clasificación, datos fiscales, atributos, galería de imágenes, variantes, saldos por almacén y últimos movimientos cuando el permiso lo permite.
 - Se respeta la regla de no subir nuevas imágenes a productos inactivos.
+- La imagen principal de la galería se sincroniza con `product.imageUrl`; al retirarla, se promueve otra imagen publicada o se limpia la miniatura. Las actualizaciones ordinarias de la ficha conservan esa imagen.
 - La carga continúa limitada a PNG/JPEG y 5 MB; la validación de contenido real y tamaño también ocurre en backend.
 
 ### Backend
@@ -66,8 +67,8 @@
 ## Limitaciones conocidas / trabajo pendiente
 
 1. El filtro y el orden por existencia son de alcance **página actual**, no globales. Para hacerlos globales hace falta un endpoint de inventario que filtre/ordene el catálogo con saldos agregados en base de datos.
-2. El botón CSV exporta **la página actual**; todavía no existe exportación de todos los resultados filtrados.
-3. No se ha añadido importación masiva de productos por CSV/XLSX ni actualización masiva.
+2. La exportación CSV completa recorre páginas y puede exportar hasta el límite defensivo de 100.000 registros; el filtro/orden por existencia de página no se aplica a esa exportación.
+3. No se ha añadido importación masiva de productos por CSV/XLSX ni actualización masiva con vista previa, conflictos y resultados por fila.
 4. No se han implementado edición de SKU, códigos internos alternativos ni etiquetas imprimibles; los SKU son inmutables por diseño.
 5. Las imágenes adicionales se gestionan al editar un producto ya creado; no se adjuntan antes del primer guardado.
 6. La galería acepta PNG/JPEG; formatos WebP/AVIF, antivirus/escaneo y CDN/almacenamiento externo deben evaluarse para producción.
