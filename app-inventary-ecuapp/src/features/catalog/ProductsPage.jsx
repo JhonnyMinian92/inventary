@@ -350,7 +350,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       <span className={withoutStock ? 'warn' : ''}><strong>{number(withoutStock)}</strong> activos sin stock en esta página</span>
     </div>
     <div className="filter-bar">
-      <label className="search-field"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar por nombre o SKU" aria-label="Buscar productos" /></label>
+      <label className="search-field"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar nombre, SKU o código de barras" aria-label="Buscar productos" /></label>
       <select value={categoryId} onChange={event => { setCategoryId(event.target.value); setPage(0); }} aria-label="Categoría">
         <option value="">Todas las categorías</option>
         {categories.map(category => <option key={idOf(category)} value={idOf(category)}>{category.name}</option>)}
