@@ -1,3 +1,17 @@
+## Adenda de actualización — 2026-11-02
+
+**Código actualizado:** commit 992b131c2de9cf5ed60c83ec4b826d2797029270. Los commits posteriores en esta rama contienen documentación funcional por pantalla.
+
+- SecurityConfig ya no permite acceso público a /api/v1/tax/** ni /api/v1/refunds/**.
+- Fiscal: requiere security:manage.
+- Reembolsos: GET requiere sales:read; aprobar requiere sales:cancel; otras escrituras requieren sales:manage.
+- TaxController aplica filtro por vigencia efectiva y estado activo.
+- Se agregó prueba HTTP de contrato para ausencia de autenticación y permisos.
+- CI del commit de código está en ejecución; no marcar este hallazgo como verificado hasta que finalice correctamente.
+- El cierre financiero de reembolsos sigue pendiente: ledger de pagos liquidados, conciliación, pasarela y confirmación autenticada del proveedor.
+
+La matriz funcional más útil para conocer qué falta por pantalla frontend/backend está en [ESTADO_FUNCIONAL_POR_PANTALLA.md](../../../ESTADO_FUNCIONAL_POR_PANTALLA.md).
+
 # 24 — Estado actual verificable del repositorio
 
 **Rama:** implementacion_propuestas  
