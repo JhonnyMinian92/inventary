@@ -33,13 +33,14 @@ public class MfaService {
     private final AppUserRepository users;
     private final AuditService audit;
     private final MeterRegistry metrics;
+    private final LoginAttemptGuard attempts;
     private final byte[] encryptionKey;
     private final String issuer;
 
-    public MfaService(JdbcTemplate jdbc, AppUserRepository users, AuditService audit, MeterRegistry metrics,
+    public MfaService(JdbcTemplate jdbc, AppUserRepository users, AuditService audit, MeterRegistry metrics, LoginAttemptGuard attempts,
             @Value("${app.security.mfa.encryption-key:}") String encryptionSecret,
             @Value("${app.security.mfa.issuer:Inventary}") String issuer) {
-        this.jdbc=jdbc; this.users=users; this.audit=audit; this.metrics=metrics; this.issuer=issuer;
+        this.jdbc=jdbc; this.users=users; this.audit=audit; this.metrics=metrics; this.attempts=attempts; this.issuer=issuer;
         try {
             this.encryptionKey=encryptionSecret==null||encryptionSecret.length()<32?null:
                 MessageDigest.getInstance("SHA-256").digest(encryptionSecret.getBytes(StandardCharsets.UTF_8));
@@ -121,6 +122,7 @@ public class MfaService {
         String encrypted=jdbc.query("SELECT secret_ciphertext FROM auth_mfa WHERE user_id=? AND enabled=TRUE",
                 rs->rs.next()?rs.getString(1):null,userId);
         if(encrypted==null||!verify(decrypt(encrypted),code)) {
+            users.findById(userId).ifPresent(user -> attempts.recordFailure(user.getUsername()));
             metrics.counter("inventary.auth.mfa","outcome","invalid_code").increment();
             throw new BadCredentialsException("El código MFA no es válido.");
         }
