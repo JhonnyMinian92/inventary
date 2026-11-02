@@ -10,6 +10,7 @@ import { dateTime, idOf, isInactive, isoDate, money, movementDirection, movement
 import './catalog.css';
 import '../operations/operational-forms.css';
 import { readSearchValue, updateBrowserQuery } from '../../shared/lib/url-state.js';
+import { filterProductsByPageStock } from '../../entities/product/model/product.js';
 
 const PAGE_SIZE = 20;
 const PRODUCT_SORT_KEYS = new Set(['name', 'category', 'price', 'stock']);
@@ -270,12 +271,8 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
   // Search, category, kind, status and all supported sort keys are authoritative on the
   // server. Do not filter them again here: the API also searches variant barcodes, which
   // are intentionally not repeated in the parent product projection.
-  const rows = useMemo(() => serverProducts.filter(product => {
-    const onHand = stock.get(String(idOf(product)))?.onHand || 0;
-    if (stockFilter === 'with' && !(onHand > 0)) return false;
-    if (stockFilter === 'without' && onHand > 0) return false;
-    return true;
-  }), [serverProducts, stockFilter, stock]);
+  const rows = useMemo(() => filterProductsByPageStock(serverProducts, balances, stockFilter),
+    [serverProducts, balances, stockFilter]);
 
   // Stock is aggregated from warehouse balances and therefore sorted only within the
   // currently loaded page. Every other sort is performed by the paginated API.
