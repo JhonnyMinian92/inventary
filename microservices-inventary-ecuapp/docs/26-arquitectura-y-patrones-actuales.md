@@ -1,176 +1,101 @@
-# 26 — Arquitectura, jerarquía y patrones actuales
+# 26 — Arquitectura y patrones actuales
 
-> **Actualización — Fase 4, 2026-10-31:** el catálogo tiene ahora los controladores REST en `catalog.api.rest.controller`, el resolver GraphQL en `catalog.api.graphql.controller` y los servicios del catálogo en `catalog.application.service`. El adaptador WhatsApp fue actualizado para el nuevo paquete de `ProductService`. Esta es una primera migración de paquetes, no la finalización de la arquitectura hexagonal: entidades JPA/repositorios y algunas dependencias entre capas continúan en transición. Ver [migración Fase 4 del catálogo](27-migracion-arquitectura-fase4-catalogo.md).
+**Código auditado:** dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
 
-## 1. Decisión arquitectónica efectiva
+## 1. Topología efectiva
 
-El backend es un **monolito modular Spring Boot**, ejecutado como una aplicación conectada a PostgreSQL. El nombre “microservices-inventary-ecuapp” es histórico; no implica despliegues separados por dominio. REST y GraphQL comparten proceso, seguridad, migraciones y persistencia. La SPA React/Vite es un artefacto separado y consume la API; no se observó BFF/gateway interno en este repositorio.
-
-## 2. Diagrama lógico
-
-~~~mermaid
-flowchart LR
-  U[Usuario navegador] --> FE[React + Vite SPA]
-  FE -->|HTTPS JSON Bearer| API[Spring Boot MVC]
-  W[n8n / WhatsApp] -->|X-Integration-Key| API
-  C[Consumidor público] -->|REST / GraphQL| API
-  API --> SEC[Spring Security JWT RBAC]
-  SEC --> CTRL[REST controllers / GraphQL]
-  CTRL --> SVC[Servicios de aplicación y negocio]
-  SVC --> DOM[Entidades, reglas e invariantes]
-  SVC --> REP[Repositorios JPA / SQL]
-  REP --> PG[(PostgreSQL + Flyway)]
-  SVC --> OB[Transactional Outbox]
-  OB -. relay opcional .-> K[Kafka]
-  API --> CACHE[Caffeine local]
-  API --> OPS[Actuator / logs / métricas]
-~~~
-
-La publicación hacia Kafka es opcional. Los consumidores y proyecciones Kafka no están en alcance. Caffeine es caché local del proceso, no distribuida.
-
-## 3. Jerarquía actual del repositorio
+Inventary es un monolito modular Spring Boot conectado a PostgreSQL, acompañado de una SPA React/Vite. REST, GraphQL, seguridad, jobs y acceso JPA corren en el mismo proceso backend. La carpeta con prefijo “microservices” es un nombre histórico; no existen servicios independientes por dominio.
 
 ~~~text
-inventary/
-├── README.md
-├── AUDITORIA_TECNICA_PENDIENTES.md
-├── .github/workflows/
-│   ├── backend-ci.yml
-│   └── frontend-ci.yml
-├── app-inventary-ecuapp/
-│   ├── package.json / .nvmrc / .env.example
-│   ├── index.html / vite.config.js
-│   ├── src/
-│   │   ├── main.jsx
-│   │   ├── App.jsx                 # sesión, navegación, coordinación
-│   │   ├── api.js                  # REST, token, errores, idempotencia
-│   │   ├── components/             # tablas y detalles
-│   │   ├── hooks/                  # diálogos y accesibilidad
-│   │   ├── features/
-│   │   │   ├── catalog/
-│   │   │   ├── dashboard/
-│   │   │   ├── inventory/
-│   │   │   ├── operations/
-│   │   │   ├── purchasing/
-│   │   │   ├── reports/
-│   │   │   └── sales/
-│   │   └── styles.css
-│   └── docs/                       # cobertura API, roadmap, soporte
-└── microservices-inventary-ecuapp/
-    ├── pom.xml / Dockerfile / docker-compose.yml / .env.example
-    ├── mvnw / mvnw.cmd
-    ├── scripts/smoke_test_api.py
-    ├── src/main/java/com/ecuapp/inventary/
-    │   ├── audit/
-    │   ├── auth/
-    │   ├── catalog/                # CRUD y arquitectura por puertos en parte
-    │   ├── common/                 # errores, páginas, idempotencia, periodos
-    │   ├── config/                 # seguridad, CORS, rate limit, filtros
-    │   ├── graphql/
-    │   ├── inventory/              # saldo, movimientos, valoración, conteos
-    │   ├── media/
-    │   ├── partners/
-    │   ├── purchasing/
-    │   ├── reports/
-    │   ├── returns/
-    │   ├── sales/                  # ventas, outbox y relay
-    │   ├── transfers/
-    │   ├── warehouse/
-    │   └── whatsapp/
-    ├── src/main/resources/
-    │   ├── application.yaml
-    │   ├── graphql/schema.graphqls
-    │   └── db/migration/V1..V14
-    ├── src/test/java/
-    └── docs/                       # contrato, arquitectura, runbook y evidencia
+Navegador
+  └── SPA React/Vite
+       └── cliente HTTP compartido
+            └── Nginx/proxy (Docker)
+                 └── Spring Boot API
+                      ├── Auth/RBAC/scopes
+                      ├── Catalog / Partners / Warehouse
+                      ├── Inventory / Purchasing / Sales / Returns
+                      ├── Subscriptions / WhatsApp
+                      ├── Taxpayer / Tax / Refund (con bloqueos de seguridad documentados)
+                      ├── Reports / Audit / Integration / Realtime
+                      ├── JPA + Flyway
+                      └── PostgreSQL
 ~~~
 
-El diagrama enumera las carpetas principales del árbol de referencia; para editar código, inspeccionar la ruta exacta del SHA que se despliega.
+Outbox/Kafka es transporte opcional; n8n es una integración/servicio externo del Compose raíz, no un microservicio de dominio interno.
 
-## 4. Límites de capas existentes
+## 2. Estructura real del frontend
 
-### HTTP / presentación
+- src/app: composición, providers, sesión, router y workspace.
+- src/pages: pantallas por ruta.
+- src/features: 12 áreas funcionales.
+- src/entities: modelos y componentes de entidades.
+- src/shared/api: transporte HTTP y APIs por dominio.
+- src/shared/ui, src/ui: controles neutrales y feedback.
+- src/components, src/widgets: gráficos y composición visual reutilizable.
+- src/security, src/hooks, src/utils: cifrado de login, hooks y utilidades.
 
-Los controladores reciben peticiones, validan path/query/body con DTOs y anotaciones, identifican el principal cuando corresponde y delegan en servicios. Los DTOs proyectan campos de salida y permiten ocultar costos. El handler común normaliza errores HTTP.
+Las fachadas src/api.js y src/router.js mantienen compatibilidad. No son el lugar preferido para añadir lógica nueva.
 
-### Seguridad transversal
+## 3. Estructura real del backend
 
-SecurityConfig configura JWT HS256, issuer/audience, expiración, usuario activo, versión de sesión y authorities. La autorización usa reglas HTTP y verificaciones @PreAuthorize. Filtros agregan request ID, auditoría, rate limit y límite del cuerpo.
+Paquetes de dominio principales:
+- auth, config, common, domain
+- catalog, partners, warehouse, taxpayer, tax
+- inventory, purchasing, sales, returns, refund, subscriptions
+- reports, audit, media, whatsapp
+- integration, realtime
 
-### Aplicación / negocio
+Persistencia: JPA repositories/entities, consultas SQL puntuales con JdbcTemplate y migraciones Flyway V1–V28. La fuente autoritativa del esquema es Flyway, no ddl-auto.
 
-Servicios como ProductService, InventoryService, PurchaseOrderService, SalesController/service, servicios de devolución, StockTransferService, CatalogStructureService, InventoryCostingService y servicios de reportes coordinan reglas y transacciones. Los comandos que afecten stock deben correr en el backend.
+## 4. Separación de capas y arquitectura hexagonal
 
-### Persistencia
+La separación hexagonal se aplica parcialmente al catálogo: casos de uso, comandos/resultados, puerto de persistencia y adaptador JPA. En varios dominios los servicios consumen repositorios Spring Data y entidades JPA de forma directa; existen dependencias cruzadas entre paquetes.
 
-Spring Data/JPA y consultas SQL especializadas acceden a PostgreSQL. Flyway mantiene V1–V14; Hibernate valida el esquema y open-in-view está deshabilitado. Restricciones, locks, inserción idempotente y triggers append-only complementan las reglas Java.
+No afirmar arquitectura hexagonal completa. La evolución correcta es por cortes verticales con DTOs/puertos claros, no una reescritura total.
 
-### Integraciones / plataforma
+## 5. Patrones presentes
 
-GraphQL es lectura de catálogo, no una segunda API de comandos. WhatsApp usa una credencial de máquina. Outbox persiste eventos en la transacción de negocio; el relay publica fuera de la transacción de reclamación y permite redrive. Actuator ofrece health/probes e info/métricas bajo permisos.
+- JWT Resource Server, RBAC y scopes de almacén/contribuyente.
+- Transacciones locales en comandos de inventario/compras/ventas.
+- Bloqueos de fila, restricciones de base e idempotencia.
+- Movimientos de inventario append-only y ledger de valoración.
+- Outbox/Inbox, envelopes versionados y deduplicación por eventId.
+- Maker-checker en conteos; segregación en aprobación de compras y cancelaciones.
+- DTOs REST, errores Problem Details y correlación X-Request-ID.
+- Paginación server-side, allowlists de sort en controladores que la implementan.
+- Dashboard SSE de señales; la señal dispara nuevas consultas, no es una proyección distribuida.
 
-## 5. Hexagonal: aplicada parcialmente
+## 6. Límites arquitectónicos y operativos
 
-El módulo de catálogo incluye ProductUseCases, ProductCommand/ProductResult, ProductPersistencePort y JpaProductPersistenceAdapter. La Fase 4 ubicó controladores REST/GraphQL y servicios en paquetes api/application, pero Product sigue siendo una entidad JPA usada por el puerto, varios repositorios permanecen en el paquete raíz y los servicios todavía consultan repositorios de dominios vecinos. El resto de los dominios conserva mayormente el patrón controlador → servicio → repositorio/entidad. Por tanto, la arquitectura hexagonal no es uniforme y no debe anunciarse como completamente implementada.
+- Kafka permanece apagado por defecto. El consumidor actual invalida cache de catálogo público.
+- Outbox entrega al menos una vez; no declarar exactly-once.
+- V28 crea estados/tablas y endpoints de administración para operaciones y webhooks; no hay worker externo completo en el árbol.
+- SSE mantiene emitters en memoria del proceso; no es broker distribuido ni feed de cambios de negocio.
+- Caffeine y rate limit son locales por instancia.
+- No existe aislamiento multiempresa.
+- Inventario tiene una ubicación por producto/almacén; multi-bin no está implementado.
+- No hay proveedor fiscal ni gateway de pagos aprobado.
+- Las rutas tax y refunds están permitAll en SecurityConfig; este defecto debe resolverse antes de exposición.
 
-No se recomienda reescribir módulos solo para crear interfaces. Extraer puertos cuando exista una necesidad verificable de sustitución de infraestructura, testabilidad o aislamiento.
+## 7. Transacciones e inventario
 
-## 6. Patrones presentes en código
+El servidor valida nuevamente disponibilidad, bloquea/serializa saldos, crea documentos y movimientos, actualiza valoración y registra auditoría/Outbox dentro de transacciones locales. La disponibilidad consultada por UI es informativa y no reserva stock. Las operaciones externas nunca quedan atómicas solo por compartir un evento Outbox.
 
-| Patrón | Dónde / para qué |
-|---|---|
-| Layered architecture / Service Layer | Controladores, servicios, repositorios, DTOs |
-| Repository / Data Mapper | Spring Data JPA y consultas SQL específicas |
-| DTO / Projection | Contratos de entrada y salida, ocultamiento de costos |
-| Dependency Injection | Beans Spring y dependencias por constructor |
-| Transaction Script / Unit of Work | Servicios transaccionales |
-| RBAC / Policy enforcement | SecurityConfig y @PreAuthorize |
-| Idempotency key | Registro backend, hash del comando y reintentos compatibles |
-| Optimistic concurrency | Versionado de stock cuando aplica |
-| Pessimistic locking | Serializar filas/entidades críticas |
-| Append-only ledger | Stock movements y entradas de valoración; triggers |
-| Compensating transaction | Cancelaciones/reversiones de operaciones contabilizadas |
-| Transactional Outbox | Persistencia de evento en la transacción de negocio |
-| Lease + SKIP LOCKED | Reclamar trabajos pendientes de Outbox |
-| Retry/backoff/redrive | Reintento operativo de eventos fallidos |
-| Local cache-aside | Caffeine con invalidación selectiva |
-| Query / Report Service | Consultas financieras y operativas read-only |
-| Anti-corruption boundary | DTO y validación del canal WhatsApp frente a input externo |
-| Problem Details | Errores HTTP normalizados y requestId |
+Las capas iniciales derivadas de coste de catálogo para existencias preexistentes son estimaciones, no reconstrucción del coste histórico contable.
 
-### No presentes o parciales
+## 8. Evidencia
 
-- Microservicios independientes: no.
-- CQRS completo/event sourcing: no; hay ledger de stock y outbox, no un event store general.
-- Arquitectura hexagonal en todos los dominios: no.
-- Consumidores/proyecciones Kafka: no.
-- Rate limit distribuido: no; el filtro actual es por instancia.
-- Stock por variante y picking multi-bin: no.
-- Multiempresa/tenant: no.
-- Pasarela de pago y facturación fiscal: no.
-
-## 7. Integridad transaccional de inventario
-
-La compra crea un documento; el stock aumenta cuando se contabiliza la recepción. Las ventas, ajustes, conteos, transferencias y devoluciones crean movimientos mediante servicios de negocio. No cambiar onHand manualmente ni corregir el historial mediante UPDATE/DELETE.
-
-FIFO consume capas ordenadas; el costo promedio utiliza estado de valoración correspondiente. El método no debe cambiarse tras movimientos valorizados sin migración planificada. Para existencias anteriores a V14, la capa inicial derivada de product.costPrice es estimación, no reconstrucción de costo contable histórico.
-
-La verificación de disponibilidad en UI es informativa: el comando debe volver a validar disponibilidad, bloquear/serializar saldo, y confirmar documento, saldo, movimiento y valoración en una transacción. La misma Idempotency-Key con mismo payload debe evitar una segunda contabilización.
-
-## 8. Riesgos operativos de arquitectura
-
-- El pool PostgreSQL multiplica conexiones por cada instancia.
-- Caffeine cache y rate limiting son locales y no coordinan réplicas.
-- Outbox entrega potencialmente al menos una vez; cualquier futuro consumidor debe deduplicar por eventId.
-- FORWARD_HEADERS_STRATEGY por defecto es none; native solo detrás de proxy confiable que reescriba headers.
-- JWT se almacena en localStorage del navegador; reforzar CSP/XSS.
-- El informe histórico ejecutó pruebas locales en PostgreSQL 18.6 aunque Compose/CI definen PostgreSQL 16. Debe certificarse la versión objetivo.
-- La carpeta de backend puede tener un nombre legado que confunda a equipos nuevos; no cambiar nombres en bloque sin evaluar paths, scripts y despliegues.
+En el SHA documentado:
+- Backend: Maven Verify/PostgreSQL 16, 119 pruebas y smoke de backend Compose desde volumen vacío.
+- Frontend: 26 pruebas, build y smoke responsive login a 360/768/1280.
+- Los workflows no certifican E2E autenticado de cada dominio ni el Compose raíz frontend+API+n8n.
 
 ## 9. Evolución sugerida
 
-1. Sincronizar controlador, DTO, referencia API, permiso, tests y guía en cada PR.
-2. Habilitar CI automática para frontend y backend, PostgreSQL 16, lockfile npm y reglas de protección de master.
-3. Añadir pruebas navegador para compra/recepción → venta total → reposición → reportes.
-4. Extraer capas/puertos de manera incremental y orientada a problemas.
-5. Tratar multi-bin, stock de variante, pagos, SRI y multiempresa como proyectos con decisión de dominio y migraciones independientes.
+1. Corregir de inmediato la seguridad fiscal y de reembolsos.
+2. Terminar snapshots fiscales y ciclo de pagos/reembolsos antes de anunciar capacidades financieras.
+3. Completar executor de operaciones y entregador de webhooks con idempotencia, retry, firma, observabilidad y sandbox.
+4. Mantener límites por dominio y ampliar la arquitectura modular gradualmente.
+5. Añadir pruebas de concurrencia y E2E autenticado.
+6. Solo evaluar microservicios, multi-bin o agentes con requisitos y ownership demostrables.

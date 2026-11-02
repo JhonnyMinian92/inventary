@@ -1,92 +1,123 @@
 # 24 — Estado actual verificable del repositorio
 
-**Corte actualizado:** 2026-10-27. **Rama:** `master`. Este documento conserva los snapshots históricos debajo; la adenda al inicio y los resultados de Actions enlazados son la referencia para el estado vigente. El backend pasó Maven verify contra PostgreSQL 16 y un smoke test real de Docker Compose con volumen vacío en [backend-ci 40504351485](https://github.com/JhonnyMinian92/inventary/actions/runs/40504351485) sobre el commit `ac60c93a97c90c6384262880bf970dea813a6dce`. El frontend pasó `npm test` y `npm run build` en [Frontend Build 40504502526](https://github.com/JhonnyMinian92/inventary/actions/runs/40504502526) sobre el commit `26dc33cd209133be037beb13fb7990933cde394d`. La ejecución del workflow revisado para el último ajuste de limpieza de Compose está en curso; no afecta al código de aplicación.
+**Rama:** implementacion_propuestas  
+**SHA de código auditado:** dc028a346ccf7b94cfbb60b4fb6cd5493518b481  
+**Evidencia de Actions:** [Backend CI 41385132612](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132612) · [Frontend Build 41385132616](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132616).
 
-## 1. Dictamen
+Este documento es la referencia viva del estado del código. Los documentos anteriores o con SHA distinto se leen como historia, no como certificación del HEAD.
 
-Inventary es una aplicación web con frontend React/Vite y API transaccional Spring Boot/PostgreSQL. Aunque el nombre del folder backend conserva “microservices”, la topología implementada en este repositorio es un **monolito modular**, no múltiples microservicios desplegables de forma independiente.
+## 1. Dictamen ejecutivo
 
-Separar estos estados es obligatorio:
-- **Implementado en código:** existen controlador, servicio/DTO/migración y reglas en el árbol.
-- **Probado históricamente:** un reporte registra ejecución en un snapshot anterior.
-- **Validado en HEAD:** build/test/CI reproducible asociado exactamente al SHA desplegable.
-- **Fuera de alcance:** no debe ofrecerse como capacidad de esta entrega.
-- **Pendiente de decisión:** necesita aprobación explícita de producto/arquitectura.
+Inventary contiene una SPA React/Vite y una API Spring Boot/PostgreSQL. El backend es un monolito modular, no un conjunto de microservicios independientes. La rama incorpora catálogo, inventario, compras, ventas, devoluciones, suscripciones, WhatsApp, reportes, auditoría, Outbox/Inbox y las primeras tablas/endpoints de operaciones y webhooks.
 
-El cierre de calidad ahora cuenta con una ruta reproducible en CI: Maven verify contra PostgreSQL 16, validación de los perfiles normal/Kafka de Compose y arranque de la API desde una base vacía. Esto demuestra compilación e integración del entorno de prueba; no equivale a una certificación de producción ni de cargas reales.
+El estado de calidad de código es bueno en los workflows del SHA auditado: backend 119 pruebas y smoke de backend desde base vacía; frontend 26 pruebas, build y smoke responsive del login. Esto no significa que todos los módulos tengan E2E browser ni que el entorno sea apto para producción.
 
-## 2. Identidad y estructura
+> **Bloqueo P0:** el backend permite actualmente acceso sin autenticación a las rutas /api/v1/tax/** y /api/v1/refunds/** en la cadena general de Spring Security. Los controladores no agregan autorización por método. No es una excepción limitada a local/dev. Esta situación impide aprobar la exposición del sistema a usuarios o redes no confiables.
 
-Repositorio: https://github.com/JhonnyMinian92/inventary  
-Rama principal: master. En la consulta se encontró únicamente esta rama y no estaba protegida.  
-SHA base revisado: 7d240c9403244e6a7c25d7f22a96fb5af7e12269.
+## 2. Inventario técnico observado
 
-### Frontend: app-inventary-ecuapp
+| Elemento | Conteo/versión en el árbol |
+|---|---:|
+| Archivos Java de producción | 263 |
+| Archivos Java de prueba | 25 |
+| Controladores Spring identificados | 32 |
+| Migraciones Flyway | V1–V28 (28 archivos) |
+| Archivos bajo frontend src | 127 |
+| Módulos feature frontend | 12 |
+| Archivos de prueba frontend | 6 |
+| Scripts frontend | test, build, dev, preview |
+| Java / Spring Boot | 21 / 3.5.6 |
+| React / Vite | 19 / 8.3.5 |
 
-- React y React DOM 19.3.1, Vite 8.3.5, plugin React 6.1.2 y lucide-react 1.61.0.
-- Node >=22.12.0 y <23; .nvmrc declara la línea 22; npm 10 u 11.
-- SPA coordinada por src/App.jsx; cliente REST compartido, Bearer, errores e idempotencia temporal en src/api.js.
-- UI observada: dashboard; productos/categorías/atributos; almacenes, proveedores, clientes y unidades; compras y recepción parcial; devolución a proveedor; ventas, solicitudes/aprobaciones de cancelación y devoluciones de cliente; saldos, movimientos, ajustes, conteos, traslados, reabastecimiento; reportes y CSV.
-- `package.json` declara `test` con Node test runner, además de `build`; `npm test` y `npm run build` están incluidos en el workflow frontend. No se encontró `package-lock.json`; la instalación usa `npm install`, de modo que versionar un lockfile sigue siendo una mejora de reproducibilidad recomendada.
-- El token de acceso está guardado en localStorage. Revisar XSS/CSP y modelo de almacenamiento antes de producción.
-- La SPA incorpora un flujo de imágenes en edición de productos existentes, con subida PNG/JPEG y galería; mantiene sin UI dedicada parte de la administración avanzada, auditoría completa, Outbox, políticas de costeo y gestión directa de variantes.
+## 3. Frontend: funcionalidades visibles
 
-### Backend: microservices-inventary-ecuapp
+- Auth/login, providers de sesión, permisos y router.
+- Dashboard con ventas, utilidad, alertas, tareas, existencias y movimientos.
+- Escena isométrica operativa con SSE; el evento recibido dispara una consulta de refresco, no entrega un payload completo de negocio.
+- Catálogo de productos/categorías/atributos/unidades/variantes/medios.
+- Contactos y almacenes; registro tributario manual con establecimientos y snapshots.
+- Inventario: centro de mando, existencias, movimientos, operaciones, conteos, ajustes, traslados y reposición.
+- Compras: pestañas órdenes, recepciones y devoluciones a proveedores; filtros/paginación server-side.
+- Ventas: pestañas ventas, devoluciones y reembolsos; acciones de cancelación/aprobación.
+- Suscripciones con filtros y vistas operativas.
+- WhatsApp: bandeja, resumen de trabajo, detalle y confirmación manual de pago.
+- Reportes: balance, ventas, compras, Kárdex, valoración y CSV.
 
-- Java 21, Spring Boot 3.5.6, Spring MVC, Spring Security, Spring Data JPA/Hibernate, PostgreSQL, Flyway, Bean Validation, Actuator, Spring GraphQL, Caffeine, Spring Kafka y springdoc-openapi.
-- 25 controladores HTTP observados en el árbol de referencia.
-- Migraciones Flyway V1–V15. V15 incorpora inbox persistente para deduplicación Kafka. Hibernate valida el esquema; las pruebas de CI verifican las migraciones con PostgreSQL 16.
-- JWT HS256 con issuer/audience, expiración, usuario activo, versión de token y permisos consultados desde la base.
-- RBAC por autoridades/permiso y restricciones de método.
-- Integridad de inventario con transacciones, bloqueos, claves únicas, idempotencia, movimientos históricos y asientos/capas de valoración.
-- Reportes: balance histórico, valoración, ventas, compras, kardex y stock bajo.
-- Catálogo público, consultas GraphQL, integración WhatsApp/n8n, Outbox/relay opcional, auditoría y Actuator.
+La organización por features está presente, pero las pruebas browser actuales no recorren todos estos flujos con autenticación y roles diferentes.
 
-## 3. Estado por dominio
+## 4. Backend: funcionalidades y límites
 
-| Dominio | Estado en el código | Condición/límite importante |
+| Dominio | Implementado en código | Límite real |
 |---|---|---|
-| Login y sesión | Login, identidad, logout, cambio de contraseña | Revalidar con JWT real en HEAD |
-| Usuarios/roles | Gestión de usuarios, roles y permisos | No hay UI administrativa completa |
-| Catálogo | Productos, categorías, atributos dinámicos tipados/versionados | Reglas de historial y autorización |
-| Variantes | SKU/barcode, combinaciones y precio | No tienen stock/costo independiente |
-| Unidades | Unidades y conversiones | Validar escenarios de uso en integración |
-| Terceros | Proveedores/clientes | Protección de documentos históricos |
-| Almacenes | Almacenes y endpoints de ubicaciones | Sin multi-bin operativo; una ubicación operativa por producto/almacén |
-| Inventario | Saldos, disponibilidad, kardex, ajustes y conteos | No modificar stock a través del CRUD de productos |
-| Compras | Orden, envío/aprobación, recepción parcial, devolución | La orden sola no aumenta stock |
-| Ventas | Venta multítem y cancelación con aprobación | Disponibilidad se revalida dentro de transacción |
-| Devoluciones | Cliente/proveedor | Cantidades limitadas por líneas recibidas/vendidas y cantidades ya devueltas |
-| Traslados | Despacho, recepción, cancelación, reversión | Revalidar concurrencia y ledger en PostgreSQL 16 |
-| Costeo | FIFO/promedio y ledger | V14 estima capas iniciales con product.costPrice; no reconstruye COGS previo |
-| Reportes | Seis familias de endpoints | Balance limita rango a 366 días y página a 100 |
-| Auditoría | Eventos de auditoría consultables | Mantener logs sin credenciales ni cuerpos sensibles |
-| WhatsApp/n8n | Catálogo, carrito, cotización, pedido, cancelación/backoffice | No es una pasarela de pago |
-| Outbox/Kafka | Outbox, relay, endpoints operativos y consumidor opcional con inbox, deduplicación por eventId, hash canónico y DLQ con reintentos acotados | Deshabilitado por defecto; el consumidor implementado invalida caché pública, no genera proyecciones analíticas |
-| API GraphQL | Consultas públicas del catálogo | No sustituye comandos REST |
-| Operación | Docker Compose, Actuator, rate limit local, checks de CI | El workflow actual valida Compose y arranca API + PostgreSQL desde volumen vacío; el rate limit sigue siendo local por instancia |
-| Fiscal/pagos | No implementado de forma fiscal | Impuesto 0, sin SRI ni pasarela/reembolso |
-| Multiempresa | No implementado | No anunciar SaaS multi-tenant |
-| Imágenes | Metadatos HTTPS y subida binaria segura PNG/JPEG, validación real, tamaño/resolución máximos, almacenamiento UUID y endpoint público condicionado a publicación | Carga limitada a 5 MiB; almacenamiento persistente configurado en Compose |
-| Rate limit distribuido | No implementado | Límite local por instancia |
+| Auth/RBAC | JWT, cifrado de login, revocación, roles/permisos | Excepciones fiscales/reembolso exponen rutas sin JWT; revisar scope en todos los controladores. |
+| Catálogo | Productos, categorías, atributos, variantes, unidades, imágenes | Variantes comparten stock/costo del producto padre. |
+| Inventario | Saldos, movimientos, ajustes, conteos maker-checker, FIFO/promedio, transferencias | Una ubicación operativa por producto/almacén; no WMS multi-bin. |
+| Compras | Órdenes, aprobación, recepciones parciales, devoluciones | No existe factura de proveedor/AP ni pagos a proveedores. |
+| Ventas | Venta transaccional, stock, coste, cancelación aprobada, retorno físico | Snapshot tributario/comercial completo y cumplimiento no están cerrados. |
+| Fiscal | Datos tributarios manuales, tarifas, tratamiento de producto y cálculo inicial | Sin SRI real; snapshot histórico incompleto; API fiscal pública por configuración actual. |
+| Reembolsos | Entidad, estados, servicio, endpoints y panel | API pública, sin libro de pagos liquidado ni conciliación segura. |
+| Suscripciones | Calendario/cuotas y facturación interna | Facturación interna no prueba cobro externo. |
+| WhatsApp | Carrito/cotización/pedido, backoffice y pago confirmado manualmente | No hay gateway ni fulfillment completo. |
+| Outbox/Inbox | Envelope versionado, lease, reintentos, deduplicación | Kafka opt-in; consumidor de alcance limitado. |
+| Integraciones V28 | Operaciones/tabla de entrega/suscripciones de webhook y endpoints de administración | No se identifica worker/dispatcher de extremo a extremo. |
+| Reportes | Balance histórico, ventas, compras, Kárdex, valoración, bajo mínimo | No constituye libro contable ni reportes tributarios oficiales. |
+| Multiempresa | No implementado | No anunciar SaaS multi-tenant. |
+| WMS avanzado | No implementado | Sin bins/lotes/series/caducidad/picking multi-bin. |
 
-## 4. Evidencia disponible y límites
+## 5. Integraciones nuevas del último corte
 
-El documento histórico fechado el 2026-10-23 afirma 76 pruebas backend verdes y un smoke test de 192 llamadas que cubrió 138 operaciones documentadas. También explica que se ejecutó en una copia local que no era un repositorio Git y sin SHA inicial/final. Debe conservarse como evidencia histórica, no como certificación del HEAD.
+- GET /api/v1/inventory/command-center: agregados y alertas del centro de mando.
+- GET /api/v1/dashboard/events: SSE autenticado; emite un evento de conexión y señales snapshot periódicas con updatedAt.
+- GET /api/v1/whatsapp-orders/work-summary: contadores de trabajo por ámbito del usuario.
+- GET /api/v1/goods-receipts/{id}/returnable-lines: cantidades retornables calculadas en servidor.
+- /api/v1/integration-operations: crear, consultar, listar y reintentar operaciones administrativas.
+- /api/v1/webhook-subscriptions: crear, listar y desactivar suscripciones.
+- Migración V28: tablas integration_operation, webhook_subscription y webhook_delivery, además de permisos integration:read/manage.
 
-Los workflows de frontend y backend se ejecutan automáticamente sobre cambios relevantes a `master` y PRs. La evidencia más reciente debe comprobarse en Actions enlazadas arriba; cualquier release posterior debe estar asociada al SHA exacto que fue verificado.
+La migración y los endpoints administrativos no demuestran por sí mismos que se ejecute la operación remota o que se envíe/reintente un webhook. Falta el ejecutor externo, redelivery y conciliación.
 
-## 5. Documentación autoritativa
+## 6. Seguridad y riesgos confirmados
 
-- Endpoints, métodos, permisos y límites: [25 — Referencia de APIs](25-referencia-apis.md).
-- Ejemplos reproducibles de consumo: [27 — Guía de consumo](27-guia-consumo-apis.md).
-- Arquitectura, jerarquía y patrones reales: [26 — Arquitectura actual](26-arquitectura-y-patrones-actuales.md).
-- Riesgos, orden de trabajo y Definition of Done: [28 — Plan de cierre](28-plan-cierre-y-validacion.md).
-- Operación: [23 — Runbook](23-runbook-operacion.md).
-- Índice: [documentación técnica](README.md).
+1. **P0 — Fiscal:** SecurityConfig declara permitAll para /api/v1/tax/**; TaxController no tiene @PreAuthorize. Crear/modificar tarifas y tratamiento fiscal de productos queda público.
+2. **P0 — Reembolsos:** SecurityConfig declara permitAll para /api/v1/refunds/**; RefundController no tiene @PreAuthorize. Los endpoints permiten listar y mutar estados sin autenticación.
+3. **P1 — Reembolso no financiero:** no existe ledger de pagos realmente liquidados; no se limita suma de reembolsos al saldo liquidado y amount ya reembolsado; complete no exige respuesta autenticada de gateway.
+4. **P1 — Snapshot fiscal:** se calcula impuesto usando una tarifa, pero Sale no persiste un detalle fiscal inmutable suficiente por venta/línea. Las columnas de V27 no equivalen al snapshot utilizado.
+5. **P1 — Consulta de tarifas:** TaxController acepta parámetro date, pero el código no lo aplica como filtro real por vigencia.
+6. **P1 — Integraciones V28:** las operaciones pueden quedar QUEUED; no se encontró un worker externo completo de operación ni de webhook delivery.
+7. **P2 — Rate limit:** Caffeine local por instancia; no es global.
+8. **P2 — Reproducibilidad operativa:** CI valida el Compose del backend; no prueba el stack completo del Compose raíz con frontend+n8n y PostgreSQL del anfitrión.
+9. **P2 — E2E:** smoke browser solo login responsive; faltan recorridos de negocio autenticados.
 
-Los documentos P03–P12 son registros de hitos/decisiones anteriores; no sustituyen este inventario vivo.
+No utilizar ocultación de botones del frontend como corrección de los riesgos 1–3.
 
-## 6. Política de actualización
+## 7. Evidencia de validación
 
-Para cada API nueva o modificada deben actualizarse en el mismo cambio el controlador/DTO, las pruebas, la referencia API, la matriz de permisos, el ejemplo de consumo y el estado/limitación. “Implementado” describe el árbol; “validado” requiere comando, versión, resultado y SHA. Nunca marcar un resultado como exitoso por inferencia.
+### Backend CI 41385132612
+
+- Maven Verify con Java 21 y PostgreSQL 16.
+- 119 pruebas: 0 fallos, 0 errores, 0 omitidas.
+- Configuración Compose backend normal y perfil Kafka.
+- Smoke test de arranque de API/backend con volumen PostgreSQL vacío.
+- No equivale a probar el Compose raíz con web y n8n.
+
+### Frontend Build 41385132616
+
+- 26 pruebas Node Test Runner.
+- Build de producción Vite.
+- Preview del build.
+- Smoke Chromium de login en 360, 768 y 1280 px.
+- No equivale a E2E autenticado de todas las pantallas.
+
+## 8. Estado de entrega
+
+**No aprobado para producción** mientras las rutas fiscales y de reembolsos mantengan permitAll y no exista un ciclo financiero/fiscal validado. La base de aplicación y los checks de CI son reales; el cierre de seguridad, operación e integraciones externas sigue pendiente.
+
+## 9. Documentos autoritativos
+
+- [25 — Referencia de APIs](25-referencia-apis.md)
+- [26 — Arquitectura actual](26-arquitectura-y-patrones-actuales.md)
+- [27 — Guía de consumo](27-guia-consumo-apis.md)
+- [28 — Plan de cierre](28-plan-cierre-y-validacion.md)
+- [29 — Fase 5](29-implementacion-fase5-datos-maestros.md)
+- [30 — Fase 6](30-implementacion-fase6-operaciones-comerciales.md)
+- [31 — Fase 7](31-implementacion-fase7-integraciones-durables.md)

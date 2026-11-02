@@ -1,35 +1,43 @@
-> **Adenda de estado — 2026-10-26:** esta matriz enumera las rutas consumidas por la SPA, no todas las APIs del backend. La referencia contractual completa y sus permisos están en [25 — Referencia de APIs](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md); el estado por dominio está en [24](../../microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md). Mantener esta matriz alineada con src/api.js no implica que las rutas hayan pasado pruebas de integración en el HEAD actual.
+# Cobertura de API consumida por el frontend
 
-# Cobertura de API del frontend
+**Código auditado:** rama implementacion_propuestas, SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
 
-Esta matriz se revisó contra los controladores Spring bajo `microservices-inventary-ecuapp/src/main/java/com/ecuapp/inventary` y el cliente `src/api.js`. Describe las rutas que consume el frontend; no sustituye las reglas de autorización del servidor. Las rutas de la tabla son relativas a la URL base configurada en `VITE_API_BASE_URL`, que incluye el prefijo `/api/v1`.
+Esta matriz describe los endpoints que la SPA consume. No es el inventario completo del backend ni una certificación de que cada operación esté autorizada de forma segura. La referencia completa está en [25 — APIs del backend](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md).
 
-| Módulo de UI | Rutas REST consumidas | Propósito |
+| Módulo UI | Rutas REST consumidas | Uso |
 |---|---|---|
-| Sesión | `POST /auth/login`, `GET /auth/me`, `POST /auth/logout` | Iniciar sesión, recuperar usuario y cerrar sesión. |
-| Productos | `GET /catalog/products`, `GET /catalog/products/{id}`, `POST /catalog/products`, `PUT /catalog/products/{id}`, `POST /catalog/products/{id}/activate`, `POST /catalog/products/{id}/deactivate` | Catálogo, detalle y estado del producto. |
-| Imágenes de producto | `GET /catalog/products/{id}/images`, `POST /catalog/products/{id}/images/upload`, `DELETE /catalog/products/{id}/images/{imageId}` | Editar productos existentes: consultar galería, subir PNG/JPEG y retirar imágenes del catálogo público. |
-| Categorías y atributos | `GET /catalog/categories`, `POST /catalog/categories`, `PUT /catalog/categories/{id}`, `POST /catalog/categories/{id}/activate`, `POST /catalog/categories/{id}/deactivate`, `GET /catalog/categories/{id}/attributes`, `PUT /catalog/categories/{id}/attributes`, `GET /catalog/attribute-presets`, `GET /catalog/attribute-presets/suggestion`, `GET /catalog/product-kinds` | Categorías y esquema de propiedades dinámicas. |
-| Unidades | `GET /catalog/units`, `GET /catalog/unit-dimensions`, `POST /catalog/units`, `PUT /catalog/units/{id}`, `GET /catalog/unit-conversions`, `POST /catalog/unit-conversions` | Unidades y factores de conversión. |
-| Almacenes | `GET /warehouses`, `GET /warehouses/{id}`, `POST /warehouses`, `PUT /warehouses/{id}`, `POST /warehouses/{id}/activate`, `POST /warehouses/{id}/deactivate` | Catálogo de almacenes. |
-| Proveedores y clientes | `GET/POST /suppliers`, `GET/PUT /suppliers/{id}`, acciones `activate/deactivate`; equivalentes en `/customers` | Contrapartes de compras y ventas. |
-| Saldos y movimientos | `GET /inventory/balances`, `GET /inventory/balances/{productId}/{warehouseId}`, `GET /inventory/availability`, `GET /inventory/movements`, `POST /inventory/adjustments` | Consulta de stock, disponibilidad y trazabilidad; ajustes autorizados. |
-| Traslados | `GET /inventory/transfers`, `GET /inventory/transfers/{id}`, `POST /inventory/transfers`, acciones `dispatch`, `receive`, `cancel`, `reverse` bajo `/inventory/transfers/{id}` | Crear y procesar movimientos entre almacenes. |
-| Conteos y reposición | `GET/POST /inventory/counts`, `GET /inventory/counts/{id}`, acciones `post/cancel`; `GET/POST /inventory/reorder-rules`, `PUT /inventory/reorder-rules/{id}`, `POST /inventory/reorder-rules/{id}/deactivate`, `GET /inventory/replenishment-suggestions` | Conteos físicos y abastecimiento. |
-| Compras y recepción | `GET /purchase-orders`, `GET /purchase-orders/{id}`, `POST /purchase-orders`, acciones `submit/approve/cancel`, `POST /purchase-orders/{id}/receipts`, `GET /goods-receipts`, `GET /goods-receipts/{id}` | Orden, aprobación y contabilización de recepciones. |
-| Devoluciones a proveedores | `GET /purchase-returns`, `GET /purchase-returns/{id}`, `POST /purchase-returns` | Devolver cantidades de recepciones contabilizadas. |
-| Ventas | `GET /sales`, `GET /sales/{id}`, `POST /sales`, `POST /sales/{id}/request-cancellation`, `POST /sales/{id}/approve-cancellation` | Venta y aprobación separada de anulaciones. |
-| Devoluciones de clientes | `GET /sales-returns`, `GET /sales-returns/{id}`, `POST /sales-returns` | Devoluciones por artículo de una venta. |
-| Informes | `GET /reports/inventory-balance`, `GET /reports/sales`, `GET /reports/purchases`, `GET /reports/kardex`, `GET /reports/valuation`, `GET /reports/low-stock` | Balance histórico, ventas/margen, compras, kardex, valoración y alertas de stock bajo. |
+| Sesión | POST /auth/login, POST /auth/login-challenge, GET /auth/me, POST /auth/logout | Inicio, desafío de credenciales, sesión y cierre. |
+| Catálogo | /catalog/products, /catalog/categories, /catalog/units, /catalog/unit-dimensions, /catalog/unit-conversions, /catalog/attribute-presets, /catalog/product-kinds, rutas de variantes | Productos, categorías, atributos, tipo de producto, unidades y variantes. |
+| Imágenes | GET/POST/DELETE /catalog/products/{id}/images... | Galería, carga PNG/JPEG y retirada de imágenes. |
+| Contactos | /customers, /suppliers, /partners | Clientes, proveedores y tipo de contraparte. |
+| Almacenes | /warehouses, /warehouses/{id}, /warehouses/{id}/establishment-assignments | Almacenes y asociaciones fiscales de establecimientos. |
+| Datos tributarios | /taxpayers, /taxpayers/{id}/establishments, /taxpayers/{id}/snapshots, /tax/rates, /tax/products/{id} | Registro manual de contribuyentes, tarifas y tratamiento fiscal de productos. No es consulta oficial ni emisión SRI. |
+| Inventario | /inventory/command-center, /inventory/balances, /inventory/availability, /inventory/movements, /inventory/adjustments | Centro de mando, existencias, disponibilidad, movimientos y ajustes. |
+| Operaciones de inventario | /inventory/counts, /inventory/transfers, /inventory/reorder-rules, /inventory/replenishment-suggestions | Conteos, traslados, reposición y reglas. |
+| Compras | /purchase-orders, /goods-receipts, /goods-receipts/{id}/returnable-lines, /purchase-returns | Órdenes, recepciones y devoluciones a proveedores. |
+| Ventas | /sales, /sales/{id}, /sales/{id}/request-cancellation, /sales/{id}/approve-cancellation | Ventas y cancelaciones aprobadas. |
+| Devoluciones/reembolsos | /sales-returns, /refunds, /refunds/{id}/... | Devoluciones físicas y estados iniciales de reembolso. La API de reembolsos tiene bloqueo crítico de autorización en backend. |
+| Suscripciones | /subscriptions, /subscriptions/options, /subscriptions/preview, acciones de facturación/prepago/cancelación | Calendarios y facturación interna. |
+| WhatsApp backoffice | /whatsapp-orders, /whatsapp-orders/work-summary, /whatsapp-orders/{id}, /whatsapp-orders/{id}/confirm-payment | Bandeja de trabajo, detalle y confirmación manual de pago. |
+| Reportes | /reports/inventory-balance, /reports/sales, /reports/purchases, /reports/kardex, /reports/valuation, /reports/low-stock | Balance por periodo, resultados comerciales, trazabilidad y valoración. |
 
-## Reglas de autorización relevantes
+## Funciones backend sin pantalla equivalente en esta SPA
 
-- Las rutas de informe están protegidas por `reports:financial`; la UI muestra la falta de permiso sin inventar datos.
-- El backend exige permisos propios para catálogo, inventario, compras, aprobación de compras, ventas, cancelación de ventas y administración de contrapartes. Los controles del frontend solo mejoran la experiencia; no sustituyen la autorización del servidor.
-- Una orden de compra no aumenta el inventario hasta que el backend registra la recepción aprobada.
-- La venta, los traslados, los ajustes, los conteos y las devoluciones se contabilizan a través de las APIs, no modificando saldos localmente.
-- El cliente añade `Idempotency-Key` a las operaciones marcadas como idempotentes y bloquea acciones en curso donde corresponde. Si una solicitud falla por red o error temporal, un reintento idéntico durante los siguientes dos minutos en la misma pestaña reutiliza la clave; la caché se borra al cambiar la sesión y no sobrevive a una recarga. Tras una recarga con resultado incierto, consulta primero el estado en el backend antes de repetir la operación.
+- Administración completa de usuarios, roles y permisos.
+- Consulta detallada de auditoría y operaciones Outbox.
+- Operaciones de integración, suscripciones de webhooks y diagnóstico de entregas.
+- GraphQL de catálogo.
+- Gestión operativa de Kafka.
+- Herramientas de operación/Actuator.
 
-## Rutas del backend que no son pantallas de este frontend
+## Reglas del cliente
 
-No se incluye aquí administración avanzada de usuarios/roles, auditoría completa, políticas de costeo, catálogo público/GraphQL, imágenes de producto, variantes, operaciones de outbox ni integraciones de WhatsApp. Son áreas que existen en el backend o sus controladores y deben tratarse como alcance adicional; no deben interpretarse como pantallas implementadas por este frontend.
+- El frontend centraliza autorización Bearer, request ID, Problem Details y claves de idempotencia en el transporte compartido.
+- La clave de idempotencia debe reutilizarse solo con el mismo payload y la misma operación lógica.
+- Ante timeout o pérdida de conexión después de enviar una escritura, consultar el estado en backend antes de repetirla.
+- Un 401 significa sesión ausente/no válida; un 403 significa que el usuario no tiene el permiso requerido. Ninguno debe convertirse en lista vacía o cifra cero.
+- El estado visual de una acción no sustituye la autorización ni la validación transaccional del servidor.
+
+## Riesgo de seguridad que afecta a esta matriz
+
+Aunque la UI muestre gestión fiscal y reembolsos solo a ciertos permisos, el código backend auditado mantiene permitAll para /api/v1/tax/** y /api/v1/refunds/**. La ocultación de pestañas no protege esos endpoints. No exponerlos a redes no confiables hasta corregir SecurityConfig/controladores y probar respuestas 401/403 por HTTP.

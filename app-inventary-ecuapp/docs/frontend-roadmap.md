@@ -1,73 +1,58 @@
-> **Estado actualizado — 2026-10-31, rama `implementacion_propuestas`:** la reorganización de código y estilos de la Fase 3 está implementada y validada por CI en el SHA `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`. El workflow ejecutó 22 pruebas y el build de producción con éxito. La comprobación visual E2E en navegador queda pendiente y no se presenta como realizada.
+# Estado y roadmap del frontend Inventary
 
-# Plan de implementación del frontend
+**Código auditado:** dc028a346ccf7b94cfbb60b4fb6cd5493518b481 en implementacion_propuestas.
 
-La construcción del frontend se divide por fases de código fuente. Las pruebas integrales se ejecutarán después de completar todo el alcance de código fuente, según lo solicitado.
+Este documento sustituye el calendario histórico de implementación por una descripción del código actual y de las brechas que siguen abiertas.
 
-## Fase 1 — Fundación y catálogo
+## Estado actual por área
 
-**Estado del código fuente: completada en `master`.** La compilación y las pruebas quedan pendientes deliberadamente hasta que se complete el 100 % del frontend.
+| Área | Estado del código |
+|---|---|
+| Fundación, login y sesión | Implementado; unit tests y smoke browser responsive del login pasan en CI. |
+| Catálogo | Productos, categorías, atributos, unidades, conversiones, imágenes y variantes tienen pantallas/workflows. |
+| Contactos y datos fiscales | Clientes/proveedores/almacenes y registro tributario manual están en UI. La importación sigue en revisión manual; la gestión de tarifas tiene una API con excepción de autorización pública. |
+| Inventario | Centro de mando con KPIs/alertas/acciones; pestañas de existencias, movimientos, operaciones y auditoría; consumos de endpoint command-center. |
+| Compras | Pestañas Órdenes, Recepciones y Devoluciones a proveedores. Órdenes, recepciones y devoluciones usan búsqueda/paginación desde servidor. |
+| Ventas | Pestañas Ventas, Devoluciones y Reembolsos; acciones de cancelación y aprobación. El filtrado local de ventas no debe confundirse con búsqueda server-side completa. |
+| Suscripciones | Paginación y filtros de estado, texto, almacén, ventana de próximo cobro y fallos de facturación. |
+| WhatsApp | Bandeja con colas, query, resumen de trabajo, detalle expandible y confirmación manual de pago. |
+| Reportes | Centro de reportes operativo/financiero con filtros, páginas y CSV. |
 
-- Mantener React + Vite como única aplicación web.
-- Centralizar las llamadas REST, autorización Bearer, errores e idempotencia en **src/api.js**.
-- Completar el inicio de sesión y el marco común de navegación.
-- Separar los formularios de productos y categorías en componentes independientes.
-- Crear y editar productos y categorías mediante el backend.
-- Leer el esquema de propiedades de cada categoría y renderizar los campos compatibles con el tipo de dato.
-- Crear, editar y eliminar definiciones de propiedades; validar claves, opciones de listas y longitudes.
-- Incluir acciones de activar/desactivar productos y categorías.
-- Documentar los contratos y la configuración local.
+## Mejoras de interfaz recientes ya presentes
 
-**Criterio de cierre:** el código fuente de autenticación, catálogo y propiedades dinámicas está incorporado; no se considera validado hasta ejecutar las pruebas en la fase final.
+- Compras se organiza en tres pestañas, con estados, búsquedas y paginación separadas. La elegibilidad de devolución se obtiene del endpoint del backend, no se reconstruye a partir de un conjunto limitado de filas.
+- Ventas separa las tablas de ventas, devoluciones y reembolsos. La acción de completar reembolso utiliza un diálogo y evita envíos simultáneos, pero no resuelve los defectos de seguridad/finanzas del backend.
+- Inventario tiene una vista de mando conectada a agregados del servidor, además de vistas de saldos, movimientos, operaciones y auditoría.
+- Suscripciones expone filtros y detalle operativo; las acciones reflejan facturación interna, no cobro bancario.
+- WhatsApp incorpora indicadores de trabajo, paginación y detalle de pedido; la confirmación sigue siendo una revisión manual por un usuario autorizado.
+- El dashboard incorpora una escena operativa que mantiene una conexión SSE. El evento recibido funciona como señal para volver a consultar la API; no transporta un snapshot completo de negocio.
 
-## Fase 2 — Operación de inventario
+## Arquitectura
 
-**Estado del código fuente: completada en `master`.** Las pruebas de compilación y de negocio siguen aplazadas hasta el cierre de todo el frontend.
+La composición está en src/app; las rutas delegan a src/pages; los módulos de negocio viven en src/features; el transporte y APIs por dominio están en src/shared/api. Las fachadas src/api.js y src/router.js mantienen compatibilidad.
 
-- Administrar almacenes, proveedores, clientes y unidades de medida; asignar unidades a productos y configurar conversiones.
-- Crear órdenes de compra con múltiples productos; enviar a aprobación, cancelar borradores/órdenes pendientes y registrar recepción parcial o completa por línea.
-- Registrar devoluciones a proveedores desde recepciones contabilizadas, limitando cantidades a las que aún no se han devuelto.
-- Registrar ventas multítem con clientes registrados u ocasionales, consultar disponibilidad y solicitar/aprobar anulaciones.
-- Registrar devoluciones de clientes por línea de venta, eligiendo entre reincorporar el artículo al inventario o descartarlo.
-- Consultar saldos y movimientos filtrando por almacén y producto, mostrando los campos reales de los DTOs.
-- Gestionar traslados multítem con despacho, recepción, cancelación y reversión con motivo.
-- Registrar ajustes de stock con dirección, cantidad, motivo obligatorio y costo unitario para entradas.
-- Registrar conteos físicos multítem y contabilizar o cancelar los documentos; crear/editar/desactivar reglas de reposición y consultar sugerencias.
-- Centralizar las nuevas rutas bajo el cliente REST, usando claves de idempotencia para operaciones transaccionales que modifican inventario.
+Consulta [Arquitectura implementada](../src/README_ARCHITECTURE.md).
 
-## Fase 3 — Arquitectura y separación del frontend React
+## Evidencia de calidad
 
-**Estado de implementación en `implementacion_propuestas`: código y CI completados en el SHA `f8d197b5076d1cccd9ae5bd4e77ff51ecf51364f`; 22 pruebas y build correctos. La inspección responsive/a11y fue estática; falta prueba visual E2E en navegador.**
+En el SHA auditado, Frontend Build 41385132616 aprobó:
+- 26 pruebas Node Test Runner.
+- Build Vite de producción.
+- Preview del build.
+- Smoke browser de login en Chromium a 360, 768 y 1280 px.
 
-- Punto de entrada reducido a composición de providers y workspace; el root `src/App.jsx` queda como fachada de compatibilidad.
-- Separación explícita de `app`, `pages`, `widgets`, `features`, `entities` y `shared`, con dependencias dirigidas y una navegación declarativa.
-- Controlador del workspace separado de las vistas: navegación/URL en `app/model/useWorkspaceController.js`, consultas por vista en `useWorkspaceData` y operaciones en `useWorkspaceCommands`.
-- Autenticación permanece aislada en `AuthProvider`; conserva el flujo de cifrado, persistencia de token, expiración y consulta del perfil.
-- Componentes UI neutrales movidos a `shared/ui`; selector de producto y detalles de transacción movidos a `entities`. Fachadas antiguas conservan imports existentes sin duplicar implementación.
-- Filtros y paginación de productos, compras, ventas, inventario y reportes se reflejan en query strings; `popstate` restaura el estado de las vistas que lo gestionan.
-- Corrección de paginación doble en catálogo: el backend ya entrega una página, por lo que el cliente no vuelve a aplicar el desplazamiento local.
-- Corrección de dependencias del filtrado memoizado del catálogo; el resultado ahora responde a búsqueda, categoría, estado y existencias.
-- Datos de referencia de reportes se cargan al entrar por URL directa; la capa de datos no retiene registros/contadores/paginación obsoletos ante errores de la consulta correspondiente.
-- Estilos separados por dominio y componente: catálogo, operaciones, devoluciones, reportes, detalles transaccionales, formularios guiados y accesibilidad; el archivo global conserva layout/base y reglas transversales. Tokens semánticos y escala de espacio/radio/foco en `shared/styles/tokens.css`.
-- Se añaden pruebas unitarias de URL state sin instalar dependencias adicionales.
+Esto no equivale a E2E autenticado del producto. Siguen pendientes pruebas browser para roles, permisos, compra/recepción/devolución, venta/cancelación, inventario/conteo/traslado, suscripciones, WhatsApp, reportes y errores/expiración de sesión.
 
-## Fase 4 — Cierre del código fuente y documentación
+No existe script lint en package.json. No presentar la suite actual como cobertura completa de UI.
 
-**Estado del código fuente: completada en `master`.** La aplicación y sus instrucciones quedan preparadas para iniciar la fase separada de validación.
+## Trabajo frontend pendiente
 
-- Revisada la cobertura de rutas REST consumidas y documentadas en [api-coverage.md](api-coverage.md), incluidos permisos backend relevantes y funcionalidades que no se exponen como pantallas en este frontend.
-- Configuración por entorno documentada en `.env.example`; Node 22 está indicado en `.nvmrc` y los requisitos de Node/npm en `package.json`.
-- Versiones directas de React, React DOM, Vite, el plugin React y lucide-react fijadas a versiones exactas.
-- Guía de ejecución y solución de problemas disponible en [troubleshooting.md](troubleshooting.md), con configuración CORS, variables públicas, errores 401/403/404/409 y manejo de sesión.
-- Revisado el cliente REST para distinguir error de red, errores HTTP y pérdida de autorización. La sesión limpia la caché temporal de idempotencia al cambiar el usuario.
-- Las operaciones transaccionales marcadas como idempotentes reutilizan temporalmente la misma clave ante un reintento idéntico tras un fallo ambiguo de red o error temporal. La clave no sustituye las validaciones del backend ni persiste tras recargar el navegador.
-- Mejorados filtros y métricas paginadas de los informes; cuando cambian los filtros, se descarta el resultado anterior para no mostrar datos que no corresponden a la consulta actual.
-- El workflow de compilación de GitHub Actions es manual y requiere confirmar que el código fuente está completo; no ejecuta pruebas automáticamente antes del cierre de esta fase.
-- El archivo `package-lock.json` se generará y añadirá en la fase de validación al disponer de acceso al registro de npm. No se afirma que la compilación o la integración estén verificadas porque no se han ejecutado.
+1. Automatizar E2E autenticado con datos efímeros y distintos roles.
+2. Cubrir los recorridos comerciales y los casos de error/resultado incierto.
+3. Completar pruebas de accesibilidad y navegación con teclado de formularios, modales y tablas.
+4. Extender filtros server-side donde aún se aplican solo sobre la página recibida.
+5. Revisar el flujo de reembolso solo después de corregir la API y su autorización.
+6. Diferenciar visualmente estados comercial, fiscal, pago y cumplimiento; no inferir un cobro a partir de una venta o un pedido.
+7. Mantener el mapa API sincronizado con cada endpoint nuevo o retirado.
 
-**Alcance no representado por pantallas:** administración avanzada de usuarios/roles, auditoría completa, política de costeo, catálogo público/GraphQL, imágenes de productos, variantes, outbox e integraciones de WhatsApp. El mapa de cobertura identifica estas áreas para que no se confundan con módulos ya implementados.
-
-
-## Fase de pruebas posterior
-
-Se ejecutará solo después de finalizar las cuatro fases de código: compilación de producción, revisión estática, pruebas de componentes y escenarios end-to-end contra el backend y PostgreSQL, incluyendo compras, recepción, venta total, reposición del mismo producto y balance por rango de fechas.
+La implementación actual es una SPA operativa con módulos por dominio, no una aceptación completa del producto ni prueba de aptitud productiva.

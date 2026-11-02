@@ -1,118 +1,76 @@
-> **Adenda de cierre — 2026-10-27.** La evidencia de este corte ha cambiado respecto a la tabla histórica inferior. El backend ha pasado `./mvnw -B --no-transfer-progress verify` contra PostgreSQL 16, `docker compose config --quiet` (incluido el perfil Kafka) y el smoke test de Compose con un volumen PostgreSQL vacío en [backend-ci 40504351485](https://github.com/JhonnyMinian92/inventary/actions/runs/40504351485), SHA `ac60c93a97c90c6384262880bf970dea813a6dce`. El ajuste posterior de limpieza del workflow se está verificando en [backend-ci 40504639896](https://github.com/JhonnyMinian92/inventary/actions/runs/40504639896), SHA `b81ce241aff62d6eabff3408c1be4e6c10eb3be7`; Maven verify y la validación de Compose están verdes en esa ejecución, el smoke test está en curso al redactar esta adenda. El frontend `npm test` y `npm run build` pasaron en [Frontend Build 40504502526](https://github.com/JhonnyMinian92/inventary/actions/runs/40504502526), SHA `26dc33cd209133be037beb13fb7990933cde394d`.
+# 28 — Plan de cierre, riesgos y Definition of Done
 
-> **Estado de alcance:** implementados y cubiertos por pruebas: subida validada de imágenes PNG/JPEG con límite de tamaño y resolución, retirada que revoca la URL pública, inbox Kafka persistente con idempotencia y DLQ opcional, protección CSV contra fórmulas, y CI automatizada de backend/frontend. Kafka sigue deshabilitado por defecto y el consumidor implementado invalida caché; no es una plataforma de proyecciones analíticas. Quedan como riesgos o decisiones de producto explícitos: lockfile npm reproducible (CI usa `npm install`), revisión XSS/CSP y token en localStorage, rate limit distribuido multiinstancia, reconciliación de capas de costo iniciales con inventario real, SRI/facturación electrónica, pagos, multiempresa y picking multi-bin. Estos límites no se consideran capacidades entregadas.
+**Corte de código:** SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481, rama implementacion_propuestas.
 
-# 28 — Próximos pasos, riesgos y Definition of Done
+## 1. Estado de validación
 
-## 1. Objetivo
+- Backend CI 41385132612: Maven Verify sobre PostgreSQL 16; 119 pruebas sin fallos; configuración Compose backend normal/Kafka; smoke de API/backend desde volumen PostgreSQL vacío.
+- Frontend Build 41385132616: 26 pruebas, build de producción y smoke Chromium de login a 360/768/1280 px.
+- No existe en estos workflows aceptación E2E autenticada de todas las pantallas.
+- El Compose raíz (frontend + API + n8n contra PostgreSQL del anfitrión) no forma parte del smoke de backend actual.
 
-Cerrar la brecha entre implementación fuente, contrato documentado y evidencia del artefacto desplegable. No declarar un hallazgo resuelto por la existencia de archivos; solo se declara validado si una ejecución reproducible está ligada al SHA.
+## 2. Bloqueos de prioridad
 
-## 2. Riesgos priorizados
+| Prioridad | Condición | Acción requerida |
+|---|---|---|
+| P0 | /api/v1/tax/** y /api/v1/refunds/** tienen permitAll y controladores sin autorización por método | Restringir rutas, validar scopes y probar JWT ausente/rol permitido/rol denegado por HTTP. |
+| P1 | Reembolsos sin ciclo financiero completo | Libro de pagos liquidados, acumulado reembolsable, aprobador distinto, audit trail y gateway/confirmación manual verificable. |
+| P1 | Snapshot fiscal insuficiente | Persistir tarifa, base, tratamiento, monto y contexto tributario por documento/línea; probar cambios de tarifa sin alterar historia. |
+| P1 | API tax acepta date sin usarlo como filtro | Corregir contrato/implementación y añadir prueba para vigencia histórica. |
+| P1 | Operaciones/webhooks V28 sin worker externo completo | Dispatcher, firma, retry/backoff, resultado, idempotencia, redrive y conciliación; no etiquetar QUEUED como completado. |
+| P1 | Faltan E2E autenticados | Browser journeys para roles y flujos comerciales completos. |
+| P2 | Compose raíz sin smoke CI | Validar frontend + API + n8n + PostgreSQL externo/local con configuración limpia. |
+| P2 | Rate limit local por instancia | Gateway/WAF o limitador distribuido en topología multiinstancia. |
+| P2 | Observabilidad y recuperación | Alertas, backup/restore probado, runbook, redrive y comprobación de versiones/configuración. |
+| P2 | Integridad de scopes | Cubrir cada controlador sensible y recurso por almacén/contribuyente. |
 
-| Prioridad | Riesgo/condición | Estado del corte | Acción |
-|---|---|---|---|
-| P1 | Build y tests del HEAD actual | Sin evidencia vinculada a SHA actual | Ejecutar frontend y backend en CI y preservar logs/resumen |
-| P1 | Compatibilidad PostgreSQL 16 | Informe histórico ejecutó localmente en PostgreSQL 18.6; CI/Compose declaran 16 | Tests+migraciones V1–V14 en PostgreSQL 16 |
-| P1 | Balance y costeo | Código y evidencia histórica | E2E agotar/reposición del mismo producto, devolución, cancelación, kardex y conciliación |
-| P1 | Tests frontend | package.json no declara test/lint | Añadir pruebas de cliente, componentes y navegador |
-| P1 | Automatización de calidad | Workflows manuales | CI automática en push/PR, checks obligatorios y protección de master |
-| P2 | Lockfile npm | No se encontró package-lock.json | Generarlo y versionarlo; usar npm ci en CI |
-| P2 | CSV formula injection | Escapa comillas, pero requiere neutralizar fórmulas de spreadsheet | Sanear valores iniciados por =, +, - o @ y probar |
-| P2 | Categoría + esquema en dos peticiones | Un paso puede persistir cuando falla el segundo | Endpoint transaccional o compensación documentada y probada |
-| P2 | Token en localStorage | Implementado en cliente web | Revisar CSP, XSS, dependencias y aislamiento de origen |
-| P2 | Rate limit multiinstancia | Filtro local | Gateway/WAF distribuido cuando escale a varias réplicas |
-| P2 | Datos de smoke | El informe histórico indica filas SMK y usuario admin en base de prueba | No reutilizar esa base con datos reales; backup/limpieza aprobada |
-| P2 | Valor inicial de coste | V14 estima capas previas desde costPrice | Conciliar con inventario real antes de usar como contabilidad |
-| P2 | Documentación heredada | Algunos MD reflejan diseños previos | Usar docs/24–28 como referencia viva; marcar históricos |
-| P3 | Hexagonal parcial | Es un monolito modular con puertos en parte del catálogo | Evolución incremental y justificada |
-| Alcance | Pago/SRI/tenant/variant stock/multi-bin/consumidores Kafka | No implementado | No anunciar soporte; requerir decisión de arquitectura |
+## 3. Funcionalidades no entregadas
 
-## 3. Orden de ejecución
+- Emisión, firma, consulta, autorización, anulación y nota de crédito SRI real.
+- Pasarela de pagos y conciliación bancaria.
+- Cuentas por pagar/facturas de proveedor.
+- Fulfillment/envíos, picking y WMS multi-bin.
+- Multiempresa/tenant.
+- Consumidores Kafka de proyección analítica.
+- Motor de recomendaciones/experimentos y agentes A0–A4.
+- Worker de operaciones externas y webhook delivery.
+- E2E autenticado completo de la SPA.
 
-### Fase A — Baseline
+## 4. Escenarios funcionales que deben quedar cubiertos
 
-1. Registrar rama, git status y SHA; no sobrescribir cambios locales.
-2. Frontend con Node/npm declarados: instalar, build y añadir pruebas.
-3. Backend con Java 21: ./mvnw -B verify contra PostgreSQL 16.
-4. Migrar V1–V14 desde cero y actualizar base de prueba desde V13.
-5. Ejecutar smoke HTTP con credenciales desechables.
-6. Registrar los comandos, versiones, SHA y resultados.
+1. Recibir stock, vender todo, recomprar el mismo producto y consultar balance por periodos antes/después de reposición.
+2. Repetir compra/recepción con la misma Idempotency-Key y confirmar que el stock no se duplica.
+3. Devolver parcialmente unidades de una recepción y demostrar que el servidor bloquea una sobredevolución concurrente.
+4. Vender/cancelar con maker-checker, comprobar reposición exacta y auditar actores/movimientos.
+5. Realizar devolución física y mantener separado el eventual reembolso.
+6. Cambiar una tarifa fiscal y demostrar que el detalle fiscal de una venta anterior no cambia.
+7. Reintentar operación externa tras timeout ambiguo sin duplicar side effects.
+8. Restaurar un backup en un entorno aislado y ejecutar migraciones/validaciones.
 
-Aceptación: sin desactivar controles, seguridad, migraciones ni aserciones.
+## 5. Definition of Done por API
 
-### Fase B — Flujos críticos
+- Método, ruta, DTO, validaciones, códigos y errores documentados.
+- Permiso y scope definidos; pruebas de acceso permitido y denegado.
+- Prueba de persistencia/efecto de negocio y de idempotencia donde aplique.
+- Paginación/filtros/orden documentados y acotados.
+- Cliente frontend/integración actualizado.
+- Resultado de prueba ligado al SHA y entorno.
+- No exponer secretos, payloads sensibles ni trazas internas.
 
-1. Crear producto, categoría y atributos; probar tipos inválidos.
-2. Crear compra, someter/aprobar, recepción parcial y restante.
-3. Vender todo el saldo y verificar que una venta concurrente se rechaza.
-4. Comprar de nuevo el mismo SKU tras agotamiento.
-5. Devoluciones de cliente y proveedor con cantidades límites.
-6. Solicitud/aprobación de anulación por actores distintos.
-7. Despachar/recibir/cancelar/revertir transferencia y conciliar saldos.
-8. Consultar balance, kardex y valoración antes y después de la reposición.
+## 6. Definition of Done del repositorio
 
-Aceptación: sin sobreventa, duplicación de movimientos, diferencias de ledger ni uso de costo vigente incorrecto para valorar movimientos históricos nuevos.
+- [ ] Cero rutas sensibles sin autenticación y autorización por método.
+- [ ] Todos los controles de permisos/scope cubiertos por pruebas HTTP.
+- [ ] Pagos, reembolsos e impuestos tienen contratos claros y snapshots/auditoría.
+- [ ] Migraciones V1–V28 y Hibernate validation pasan desde base vacía y upgrade representativo.
+- [ ] Suite backend, concurrencia y tests de integración pasan.
+- [ ] Frontend build/unit tests pasan.
+- [ ] E2E browser autenticado pasa para roles y recorridos principales.
+- [ ] Compose raíz validado junto con servicios reales que declara.
+- [ ] Backups/restores, secretos, TLS, rate limiting, logs/alertas y runbooks revisados.
+- [ ] README, contrato API y matriz frontend coinciden con el código.
+- [ ] La versión liberable se asocia a un SHA exacto y a todos sus checks.
 
-### Fase C — Frontend
+## 7. Estado de las diez fases
 
-1. Versionar package-lock.json y usar npm ci.
-2. Probar cliente REST: bearer, 401, 403, Problem Details, requestId e idempotencia.
-3. Probar formularios, estados de carga/vacío/error/permiso, filtros y diálogos.
-4. E2E navegador: compra/recepción → venta total → reposición → balance.
-5. Probar que el usuario sin permiso financiero no ve datos de costo.
-6. Probar CSV con fórmulas, comas, comillas, saltos de línea, Unicode y decimales.
-
-### Fase D — Seguridad/operación
-
-1. Rotar secretos y validar JWT/CORS; no usar valores de ejemplo.
-2. Revisar health/readiness/liveness y proteger info/metrics/Swagger.
-3. Ejecutar Docker Compose e imagen de verdad; comprobar usuario no root, puertos, healthchecks y persistencia.
-4. Probar proxy/headers y asegurar que el cliente no falsifique X-Forwarded-For.
-5. Ensayar backup y restore en base aislada.
-6. Añadir rate limit distribuido si hay más de una instancia.
-
-### Fase E — Gobernanza
-
-1. Actualizar estado y limitaciones de cada API al cambiar código.
-2. Actualizar referencia API, arquitectura, permisos, ejemplos y tests en el mismo PR.
-3. Mantener identificados los documentos P03–P12 como hitos históricos.
-4. Cambiar workflows a push/pull_request, bloquear merge con checks fallidos y proteger master.
-5. Crear release/tag solo tras cumplir todos los criterios.
-
-## 4. Definition of Done para una API
-
-- Método/ruta, DTO, status, errores, filtros, paginación, orden y zona documentados.
-- DTO valida sintaxis y reglas de negocio; campos desconocidos no se aceptan silenciosamente.
-- 401, 403, permiso válido/no válido probados por HTTP.
-- DTO no expone costo ni PII a usuarios sin permiso.
-- Transacción y rollback validados; FK, unicidad, restricciones y migración verificadas.
-- Idempotencia de reintento/clave conflictiva probada donde aplica.
-- Concurrencia y límites de cantidad probados en comandos de inventario.
-- Auditoría de acciones sensibles sin secretos.
-- Errores uniformes, requestId y sin stack trace.
-- Consumidor frontend/integración y documentación actualizados.
-- Evidencia enlazada a versión, comando, entorno y SHA.
-
-## 5. Definition of Done del repositorio
-
-- [ ] SHA final de master registrado y revisado.
-- [ ] Frontend build y tests verdes.
-- [ ] Backend mvn verify verde con PostgreSQL 16.
-- [ ] Flyway V1–V14 validado desde cero y upgrade.
-- [ ] Pruebas HTTP/RBAC y concurrencia verdes.
-- [ ] Smoke test de APIs y contrato OpenAPI cotejados.
-- [ ] Escenario agotar → comprar de nuevo → devolución → balance conciliado.
-- [ ] Docker Compose ejecutado realmente.
-- [ ] CI automática, master protegido y checks requeridos.
-- [ ] Secretos, backups, restore, rate limit y observabilidad revisados.
-- [ ] Funciones fuera de alcance explícitas.
-- [ ] README y estado de cada API no contradicen el código.
-
-## 6. Estados de auditoría permitidos
-
-- **Implementado en código:** la implementación puede localizarse en el árbol.
-- **Validado:** las pruebas reproducibles pasan en el SHA indicado.
-- **Bloqueado:** falta entorno, acceso o decisión, por lo cual no puede declararse aprobado.
-- **Fuera de alcance:** exclusión aprobada y publicada.
-- **Abierto:** requiere trabajo.
+El avance por fase se mantiene en [Plan maestro](../../PLAN_EJECUCION_PROPUESTAS_INVENTARY.md). La Fase 1 está validada; Fases 2 y 4–7 continúan abiertas; el frontend tiene su estructura y smoke responsive, pero no E2E autenticado completo; las Fases 8–10 conservan alcance parcial/objetivo. No declarar producción por el hecho de que CI compile o pase tests.

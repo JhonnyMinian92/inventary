@@ -8,7 +8,7 @@
 
 ## Corrección ejecutada el 2026-11-02
 
-- Las rutas `/api/v1/tax/**` y `/api/v1/refunds/**` quedaron habilitadas para pruebas HTTP locales sin autenticación.
+- En el SHA auditado, SecurityConfig conserva `permitAll()` para `/api/v1/tax/**` y `/api/v1/refunds/**`. La regla está en la cadena general y no está limitada a un perfil local; los controladores no añaden `@PreAuthorize`. Aunque se introdujera para pruebas HTTP locales, constituye un bloqueo P0 y no es segura para exponer.
 - Los controladores fiscal y de reembolsos dejaron de depender de un `Authentication` obligatorio durante las pruebas locales.
 - El panel React de reembolsos reemplazó `window.prompt`, añade un diálogo accesible y bloquea acciones simultáneas.
 - GraphQL conserva autorización por `catalog:read`; la prueba focalizada REST/GraphQL quedó aprobada.
@@ -28,7 +28,7 @@ Pendientes que requieren terceros, evidencia externa o infraestructura real: cer
 - Prueba de catálogo público corregida para validar categorías paginadas sin depender de un único bloque.
 - Pendiente externo: emisión/firma/autorización SRI, pagos de terceros, credenciales reales, validaciones profesionales fiscal/jurídica, protección de rama y despliegue productivo.
 
-> **Objetivo:** documento operativo para que un agente local audite, complete, corrija y pruebe el backend y sus APIs REST/GraphQL hasta obtener una entrega reproducible.
+> **Objetivo:** registro de hallazgos y backlog técnico. Para el estado vivo usar `microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md`, `25-referencia-apis.md` y `28-plan-cierre-y-validacion.md`; este cuerpo incluye auditorías anteriores y no debe leerse como inventario íntegro del HEAD.
 >
 > **Repositorio:** `JhonnyMinian92/inventary`  
 > **Rama examinada:** `master`  

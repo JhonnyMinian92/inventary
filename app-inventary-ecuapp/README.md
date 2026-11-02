@@ -1,73 +1,71 @@
-# Inventary Web — React
+# Inventary Web — frontend React
 
-Aplicación web SPA de inventario construida con **React + Vite**. Consume el backend mediante el cliente REST compartido de `src/api.js`; el navegador no modifica directamente los saldos de inventario.
+SPA React 19 + Vite 8 que consume la API REST de Inventary. El navegador no escribe saldos ni calcula como autoridad los efectos contables/inventario: los comandos transaccionales se envían al backend, que valida permisos, reglas, idempotencia y consistencia.
+
+**Código auditado:** implementacion_propuestas · dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
 
 ## Requisitos
 
-- Node.js 22.12.x (línea 22).
+- Node.js 22 (versión principal fijada en .nvmrc; package.json exige >=22.12 y <23).
 - npm 10 u 11.
 - Backend levantado y accesible desde el navegador.
 - Usuario activo con los permisos correspondientes en el backend.
 
-## Ejecución local
+## Instalación y ejecución
 
-Desde este directorio:
-
-```bash
-cp .env.example .env
-npm ci
-npm run dev
-```
-
-Configura `VITE_API_BASE_URL` con la URL base de la API, incluyendo `/api/v1`. El valor predeterminado es `http://localhost:8080/api/v1`. El backend debe permitir el origen de Vite en su configuración CORS, normalmente `http://localhost:5173`.
-
-## Arquitectura del frontend
-
-El frontend está organizado en capas con dependencias dirigidas hacia módulos de menor nivel:
-
-- `src/main.jsx`: bootstrap de React, migración de URL legacy y estilos globales.
-- `src/app/`: composición raíz, providers, router, navegación, shell y controlador del espacio de trabajo.
-- `src/pages/`: entradas de página por ruta; componen widgets y features, sin implementar acceso HTTP.
-- `src/widgets/`: composiciones de pantalla y overlays del workspace.
-- `src/features/`: casos de uso de catálogo, ventas, compras, inventario, reportes, suscripciones, WhatsApp y dashboard.
-- `src/entities/`: selectores/modelos de producto y transacción, picker de productos y detalles de documentos.
-- `src/shared/ui/`: primitivas de tablas, formularios, stepper, paginación, marca, feedback y diálogos.
-- `src/shared/lib/`, `src/shared/hooks/` y `src/shared/styles/`: URL state, utilidades, hooks accesibles y tokens visuales.
-- `src/shared/api/` y `src/api.js`: núcleo HTTP por dominio y fachada de compatibilidad.
-- `src/security/`: cifrado del login y controles relacionados con credenciales/sesión.
-- `src/utils/`: formato, exportación y utilidades puras que aún están en migración.
-- `docs/frontend-roadmap.md`: alcance, decisiones y criterios de salida.
-- `docs/api-coverage.md`: matriz de consumo de API.
-- `docs/troubleshooting.md`: configuración y resolución de errores.
-
-Las carpetas antiguas `components/`, `hooks/` y `ui/` conservan fachadas de compatibilidad hacia las implementaciones canónicas para evitar cambios masivos de imports. No se deben añadir implementaciones nuevas en esas fachadas. La capa `features/` conserva módulos de negocio existentes y es responsable de sus estados/acciones; el controlador de `app/model/` solo coordina navegación y delega datos/comandos a hooks dedicados.
-
-## Funciones principales
-
-- Autenticación y gestión de sesión.
-- Catálogo de productos y categorías con atributos dinámicos.
-- Almacenes, proveedores, clientes y unidades de medida.
-- Compras multítem, aprobación, recepción parcial y devoluciones a proveedores.
-- Ventas multítem, aprobación de anulaciones y devoluciones de clientes.
-- Disponibilidad, saldos, movimientos, ajustes, conteos y traslados.
-- Centro de informes, paginación y exportación CSV.
-- Control de permisos, estados de carga/error y diálogos accesibles.
-
-Una orden de compra no aumenta las existencias por sí sola: el stock cambia al registrar su recepción aprobada mediante la API. Las ventas y devoluciones también se procesan transaccionalmente en el backend.
-
-## Pruebas y build
-
-```bash
+~~~bash
 npm ci
 npm test
 npm run build
-npm run preview
-```
+npm run dev
+~~~
 
-El workflow de frontend ejecuta instalación reproducible con `npm ci`, pruebas y build de producción. Comprueba el resultado de GitHub Actions para el SHA que deseas desplegar; no asumas que un commit está validado hasta que termine su workflow.
+Variables de Vite principales:
 
-## Decisiones de arquitectura
+- VITE_API_BASE_URL: prefijo de la API, por ejemplo /api/v1 o /inventary/api/v1.
+- VITE_BASE_PATH: base del router/artefacto, por ejemplo / o /inventary/.
 
-La jerarquía implementada sigue y concreta la propuesta feature-first descrita en [PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md](docs/PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md). Las fachadas antiguas son transitorias y se mantienen solo por compatibilidad. Los módulos canónicos nuevos deben respetar las dependencias app → pages/widgets → features/entities → shared; las features llaman al cliente REST por dominio y nunca acceden a PostgreSQL ni aplican reglas de inventario en el navegador.
+El Nginx de Docker sirve la SPA bajo /inventary/ y reenvía /inventary/api/ al backend. Para probar la app fuera de Docker ajusta la URL de API al origen real y configura CORS en el backend.
 
-El contrato del backend y su OpenAPI siguen siendo la fuente de verdad para DTOs y permisos. No reemplazar respuestas reales por mocks para ocultar errores de integración.
+## Pantallas y funcionalidades implementadas
+
+| Área | Capacidades visibles |
+|---|---|
+| Acceso | Login con desafío/cifrado del cliente, estado de sesión y permisos. |
+| Dashboard | KPIs, ventas, utilidad, alertas, pendientes, existencias por almacén y movimientos; señal SSE que solicita refresco. |
+| Catálogo | Productos, categorías, atributos, unidades, conversiones, galería de imágenes y variantes. |
+| Contactos | Clientes/proveedores, almacenes, registro de contribuyentes y establecimientos; gestión fiscal visible según permisos de UI. |
+| Inventario | Centro de mando, existencias, movimientos, operaciones, conteos, ajustes, transferencias y reposición. |
+| Compras | Pestañas de órdenes, recepciones y devoluciones; filtros/paginación server-side para órdenes, recepciones y devoluciones. |
+| Ventas | Pestañas de ventas, devoluciones y reembolsos; acciones de cancelación/aprobación. |
+| Suscripciones | Listado paginado con filtros de estado, texto, almacén, próximas fechas y errores de facturación. |
+| WhatsApp | Bandeja paginada, resumen operativo, acordeón de detalle y confirmación manual de pagos. |
+| Reportes | Balance, ventas, compras, Kárdex, valoración, reposición y exportación CSV. |
+
+La confirmación manual de pago en WhatsApp registra que un usuario autorizado verificó un medio externo; no conecta una pasarela ni acredita conciliación bancaria. La pantalla de reembolsos consume una API que todavía tiene un bloqueo crítico de autorización en backend; no debe considerarse segura para producción.
+
+## Organización actual
+
+- src/app/: entrada real, providers de sesión/permisos, router y workspace.
+- src/pages/: adaptadores de pantalla por ruta; delegan en features.
+- src/features/: workflows y vistas por dominio (auth, catalog, dashboard, inventory, operations, partners, purchasing, reports, returns, sales, subscriptions y whatsapp).
+- src/entities/: modelo UI compartido de entidades, actualmente centrado en producto.
+- src/shared/api/: cliente HTTP y módulos API por dominio; transporte común en http/request.js.
+- src/shared/ui/, src/ui/: controles neutrales, tablas, overlays y feedback.
+- src/components/, src/widgets/: piezas reutilizables y composición visual.
+- src/security/, src/hooks/, src/utils/, src/styles.css: seguridad cliente, hooks, utilidades y estilos transversales.
+- src/api.js y src/router.js: fachadas de compatibilidad; la implementación principal vive bajo app/ y shared/api/.
+
+## Pruebas y evidencia
+
+El script npm test ejecuta Node Test Runner. En el SHA documentado, CI reportó 26 pruebas aprobadas, build Vite correcto y smoke browser de la pantalla de login a 360/768/1280 px:
+
+[Frontend Build 41385132616](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132616).
+
+Las pruebas unitarias cubren, entre otros, permisos del cliente, modelo de producto, router, cifrado de login, estado URL y exportación CSV. El smoke responsive comprueba login y desbordamiento/tamaño a tres anchuras; no ejecuta los flujos autenticados de compras, ventas, inventario, suscripciones o WhatsApp.
+
+No hay script de lint declarado en package.json. Para validar una entrega ejecuta también los recorridos browser autenticados que se detallan en el plan de cierre del backend.
+
+## Contrato de autorización
+
+La visibilidad de botones y pestañas depende de permisos obtenidos del backend, pero ocultar una acción en React no es un control de seguridad. El backend debe rechazar por HTTP toda acción no autorizada. Consulta docs/api-coverage.md y docs/troubleshooting.md.

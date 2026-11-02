@@ -1,92 +1,116 @@
-# Inventary — sistema de inventario
+# Inventary
 
-Inventary es una aplicación de **EcuApp** para administrar catálogo, compras, recepciones, existencias, ventas, devoluciones, traslados y reportes. El repositorio contiene una SPA React/Vite y una API transaccional Java/Spring Boot/PostgreSQL.
+Inventary es una aplicación web de EcuApp para administrar catálogo, almacenes, inventario, compras, ventas, devoluciones, suscripciones, pedidos de WhatsApp y reportes.
 
-> © 2026 EcuApp. Software propietario, todos los derechos reservados. Ver [LICENSE](LICENSE).
+**Código auditado:** rama implementacion_propuestas, SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481.  
+**Arquitectura efectiva:** SPA React/Vite y API Spring Boot como monolito modular; PostgreSQL es la fuente transaccional. El nombre histórico de la carpeta backend no significa que existan microservicios desplegables por separado.
 
-> **Estado de entrega:** consulta los checks de GitHub Actions asociados al SHA exacto antes de desplegar. La existencia de workflows o pruebas no implica que el último commit ya haya sido validado.
+> La documentación describe el código del SHA indicado. Las auditorías antiguas y las propuestas de producto se conservan como historial/diseño; no demuestran por sí mismas que una capacidad esté implementada.
 
 ## Componentes
 
-- **Frontend:** `app-inventary-ecuapp` — React 19, Vite; consume REST mediante un cliente compartido.
-- **Backend:** `microservices-inventary-ecuapp` — Java 21, Spring Boot, PostgreSQL, Flyway, JWT/RBAC, REST y GraphQL.
-- **Arquitectura real:** monolito modular Spring Boot, no varios microservicios desplegables de forma independiente.
-- **Persistencia:** PostgreSQL es la fuente transaccional; no actualizar saldos directamente ni usar `ddl-auto=update`.
+| Componente | Tecnología | Ruta |
+|---|---|---|
+| Frontend | React 19, Vite 8, JavaScript/JSX | app-inventary-ecuapp |
+| Backend | Java 21, Spring Boot 3.5.6, Spring MVC, JPA, Spring Security | microservices-inventary-ecuapp |
+| Base de datos | PostgreSQL, Flyway V1–V28 | microservices-inventary-ecuapp/src/main/resources/db/migration |
+| Orquestación local | Docker Compose, Nginx, n8n opcional | docker-compose.yml y Compose del backend |
 
-## Inicio rápido con Docker
+## Funcionalidades visibles en la aplicación
 
-Requisitos: Docker Desktop y un PostgreSQL accesible desde el anfitrión con la base `inventary` creada (puede estar vacía: Flyway crea las tablas al arrancar).
+- Inicio de sesión, sesión JWT, permisos efectivos y navegación protegida por capacidades.
+- Dashboard con indicadores, pendientes y escena operativa; el navegador recibe señales SSE para refrescar datos.
+- Catálogo de productos, categorías, atributos, unidades, conversiones, imágenes y variantes.
+- Contactos de clientes/proveedores, almacenes, registro tributario manual y administración de tarifas.
+- Inventario: centro de mando, existencias, movimientos, operaciones, conteos, ajustes, traslados y reposición.
+- Compras: pestañas de órdenes, recepciones y devoluciones a proveedores; búsqueda y paginación de servidor.
+- Ventas: pestañas de ventas, devoluciones y reembolsos; cancelaciones sujetas a aprobación.
+- Suscripciones con filtros, calendario/cuotas y operaciones de facturación interna.
+- Bandeja de pedidos WhatsApp con detalle, resumen de trabajo y confirmación manual de pago.
+- Centro de reportes: balance histórico, ventas, compras, Kárdex, valoración y bajo mínimo; exportación CSV.
 
-```bash
-cp .env.example .env
-# Ajustar DB_USERNAME, DB_PASSWORD, JWT_SECRET y credenciales iniciales.
-docker compose up --build -d
-```
+La matriz de consumo de API está en [Cobertura API del frontend](app-inventary-ecuapp/docs/api-coverage.md). Las funciones de backend sin pantalla propia están identificadas en [Referencia de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md).
 
-- Frontend: http://localhost:3000/inventary
-- API: http://localhost:8080/api/v1 (publicada solo en 127.0.0.1).
-- Swagger: http://localhost:8080/swagger-ui.html cuando `SWAGGER_ENABLED=true`.
-- Para un PostgreSQL en contenedor usar `microservices-inventary-ecuapp/docker-compose.yml`.
+## Inicio rápido
 
-El primer arranque crea el administrador configurado solo si no existen usuarios. Las operaciones sensibles de aprobación requieren los permisos y la segregación de funciones configurados en el backend.
+### Frontend
 
-## Inicio rápido sin Docker
+Requisitos: Node.js 22 (ver .nvmrc) y npm 10 u 11.
 
-Requisitos: Java 21, PostgreSQL compatible, Node.js 22.12.x y npm 10/11. Crear los archivos `.env` locales a partir de los ejemplos; nunca subir secretos.
-
-```bash
-cd microservices-inventary-ecuapp
-./mvnw -B verify
-./mvnw spring-boot:run
-```
-
-Configurar `SPRING_DATASOURCE_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET` y `CORS_ALLOWED_ORIGINS`. El secreto JWT debe ser aleatorio y tener al menos 32 bytes.
-
-```bash
+~~~bash
 cd app-inventary-ecuapp
 npm ci
+npm test
 npm run dev
-```
+~~~
 
-Configurar `VITE_API_BASE_URL` con la URL base de la API. El lockfile versionado permite instalar exactamente las dependencias declaradas.
+Configura VITE_API_BASE_URL para que apunte al prefijo REST del backend, normalmente /api/v1 en desarrollo directo o /inventary/api/v1 detrás del Nginx del stack raíz.
 
-## Funcionalidad implementada
+### Backend
 
-- Autenticación JWT, usuarios, roles y permisos.
-- Productos, categorías, atributos dinámicos, unidades y conversiones.
-- Proveedores, clientes y almacenes.
-- Compras, aprobación, recepción parcial y devoluciones a proveedor.
-- Ventas multítem, cancelación con aprobación y devoluciones de clientes.
-- Saldos, disponibilidad, movimientos, ajustes, conteos y traslados.
-- Costeo FIFO/promedio, ledger de valoración y reportes históricos.
-- Catálogo público, GraphQL de consulta, integración WhatsApp/n8n y Outbox.
-- Auditoría, errores Problem Details, limitación de solicitudes y Actuator.
+Requisitos: Java 21 y PostgreSQL 16 para reproducir la validación de CI.
 
-La presencia de una implementación no sustituye la validación de cada commit. Los workflows ejecutan pruebas/build del frontend y Maven verify con PostgreSQL para el backend. Consulta el SHA y resultado de Actions antes de desplegar.
+~~~bash
+cd microservices-inventary-ecuapp
+./mvnw -B --no-transfer-progress verify
+./mvnw spring-boot:run
+~~~
 
-## Documentación
+Configura SPRING_DATASOURCE_URL, DB_USERNAME, DB_PASSWORD y un JWT_SECRET aleatorio de al menos 32 bytes. El arranque inicial también requiere BOOTSTRAP_ADMIN_USERNAME y BOOTSTRAP_ADMIN_PASSWORD cuando la base aún no tiene usuarios. La contraseña inicial debe respetar la política de la aplicación: 8–15 caracteres, mayúscula, minúscula, número y símbolo.
 
-- [Estado actual por dominio y brechas](microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md)
-- [Catálogo de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md)
-- [Arquitectura y patrones actuales](microservices-inventary-ecuapp/docs/26-arquitectura-y-patrones-actuales.md)
+### Stack raíz con Docker
+
+El Compose de la raíz levanta API, frontend/Nginx y n8n, y conecta la API a un PostgreSQL accesible desde el anfitrión. No incluye un servicio PostgreSQL propio. Para un PostgreSQL en contenedor utiliza el Compose del directorio backend.
+
+~~~bash
+cp .env.example .env
+# Ajusta credenciales, JWT_SECRET y N8N_ENCRYPTION_KEY.
+docker compose config
+docker compose up --build -d
+~~~
+
+## Estado de validación del código
+
+Los checks verdes más recientes están asociados al SHA de código indicado arriba:
+
+- [Backend CI 41385132612](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132612): Maven Verify con PostgreSQL 16, 119 pruebas sin fallos, validación de Compose del backend normal/Kafka y smoke test de la API desde un volumen PostgreSQL vacío.
+- [Frontend Build 41385132616](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132616): 26 pruebas, build de producción y smoke browser de login a 360, 768 y 1280 px.
+
+El smoke browser no es una aceptación E2E de todos los flujos autenticados. Los cambios documentales posteriores no alteran el código validado.
+
+## Límites y riesgos que no deben ocultarse
+
+- La topología sigue siendo un monolito modular, no microservicios distribuidos.
+- No existe integración aprobada con proveedor SRI ni emisión, firma y autorización real de comprobantes electrónicos.
+- Los datos tributarios se importan manualmente y quedan en revisión; no validan por sí solos una condición oficial ante el SRI.
+- El cálculo de impuestos no equivale a un comprobante fiscal y el snapshot tributario histórico por línea no está completo.
+- No hay gateway de pagos ni libro de pagos conciliado. La confirmación de pago de pedidos WhatsApp es manual.
+- Existe un modelo inicial de reembolsos, pero no representa un ciclo financiero seguro y completo.
+- No hay WMS multi-bin, stock independiente por variante ni multiempresa/tenant isolation.
+- Kafka está deshabilitado por defecto; el consumidor actual tiene un efecto limitado de invalidación de caché.
+- La migración V28 y sus endpoints crean/administran operaciones y suscripciones de webhooks, pero todavía no hay un worker completo que ejecute operaciones externas y entregue webhooks de extremo a extremo.
+- El límite de solicitudes es local por instancia; el rate limit global requiere gateway/WAF u otra coordinación distribuida.
+
+> **Bloqueo de seguridad:** en el código auditado, SecurityConfig mantiene permitAll para /api/v1/tax/** y /api/v1/refunds/**. Los controladores correspondientes no incorporan una autorización equivalente por método. La excepción no está limitada a un perfil local. No expongas esta API a redes no confiables ni a datos reales hasta corregirla y añadir pruebas HTTP de autorización.
+
+## Documentación vigente
+
+- [Frontend README](app-inventary-ecuapp/README.md)
+- [Arquitectura frontend](app-inventary-ecuapp/src/README_ARCHITECTURE.md)
+- [Cobertura de API consumida por frontend](app-inventary-ecuapp/docs/api-coverage.md)
+- [Ejecución y troubleshooting frontend](app-inventary-ecuapp/docs/troubleshooting.md)
+- [README backend](microservices-inventary-ecuapp/README.md)
+- [Índice técnico backend](microservices-inventary-ecuapp/docs/README.md)
+- [Estado verificable por dominio](microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md)
+- [Referencia de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md)
+- [Arquitectura implementada](microservices-inventary-ecuapp/docs/26-arquitectura-y-patrones-actuales.md)
 - [Guía de consumo de API](microservices-inventary-ecuapp/docs/27-guia-consumo-apis.md)
-- [Plan de cierre y validación](microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md)
-- [Índice de documentación backend](microservices-inventary-ecuapp/docs/README.md)
-- [Cobertura de rutas frontend](app-inventary-ecuapp/docs/api-coverage.md)
-- [Troubleshooting frontend](app-inventary-ecuapp/docs/troubleshooting.md)
-- [Propuesta de arquitectura frontend](app-inventary-ecuapp/docs/PROPUESTA_JERARQUIA_ARQUITECTURA_FRONTEND_V1.md)
-- [Propuesta de arquitectura backend](microservices-inventary-ecuapp/docs/PROPUESTA_JERARQUIA_ARQUITECTURA_BACKEND_V1.md)
+- [Plan de cierre y Definition of Done](microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md)
+- [Plan maestro de las diez fases](PLAN_EJECUCION_PROPUESTAS_INVENTARY.md)
+- [Matriz de trazabilidad de propuestas](MATRIZ_TRAZABILIDAD_PROPUESTAS_INVENTARY.md)
 
-Los documentos de auditoría con fechas y SHA históricos deben leerse como evidencia de su snapshot, no como una descripción automática del HEAD actual.
-
-## Límites funcionales conocidos
-
-La facturación electrónica SRI completa, la integración con pasarelas de pago/reembolsos, multiempresa, picking multi-bin, proyecciones analíticas Kafka y rate limit distribuido requieren implementación y validación específicas. Una cancelación operativa o una devolución de inventario no debe interpretarse por sí sola como anulación fiscal ni como reembolso monetario ejecutado.
-
-## CI y release
-
-Los workflows automatizan pruebas/build del frontend y `mvnw verify` con PostgreSQL para el backend. Antes de liberar, confirmar checks verdes del SHA exacto y probar el despliegue en el entorno objetivo.
+Las propuestas de la raíz describen alcance deseado. Los documentos P01–P23 y las auditorías anteriores se conservan como antecedentes; el índice vigente identifica cuáles son historia y cuáles son referencias operativas.
 
 ## Licencia
 
-Inventary es una aplicación de EcuApp. Copyright © 2026 EcuApp; titular de los derechos: JhonnyMinian92. Software propietario con todos los derechos reservados. Términos completos en [LICENSE](LICENSE).
+Software propietario de EcuApp. Ver LICENSE.

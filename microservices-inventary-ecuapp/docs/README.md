@@ -1,53 +1,41 @@
-# Inventary — índice de documentación técnica
+# Índice de documentación técnica de Inventary
 
-**Corte documental:** 2026-10-26. La fuente viva para el estado del código es la rama master. El commit que publica esta consolidación es documental; la validación de runtime debe registrarse por SHA en CI.
+**Código auditado:** rama implementacion_propuestas, SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481. Los checks de CI enlazados en el estado verificable corresponden a ese SHA.
 
-## Empezar por aquí
+## Fuente operativa vigente
 
-1. [24 — Estado actual del repositorio](24-estado-actual-repositorio.md): funcionalidades, límites y evidencia.
-2. [25 — Referencia actual de APIs](25-referencia-apis.md): rutas actuales, métodos, permisos, ejemplos y errores.
-3. [26 — Arquitectura, jerarquía y patrones](26-arquitectura-y-patrones-actuales.md): código real frente a arquitectura objetivo.
-4. [27 — Guía de consumo](27-guia-consumo-apis.md): autenticación, curl/JSON, idempotencia, reportes.
-5. [28 — Próximos pasos y Definition of Done](28-plan-cierre-y-validacion.md): riesgos, validación y criterios de salida.
-6. [23 — Runbook operativo](23-runbook-operacion.md): configuración, despliegue, backup/restore, Outbox y proxy.
+1. [24 — Estado actual verificable](24-estado-actual-repositorio.md): funcionalidades, brechas, evidencia y límites reales.
+2. [25 — Referencia de APIs](25-referencia-apis.md): rutas existentes, permisos, excepciones conocidas y APIs sin UI.
+3. [26 — Arquitectura y patrones actuales](26-arquitectura-y-patrones-actuales.md): topología y estructura real del monolito modular.
+4. [27 — Guía de consumo de APIs](27-guia-consumo-apis.md): autenticación, paginación, idempotencia, filtros y errores.
+5. [28 — Plan de cierre y Definition of Done](28-plan-cierre-y-validacion.md): prioridades, riesgos, criterios de salida y evidencia requerida.
+6. [23 — Runbook operativo](23-runbook-operacion.md): variables, despliegue, proxy, backup/restore y Outbox. Confirmar valores con el Compose y perfiles actuales antes de ejecutarlo.
+7. [29 — Fase 5, datos maestros](29-implementacion-fase5-datos-maestros.md).
+8. [30 — Fase 6, operaciones comerciales](30-implementacion-fase6-operaciones-comerciales.md).
+9. [31 — Fase 7, integraciones durables](31-implementacion-fase7-integraciones-durables.md).
 
 ## Documentos de negocio y diseño
 
 - [02 — Requisitos y alcance](02-requisitos-y-alcance.md)
-- [03 — Arquitectura y patrones, decisiones históricas](03-arquitectura-y-patrones.md)
+- [03 — Arquitectura y patrones propuestos](03-arquitectura-y-patrones.md)
 - [04 — Modelo de dominio y reglas](04-modelo-dominio-y-reglas.md)
-- [05 — Catálogo de APIs e índice contractual](05-catalogo-apis.md)
-- [29 — Catálogo propuesto original, conservado como histórico](29-catalogo-apis-propuesta-historica.md)
-- [06 — Flujos de negocio y API](06-flujos-de-negocio-y-api.md)
+- [05 — Catálogo inicial de APIs](05-catalogo-apis.md)
+- [06 — Flujos de negocio](06-flujos-de-negocio-y-api.md)
 - [07 — Seguridad y definición de hecho](07-seguridad-y-definicion-de-hecho.md)
-- [08 — Plan de trabajo](08-plan-de-trabajo.md)
-- [09 — WebFlux, n8n, WhatsApp y OpenAI](09-webflux-n8n-whatsapp-openai.md)
-- [11 — Escalabilidad, GraphQL, Kafka y caché](11-escalabilidad-graphql-kafka-cache-datos.md)
+- [08 — Plan de trabajo inicial](08-plan-de-trabajo.md)
+- [09–11 — WebFlux, WhatsApp, GraphQL, Kafka y escalabilidad](09-webflux-n8n-whatsapp-openai.md), (10-estimacion-agente-ia-tokens.md), (11-escalabilidad-graphql-kafka-cache-datos.md).
 
-## Decisiones e hitos históricos
+## Hitos e historia
 
-- [12 — Decisiones P01](12-decisiones-p01.md)
-- [13 — Implementación P03](13-implementacion-p03-arquitectura.md)
-- [14 — Implementación P04](14-implementacion-p04-esquema.md)
-- [15 — Implementación P05](15-implementacion-p05-seguridad.md)
-- [16 — Implementación P06](16-implementacion-p06-ventas-atomicas.md)
-- [17 — Implementación P07](17-implementacion-p07-inventario-operativo.md)
-- [18 — Implementación P08](18-implementacion-p08-compras-y-recepciones.md)
-- [19 — Implementación P09](19-implementacion-p09-devoluciones-y-anulaciones.md)
-- [20 — Implementación P10](20-implementacion-p10-transferencias-consistentes.md)
-- [21 — Implementación P11](21-implementacion-p11-auditoria-documentacion-api.md)
-- [22 — Entrega P12](22-entrega-p12-integracion-codigo.md)
+Los documentos 12–23 describen decisiones e hitos de implementación P01–P12. Son evidencia histórica, no la referencia primaria del código posterior. El documento 29-catalogo-apis-propuesta-historica.md también es archivo histórico y no debe emplearse como contrato vigente.
 
-Los documentos P03–P12 son registros de decisiones/hitos y pueden reflejar el estado de cuando se redactaron. Para estado vivo usar 24; para rutas/contratos usar 25; para arquitectura implementada usar 26. No copiar rutas de un documento histórico sin comprobar el controlador actual.
-
-## Evidencia y operación
-
-- [Resultado histórico de ejecución](RESULTADO_AUDITORIA_EJECUCION.md)
-- [Auditoría original de pendientes](../AUDITORIA_TECNICA_PENDIENTES.md)
-- [Pendientes históricos del reporte de balance](../PENDIENTES.md)
-- [README backend](../README.md)
-- [Auditoría de la raíz del repositorio](../../AUDITORIA_TECNICA_PENDIENTES.md)
+El resultado de auditoría de ejecución conserva un snapshot anterior y su evidencia; no sustituye los runs actuales de Actions.
 
 ## Regla de calidad documental
 
-“Implementado en código” no significa “validado”. Validado requiere una ejecución reproducible contra el SHA exacto. Histórico describe una corrida anterior; Fuera de alcance describe algo no ofrecido en esta versión. Nunca marcar un resultado como exitoso por inferencia. Para cada endpoint se deben actualizar contrato, DTO, autorización, tests, guía y estado en el mismo cambio.
+- Estado del código y contrato vivo: documentos 24–28 y 29–31, más README y CI.
+- Diseño futuro: propuestas de la raíz, siempre etiquetadas como propuesta.
+- Histórico: documentos P01–P12, auditorías antiguas y catálogos históricos.
+- Una clase, tabla o endpoint no demuestra un flujo completo ni su autorización.
+- Toda afirmación de validación debe indicar SHA, comando/entorno, resultado y enlace al run correspondiente.
+- No afirmar seguridad productiva mientras existan excepciones permitAll en rutas fiscales y de reembolso.

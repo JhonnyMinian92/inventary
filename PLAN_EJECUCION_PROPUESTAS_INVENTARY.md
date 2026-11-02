@@ -2,9 +2,9 @@
 
 **Repositorio:** JhonnyMinian92/inventary  
 **Rama de ejecución:** implementacion_propuestas  
-**Corte de análisis:** 31 de octubre de 2026  
+**Corte de análisis:** SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481  
 **Alcance:** frontend, backend, datos, seguridad, integraciones, operación y experiencia comercial.  
-**Estado:** Fase 1 completada; Fase 2 en progreso; Fase 3 implementada con smoke E2E responsive de login; Fase 4 en progreso con la primera reorganización vertical del catálogo backend; Fase 5 en progreso con datos tributarios manuales trazables; Fase 6 en progreso con búsqueda server-side de órdenes, recepciones y devoluciones; Fase 7 en progreso con envelope Outbox/Inbox versionado y trazabilidad de correlación. La verificación browser integral de la Fase 3 y las fases 2 y 4–10 siguen abiertas.
+**Estado al SHA auditado:** Fase 1 validada por CI; Fase 2 parcial con bloqueo de seguridad; Fase 3 estructura implementada y smoke responsive de login; Fase 4 en progreso; Fase 5 parcial con UI/datos fiscales manuales y cálculo inicial; Fase 6 en progreso con pestañas y búsqueda server-side; Fase 7 en progreso con Outbox/Inbox V1–V28; Fase 8 parcial por la bandeja WhatsApp sin fulfillment; Fase 9 parcial por dashboard/command-center/reportes sin analítica avanzada; Fase 10 pendiente.
 
 ## 1. Resultado de la consolidación
 
@@ -100,6 +100,9 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 **Estado: FASE 1 COMPLETADA**
 
 ### Fase 2 — Seguridad, ámbitos, integridad transaccional y trazabilidad base
+
+**Estado al SHA auditado: PARCIAL.** JWT/RBAC, scopes, auditoría y Outbox existen, pero SecurityConfig deja públicas sin autenticación las familias /api/v1/tax/** y /api/v1/refunds/**. Corregir ese bloqueo P0 y probar cada ruta sensible antes de cerrar.
+
 
 **Objetivo:** cerrar los controles fundacionales antes de ampliar pantallas, datos sensibles o integraciones.
 
@@ -221,139 +224,62 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 
 ### Fase 5 — Datos maestros, catálogo, almacenes y unidades
 
-**Objetivo:** construir la base semántica y de datos fiable para ventas, compras, inventario, fiscalidad y logística.
+**Estado al SHA auditado: PARCIAL.** El registro tributario manual, snapshots, establecimientos, asignaciones, UI, tratamiento fiscal de productos y CRUD inicial de tarifas existen. La importación queda en MANUAL_REVIEW y no equivale a consulta oficial SRI.
 
-**Fiscalidad de datos maestros y almacenes**
-- Modelar perfil del contribuyente/RUC, snapshots de consulta, establecimientos SRI y snapshots históricos con fuente, hora, versión, estado recibido y frescura.
-- Fuente SRI/proveedor aprobada y documentada; no asumir API pública con JSON exacto ni usar scraping no documentado. Si no existe fuente aprobada, importación controlada y trazable.
-- Información oficial de SRI es de solo lectura en Inventary; no editar manualmente ni reemplazar códigos oficiales con código de almacén.
-- Mantener establecimiento como código textual de tres dígitos preservando ceros, estados y nombres comerciales nulos.
-- Modelar WarehouseEstablishmentAssignment N:M con tipo de relación, vigencia, prioridad/uso, responsable y auditoría; no define stock owner ni emisor.
-- Separar legalEntity/owner del stock para impedir acceso y mezcla de inventario entre RUC diferentes en bodegas compartidas.
-- No desactivar una bodega por tener un establecimiento cerrado/suspendido; son estados independientes.
+Para cerrar:
+- Proveedor fiscal aprobado y consulta real o proceso manual controlado aprobado.
+- Scope por contribuyente/establecimiento y propietario legal de inventario.
+- Corregir autorización pública de /api/v1/tax/**.
+- Aplicar correctamente filtro de fecha a GET /tax/rates?date=.
+- Snapshots fiscales inmutables por venta/línea: tarifa, base, tratamiento, importe y contexto.
+- Contratos de identificación y formularios de socios/compras/ventas completos.
+- Pruebas de permisos, vigencias, aislamiento y cambios de tarifa sin alterar historia.
 
-**Socios comerciales y unidades**
-- Un BusinessPartner con roles cliente/proveedor/ambos; evitar duplicados de una misma identificación tributaria.
-- CRUD central de clientes y proveedores con búsqueda y paginación del servidor; crear/editar en contexto de compras y ventas preservando el formulario.
-- Mover unidades a configuración del catálogo de productos; conservar unidades, dimensiones, precisión y conversiones existentes.
-- Conversiones versionadas y compatibles; no convertir automáticamente una operación de compra/venta por existir un factor sin especificar la semántica, unidad base, redondeo y snapshot.
-
-**Productos**
-- Consolidar tipo STOCKED_GOOD, NON_STOCKED_GOOD y SERVICE; separar servicio one-time de servicio por suscripción.
-- Atributos dinámicos con esquema versionado por categoría, obligatoriedad, tipos y validación server-side.
-- Variantes con SKU/barcode propios y vínculo integral a búsqueda, compra, venta, precio, unidad e inventario cuando se apruebe la semántica vendible.
-- Búsqueda por nombre/SKU/barcode/atributos, filtros combinables, paginación, columnas y restauración de filtros.
-- Ficha maestra separada del saldo físico/movimientos/valoración.
-- Crear/editar por pasos, borrador, calidad explicable y publicación validada en backend.
-- Imágenes con archivos seguros, metadatos, orden, alt-text y estado público controlado.
-- Edición masiva con previsualización antes/después, validación por fila, control de concurrencia y reintento parcial.
-- Asistencia IA de descripción/normalización en borrador, con fuentes verificables y aprobación humana; no inventar compatibilidad, medidas, certificaciones, garantía, precio o stock.
-
-**Avance de implementación (2026-10-31/11-01; primer corte backend):**
-- Se agregó la migración incremental V21 para perfiles tributarios, establecimientos SRI, snapshots de importación y asignaciones N:M bodega–establecimiento; V1–V20 no se modificaron.
-- Se incorporaron entidades y repositorios para conservar RUC como texto de 13 dígitos, código de establecimiento como texto de tres dígitos (incluido `001`), nombre comercial nulo, estado recibido y estado normalizado `UNKNOWN` cuando no se reconoce.
-- V25 incorpora scopes tributarios temporales por usuario/RUC; los listados y detalles solo devuelven contribuyentes asignados al usuario, y la revocación invalida el acceso inmediatamente. La administración de ámbitos queda restringida a `security:manage`.
-- Se agregó importación manual trazable, con hash SHA-256, snapshots históricos y auditoría. El estado queda explícitamente `MANUAL_REVIEW`; no se presenta como consulta automática ni verificación directa del SRI.
-- V23 separa permisos `taxpayer:read` y `taxpayer:manage`: AUDITOR/SUPER_ADMIN pueden consultar; solo SUPER_ADMIN puede importar/administrar. La cadena de filtros HTTP y los métodos del controlador exigen los permisos dedicados.
-- La UI de Almacenes y contactos incorpora la pestaña Datos tributarios, búsqueda/paginación, detalle de establecimientos e historial de snapshots e importación controlada con varias sedes. El módulo se oculta a usuarios sin `taxpayer:read` y la acción de importación se oculta sin `taxpayer:manage`.
-- Los endpoints del registro tributario exigen `taxpayer:read`/`taxpayer:manage`; los endpoints de asignación fiscal también exigen el permiso de inventario de su ruta de almacén. El servicio valida el ámbito de la bodega y bloquea asociaciones activas entre RUC diferentes mientras no exista propietario legal del stock.
-- Se añadió API auditada para cambiar roles de un mismo BusinessPartner entre CUSTOMER, SUPPLIER y BOTH sin duplicar RUC/código; la UI de contactos permite seleccionar ambos roles y refleja el cambio en ambos listados.
-- La asociación fiscal no cambia el estado de la bodega, no define propiedad de stock y no autoriza emisión fiscal. Las importaciones parciales no eliminan establecimientos previos.
-
-**Pendiente para cerrar Fase 5:** integrar una fuente/proveedor SRI aprobado (la UI de importación controlada ya existe), completar scopes tributarios por contribuyente/establecimiento, tipos de identificación de socios, formularios contextuales de Compras/Ventas, mover la configuración de unidades en UI, robustecer reglas de conversión, y pruebas integrales HTTP/DB/frontend. Las conversiones por línea siguen deshabilitadas hasta acordar unidad de captura, precio, redondeo y snapshots históricos. No se inventó un endpoint público SRI ni se habilitó scraping.
-
-**Estado: EN PROGRESO — primer corte de modelo tributario y relación fiscal de almacenes implementado; no se declara completa la fase.**
+No habilitar facturación por la mera existencia de tarifas, RUC o establecimientos manuales.
 
 ### Fase 6 — Operaciones comerciales y estados financieros completos
 
-**Compras**
-- Pestañas separadas: órdenes, recepciones y devoluciones a proveedores.
-- Listas paginadas con filtros/orden del servidor, búsqueda q, DTOs ligeros, filtros persistidos en URL, contadores agregados con semántica y moneda definidas.
-- Carga, error, forbidden y empty por pestaña, skeletons, reintento, acción por fila independiente, permiso por operación y diseño responsive.
-- Preservar máquina DRAFT → SUBMITTED → APPROVED → PARTIALLY_RECEIVED → RECEIVED / CANCELLED, segregación de aprobación y recepciones parciales.
-- Elegibilidad de devolución por línea con recibida/devuelta/pendiente/procesable y revalidación transaccional; no permitir sobredevolución ni devolución sin stock real.
-- Edición de DRAFT y reversión solo si se aprueba su contrato y compensación transaccional, no por simple cambio de estado.
-- No confundir devolución a proveedor con reembolso de dinero, nota de crédito o factura de proveedor.
+**Estado al SHA auditado: EN PROGRESO.** La UI tiene pestañas Órdenes/Recepciones/Devoluciones en Compras y Ventas/Devoluciones/Reembolsos en Ventas. Órdenes, recepciones y devoluciones usan búsqueda/paginación server-side y el backend calcula líneas retornables.
 
-**Ventas**
-- Flujo de mostrador de pocos pasos, cotización inmediata, buyer/facturación, fulfillment y pago separados.
-- Resolver almacén automáticamente a partir del usuario/terminal/caja y scope del servidor; permitir cambio solo a ubicaciones autorizadas con validación.
-- Descuentos/promociones con elegibilidad, límites por rol, vigencia, motivo, aprobación y cálculo server-side; sin precio dinámico manipulador.
-- Impuestos/cargos como resultados calculados por autoridad fiscal/contrato; nada de tasa hardcodeada en React o subtotal presentado como impuesto.
-- Snapshot histórico inmutable del receptor, identificación, dirección de facturación, dirección de entrega/retiro, línea, unidad, descripción, precio, descuento, moneda y condiciones.
-- Separar cliente/contacto del destinatario y del punto de cumplimiento.
-- Vínculo con pedido/cotización, venta, movimientos/ledger, factura fiscal y pago.
-- Cancelación antes de factura, cancelación operativa posterior y devolución parcial/total con permisos y compensaciones distintas.
-- Flujo de devolución desde la venta original: cantidades vendidas/devueltas/retornables, motivo, prorrateo, RESTOCK/SCRAP y estados de conciliación.
+Capacidades confirmadas:
+- Compras/recepciones parciales/devoluciones a proveedor y movimientos de stock valorizados.
+- Ventas, cancelación con aprobador distinto y devoluciones físicas.
+- Suscripciones con cuotas/facturación interna y filtros de listado.
+- WhatsApp backoffice con resumen operativo y confirmación manual de pago.
+- Modelo inicial de reembolso con estados y UI.
 
-**Pagos y reembolsos**
-- Libro de pagos y PaymentAttempt/Transaction: método, importe, moneda, estado, referencia externa, actor, fecha, proveedor y correlación.
-- Registrar pagos manuales autorizados cuando aplique, claramente identificados como registro manual; no declarar transferencia/pasarela verificada por una captura.
-- Anticipos, pagos parciales, saldos por cobrar, créditos y vencimientos solo con reglas aprobadas.
-- Reembolso es transacción separada enlazada al pago original, idempotente y auditable; estado de dinero no se deriva de devolución física ni de nota de crédito.
-- Conciliación con proveedor/banco cuando exista integración real.
+Pendientes de cierre:
+- Libro de pagos liquidados, gateway/contrato externo y conciliación.
+- Control de reembolso acumulado contra pago realmente liquidado; idempotencia/replay robustos y auditoría de cada transición.
+- Cerrar autorización de /api/v1/refunds/** y segregación de funciones.
+- Snapshots inmutables de comprador/fiscalidad/fulfillment por documento.
+- Factura de proveedor/cuentas por pagar si el producto necesita deuda y liquidación de proveedores.
+- Contadores/detalles/estados por fila y E2E autenticado de las nuevas pestañas.
+- Separación visual y contable entre venta, factura, pago, devolución física y reembolso.
 
-**Suscripciones**
-- Corregir etiquetas y semántica actuales: “facturación anticipada” no significa “pago anticipado”.
-- Mantener el alcance actual fijo mientras no se apruebe plan/lifecycle más amplio; preservar frecuencia, calendario, zona horaria, previsualización, cancelación AT_END y claves idempotentes.
-- Venta inicia contratación mediante caso de uso propio; plan, contrato, cuota/factura y pago siguen separados.
-- Snapshot inmutable de plan, precio, moneda, términos, consentimiento y calendario.
-- Listado con bandeja de próximos cargos y errores; búsqueda/filtros, estados y totales que distingan programado/facturado/cobrado.
-- Vincular venta interna y cuota a documento fiscal en Fase 7.
-- No habilitar auto-renovación, prueba gratis, créditos, derechos, acceso o sector médico sin modelo y pruebas específicos.
-
-**Avance de implementación (2026-11-01):**
-- Se verificaron las capacidades existentes de compras, recepciones parciales, devoluciones físicas, ventas, cancelaciones segregadas y calendario de suscripciones.
-- Se agregó búsqueda server-side por número de orden/proveedor en `GET /api/v1/purchase-orders`, con el mismo scope de almacenes y paginación. Se conectó el filtro de la pantalla Compras y se persiste en la URL.
-- Se extendió `q` server-side a recepciones y devoluciones a proveedores, manteniendo paginación y scope por almacén.
-- Se añadió `GET /api/v1/goods-receipts/{id}/returnable-lines`, que calcula en el servidor cantidad recibida, devuelta y restante por línea; la UI dejó de descargar hasta 100 devoluciones para reconstruir elegibilidad y ahora busca/pagina recepciones y devoluciones.
-- Se agregaron pruebas de integración para búsqueda de órdenes, recepciones, devoluciones y saldos retornables. Las ejecuciones intermedias detectaron fallos durante la aplicación secuencial de cambios; el SHA final debe confirmar el resultado.
-- Se corrigió la expectativa de versión de Flyway en la prueba de bootstrap (V22).
-
-**Pendiente para cerrar Fase 6:** separar Compras en pestañas de órdenes/recepciones/devoluciones, completar DTOs ligeros, filtros URL y permisos/estados por fila; completar el flujo de venta con snapshots de comprador/destinatario/fulfillment y resolución server-side de almacén; separar ventas y devoluciones en la UI; crear libro de pagos/reembolsos con estados de verificación, idempotencia, aprobación y conciliación; y completar búsqueda/contadores de suscripciones distinguiendo programado/facturado/cobrado. No existe contrato de gateway aprobado ni modelo de factura de proveedor/cuentas por pagar; no se simularán pagos verificados ni deuda al proveedor.
-
-**Estado: EN PROGRESO — búsqueda server-side de órdenes, recepciones y devoluciones, endpoint de cantidades retornables y UI paginada implementados; pagos/reembolsos, ventas, suscripciones y cierre integral pendientes. El resto de brechas está documentado en `microservices-inventary-ecuapp/docs/30-implementacion-fase6-operaciones-comerciales.md`.**
+No presentar el reembolso actual como flujo financiero seguro ni el pago de WhatsApp como pasarela.
 
 ### Fase 7 — Facturación SRI e integración distribuida durable
 
-**Contrato fiscal**
-- Acordar API real y ownership con el backend fiscal externo antes de codificar clientes o payloads.
-- Inventary conserva venta, snapshots, contexto fiscal, idempotencia, referencia fiscal y estado. Backend fiscal mantiene certificados, XML, firma, numeración, transmisión, RIDE y autorización.
-- Persistir solicitud fiscal idempotente ligada a saleId/line snapshots; estado PENDING/ACCEPTED no es autorizado.
-- Callbacks firmados o polling por operationId; verificar firma, timestamp, replay, cuenta y documento origen.
-- Conciliar autorización/rechazo/anulación/notas de crédito y solicitudes de revisión.
-- Aplicar reglas consolidadas y vigentes de SRI, incluido el régimen de consumidor final y NAC-DGERCGC26-00000027 cuando corresponda. El RUC del proveedor tecnológico es configuración del backend fiscal, separado del RUC emisor y comprador; validar aplicabilidad con responsable fiscal.
-- No generar XML, firma, secuenciales, RIDE, códigos fiscales ni plazos desde React/n8n.
+**Estado al SHA auditado: EN PROGRESO.** Outbox/Inbox versionado, lease con transacciones cortas, retry, deduplicación y endpoints de diagnóstico están implementados. V28 agrega tablas y endpoints de administración de integration_operation y webhook_subscription/webhook_delivery. Kafka sigue opt-in.
 
-**Clientes HTTP e Integration Hub**
-- Cliente tipado por proveedor/destino, RestClient por defecto con Spring MVC; WebClient solo si streaming/I/O no bloqueante lo justifica.
-- Config por entorno y destino allowlist; auth de servicio, secret references, TLS validado, timeouts/deadline, límites, clasificación de errores y observabilidad.
-- Retry acotado + backoff/jitter, Retry-After, circuit breaker, bulkhead y rate limit coordinados; no reintentar POST ambiguo sin idempotencia del proveedor.
-- Estado durable de integración y de intentos: ACCEPTED, UNKNOWN_OUTCOME, NEEDS_REVIEW, FAILED_PERMANENT, RETRY_SCHEDULED, etc.
-- Iniciar Integration Hub como módulo del monolito; extraer servicio independiente solo si varios backends lo usan y la operación lo justifica.
-- Webhooks salientes firmados, destinos registrados/allowlisted, SSRF guard, anti-replay, rotación de secretos; webhooks entrantes con Inbox persistente y deduplicación.
-- Adaptadores fiscal, mailing, flota y analítica según contrato. Mailing/flota no alteran stock ni factura.
+También existen:
+- GET /api/v1/dashboard/events, SSE autenticado con señales periódicas para refresco de dashboard.
+- GET /api/v1/whatsapp-orders/work-summary.
+- APIs integration:read/manage para crear/consultar/reintentar operaciones y administrar suscripciones.
 
-**Kafka, Outbox, caché y jobs**
-- Kafka sigue opt-in; desarrollo/staging/prod con TLS/auth/ACL/replicación/lag/DLT y runbook antes de marcarlo operativo.
-- Envelope versionado, ownership por topic, retención y clasificación de datos; consumer group por consumidor lógico, Inbox dedupe por eventId.
-- Outbox cubre cambios de dominio; reintentos, DLQ, replay y redrive autorizados con auditoría.
-- Jobs scheduler multiinstancia con lease/lock, recuperación y no doble facturación/caducidad.
-- Caffeine con maximumSize y TTL explícito no mayor a 60 minutos; TTL específico más corto donde aplique. Nunca cachear stock transaccional, reservas, precio de cotización ni estado fiscal como fuente de verdad.
-- Invalidación coherente con múltiples réplicas; medir freshness/hit/miss/lag y no asumir que Kafka entrega un evento a cada instancia del mismo consumer group.
+Límites:
+- No se encontró worker que ejecute integration_operation ni dispatcher que entregue webhook_delivery de extremo a extremo.
+- No hay proveedor fiscal aprobado, XML, firma, secuenciales, RIDE, autorización ni sandbox real.
+- La tarifa fiscal/calculadora no es comprobante; el snapshot histórico aún no está completo.
+- Kafka no está configurado para producción con TLS/ACL/replicación/DLQ/lag/runbook.
 
-**Avance de implementación (2026-11-01):**
-- Se añadió la migración V24 para versionar el envelope Outbox y persistir `schema_version`, `correlation_id`, `causation_id` y `aggregate_version`; filas históricas quedan como versión 1 sin reescribir payloads.
-- Outbox captura el requestId HTTP propagado por MDC, permite causation/aggregate version explícitos y Relay publica el envelope con schemaVersion, eventId, agregado, tipo, timestamp, payload y metadatos disponibles.
-- Inbox valida la versión y metadatos antes de persistir; conserva compatibilidad con envelopes legacy sin versión como v1, rechaza versiones desconocidas y mantiene deduplicación por hash canónico.
-- La API de operaciones muestra versión y metadatos de trazabilidad sin exponer payloads.
-- Se añadieron pruebas para migración, envelope, correlación/causalidad, versión desconocida y deduplicación.
-
-**Bloqueos para completar Fase 7:** no existe en el repositorio un contrato aprobado del backend fiscal externo (proveedor, URL, autenticación, payload, idempotencia, operationId, callback/polling y errores). Tampoco hay catálogo tributario con vigencias y aprobación fiscal para el emisor/establecimientos. Las ventas conservan `tax=0`; no se inventarán tasas, XML, firmas, secuenciales, RIDE ni autorizaciones. Kafka sigue opt-in y no se declara configurado en producción.
-
-**Estado: EN PROGRESO — contrato de eventos durable versionado implementado; cliente fiscal, snapshots/cálculo tributario y conciliación con sandbox real pendientes. Evidencia y lista exacta de dependencias: `microservices-inventary-ecuapp/docs/31-implementacion-fase7-integraciones-durables.md`.**
+Para cerrar, aprobar contratos/proveedores, crear worker/dispatcher con firma, retry, idempotencia y conciliación, y probar outcomes ambiguos/callback duplicado/falso contra sandbox real.
 
 ### Fase 8 — Logística, Pedidos WhatsApp y automatización n8n
+
+**Estado al SHA auditado: PARCIAL.** La aplicación ya cuenta con bandeja WhatsApp paginada, work-summary, detalle y confirmación manual de pago; n8n aparece en el Compose raíz. No se encontró un conjunto de workflows n8n exportados/versionados ni fulfillment, picking/envío, prueba de entrega o handoff de extremo a extremo.
+
 
 **Fulfillment**
 - Modelar opción de cumplimiento, origen, destino, grupo, líneas, reservas, shipment, pickup record, capacidad/horario, coste y ventana estimada.
@@ -384,6 +310,9 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 
 ### Fase 9 — Centros de mando, reportes, analítica y motor comercial
 
+**Estado al SHA auditado: PARCIAL.** Hay dashboard gerencial/operativo, endpoint inventory command-center, reportes operativos/financieros y CSV. El SSE solo envía señal periódica de refresco. No existe todavía el catálogo de datasets/medidas ni el motor de experimentos/recomendaciones avanzado descrito más abajo.
+
+
 **Inventario Agent Ready V3**
 - Vista de dueño orientada a alertas/decisiones y modo separado para operador y auditor.
 - Vistas de primer nivel: Resumen, Existencias, Movimientos/Kárdex, Operaciones y Auditoría.
@@ -409,6 +338,9 @@ La secuencia tiene **10 fases en total**. La Fase 1 ya está completada; restan 
 - Recomendaciones transparentes por atributos, compatibilidad y complementos; modelos estadísticos no antes de tener volumen, consentimiento, exposición, labels y evaluación temporal/causal suficiente.
 
 ### Fase 10 — Agentes, capacidades especializadas, WMS opcional y cierre productivo
+
+**Estado al SHA auditado: PENDIENTE.** No se localizó registro/herramientas de agentes A0–A4 ni WMS multi-bin. Se mantiene como alcance condicionado y no debe anunciarse como funcionalidad disponible.
+
 
 - Contratos OpenAPI estables, catálogo de herramientas tipadas y scopes por función, permisos y ámbito. Empezar solo con lectura (A0), luego recomendación (A1).
 - Propuestas persistidas para compra/traslado/ajuste/conteo y acciones (A2); hash del contenido exacto, actor aprobador, expiración, snapshot de precondiciones y estado STALE.
@@ -459,14 +391,18 @@ Una fase no se cierra por “compilar” solamente. Debe:
 
 ## 6. Estado final del plan
 
-- Fases totales: **10**.
-- Fase 1: completada y validada por CI.
-- Fase 2: **implementación parcial**; se añadieron auditoría de lecturas sensibles, eventos Outbox para ajustes/conteos/órdenes de compra y maker-checker en conteos físicos. No se declara cerrada por las brechas enumeradas en su sección.
-- Fase 3: **implementación estructural completada y smoke E2E responsive del login validado**; la aceptación browser de todos los flujos autenticados queda pendiente.
-- Fase 4: **en progreso**; se reorganizó la primera rebanada vertical de catálogo (REST/GraphQL y servicios de aplicación), pero persisten las brechas de entidades/repositorios JPA, puertos entre dominios, DTOs y migración del resto de contextos.
-- Fase 5: **implementación parcial**; V21 agrega registro tributario manual con snapshots y asociación N:M tipada bodega–establecimiento. No hay proveedor SRI automático ni UI completa; continúan pendientes los elementos listados en la sección de Fase 5.
-- Fase 6: **en progreso**; búsqueda server-side de órdenes y filtro UI implementados; pagos/reembolsos, UX de recepciones/devoluciones y cierre integral pendientes.
-- Fases pendientes de implementación/cierre: **Fase 2 (cierre), 4–10**.
-- Frontend E2E: [run 41213440556](https://github.com/JhonnyMinian92/inventary/actions/runs/41213440556), success, 26/26 tests y Chromium 360/768/1280. Backend del código actual: [run 41214296258](https://github.com/JhonnyMinian92/inventary/actions/runs/41214296258), success, 106/106 tests, validación Flyway/Hibernate, Compose y smoke test desde volumen vacío.
-- Rama actual de trabajo: implementacion_propuestas; master no fue modificada.
-- Este plan es la fuente viva de secuencia; la matriz de cobertura complementaria detalla cada uno de los 22 documentos y su asignación por fase.
+- SHA del código auditado: dc028a346ccf7b94cfbb60b4fb6cd5493518b481, rama implementacion_propuestas.
+- Fase 1: COMPLETADA; Backend CI y Frontend Build verdes sobre el SHA documentado.
+- Fase 2: PARCIAL; seguridad y scopes en progreso; rutas fiscales y de reembolso públicas bloquean cierre.
+- Fase 3: ESTRUCTURA IMPLEMENTADA; smoke responsive del login validado; E2E browser de flujos autenticados pendiente.
+- Fase 4: EN PROGRESO; primera separación vertical del catálogo; arquitectura hexagonal no uniforme.
+- Fase 5: PARCIAL; registro manual, establecimientos, UI, tarifas y cálculo inicial; integración SRI, seguridad y snapshots fiscales pendientes.
+- Fase 6: EN PROGRESO; pestañas separadas y búsqueda server-side mejoradas; pagos/reembolsos seguros y ciclo financiero completo pendiente.
+- Fase 7: EN PROGRESO; Outbox/Inbox y modelo V28; worker de integración, dispatcher webhook y SRI real pendientes.
+- Fase 8: PARCIAL; base WhatsApp/backoffice/n8n; fulfillment y workflows operativos pendientes.
+- Fase 9: PARCIAL; dashboard, command-center, reportes y SSE señalizador; analítica y motor comercial avanzados pendientes.
+- Fase 10: PENDIENTE; agentes y WMS opcional no implementados.
+- Evidencia backend: [run 41385132612](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132612), 119/119 pruebas, PostgreSQL 16, Compose backend y smoke desde volumen vacío.
+- Evidencia frontend: [run 41385132616](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132616), 26/26 pruebas, build y Chromium login 360/768/1280.
+- La evidencia browser actual no acredita E2E autenticado de todas las pantallas. El Compose raíz con frontend+n8n no es el Compose probado por backend CI.
+- Este plan describe código existente y brechas; propuestas de producto no se interpretan como implementación.

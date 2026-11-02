@@ -1,1 +1,0 @@
-Colocar aqui el contexto y documentacion solo del frontend

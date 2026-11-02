@@ -1,5 +1,17 @@
 # Matriz de trazabilidad de las 22 propuestas — Inventary
 
+**Corte de implementación:** código SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481, rama implementacion_propuestas.
+
+## Estado documental del corte actual
+
+- El estado del código se documenta en microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md.
+- Las rutas/permisos reales se documentan en microservices-inventary-ecuapp/docs/25-referencia-apis.md.
+- La arquitectura real se describe en microservices-inventary-ecuapp/docs/26-arquitectura-y-patrones-actuales.md.
+- El estado de las fases 5–7 está en docs/29, docs/30, docs/31; las diez fases se consolidan en PLAN_EJECUCION_PROPUESTAS_INVENTARY.md.
+- Frontend: app-inventary-ecuapp/README.md, docs/frontend-roadmap.md, docs/api-coverage.md y src/README_ARCHITECTURE.md.
+- Las propuestas siguen siendo diseño/alcance, no evidencia de código.
+- Se retiran documentos duplicados, placeholders y diagnósticos de un fallo CI ya corregido; las auditorías históricas de la raíz se conservan como registro y no como estado vivo.
+
 **Fecha de análisis:** 30 de octubre de 2026  
 **Rama revisada:** implementacion_propuestas  
 **Plan de ejecución:** PLAN_EJECUCION_PROPUESTAS_INVENTARY.md  

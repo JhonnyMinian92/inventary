@@ -1,395 +1,154 @@
-# 25 — Referencia actual de APIs de Inventary
+# 25 — Referencia de APIs de Inventary
 
-Este catálogo corresponde a las rutas anotadas en el código fuente del backend del corte documental. Para los campos exactos de cada request/response, los DTOs y el OpenAPI generado por el mismo SHA desplegado son la autoridad final. Las rutas propuestas en documentos de diseño antiguos no deben tratarse como contratos implementados.
+**Código auditado:** implementacion_propuestas · dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
 
-- Base REST local: http://localhost:8080/api/v1
-- Formato: JSON UTF-8.
-- Identificadores: UUID salvo que se indique SKU/identifier.
-- Sesión: Authorization: Bearer <accessToken>.
-- Integración de máquina WhatsApp: X-Integration-Key validada por la aplicación.
-- Fechas: YYYY-MM-DD; zona de reportes por defecto America/Guayaquil, configurable.
-- El backend rechaza propiedades JSON desconocidas.
-- El permiso del servidor es autoritativo; ocultar botones en UI no es seguridad.
-- GET /v3/api-docs y Swagger UI solo están disponibles cuando SWAGGER_ENABLED se habilita en entorno controlado.
+Este documento resume rutas presentes en controladores del backend. OpenAPI generado por la aplicación es el contrato HTTP detallado del SHA desplegado. La presencia de una ruta no prueba autorización correcta, ejecución de un sistema externo ni cobertura de tests del endpoint.
 
-## Matriz de implementación y evidencia por familia API
+## 1. Familias de APIs
 
-La matriz distingue el código presente, la evidencia histórica y la validación actual. “Prueba histórica” significa que la clase aparece en el informe del 2026-10-23; el informe indica que la copia probada no tenía SHA Git. Los commits de esta consolidación solo modifican Markdown. No se ha vuelto a ejecutar la suite contra el HEAD documental.
-
-| Familia de rutas | Controladores / fuente principal | Pruebas históricas descritas | Estado de validación del HEAD |
-|---|---|---|---|
-| Login, identidad, usuarios, roles y permisos | auth/AuthController, UserManagementController, RoleManagementController, SecurityConfig | AuthAdminApiTest, SecurityContractApiTest, RoleMatrixApiTest | Código presente; pruebas de otro snapshot; reejecutar |
-| Productos, categorías y esquema de atributos | catalog/ProductController, CategoryController, CatalogStructureController | CatalogApiTest, DomainRulesTest | Código presente; pruebas históricas; reejecutar |
-| Variantes, unidades, conversiones e imágenes | catalog/CatalogStructureController, media/ProductImageController | CatalogApiTest | Código presente; pruebas históricas; reejecutar |
-| Catálogo público REST y GraphQL | catalog/api/rest/controller/PublicCatalogController, catalog/api/graphql/controller/GraphqlCatalogController, graphql/schema.graphqls | CatalogApiTest, SecurityContractApiTest | Código presente; pruebas históricas; reejecutar |
-| Proveedores, clientes y almacenes | partners/PartnerController, warehouse/WarehouseController | CatalogApiTest, InventoryApiTest | Código presente; pruebas históricas; reejecutar |
-| Saldos, disponibilidad, movimientos, ajustes, conteos, reposición | inventory/InventoryController, InventoryCountController, ReorderController | InventoryApiTest, StockBalanceTest | Código presente; pruebas históricas; reejecutar |
-| Traslados/compensaciones | transfers/StockTransferController | TransfersApiTest | Código presente; pruebas históricas; reejecutar |
-| Compras, recepción y devoluciones a proveedor | purchasing/PurchaseOrderController, PurchaseReturnController | PurchasingAndCostingApiTest | Código presente; pruebas históricas; reejecutar |
-| Ventas, cancelación y devoluciones de cliente | sales/SalesController, returns/SalesReturnController | SalesApiTest | Código presente; pruebas históricas; reejecutar |
-| Política de coste y reportes | inventory/CostingPolicyController, reports/InventoryBalanceReportController | PurchasingAndCostingApiTest, ReportsApiTest, InventoryBalanceReportServiceTest | Código presente; pruebas históricas; reejecutar |
-| Integración y backoffice WhatsApp | whatsapp/WhatsAppIntegrationController, WhatsAppOrderBackofficeController | WhatsAppApiTest | Código presente; pruebas históricas; reejecutar |
-| Auditoría y Outbox | audit/AuditController, sales/OutboxOperationsController | AuditAndOutboxApiTest | Código presente; pruebas históricas; reejecutar |
-| Actuator, CORS, rate limit, errores y OpenAPI | config/*, application.yaml | SecurityContractApiTest | Código/config presentes; pruebas históricas; reejecutar |
-| Cliente frontend / consumo REST | app-inventary-ecuapp/src/api.js y features/* | No hay script test/lint declarado en package.json | Build/tests del frontend pendientes de ejecución en HEAD |
-
-Las clases citadas proceden del informe de ejecución histórico y deben comprobarse con el árbol actual antes de usarse como prueba. La declaración exacta del estado de una ruta requiere: controlador y DTO en el SHA; tests positivos y negativos; autorización; transacción/efecto persistido; idempotencia/concurrencia donde aplica; y resultado de ejecución referido a ese SHA.
-
-## 1. Sesión y administración
-
-| Método | Ruta | Acceso / finalidad |
+| Familia | Rutas principales | Estado |
 |---|---|---|
-| POST | /auth/login-challenge | Público y rate-limited; clave ECDH P-256 de un solo uso (challengeId, algorithm, publicKey, expiresAt) |
-| POST | /auth/login | Público y rate-limited; credenciales cifradas (`encrypted`); devuelve accessToken, tokenType, expiresAt. 429 LOGIN_TEMPORARILY_LOCKED tras 5 fallos de la misma cuenta |
-| GET | /auth/me | Token vigente; identidad, rol y permisos efectivos |
-| POST | /auth/logout | Sesión válida; 204 |
-| PUT | /auth/me/password | Contraseña actual y nueva; 204 |
-| GET | /admin/users | security:manage; página de usuarios |
-| GET | /admin/users/{id} | security:manage; detalle |
-| POST | /admin/users | security:manage; creación |
-| PATCH | /admin/users/{id} | security:manage; actualización |
-| PUT | /admin/users/{id}/password | security:manage; restablecimiento |
-| GET | /admin/roles | security:manage |
-| GET | /admin/roles/{code} | security:manage |
-| POST | /admin/roles | security:manage; crear rol |
-| PATCH | /admin/roles/{code} | security:manage |
-| GET | /admin/permissions | security:manage |
-| PUT | /admin/roles/{code}/permissions | security:manage |
+| Sesión | /api/v1/auth/** | JWT, login challenge, sesión, logout. |
+| Administración | /api/v1/admin/** | Usuarios, roles, permisos, revocación. |
+| Catálogo | /api/v1/catalog/** | Productos, categorías, atributos, unidades, variantes, imágenes. |
+| Catálogo público | /api/v1/public/**, GraphQL | Consulta pública acotada y GraphQL protegido. |
+| Partners/almacenes | /api/v1/customers/**, /suppliers/**, /warehouses/**, /partners/** | Contrapartes, bodegas y relaciones. |
+| Registro fiscal | /api/v1/taxpayers/**, /warehouses/{id}/establishment-assignments/** | Importación manual y scopes fiscales. |
+| Tarifas fiscales | /api/v1/tax/** | CRUD inicial de tarifas y tratamiento de producto; público por SecurityConfig. |
+| Inventario | /api/v1/inventory/** | Saldos, disponibilidad, movimientos, command-center, ajustes, conteos y reposición. |
+| Transferencias | /api/v1/inventory/transfers/** | Crear, despachar, recibir, cancelar y revertir. |
+| Compras | /api/v1/purchase-orders/**, /goods-receipts/**, /purchase-returns/** | Órdenes, recepciones y devoluciones. |
+| Ventas | /api/v1/sales/**, /sales-returns/** | Ventas, cancelaciones aprobadas y devoluciones físicas. |
+| Reembolsos | /api/v1/refunds/** | Estados iniciales de reembolso; público por SecurityConfig. |
+| Suscripciones | /api/v1/subscriptions/** | Plan/calendario, cuotas, previsualización, facturación interna y cancelación. |
+| Reportes | /api/v1/reports/** | Balance histórico, ventas, compras, Kárdex, valoración y stock bajo. |
+| WhatsApp integración | /api/v1/integrations/whatsapp/** | El matcher JWT permite la ruta; el controlador valida X-Integration-Key. |
+| WhatsApp backoffice | /api/v1/whatsapp-orders/** | Bandeja, work-summary, detalle y confirmación manual. |
+| Auditoría | /api/v1/audit-events/** | Lectura paginada con audit:read y scopes. |
+| Outbox | /api/v1/operations/outbox/** | Diagnóstico, métricas y retry con operations:manage. |
+| Operaciones externas | /api/v1/integration-operations/** | Crear, consultar, listar y reintentar operaciones. |
+| Webhooks | /api/v1/webhook-subscriptions/** | Crear, listar y desactivar suscripciones. No acredita dispatch completo. |
+| Dashboard realtime | GET /api/v1/dashboard/events | SSE autenticado; señales periódicas para refresco de datos. |
+| Operación | /actuator/health/**, /actuator/metrics/** | Health público limitado; métricas/info requieren permisos. |
 
-Login con cifrado en la capa de aplicación (obligatorio por defecto, `LOGIN_ENCRYPTION_REQUIRED=true`):
+## 2. Catálogo y entidades
 
-1. `POST /auth/login-challenge` devuelve `challengeId`, `algorithm` (`ECDH-ES+HKDF-SHA256+A256GCM`), `publicKey` (SPKI P-256 en Base64) y `expiresAt` (120 s).
-2. El cliente genera una clave ECDH P-256 efímera, deriva el secreto compartido, aplica HKDF-SHA256 (salt = `challengeId` en UTF-8, info = `inventary/login/v1`, 32 bytes) y cifra `{"username":"…","password":"…"}` con AES-256-GCM (IV aleatorio de 12 bytes, AAD = `challengeId`).
-3. `POST /auth/login` con `{"encrypted":{"challengeId","publicKey","iv","ciphertext"}}` (Base64 estándar; el ciphertext incluye la etiqueta GCM de 16 bytes).
+Principales recursos REST:
+- Productos: listar/buscar/paginar, detalle, crear/actualizar, activar/desactivar y variantes.
+- Categorías: listar/crear/actualizar y activar/desactivar.
+- Definición de atributos por categoría y presets.
+- Unidades, dimensiones y conversiones.
+- Imágenes gestionadas PNG/JPEG, retirada y exposición pública condicionada a publicación.
 
-El desafío se consume en el primer uso: reenviar la misma petición devuelve 400 `LOGIN_CHALLENGE_INVALID`. Un cuerpo `{"username","password"}` en texto plano devuelve 400 `LOGIN_ENCRYPTION_REQUIRED`. Referencias: `src/security/loginCrypto.js` (navegador) y `encrypted_credentials` en `scripts/smoke_test_api.py` (Python).
+Las variantes tienen SKU/código de barras/combinación/precio; no mantienen stock/costo independiente. Las imágenes no son un CDN multi-región.
 
-El controlador actual no expone endpoint de refresh token. El TTL JWT por defecto es 60 minutos, configurable; usar expiresAt y volver a autenticar cuando la sesión expire.
+## 3. Inventario
 
-## 2. Catálogo, atributos, unidades, variantes e imágenes
+- GET /api/v1/inventory/balances: saldos paginados por producto/almacén.
+- GET /api/v1/inventory/availability: consulta informativa; no reserva.
+- GET /api/v1/inventory/movements, /{id}, /{id}/trace: libro de movimientos.
+- GET /api/v1/inventory/command-center: agregados y alertas para el mando operativo.
+- POST /api/v1/inventory/adjustments: ajuste con Idempotency-Key.
+- /api/v1/inventory/counts: conteos físicos, contabilización/cancelación y maker-checker.
+- /api/v1/inventory/reorder-rules y /replenishment-suggestions: reposición.
+- /api/v1/inventory/transfers: transferencias con despacho/recepción/cancelación/reversión idempotentes.
 
-Permisos principales: catalog:read para lecturas y catalog:manage para comandos.
+El modelo operativo tiene una ubicación de stock por producto/almacén; no es WMS multi-bin.
 
-| Método | Ruta | Finalidad y condiciones |
-|---|---|---|
-| GET | /catalog/categories | Lista paginada; active opcional |
-| GET | /catalog/categories/{id} | Detalle |
-| POST | /catalog/categories | Crear |
-| PUT | /catalog/categories/{id} | Actualizar |
-| POST | /catalog/categories/{id}/activate | Activar |
-| POST | /catalog/categories/{id}/deactivate | Desactivar |
-| DELETE | /catalog/categories/{id} | Borrado físico si no hay referencias |
-| GET | /catalog/categories/{id}/attributes | Esquema de propiedades |
-| PUT | /catalog/categories/{id}/attributes | Guardar esquema; `key` opcional, se deriva de `displayName` |
-| GET | /catalog/attribute-presets | Tipos de dato, propiedades sugeridas y plantillas de categoría |
-| GET | /catalog/attribute-presets/suggestion?text= | Plantilla sugerida por nombre y categoría parecida existente con sus propiedades |
-| GET | /catalog/product-kinds | Tipos de producto con etiqueta, descripción y ejemplos para el usuario |
-| GET | /catalog/products | Listado paginado y filtros implementados en controlador |
-| GET | /catalog/products/{id} | Detalle; campos de costo condicionados por permisos |
-| POST | /catalog/products | Crear; `sku`, `costPrice` y `salePrice` opcionales; `marginPercent` (25 por defecto) define el precio sugerido sobre el costo de compra |
-| PUT | /catalog/products/{id} | Actualizar |
-| POST | /catalog/products/{id}/activate | Activar |
-| POST | /catalog/products/{id}/deactivate | Desactivar |
-| DELETE | /catalog/products/{id} | Borrado físico solo si no tiene existencia ni referencias |
-| GET | /catalog/units | Unidades; active opcional; incluye `dimensionLabel` y `allowsFractions` |
-| GET | /catalog/unit-dimensions | Formas de medir (cantidad, peso, volumen…) con etiqueta y ejemplos |
-| POST | /catalog/units | Crear |
-| PUT | /catalog/units/{id} | Actualizar |
-| DELETE | /catalog/units/{id} | Borrar si no hay referencias |
-| GET | /catalog/unit-conversions | Listar conversiones |
-| POST | /catalog/unit-conversions | Crear conversión |
-| GET | /catalog/products/{productId}/variants | Listar variantes |
-| POST | /catalog/products/{productId}/variants | Crear variante |
-| GET | /catalog/variants/{variantId} | Detalle de variante |
-| PUT/PATCH | /catalog/variants/{variantId} | Actualizar variante |
-| POST | /catalog/variants/{variantId}/deactivate | Desactivar variante |
-| GET | /catalog/products/{productId}/images | Listar metadatos de imagen |
-| POST | /catalog/products/{productId}/images | Registrar imagen/URL |
-| PATCH | /catalog/products/{productId}/images/{imageId} | Editar metadatos |
-| DELETE | /catalog/products/{productId}/images/{imageId} | Retirar relación |
+## 4. Compras y devoluciones a proveedores
 
-Ejemplo representativo de ProductDtos.WriteRequest:
+- /api/v1/purchase-orders: crear, listar, detalle, enviar, aprobar, cancelar y registrar recepción.
+- La búsqueda q admite número de orden y proveedor, con filtros server-side, paginación y scopes de almacén.
+- /api/v1/goods-receipts: listado/detalle de recepciones, con búsqueda paginada.
+- GET /api/v1/goods-receipts/{id}/returnable-lines: cantidad recibida, devuelta y restante calculada por el servidor.
+- /api/v1/purchase-returns: listar/detallar/crear devoluciones físicas, con búsqueda server-side.
 
-~~~json
-{
-  "sku": "SKU-001",
-  "name": "Producto de ejemplo",
-  "description": "Descripción",
-  "categoryId": "UUID-DE-CATEGORIA",
-  "costPrice": 4.00,
-  "salePrice": 8.50,
-  "currency": "USD",
-  "kind": "STOCKED_GOOD",
-  "unitOfMeasureId": "UUID-DE-UNIDAD",
-  "attributes": {"color": "negro", "peso": 1.25}
-}
-~~~
+Una orden no suma stock hasta la recepción. Una devolución física no es una nota de crédito de proveedor ni un pago.
 
-SKU admite letras, números, punto, guion y guion bajo, longitud máxima 64. CategoryId es obligatorio. Importes no negativos con dos decimales. Attributes debe cumplir el esquema activo de la categoría. Una variante tiene SKU, código de barras, combinación de opciones y precio; comparte stock/costo del producto padre y **no** dispone de saldo independiente.
+## 5. Ventas, retornos y reembolsos
 
-## 3. Catálogo público
+- /api/v1/sales: crear/listar/detallar venta; solicitud y aprobación separada de cancelación.
+- /api/v1/sales-returns: devoluciones físicas desde la venta original.
+- /api/v1/refunds: solicitar/listar y cambiar estados de reembolso (approve, processing, complete, fail, cancel).
 
-| Método | Ruta | Uso |
-|---|---|---|
-| GET | /public/catalog/products | Catálogo público paginado |
-| GET | /public/catalog/products/{identifier} | Ficha pública |
-| GET | /public/catalog/categories | Categorías activas/publicables |
+**Advertencia:** RefundController no declara @PreAuthorize y SecurityConfig permite /api/v1/refunds/** sin autenticación. Además, el servicio no acredita libro de pago liquidado, reembolso acumulado permitido ni confirmación de gateway. La API existe, pero no debe usarse como mecanismo financiero seguro.
 
-Las proyecciones públicas no deben exponer costo o margen.
+## 6. Datos tributarios y tarifas
 
-## 4. Proveedores, clientes, almacenes y ubicaciones
+- /api/v1/taxpayers: importación manual, consulta, establecimientos y snapshots; requiere permisos taxpayer en las rutas protegidas.
+- /api/v1/warehouses/{warehouseId}/establishment-assignments: asociación temporal de almacén/establecimiento.
+- GET /api/v1/tax/rates: lista tarifas.
+- POST /api/v1/tax/rates, PUT /api/v1/tax/rates/{id}: crear/modificar tarifas.
+- PUT /api/v1/tax/products/{id}: tratamiento y código tributario de producto.
 
-| Método | Ruta | Acceso |
-|---|---|---|
-| GET | /suppliers y /suppliers/{id} | purchasing:read |
-| POST/PUT | /suppliers y /suppliers/{id} | partners:manage |
-| POST | /suppliers/{id}/activate | partners:manage |
-| POST | /suppliers/{id}/deactivate | partners:manage |
-| DELETE | /suppliers/{id} | partners:manage; reglas de historial |
-| GET | /customers y /customers/{id} | partners:read |
-| POST/PUT | /customers y /customers/{id} | customers:manage |
-| POST | /customers/{id}/activate | customers:manage |
-| POST | /customers/{id}/deactivate | customers:manage |
-| DELETE | /customers/{id} | customers:manage; reglas de historial |
-| GET | /warehouses y /warehouses/{id} | inventory:read |
-| POST/PUT | /warehouses y /warehouses/{id} | inventory:manage |
-| POST | /warehouses/{id}/activate | inventory:manage |
-| POST | /warehouses/{id}/deactivate | inventory:manage |
-| DELETE | /warehouses/{id} | inventory:manage; ausencia de referencias |
-| GET | /warehouses/{id}/locations | inventory:read |
-| POST | /warehouses/{id}/locations | inventory:manage |
+**Advertencia:** SecurityConfig permite toda la familia /api/v1/tax/** y TaxController no exige permisos por método. El parámetro date de GET rates no se aplica actualmente como filtro de vigencia. La implementación no conecta con proveedor oficial SRI ni emite comprobantes.
 
-La aplicación no ofrece picking multi-bin operativo: la restricción de saldo actual mantiene una sola existencia por producto/almacén. La estructura de ubicación no debe confundirse con soporte completo de varias ubicaciones de stock por SKU.
+## 7. Reportes
 
-## 5. Inventario, conteos, reposición y transferencias
+- GET /api/v1/reports/inventory-balance: balance histórico por fechas/almacén y producto opcional.
+- GET /api/v1/reports/sales: resumen, serie diaria y productos.
+- GET /api/v1/reports/purchases: compras por periodo.
+- GET /api/v1/reports/kardex: movimientos/valorización para producto y almacén.
+- GET /api/v1/reports/valuation: valoración.
+- GET /api/v1/reports/low-stock: alertas de reposición.
 
-Permisos principales: inventory:read para lectura, inventory:manage para escribir. Auditoría puede leer algunos listados.
+Los reportes no sustituyen contabilidad formal, bancos, cuentas por pagar/cobrar ni obligaciones tributarias.
 
-| Método | Ruta | Uso |
-|---|---|---|
-| GET | /inventory/balances | Lista paginada; productId y warehouseId opcionales |
-| GET | /inventory/balances/{productId}/{warehouseId} | Saldo de producto/almacén |
-| GET | /inventory/availability | Disponibilidad por productId o SKU y filtros del controlador |
-| GET | /inventory/movements | Movimientos/kardex paginado |
-| GET | /inventory/movements/{id} | Detalle y valoración |
-| POST | /inventory/adjustments | Ajuste; direction INCREASE/DECREASE, quantity y reason |
-| GET | /inventory/counts | Lista de conteos |
-| GET | /inventory/counts/{id} | Detalle |
-| POST | /inventory/counts | Crear conteo |
-| POST | /inventory/counts/{id}/post | Contabilizar |
-| POST | /inventory/counts/{id}/cancel | Cancelar |
-| GET | /inventory/reorder-rules | Reglas de stock mínimo/máximo |
-| POST | /inventory/reorder-rules | Crear regla |
-| PUT | /inventory/reorder-rules/{id} | Editar regla |
-| POST | /inventory/reorder-rules/{id}/deactivate | Desactivar |
-| GET | /inventory/replenishment-suggestions | Sugerencias de reposición |
-| GET | /inventory/transfers | Lista paginada de transferencias |
-| GET | /inventory/transfers/{id} | Detalle |
-| POST | /inventory/transfers | Crear transferencia |
-| POST | /inventory/transfers/{id}/dispatch | Despachar y descontar origen |
-| POST | /inventory/transfers/{id}/receive | Recibir en destino |
-| POST | /inventory/transfers/{id}/cancel | Cancelar según estado; compensar cuando corresponda |
-| POST | /inventory/transfers/{id}/reverse | Revertir tras recepción con motivo |
+## 8. Suscripciones
 
-Ejemplo de ajuste, sujeto a DTO actual:
+La API expone catálogo de opciones, previsualización, CRUD/consulta, acciones de facturación, prepago y cancelación. La facturación genera ventas internas; no implica un cobro procesado por banco o pasarela.
 
-~~~json
-{
-  "productId": "UUID-PRODUCTO",
-  "warehouseId": "UUID-ALMACEN",
-  "direction": "INCREASE",
-  "quantity": 3,
-  "reason": "Corrección de conteo aprobada",
-  "unitCost": 4.2500
-}
-~~~
+## 9. WhatsApp
 
-El costo es opcional en entradas. En salidas no exceder stock disponible. No actualizar onHand directamente. La comprobación visual de disponibilidad no reemplaza el control atómico del comando.
+### Integración técnica
 
-## 6. Compras, recepciones y devoluciones a proveedor
+/integrations/whatsapp/** ofrece catálogo, carritos, cotizaciones, pedidos, consulta y cancelación. La integración debe enviar X-Integration-Key desde un secreto del workflow. El backend calcula precio/cotización y revalida la orden.
 
-Permisos: purchasing:read para consultar; purchasing:manage para comandos; purchasing:approve para aprobar. Cuando PURCHASING_REQUIRE_DISTINCT_APPROVER=true, el aprobador debe ser distinto del usuario que creó/envió la orden.
+### Backoffice
 
-| Método | Ruta | Uso |
-|---|---|---|
-| GET | /purchase-orders | Lista |
-| GET | /purchase-orders/{id} | Detalle |
-| POST | /purchase-orders | Crear borrador |
-| POST | /purchase-orders/{id}/submit | Enviar |
-| POST | /purchase-orders/{id}/approve | Aprobar |
-| POST | /purchase-orders/{id}/cancel | Cancelar si el estado lo permite |
-| POST | /purchase-orders/{id}/receipts | Registrar recepción parcial/completa |
-| GET | /goods-receipts | Lista de recepciones |
-| GET | /goods-receipts/{id} | Detalle de recepción |
-| GET | /purchase-returns | Lista de devoluciones a proveedor |
-| GET | /purchase-returns/{id} | Detalle |
-| POST | /purchase-returns | Devolver cantidades de recepción contabilizada |
+- GET /api/v1/whatsapp-orders: bandeja paginada.
+- GET /api/v1/whatsapp-orders/work-summary: contadores de la bandeja.
+- GET /api/v1/whatsapp-orders/{id}: detalle.
+- POST /api/v1/whatsapp-orders/{id}/confirm-payment: confirmación manual con clave idempotente, método y referencia, permiso sales:manage.
 
-Creación de compra, según PurchaseDtos.CreateOrderRequest:
+La confirmación representa verificación humana registrada; no llama a gateway.
 
-~~~json
-{
-  "supplierId": "UUID-PROVEEDOR",
-  "warehouseId": "UUID-ALMACEN",
-  "notes": "Reposición",
-  "items": [
-    {"productId": "UUID-PRODUCTO", "quantity": 10, "unitCost": 4.00}
-  ]
-}
-~~~
+## 10. Operaciones e integración V28
 
-Recepción:
+### Integration operations
 
-~~~json
-{
-  "items": [
-    {"purchaseOrderLineId": "UUID-LINEA-ORDEN", "quantity": 10}
-  ]
-}
-~~~
+- POST /api/v1/integration-operations: crear operación QUEUED, requiere integration:manage e Idempotency-Key.
+- GET /api/v1/integration-operations y /{operationId}: lectura, integration:read.
+- POST /api/v1/integration-operations/{operationId}/retry: reencolar estados terminales, integration:manage.
 
-La orden por sí sola no incrementa las existencias. El stock cambia al contabilizar la recepción. Las recepciones parciales deben respetar cantidad pedida/recibida; las devoluciones no exceden las unidades recibidas que aún no se han devuelto.
+### Webhook subscriptions
 
-## 7. Ventas y devoluciones de cliente
+- POST /api/v1/webhook-subscriptions: alta, integration:manage.
+- GET /api/v1/webhook-subscriptions: listar, integration:read.
+- DELETE /api/v1/webhook-subscriptions/{id}: desactivar, integration:manage.
 
-Permisos: sales:read, sales:manage y sales:cancel para aprobar cancelaciones.
+V28 crea integration_operation, webhook_subscription y webhook_delivery. En el árbol auditado no se encontró un ejecutor completo de integration_operation ni un dispatcher que entregue/reintente webhook_delivery. Son capacidades de administración/almacenamiento inicial, no integración distribuida terminada.
 
-| Método | Ruta | Uso |
-|---|---|---|
-| GET | /sales | Lista |
-| GET | /sales/{id} | Detalle |
-| POST | /sales | Venta transaccional multítem; `unitPrice` opcional por línea (sin él se usa el sugerido) y nunca menor al costo de las unidades vendidas |
-| GET | /subscriptions | Suscripciones paginadas; filtros `status`, `customerId` |
-| POST | /subscriptions | Crear (Idempotency-Key); plan por defecto del servicio, `prepay` y `discountPercent` (requiere `sales:discount`) |
-| GET | /subscriptions/{id} | Detalle con calendario de cobros y facturas |
-| GET | /subscriptions/options | Modos de cobro, frecuencias, duraciones y si el usuario puede dar descuentos |
-| POST | /subscriptions/preview | Calendario y total de un plan sin guardarlo |
-| GET | /subscriptions/{id}/cancellation-preview | Qué se facturaría y qué se anularía al cancelar hoy |
-| POST | /subscriptions/{id}/cancel | Cancelar: factura el periodo vigente y anula los cobros futuros |
-| POST | /subscriptions/{id}/prepay | Facturar ahora todos los cobros pendientes en una sola venta |
-| POST | /sales/pricing | Precio sugerido (costo + ganancia) y mínimo sin pérdida por línea, según almacén y cantidad |
-| POST | /sales/{id}/request-cancellation | Solicitar anulación con motivo |
-| POST | /sales/{id}/approve-cancellation | Aprobar; aprobador distinto del solicitante |
-| GET | /sales-returns | Lista |
-| GET | /sales-returns/{id} | Detalle |
-| POST | /sales-returns | Devolver productos de una venta |
+## 11. Outbox, auditoría y realtime
 
-Venta representativa según SaleDtos.CreateRequest:
+- /api/v1/operations/outbox: stats, lista, detalle y requeue con operations:manage; payload de negocio no se expone en la vista operativa.
+- /api/v1/audit-events: consulta paginada de eventos auditables con audit:read y ámbito.
+- GET /api/v1/dashboard/events: SSE autenticado. Emite connected y snapshot periódico con updatedAt; el frontend vuelve a consultar sus endpoints. El evento no contiene el dashboard completo.
+- Outbox entrega al menos una vez; consumidores deben deduplicar eventId. Kafka está opt-in y el consumidor existente invalida caché pública.
 
-~~~json
-{
-  "warehouseId": "UUID-ALMACEN",
-  "customerName": "Consumidor final",
-  "customerPhone": "",
-  "channel": "POS",
-  "items": [
-    {"productId": "UUID-PRODUCTO", "quantity": 2}
-  ]
-}
-~~~
+## 12. Paginación, errores e idempotencia
 
-El precio vigente lo decide el backend desde el catálogo. El consumidor no debe enviar un precio autoritativo. El backend vuelve a validar stock dentro de la transacción. El destino de devolución debe ajustarse al DTO actual y puede indicar RESTOCK o SCRAP según regla.
+- La mayoría de listados aceptan page base cero y size limitado (habitualmente máximo 100); revisa el controlador específico.
+- Errores comunes usan Problem Details y requestId.
+- Códigos habituales: 400 validación/query, 401 autenticación, 403 autorización, 404 recurso, 409 conflicto, 413 body, 415 content type, 422 regla de negocio, 429 Retry-After.
+- Para un reintento lógico conserva la misma Idempotency-Key y exactamente el mismo payload. Una clave no autoriza a cambiar el cuerpo.
 
-## 8. Reportes y costeo
+## 13. Permisos y superficie pública
 
-Todas las rutas /reports exigen reports:financial.
+La mayoría de rutas sensibles está protegida por autoridades específicas, pero los dos casos siguientes son excepciones críticas que deben corregirse:
+- /api/v1/tax/**: permitAll; operaciones de lectura/escritura fiscales públicas.
+- /api/v1/refunds/**: permitAll; consulta/transiciones de reembolso públicas.
+- /api/v1/integrations/whatsapp/**: permitAll a nivel JWT, pero cada operación del controlador valida X-Integration-Key.
+- /api/v1/public/**: lectura de catálogo público.
 
-| Método | Ruta | Parámetros principales |
-|---|---|---|
-| GET | /reports/inventory-balance | from, to, warehouseId requeridos; productId y zone opcionales; page/size |
-| GET | /reports/valuation | warehouseId, productId, includeEmpty y page/size |
-| GET | /reports/sales | from, to; warehouseId y zone opcionales |
-| GET | /reports/purchases | from, to; warehouseId, supplierId y zone opcionales |
-| GET | /reports/kardex | productId, warehouseId, from, to; zone opcional |
-| GET | /reports/low-stock | warehouseId opcional |
-| GET | /costing/policy | reports:financial o costing:manage |
-| PUT | /costing/policy | costing:manage |
-
-Ejemplo de balance:
-
-~~~bash
-curl -G 'http://localhost:8080/api/v1/reports/inventory-balance' \
-  -H "Authorization: Bearer $TOKEN" \
-  --data-urlencode 'from=2026-10-01' \
-  --data-urlencode 'to=2026-10-26' \
-  --data-urlencode 'warehouseId=UUID-ALMACEN' \
-  --data-urlencode 'productId=UUID-PRODUCTO' \
-  --data-urlencode 'zone=America/Guayaquil' \
-  --data-urlencode 'page=0' --data-urlencode 'size=50'
-~~~
-
-El balance entrega rango, zona, generatedAt, paginación e items con saldos y valores de apertura/cierre, compras, ventas netas, costo de ventas, utilidad bruta y margen según DTO. El cierre histórico no tiene por qué coincidir con la existencia actual, que incluye movimientos posteriores. El periodo se limita a 366 días y el size efectivo a 100. En V14, las capas iniciales para existencia anterior se estiman con product.costPrice; ello no reconstruye el costo histórico real. Cambiar política tras movimientos valorizados requiere migración planificada.
-
-## 9. WhatsApp/n8n
-
-Enviar X-Integration-Key desde un secreto del workflow. Nunca tomar identidad o permisos de un texto generado por un modelo; el vínculo con el cliente debe derivarse del canal verificado.
-
-| Método | Ruta |
-|---|---|
-| GET | /integrations/whatsapp/catalog/products |
-| GET | /integrations/whatsapp/catalog/products/{identifier} |
-| POST | /integrations/whatsapp/carts |
-| GET | /integrations/whatsapp/carts/{cartId} |
-| PUT | /integrations/whatsapp/carts/{cartId}/items/{productId} |
-| DELETE | /integrations/whatsapp/carts/{cartId}/items/{productId} |
-| POST | /integrations/whatsapp/carts/{cartId}/quotes |
-| GET | /integrations/whatsapp/quotes/{quoteId} |
-| POST | /integrations/whatsapp/orders |
-| GET | /integrations/whatsapp/orders/{orderId} |
-| POST | /integrations/whatsapp/orders/{orderId}/cancel |
-| GET | /whatsapp-orders | Backoffice: sales:read |
-| GET | /whatsapp-orders/{id} | Backoffice: sales:read |
-| POST | /whatsapp-orders/{id}/confirm-payment | Backoffice: sales:manage; confirmación humana |
-
-La cotización vence y el pedido vuelve a validar condiciones. La confirmación de pago es manual: no existe pasarela, conciliación o reembolso automático.
-
-## 10. Auditoría, Outbox, GraphQL y Actuator
-
-| Método | Ruta | Acceso |
-|---|---|---|
-| GET | /audit-events | audit:read |
-| GET | /audit-events/{id} | audit:read |
-| GET | /operations/outbox | operations:manage |
-| GET | /operations/outbox/stats | operations:manage |
-| GET | /operations/outbox/{id} | operations:manage |
-| POST | /operations/outbox/{id}/retry | operations:manage |
-| POST | /graphql | Consultas de catálogo con límites de profundidad/complejidad |
-| GET | /actuator/health | Público, sin detalle sensible |
-| GET | /actuator/health/readiness | Readiness probe |
-| GET | /actuator/health/liveness | Liveness probe |
-| GET | /actuator/info | technical:read |
-| GET | /actuator/metrics y /actuator/metrics/{name} | technical:read u operations:manage |
-| GET | /v3/api-docs | OpenAPI con SWAGGER_ENABLED |
-| GET | /swagger-ui.html | Swagger UI con SWAGGER_ENABLED |
-
-El Outbox busca entrega al menos una vez. Consumidores futuros deben deduplicar por eventId; consumidores/proyecciones Kafka no son parte del alcance actual.
-
-## 11. Paginación, errores e idempotencia
-
-Los listados paginados normalmente aceptan page (base cero) y size. Usar size <=100 y solo campos de sort admitidos por el controlador. Balance requiere warehouseId, mientras que kardex requiere productId y warehouseId.
-
-Errores comunes:
-- 400: JSON o parámetro inválido; corregir payload.
-- 401: token ausente/inválido/vencido; volver a login.
-- 403: autoridad insuficiente; no reintentar.
-- 404: UUID o recurso inexistente.
-- 405: método no admitido.
-- 409: conflicto de estado/unicidad/idempotencia; leer el estado antes de repetir.
-- 413/415: cuerpo grande o content-type incorrecto.
-- 422: regla de negocio; corregir entrada.
-- 429: respetar Retry-After si existe.
-- 5xx o falla de red después de enviar comando: resultado ambiguo; consultar recurso, movimiento o saldo antes de intentar otra vez.
-
-El handler común usa application/problem+json, status, detalle seguro, code cuando aplique y requestId. No retornar stack traces ni SQL. Nunca registrar token, contraseña o X-Integration-Key.
-
-Para comandos compatibles, usar Idempotency-Key UUID por operación lógica. Reintentar con la misma clave y cuerpo idéntico. Una clave no debe compartirse entre operaciones diferentes ni sustituye validación, transacción o autorización. El cliente web mantiene sus claves temporales en memoria, por lo que tras una recarga hay que comprobar el resultado antes de reemitir un comando.
-
-## 12. Roles y permisos
-
-Roles operativos documentados: SUPER_ADMIN, AUDITOR, MANAGER_ALMACEN, VENDEDOR y SOPORTE_TI. Autoridades del código incluyen security:manage, audit:read, catalog:read, catalog:manage, inventory:read, inventory:manage, purchasing:read, purchasing:manage, purchasing:approve, partners:read, partners:manage, customers:manage, sales:read, sales:manage, sales:cancel, reports:financial, costing:manage, operations:manage y technical:read.
-
-Consultar /auth/me para permisos efectivos y RoleMatrixApiTest / docs/RESULTADO_AUDITORIA_EJECUCION.md §6 como matriz histórica. La configuración y los permisos de PostgreSQL de cada despliegue son autoritativos. reports:financial solo debe darse al rol financiero autorizado.
-
-## 13. No asumir que existe
-
-No se implementan en esta versión: refresh token, pasarela y reembolsos, impuestos fiscales completos/SRI, multiempresa, stock independiente por variante, multi-bin operacional, carga binaria gestionada, consumidores/proyecciones Kafka ni rate limiting distribuido.
+No usar los permisos declarados en la UI como sustituto de esta matriz de seguridad real.

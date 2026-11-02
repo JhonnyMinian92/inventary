@@ -1,65 +1,62 @@
-# Fase 6 — Operaciones comerciales y estados financieros completos
+# Fase 6 — Operaciones comerciales y estados financieros
 
-**Rama:** `implementacion_propuestas`  
-**Estado:** EN PROGRESO — no declarar completa hasta cerrar pagos, reembolsos, UX y pruebas integrales.
+**Código auditado:** dc028a346ccf7b94cfbb60b4fb6cd5493518b481 · **Estado:** EN PROGRESO.
 
-## Alcance revisado
+## Capacidades presentes
 
-La fase cubre órdenes de compra, recepciones, devoluciones a proveedores, ventas, cancelaciones/devoluciones de clientes, pagos/reembolsos y suscripciones. Los estados de inventario, dinero y documento fiscal son independientes.
+- Órdenes de compra con estados, envío/aprobación/cancelación, actor y eventos Outbox.
+- Recepciones parciales desde órdenes aprobadas; stock y valoración cambian al contabilizar recepción.
+- Búsqueda server-side por número/proveedor para órdenes, recepciones y devoluciones.
+- Endpoint server-side GET /goods-receipts/{id}/returnable-lines para cantidad recibida, devuelta y restante.
+- UI de Compras con pestañas Órdenes, Recepciones y Devoluciones a proveedores. Los listados de recepciones y devoluciones paginan y buscan; las devoluciones vuelven a consultar la elegibilidad al servidor.
+- Ventas transaccionales con stock/costeo e idempotencia; solicitud y aprobación separada de cancelaciones.
+- Devolución física desde venta con decisión de destino.
+- UI de Ventas con pestañas Ventas, Devoluciones y Reembolsos.
+- Suscripciones con cuotas, búsqueda y filtros de estado/almacén/fecha/error, además de facturación interna.
+- Backoffice WhatsApp con bandeja, work-summary, detalle y confirmación manual idempotente de pago.
 
-## Capacidades existentes verificadas
+## Distinciones que el sistema conserva
 
-- Órdenes de compra con estados DRAFT, SUBMITTED, APPROVED, PARTIALLY_RECEIVED, RECEIVED y CANCELLED; envío y aprobación separados, idempotencia, actor de aprobación y eventos Outbox.
-- Recepciones parciales desde órdenes aprobadas, control de cantidades pendientes, valoración de inventario, movimientos, auditoría y Outbox.
-- Devoluciones a proveedores originadas en recepciones contabilizadas; el backend revalida cantidades y disponibilidad. Una devolución física no crea por sí misma nota de crédito ni reembolso.
-- Ventas con precios calculados/validados en backend, control transaccional de stock, coste histórico, idempotencia, auditoría y Outbox.
-- Solicitud y aprobación de cancelación de venta con actores distintos; las existencias se compensan una sola vez.
-- Devoluciones de clientes desde la venta original con validaciones de cantidades y disposición del inventario.
-- Suscripciones con calendario de cuotas, previsualización, generación programada de ventas internas, cancelación y prepagos entendidos como facturación, no como confirmación de dinero recibido.
+- Orden de compra no es recepción; la recepción es el movimiento de stock.
+- Devolución física a proveedor no es factura/nota de crédito ni pago a proveedor.
+- Venta/cancelación no es factura fiscal autorizada.
+- Devolución de artículos no es reembolso de dinero.
+- Facturación de una cuota de suscripción no prueba cobro externo.
+- Pago confirmado en WhatsApp significa que un usuario autorizado registró verificación manual; no hay gateway.
 
-## Cambios de este corte
-
-- Se agregó búsqueda server-side `q` en `GET /api/v1/purchase-orders`, buscando por número de orden y nombre de proveedor y manteniendo la paginación y el filtro por almacenes autorizados.
-- Se añadió prueba de integración para la búsqueda de órdenes.
-- Se extendió la búsqueda server-side a `GET /api/v1/goods-receipts` (número de recepción, orden y proveedor) y `GET /api/v1/purchase-returns` (número de devolución, recepción, orden y proveedor), manteniendo scope y paginación.
-- Se añadió `GET /api/v1/goods-receipts/{id}/returnable-lines`, que calcula en servidor cantidad recibida, devuelta y restante por línea. La UI ya no descarga hasta 100 devoluciones para reconstruir elegibilidad ni confía en agregados parciales del navegador.
-- La UI de devoluciones a proveedores usa búsqueda paginada para recepciones y devoluciones, y consume el saldo retornable calculado por el backend.
-- Se conectó el filtro de búsqueda de la pantalla Compras al parámetro server-side y se persiste como `purchases.q` en la URL. La búsqueda no descarga el historial completo ni filtra solo la página visible.
-- Se corrigió la prueba de bootstrap Flyway que aún esperaba la versión 20; la rama ya contiene 22 migraciones incrementales.
-- La CI del commit que amplía la búsqueda y elegibilidad de devoluciones debe terminar en verde; las primeras ejecuciones intermedias fallaron porque los cambios de repositorio, servicio, controlador y pruebas se estaban aplicando secuencialmente. Se debe validar el SHA final.
-
-## Pendientes que impiden cerrar la fase
+## Brechas que mantienen la fase abierta
 
 ### Compras
-- Separar Órdenes, Recepciones y Devoluciones a proveedores en pestañas de primer nivel con estado/error/empty independiente.
-- Añadir búsqueda y filtros server-side a recepciones y devoluciones; dejar de pedir hasta 100 registros para calcular elegibilidad en la UI. El servidor debe seguir siendo la autoridad contra sobredevoluciones concurrentes.
-- DTOs ligeros para tablas, contadores agregados del servidor y medición de N+1.
-- Permisos por acción en cada fila y estados de carga por fila, no un único bloqueo global.
-- Mantener claro que el total de la orden es valor planificado, no factura del proveedor ni deuda pagada.
+- Mejorar el detalle de recepción y sustituir alertas simples por vistas/detalles accesibles donde corresponda.
+- Completar indicadores de flujo y contadores server-side independientes por pestaña.
+- DTOs ligeros, revisión N+1 y estados/errores por fila.
+- Modelo de factura de proveedor y cuentas por pagar si el producto necesita deuda y liquidación de proveedores.
 
 ### Ventas y devoluciones
-- Completar el flujo guiado de cotización, comprador/facturación, destinatario/fulfillment y confirmación con snapshots históricos inmutables.
-- Resolver almacén habitual por usuario/caja/terminal autorizada en servidor; el modelo actual requiere que el formulario proporcione `warehouseId`.
-- Presentar descuentos, impuestos/cargos y pago solo según respuestas reales del backend; no hardcodear tasas ni presentar subtotal como impuesto.
-- Separar vistas de ventas y devoluciones, con filtros, paginación, permisos por acción y estados de pago/fiscal/fulfillment.
-- Completar la conciliación de devoluciones con reembolso y, cuando corresponda, documento fiscal, sin equiparar esas operaciones.
+- Snapshot histórico completo de comprador/facturación y fulfillment.
+- Contexto operativo de almacén/caja resuelto en servidor sin permitir almacén arbitrario.
+- Descuentos/impuestos/cargos calculados por backend y desglosados por línea.
+- Conciliar devolución física, documento fiscal y reembolso como operaciones diferentes.
+- E2E por roles, estados y concurrencia.
 
 ### Pagos y reembolsos
-- No existe todavía un libro de pagos ni entidades PaymentAttempt/PaymentTransaction/Refund persistidas ligadas a la venta y al pago original.
-- Falta contrato de pago manual: métodos permitidos, evidencia, estados reportado/verificado, permisos de confirmación, aprobación independiente y conciliación.
-- Reembolso debe ser una transacción compensatoria separada, idempotente, auditada y limitada al importe realmente liquidado del pago original.
-- No hay proveedor/gateway de pago aprobado ni contrato de charge/refund; no se simula una autorización externa ni se considera una captura como confirmación bancaria.
-- No existe todavía el modelo de factura de proveedor/cuenta por pagar; por ello no se puede mostrar deuda o pagos a proveedores a partir de órdenes y recepciones.
+- No hay libro de pagos/PaymentAttempt/PaymentTransaction con importe realmente liquidado y fuente bancaria.
+- No se limita de forma completa el acumulado de reembolsos al importe efectivamente cobrado menos lo ya devuelto.
+- No hay gateway/contrato charge/refund ni confirmación externa firmada.
+- No hay conciliación bancaria.
+- **Bloqueo P0:** RefundController no define @PreAuthorize y SecurityConfig usa permitAll para /api/v1/refunds/**. La operación no es segura para datos reales.
+- Falta segregación de funciones verificable y auditoría íntegra de transiciones, además de idempotencia/replay correcto.
 
 ### Suscripciones
-- Añadir búsqueda/filtros y contadores server-side que distingan programado, facturado y cobrado.
-- Mejorar la bandeja de próximos cargos y errores de facturación con reintento seguro y operación trazable.
-- Conservar el alcance actual: no habilitar auto-renovación, pruebas, créditos, derechos ni pasarelas no modeladas.
+- Distinguir programado, facturado y cobrado de forma explícita.
+- Reintentos trazables de facturación y estados de error/conciliación.
+- No anunciar auto-renovación, pasarelas, créditos o entitlements no implementados.
 
-## Validación requerida
+## Validación de cierre
 
-- CI backend y frontend en SHA final; migraciones Flyway desde base vacía y upgrade, Hibernate validation y Compose smoke test.
-- Pruebas HTTP de permisos/scope, paginación/búsqueda, idempotencia, concurrencia de recepciones/devoluciones/cancelaciones y compensaciones.
-- Pruebas de pagos parciales, duplicados, pago reportado no verificado, aprobación independiente y reembolso no superior al saldo liquidado una vez exista el contrato.
-- Pruebas browser de las pestañas, filtros URL, formularios y responsive.
-- La fase solo se cierra cuando los contratos y las evidencias anteriores existan. No se atribuye completitud a capacidades futuras ni a integraciones externas no contratadas.
+- Pruebas HTTP/RBAC/scopes de compras, recepciones, ventas, retornos y reembolsos.
+- Pruebas concurrentes para doble recepción, sobredevolución, sobreventa y doble compensación.
+- Pruebas browser de pestañas, filtros, formularios, URLs, responsive y estados vacíos/error.
+- Contrato financiero aprobado, ledger de pagos y conciliación antes de anunciar reembolsos como capacidad completa.
+
+**Conclusión:** se mejoró sustancialmente la UX de compras/ventas y la búsqueda server-side, pero el ciclo financiero completo y la seguridad de reembolsos siguen pendientes.

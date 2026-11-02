@@ -1,181 +1,122 @@
 # 27 — Guía práctica de consumo de APIs
 
-El catálogo de rutas está en 25-referencia-apis.md. Los DTOs y el OpenAPI del mismo build son la autoridad final para campos, tipos y respuestas.
+## 1. Requisitos
 
-## 1. Requisitos y ejecución
-
-Requisitos: Java 21, PostgreSQL compatible, Node 22.12.x, npm 10/11. Obtener valores reales para las variables desde los archivos .env.example, sin subir .env ni usar claves de ejemplo en producción.
-
-Backend:
-
-~~~bash
-cd microservices-inventary-ecuapp
-./mvnw -B verify
-./mvnw spring-boot:run
-~~~
-
-Windows: mvnw.cmd. Configurar SPRING_DATASOURCE_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET, CORS_ALLOWED_ORIGINS y credenciales de bootstrap siguiendo .env.example. JWT_SECRET debe ser aleatorio y de al menos 32 bytes. Flyway realiza migraciones; nunca usar ddl-auto=update ni alterar balances manualmente.
-
-Frontend:
-
-~~~bash
-cd app-inventary-ecuapp
-cp .env.example .env
-npm install
-npm run dev
-~~~
-
-La base URL se configura en VITE_API_BASE_URL; el valor local predeterminado es http://localhost:8080/api/v1. CORS_ALLOWED_ORIGINS debe aceptar el origen real del frontend, normalmente http://localhost:5173. Para producción, npm run build genera dist. El árbol de referencia no incluye package-lock.json; crear/versionar lockfile antes de adoptar npm ci.
+- API backend Spring Boot y PostgreSQL disponibles.
+- Java 21 en backend.
+- Para desarrollo directo, configurar URL base y CORS.
+- Para Docker raíz, el navegador usa el proxy Nginx y la ruta /inventary/api/v1.
 
 ## 2. Login y token
 
-1. Pedir POST /api/v1/auth/login-challenge y enviar POST /api/v1/auth/login con las credenciales cifradas (ver el contrato en 25-referencia-apis.md, sección 1).
-2. Usar accessToken como Bearer en todas las rutas privadas.
-3. Consultar GET /api/v1/auth/me para conocer identidad, rol y permisos.
-4. Manejar expiresAt; al recibir 401, limpiar sesión y volver a login.
-5. POST /api/v1/auth/logout cierra la sesión en el backend.
-6. El controlador actual no expone refresh token.
+El login utiliza desafío de cifrado de credenciales. La SPA ejecuta el flujo del cliente y conserva el token según su módulo de sesión. La API valida firma, emisor, audiencia, expiración, estado del usuario y versión del token.
+
+Consulta permisos efectivos con:
 
 ~~~bash
-export API='http://localhost:8080/api/v1'
-export TOKEN='PEGAR_ACCESS_TOKEN'
-curl -sS "$API/auth/me" -H "Authorization: Bearer $TOKEN"
+curl -H "Authorization: Bearer $TOKEN" "$API/auth/me"
 ~~~
 
-Nunca colocar el token en query string, logs, tickets, capturas o Git. El permiso efectivo del usuario no sustituye las reglas server-side.
+La autenticación JWT protege la mayoría de endpoints, pero hay dos excepciones críticas en la configuración actual: /tax/** y /refunds/** son permitAll. No tomes la ausencia de 401 en esas rutas como comportamiento intencional seguro.
 
 ## 3. Crear producto
 
-Leer primero las categorías y unidades permitidas:
+El catálogo valida SKU, categoría, tipo, moneda, unidad y esquema de atributos en servidor. Las reglas de campos reales deben consultarse en OpenAPI del SHA desplegado.
 
 ~~~bash
-curl -sS "$API/catalog/categories?page=0&size=20" -H "Authorization: Bearer $TOKEN"
-curl -sS "$API/catalog/units" -H "Authorization: Bearer $TOKEN"
+curl -X POST "$API/catalog/products" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"sku":"SKU-DEMO","name":"Producto demo","categoryId":"UUID-CATEGORIA","costPrice":1.00,"salePrice":1.50,"currency":"USD"}'
 ~~~
 
-Crear un producto:
+## 4. Compra, recepción y devolución
+
+Flujo:
+1. Crear orden.
+2. Enviar a aprobación.
+3. Aprobar con permiso distinto cuando aplica la segregación configurada.
+4. Registrar recepción parcial/completa con Idempotency-Key.
+5. Consultar recepción y cantidad retornable en servidor.
+6. Registrar devolución desde una recepción contabilizada.
 
 ~~~bash
-curl -sS -X POST "$API/catalog/products" \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -H 'Accept: application/json' \
-  -d '{
-    "sku":"SKU-001",
-    "name":"Cable USB-C",
-    "description":"Cable de 1 m",
-    "categoryId":"UUID-CATEGORIA",
-    "costPrice":2.10,
-    "salePrice":4.50,
-    "currency":"USD",
-    "attributes":{"lengthCm":100}
-  }'
+curl -X GET "$API/goods-receipts/UUID-RECEPCION/returnable-lines" \
+  -H "Authorization: Bearer $TOKEN"
 ~~~
 
-El ejemplo es válido solo si la categoría declara lengthCm como atributo y acepta el tipo/valor. El backend valida SKU, importes, categoría, unidad y atributos. Campos desconocidos causan error.
-
-## 4. Compra, recepción y stock
-
-1. POST /purchase-orders con supplierId, warehouseId, items(productId, quantity, unitCost) crea una orden borrador.
-2. POST /purchase-orders/{id}/submit.
-3. POST /purchase-orders/{id}/approve con purchasing:approve y aprobador distinto del creador cuando se exige segregación.
-4. POST /purchase-orders/{id}/receipts con purchaseOrderLineId y quantity recibida.
-5. Consultar /inventory/balances y /inventory/movements.
-
-Ejemplo de orden:
-
-~~~json
-{
-  "supplierId": "UUID-PROVEEDOR",
-  "warehouseId": "UUID-ALMACEN",
-  "notes": "Reposición",
-  "items": [
-    {"productId": "UUID-PRODUCTO", "quantity": 10, "unitCost": 4.00}
-  ]
-}
-~~~
-
-Ejemplo de recepción parcial:
-
-~~~json
-{
-  "items": [
-    {"purchaseOrderLineId": "UUID-LINEA-ORDEN", "quantity": 4}
-  ]
-}
-~~~
-
-La orden no incrementa existencias hasta que la recepción se contabiliza. Una recepción parcial de 4 unidades aumenta el stock por 4, no por la cantidad total solicitada. Las devoluciones a proveedor refieren a recepción contabilizada y respetan unidades no devueltas y stock disponible.
+Una orden no incrementa existencias. La recepción contabilizada lo hace. Una devolución física no equivale a nota de crédito ni pago al proveedor.
 
 ## 5. Venta, cancelación y devolución
 
-POST /sales recibe warehouseId, channel, items con productId y quantity, y datos de cliente cuando aplican. El servidor consulta el precio autorizado del catálogo; no enviar ni confiar en precio autoritativo desde el navegador. La disponibilidad se valida otra vez dentro de la transacción.
-
-Para anular:
-1. POST /sales/{id}/request-cancellation, con motivo.
-2. Un actor distinto con sales:cancel ejecuta POST /sales/{id}/approve-cancellation.
-
-No borrar una venta contabilizada para corregirla. Usar POST /sales-returns de acuerdo con su DTO, limitando la devolución a la cantidad vendida y todavía no devuelta. El destino puede ser RESTOCK o SCRAP según contrato.
-
-## 6. Consultar balance por fechas
-
-El balance requiere from, to y warehouseId; productId y zone son opcionales. El usuario debe tener reports:financial.
+Crear venta con clave idempotente:
 
 ~~~bash
-curl -G "$API/reports/inventory-balance" \
-  -H "Authorization: Bearer $TOKEN" \
-  --data-urlencode 'from=2026-10-01' \
-  --data-urlencode 'to=2026-10-26' \
-  --data-urlencode 'warehouseId=UUID-ALMACEN' \
-  --data-urlencode 'zone=America/Guayaquil' \
-  --data-urlencode 'page=0' --data-urlencode 'size=50'
-~~~
-
-La respuesta incluye rango, zona, generatedAt, paginación e items. closingStock es el saldo histórico al final del periodo y puede ser distinto de currentStock si hubo movimientos posteriores.
-
-Para verificar reposición: recibir 10, vender 10, recibir otras 15 unidades del mismo producto, y consultar rangos anteriores/posteriores a la nueva recepción. Añadir devolución, cancelación aprobada y kardex/valoración. Ejecutar contra PostgreSQL real, no solo mocks.
-
-## 7. Idempotencia y resultado incierto
-
-Para comandos compatibles, enviar Idempotency-Key con una UUID nueva por operación lógica:
-
-~~~bash
-export IDEMPOTENCY_KEY="$(uuidgen)"
 curl -X POST "$API/sales" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -H "Idempotency-Key: $(uuidgen)" \
   -d '{"warehouseId":"UUID-ALMACEN","channel":"POS","items":[{"productId":"UUID-PRODUCTO","quantity":1}]}'
 ~~~
 
-En un reintento lógico, conservar clave y payload. No reutilizar la misma clave con otro cuerpo ni en otra operación. Si la conexión falla después del envío, el resultado es ambiguo: consultar la venta, orden, movimiento o saldo antes de crear otra petición. La caché de clave del frontend solo vive temporalmente en la pestaña, y no sobrevive a recargas.
+El servidor calcula precio/reglas, valida disponibilidad y registra movimientos/costeo. La cancelación requiere una solicitud y un aprobador distinto según las reglas del dominio. La devolución física y el reembolso monetario son documentos/estados distintos.
 
-## 8. Filtros y paginación
+## 6. Inventario y dashboard
 
-page suele ser base cero y size debe ser <=100. Ordenar solo por campos admitidos por el endpoint. Balance requiere warehouseId; kardex requiere productId y warehouseId. Las fechas se interpretan mediante la zona del informe, por defecto America/Guayaquil; fijar zone cuando el consumidor necesite reproducir otro corte.
+~~~bash
+curl "$API/inventory/command-center" -H "Authorization: Bearer $TOKEN"
+curl "$API/inventory/balances?warehouseId=UUID-ALMACEN&page=0&size=20" \
+  -H "Authorization: Bearer $TOKEN"
+~~~
 
-## 9. Errores
+El endpoint SSE del dashboard es:
 
-El contrato común usa application/problem+json, status y requestId, con detalle seguro y code cuando corresponde.
+~~~bash
+curl -N "$API/dashboard/events" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: text/event-stream"
+~~~
 
-| HTTP | Acción |
-|---|---|
-| 400 | Corregir ruta, JSON o filtros |
-| 401 | Limpiar token y volver a login |
-| 403 | Resolver permiso/rol; no insistir |
-| 404 | Confirmar UUID/estado |
-| 409 | Consultar estado antes de repetir comando |
-| 413 | Reducir body |
-| 415 | Enviar content-type esperado |
-| 422 | Corregir regla/valor de negocio |
-| 429 | Respetar Retry-After |
-| 5xx/red caída | Comprobar si el comando se persistió antes de repetir |
+El stream emite conexión y señales snapshot con marca temporal; el frontend vuelve a consultar sus endpoints protegidos. No es un mensaje financiero ni un feed completo de movimientos.
 
-Nunca devolver stack trace/SQL ni registrar Authorization, password o X-Integration-Key.
+## 7. WhatsApp backoffice
 
-## 10. WhatsApp/n8n
+- GET /whatsapp-orders: bandeja paginada.
+- GET /whatsapp-orders/work-summary: contadores operativos.
+- GET /whatsapp-orders/{id}: detalle.
+- POST /whatsapp-orders/{id}/confirm-payment: confirmar pago manualmente con clave idempotente y permiso sales:manage.
 
-Enviar X-Integration-Key desde un secreto del workflow. La identidad del cliente debe derivarse de una notificación validada del canal, no de texto libre o salida de LLM. El backend calcula precios, cotiza con expiración y revalida al crear el pedido. La confirmación de pago es manual; no hay pasarela ni reembolso integrado.
+La confirmación significa que un usuario autorizado registró la verificación externa. No se llama a una pasarela.
 
-## 11. Criterios de integración fiable
+## 8. Operaciones de integración V28
 
-Antes de producción, verificar OpenAPI, errores y permisos por HTTP, CORS, migraciones V1–V14 desde cero/upgrade, escenarios de stock agotado y reposición, devoluciones, cancelación, ledger, concurrencia, idempotencia y backup/restore. Documentar el comando ejecutado, versiones y SHA exacto.
+La creación de una operación usa integration:manage e Idempotency-Key:
+
+~~~bash
+curl -X POST "$API/integration-operations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: OP-UUID" \
+  -d '{"operationType":"EXAMPLE","partnerCode":"PARTNER","payload":{"reference":"123"}}'
+~~~
+
+Consulta GET /integration-operations/{operationId} con integration:read. El estado QUEUED significa encolado, no completado. En el código auditado no se encontró un worker completo que procese la operación y concilie el resultado externo.
+
+Las rutas webhook-subscriptions administran metadatos de suscripción; no debe inferirse que la entrega HTTP esté implementada.
+
+## 9. Idempotencia y resultado incierto
+
+Mismo key + mismo payload: replay lógico del comando cuando el endpoint lo soporta. Mismo key + cuerpo distinto: conflicto. Si hay timeout después de enviar una escritura, consulta primero el recurso/estado para no duplicar stock, venta o recepción.
+
+No reutilizar una clave de una operación para otra ni modificar el payload entre reintentos.
+
+## 10. Filtros, paginación y errores
+
+- page habitualmente es base cero; size máximo suele ser 100, pero verifica cada endpoint.
+- Los rangos de reportes usan la zona configurada; por defecto America/Guayaquil.
+- Errores comunes: 400 validación/query, 401 autenticación, 403 autorización, 404 recurso, 409 conflicto, 413 body, 415 content type, 422 regla de negocio, 429 Retry-After.
+- No devolver stack traces, SQL ni secretos.
+
+## 11. Seguridad y límites
+
+No usar APIs tax ni refunds desde una exposición de red no confiable hasta eliminar permitAll y probar 401/403. La importación tributaria es manual y no verifica ante el SRI; las tarifas no emiten comprobantes. No simular pagos, notas de crédito ni autorización fiscal. Kafka y las operaciones externas siguen opt-in/incompletas.

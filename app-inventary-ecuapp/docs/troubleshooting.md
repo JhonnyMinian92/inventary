@@ -1,60 +1,50 @@
-> **Actualización — 2026-10-26:** además de los errores locales descritos a continuación, confirmar que el frontend se construye contra el SHA actual, que CORS coincide con el origen real y que package-lock.json se ha versionado antes de usar npm ci. La referencia API actual es [25](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md). Para comandos de compra/venta con respuesta de red incierta, consultar primero el estado backend antes de repetir una operación.
-
-# Ejecución y solución de problemas
+# Ejecución y solución de problemas del frontend
 
 ## Requisitos
 
-- Node.js 22.12.0 o superior dentro de la línea 22.
+- Node.js 22; consulta .nvmrc.
 - npm 10 u 11.
-- Backend Spring Boot accesible y usuario de backend habilitado.
-- Origen del frontend permitido por CORS en el backend.
+- API backend levantada y con CORS configurado si frontend/API usan orígenes distintos.
 
-La versión principal de Node está declarada en .nvmrc y los requisitos de runtime en package.json. Las dependencias directas del frontend están fijadas a versiones exactas. El archivo package-lock.json debe generarse y añadirse al repositorio durante la fase de validación, ejecutando npm install con acceso al registro de npm.
+## Preparación
 
-## Preparar el entorno
+~~~bash
+cd app-inventary-ecuapp
+npm ci
+npm test
+npm run build
+npm run dev
+~~~
 
-Desde la raíz del repositorio:
+Variables:
+- VITE_API_BASE_URL: prefijo REST consumido por el cliente (por ejemplo /api/v1 o /inventary/api/v1).
+- VITE_BASE_PATH: base pública de la SPA (por ejemplo / o /inventary/).
 
-    cd app-inventary-ecuapp
-    cp .env.example .env
-    npm install
-    npm run dev
+El navegador no recibe secretos de backend. No incluir JWT de servicio, clave WhatsApp ni credenciales en variables Vite con prefijo público.
 
-Edita .env para apuntar al backend. La variable pública VITE_API_BASE_URL debe incluir la ruta base, normalmente /api/v1.
+## Problemas frecuentes
 
-    VITE_API_BASE_URL=http://localhost:8080/api/v1
+| Síntoma | Diagnóstico/acción |
+|---|---|
+| 404 de assets o ruta al refrescar | Comprueba VITE_BASE_PATH, la ruta /inventary/ y el fallback SPA de Nginx. |
+| API devuelve 404 | Revisa VITE_API_BASE_URL; debe incluir el prefijo correcto de API y no duplicar /api/v1. |
+| CORS/OPTIONS falla | Configura el origen exacto en CORS_ALLOWED_ORIGINS; no uses comodín. Si Nginx sirve SPA y API en mismo origen, usa la ruta proxy configurada. |
+| 401 | La sesión/token expiró o fue revocado. Volver a login; no convertirlo en estado vacío. |
+| 403 | El usuario no tiene el permiso. La UI puede ocultar la acción, pero el backend sigue siendo autoritativo. |
+| 409 en POST | Consultar el recurso/estado y verificar si la operación ya se aplicó antes de repetir. |
+| Datos aparentemente vacíos | Comprueba permiso, filtro, página, almacén y error de API; no asumas que 403 es cero registros. |
+| Pedido WhatsApp no se confirma | La confirmación de pago es manual y exige permiso, referencia/método válidos, clave de idempotencia y reserva vigente. No llama a una pasarela. |
+| Reembolso no disponible o inesperadamente expuesto | Bloqueo conocido en backend: la ruta de reembolsos es permitAll; no confiar en el control UI y no utilizar con datos reales hasta corregirla. |
 
-No pongas contraseñas, claves privadas, tokens permanentes ni secretos de servicios en variables VITE_*: Vite los incorpora al código que recibe el navegador. El token de sesión lo emite la API y se guarda en localStorage; para equipos compartidos, cierra siempre sesión al terminar.
+## Reglas para cambios de frontend
 
-El backend debe permitir el origen real del frontend en CORS. El origen de Vite suele ser http://localhost:5173, pero cambia cuando se despliega en otro host.
+- Las llamadas REST nuevas se agregan al módulo API del dominio bajo src/shared/api.
+- Los componentes no implementan su propio transporte ni parsean JWT.
+- Las acciones de escritura usan las claves de idempotencia previstas por el contrato backend.
+- Filtros y paginación de datos extensos deben ejecutarse en backend, no sobre una muestra local.
+- No se muestran cifras simuladas cuando falla una petición.
+- El estado de venta, documento fiscal, cobro, devolución y cumplimiento debe permanecer separado.
 
-## Errores comunes
+## Validación en CI
 
-| Síntoma | Causa probable | Qué revisar |
-|---|---|---|
-| No conecta o muestra error de red | API apagada, URL incorrecta o política CORS | Confirma que VITE_API_BASE_URL apunta al backend y que el navegador puede alcanzar esa URL. Reinicia Vite después de cambiar .env. |
-| Error 404 en casi todas las rutas | Base URL sin /api/v1 o con prefijo duplicado | Usa la URL base completa /api/v1, sin añadir rutas de recursos al valor de la variable. |
-| Error 401 | Sesión vencida o credenciales inválidas | Inicia sesión de nuevo; la aplicación limpia el token cuando la API devuelve 401. |
-| Error 403 | El usuario autenticado no tiene autoridad suficiente | Solicita el permiso necesario al administrador. Los informes financieros requieren reports:financial. La UI no puede concederse permisos. |
-| Error 400 o validación de campo | El DTO del backend rechazó los datos | Lee el mensaje de respuesta y revisa identificadores, cantidades, límites de precisión, fechas y campos obligatorios. |
-| Error 409 o conflicto de negocio | Documento en estado incompatible, stock insuficiente, código duplicado o clave de idempotencia ya usada con otro cuerpo | Actualiza los datos y revisa el estado del documento antes de reintentar. No fuerces una repetición ciega de una operación financiera. |
-| No aparecen registros esperados | Filtros activos, permisos o listado paginado | Revisa filtros y permisos; confirma también el almacén, rango de fechas y página que devuelve el backend. |
-| Un cambio en .env no se refleja | Vite conserva la configuración del proceso actual | Detén y vuelve a iniciar el servidor de desarrollo. |
-
-## Reglas de operación
-
-- Crear una orden de compra no modifica existencias. El stock aumenta cuando se contabiliza una recepción aprobada.
-- Una venta, devolución, ajuste, traslado o conteo debe registrarse mediante su endpoint. No cambies existencias editando el estado local del frontend.
-- La aprobación de compra y la aprobación de una anulación pueden requerir permisos específicos o un usuario autorizado distinto, según las reglas del backend.
-- Las acciones transaccionales incluyen Idempotency-Key. La aplicación reutiliza temporalmente la misma clave para una solicitud idéntica después de un fallo de red o error temporal (5xx/429), durante el proceso actual del navegador. La caché se pierde al recargar la página; si la respuesta de una operación quedó en duda después de una recarga, consulta primero el documento o los movimientos del backend antes de repetirla.
-- El permiso mostrado en la UI es una ayuda de experiencia. El backend sigue siendo el único responsable de autorizar cada petición.
-
-## Validación final
-
-Una vez congelado todo el código fuente, ejecutar desde app-inventary-ecuapp:
-
-    npm install
-    npm run build
-    npm run preview
-
-Después se deben ejecutar pruebas automatizadas y escenarios end-to-end contra el backend y PostgreSQL. La compilación y las pruebas no forman parte de la fase de construcción del código fuente descrita aquí.
+En SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481, [Frontend Build 41385132616](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132616) aprobó 26 pruebas, build y smoke browser de login a 360/768/1280 px. Ese smoke no navega por los flujos autenticados completos.

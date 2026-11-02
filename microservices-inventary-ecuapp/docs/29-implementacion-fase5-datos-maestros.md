@@ -1,43 +1,43 @@
-# Fase 5 — Primer corte de datos tributarios y relación fiscal de almacenes
+# Fase 5 — Datos maestros, almacenes y fiscalidad inicial
 
-**Rama:** `implementacion_propuestas`  
-**Alcance:** backend inicial, importación manual trazable. No equivale a integración automática con el SRI.
+**Código auditado:** dc028a346ccf7b94cfbb60b4fb6cd5493518b481 · **Estado:** PARCIAL.
 
 ## Implementado
 
-- Migración Flyway V21: `taxpayer_profile`, `sri_establishment`, `taxpayer_snapshot` y `warehouse_establishment_assignment`.
-- Perfil tributario con RUC en texto y restricción de 13 dígitos; el establecimiento usa código textual de tres dígitos, conserva ceros iniciales y permite `trade_name` nulo.
-- Estados recibidos se conservan literalmente. Los estados desconocidos se normalizan a `UNKNOWN`, nunca a activo.
-- La importación se identifica como `MANUAL_IMPORT` y deja `freshness_status=MANUAL_REVIEW`; conserva hash SHA-256, fuente declarada, actor, fecha y snapshot de los campos normalizados.
-- La importación no elimina establecimientos omitidos por una carga parcial y no modifica el estado operativo de la bodega.
-- Asociación N:M con tipo, prioridad, responsable y vigencia. El cierre es temporal y conserva historia.
-- El acceso a la bodega se comprueba con `WarehouseService`. Hasta modelar el propietario legal del stock, se bloquea asociar una misma bodega a RUC diferentes.
-- Endpoints:
-  - `GET /api/v1/taxpayers?q=&page=&size=`
-  - `POST /api/v1/taxpayers/import`
-  - `GET /api/v1/taxpayers/{id}`
-  - `GET /api/v1/taxpayers/{id}/establishments`
-  - `GET /api/v1/taxpayers/{id}/snapshots?page=&size=`
-  - `GET|POST /api/v1/warehouses/{warehouseId}/establishment-assignments`
-  - `POST /api/v1/establishment-assignments/{assignmentId}/close`
-- Se incorporó V23 con permisos `taxpayer:read` y `taxpayer:manage`: SUPER_ADMIN administra; AUDITOR consulta; los perfiles operativos de almacén y ventas no heredan acceso fiscal por sus permisos de inventario. La cadena HTTP y `@PreAuthorize` aplican ambos controles.
-- La interfaz de Datos tributarios está integrada en Almacenes y contactos: consulta paginada, búsqueda, detalle de establecimientos/snapshots e importación manual con varias sedes. Solo aparece con `taxpayer:read` y solo permite importar con `taxpayer:manage`.
+- Perfil de contribuyente y establecimientos con códigos y estados recibidos.
+- Importación manual trazable con source reference, actor, fecha, hash y snapshot; la importación queda MANUAL_REVIEW.
+- Relación temporal entre almacenes y establecimientos, con restricciones y scopes de acceso.
+- UI de registro tributario, detalle de establecimientos/snapshots e importación manual.
+- Datos de clientes/proveedores y transición del tipo de contraparte.
+- Unidades y conversiones en catálogo.
+- Código y tratamiento fiscal por producto.
+- Tabla de tarifas con vigencia, CRUD inicial y UI de administración.
+- Servicio de cálculo tributario que resuelve tarifa efectiva a partir del código del producto y fecha enviada por el servicio de venta.
 
-## Contrato de importación
+## Endpoints principales
 
-El request debe incluir RUC, razón social, estado recibido, referencia de fuente y al menos un establecimiento. Cada establecimiento requiere código de tres dígitos y estado recibido. El backend conserva valores originales relevantes y calcula la huella del snapshot.
+- GET/POST /api/v1/taxpayers y rutas de detalle, establecimientos y snapshots.
+- GET/POST /api/v1/warehouses/{warehouseId}/establishment-assignments; cierre de asignación por ruta específica.
+- GET /api/v1/tax/rates, POST /api/v1/tax/rates, PUT /api/v1/tax/rates/{id}.
+- PUT /api/v1/tax/products/{id}.
 
-No se incluye cliente HTTP de terceros. La referencia de fuente es metadato de procedencia declarado por el operador; **no prueba por sí misma que la fuente sea oficial**. El estado permanece en revisión manual y no debe utilizarse para autorizar facturación.
+## Límites confirmados
 
-## Límites y bloqueos deliberados
+- La importación no consulta automáticamente al SRI ni demuestra que la fuente declarada sea oficial.
+- No se implementa todavía emisión/firma/autorización de comprobantes SRI ni RIDE/notas de crédito.
+- No hay ownership legal del inventario suficiente para permitir varias razones sociales en una misma bodega.
+- La entidad Sale no persiste un snapshot tributario histórico completo por venta/línea, aunque V27 añadió columnas para ello. El cálculo no debe presentarse como comprobante fiscal.
+- GET /api/v1/tax/rates?date= acepta date pero la implementación actual no filtra las tarifas por esa fecha.
+- **Bloqueo P0:** SecurityConfig declara permitAll para toda la familia /api/v1/tax/** y TaxController no añade @PreAuthorize. La UI no protege esta API; no exponerla hasta restringirla y probar 401/403.
 
-- No se conoce ni se ha autorizado un proveedor/API estable del SRI; no se implementó scraping ni se asumió un JSON público.
-- No se modela todavía propietario legal del inventario. Por seguridad, las bodegas no pueden vincularse activamente a perfiles de RUC distintos.
-- No se implementó aún la interfaz SRI ni la visualización de asociaciones en la ficha de almacén.
-- Se añadió transición auditada de roles de un BusinessPartner (`CUSTOMER`, `SUPPLIER`, `BOTH`) sin duplicar identidad, protegida por `partners:manage` y disponible desde el catálogo de contactos. Siguen pendientes scopes fiscales por contribuyente/establecimiento, tipo de identificación, formularios contextuales en Compras/Ventas y búsqueda remota en esos formularios.
-- La configuración de unidades sigue en el catálogo existente. No se cambió la interpretación de documentos históricos ni se habilitaron unidades alternativas por línea sin un contrato de cantidad base, precio, redondeo y factor snapshot.
-- Los endpoints del registro tributario usan `taxpayer:read`/`taxpayer:manage`. Los endpoints de asignación fiscal están bajo rutas de almacén y exigen además el permiso de inventario correspondiente, además del permiso fiscal de método. Los scopes por contribuyente/establecimiento aún no están modelados.
+## Pendientes de cierre
 
-## Validación requerida
+1. Corregir autorización y auditoría de todas las operaciones fiscales.
+2. Filtrar tarifas por fecha y vigencia con pruebas.
+3. Persistir snapshots tributarios inmutables por venta y línea y definir tratamiento para ajustes/devoluciones.
+4. Completar ownership legal/contribuyente/establecimiento y sus scopes en todos los comandos.
+5. Aprobar proveedor/API/fuente fiscal externa y validar en sandbox real, sin scraping ni datos inventados.
+6. Completar identificación del cliente y formularios contextuales donde corresponda.
+7. Añadir pruebas HTTP positivas/negativas, scopes y pruebas de cambio de tarifa sin alterar historia.
 
-El workflow backend CI se debe asociar al SHA final. Debe comprobar Maven/Java 21, Flyway V1–V23 sobre PostgreSQL, Hibernate validation, pruebas HTTP/security (incluido aislamiento de permisos fiscales) y smoke de arranque desde volumen vacío. El workflow frontend debe validar el módulo de registro tributario. La prueba actual no sustituye la aceptación de los flujos UI y la integración externa.
+**Criterio:** el registro manual y las tarifas iniciales son capacidades parciales; no equivalen a validación oficial ni a facturación electrónica.
