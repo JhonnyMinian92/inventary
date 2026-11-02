@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_PRODUCT_UNIT_ID, isStockedProduct, productId, productName, productQuantity, productWritePayload } from './product.js';
+import { DEFAULT_PRODUCT_UNIT_ID, filterProductsByPageStock, isStockedProduct, productId, productName, productQuantity, productWritePayload } from './product.js';
 
 test('productId accepts current API identifier aliases without losing zero-like IDs', () => {
   assert.equal(productId({ id: 12, productId: 13 }), 12);
