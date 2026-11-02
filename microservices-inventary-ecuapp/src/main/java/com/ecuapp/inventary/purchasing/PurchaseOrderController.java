@@ -27,6 +27,8 @@ public class PurchaseOrderController {
  public PurchaseDtos.OrderView create(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody PurchaseDtos.CreateOrderRequest r,Authentication auth){return service.create(key,r,auth.getName());}
  @PutMapping("/api/v1/purchase-orders/{id}") @PreAuthorize("hasAuthority('purchasing:manage')")
  public PurchaseDtos.OrderView update(@PathVariable UUID id,@Valid @RequestBody PurchaseDtos.CreateOrderRequest r,Authentication auth){return service.update(id,r,auth.getName());}
+ @DeleteMapping("/api/v1/purchase-orders/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasAuthority('purchasing:manage')")
+ public void delete(@PathVariable UUID id,Authentication auth){service.deleteDraft(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/submit") @PreAuthorize("hasAuthority('purchasing:manage')")
  public PurchaseDtos.OrderView submit(@PathVariable UUID id,Authentication auth){return service.submit(id,auth.getName());}
  @PostMapping("/api/v1/purchase-orders/{id}/approve") @PreAuthorize("hasAuthority('purchasing:approve')")

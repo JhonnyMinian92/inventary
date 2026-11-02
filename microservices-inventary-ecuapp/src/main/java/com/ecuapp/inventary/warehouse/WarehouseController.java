@@ -14,7 +14,7 @@ import java.util.UUID;
 public class WarehouseController {
  private final WarehouseService service;
  public WarehouseController(WarehouseService service){this.service=service;}
- @GetMapping public Page<WarehouseDtos.View> list(@RequestParam(required=false) Boolean active,@PageableDefault(size=20,sort="name") Pageable p,Authentication auth){return service.list(active,p,auth.getName());}
+ @GetMapping public Page<WarehouseDtos.View> list(@RequestParam(required=false) String q,@RequestParam(required=false) Boolean active,@PageableDefault(size=20,sort="name") Pageable p,Authentication auth){return service.list(q,active,p,auth.getName());}
  @GetMapping("/{id}") public WarehouseDtos.View get(@PathVariable UUID id,Authentication auth){return service.get(id,auth.getName());}
  @PostMapping @ResponseStatus(HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public WarehouseDtos.View create(@Valid @RequestBody WarehouseDtos.WriteRequest r,Authentication auth){return service.create(r,auth.getName());}

@@ -83,8 +83,9 @@ function WorkspaceContentView({ model }) {
     case 'purchases':
       return <PurchasingPage rows={data.purchases} loading={state.loading} pagination={data.pageInfo.purchases}
         query={state.listQuery} onSearch={actions.changeListQuery} page={state.listPage} onPageChange={actions.changeListPage} onView={order => actions.openDetail('purchase', order)}
+        statusFilter={state.purchaseStatus} onStatusChange={actions.changePurchaseStatus}
         onSubmit={commands.submitPurchaseOrder} onApprove={commands.approvePurchaseOrder}
-        onCancel={commands.cancelPurchase} onReceive={commands.openReceive} onEdit={actions.editPurchase} onChanged={data.loadData} can={auth.can} />;
+        onCancel={commands.cancelPurchase} onReceive={commands.openReceive} onEdit={actions.editPurchase} onDelete={commands.deletePurchase} onChanged={data.loadData} can={auth.can} />;
     case 'sales':
       return <SalesPage rows={data.sales} loading={state.loading} pagination={data.pageInfo.sales}
         page={state.listPage} onPageChange={actions.changeListPage} onView={sale => actions.openDetail('sale', sale)}

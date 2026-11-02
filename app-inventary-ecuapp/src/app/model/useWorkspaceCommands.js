@@ -129,6 +129,15 @@ export default function useWorkspaceCommands(context) {
     if (confirmed) await runAction(() => api.cancelPurchaseOrder(pickId(order)), 'Orden cancelada.');
   }
 
+  async function deletePurchase(order) {
+    const confirmed = await confirmDialog({
+      title: 'Eliminar borrador',
+      message: `${order.orderNumber || pickId(order)} se eliminará físicamente y esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar borrador', cancelLabel: 'Cancelar', tone: 'danger'
+    });
+    if (confirmed) await runAction(() => api.deletePurchaseOrder(pickId(order)), 'Borrador eliminado físicamente.');
+  }
+
   async function openReceive(order) {
     setActionLoading(true);
     try {
@@ -209,7 +218,7 @@ export default function useWorkspaceCommands(context) {
 
   return {
     runAction, submitProduct, submitCategory, toggleStatus, deleteItem,
-    submitPurchase, cancelPurchase, openReceive, submitReceipt, submitSale,
+    submitPurchase, cancelPurchase, deletePurchase, openReceive, submitReceipt, submitSale,
     requestSaleCancellation, submitSaleCancellation, approveSaleCancellation, loadInventoryFilter
   };
 }

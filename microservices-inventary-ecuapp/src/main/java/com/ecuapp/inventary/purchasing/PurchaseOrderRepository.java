@@ -28,7 +28,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
   where (:status is null or p.status=:status)
   and (:supplierId is null or p.supplier.id=:supplierId)
   and (:warehouseId is null or p.warehouse.id=:warehouseId)
-  and lower(concat(p.orderNumber, ' ', p.supplier.name)) like concat('%', :q, '%')
+  and lower(concat(concat(concat(p.orderNumber, ' '), p.supplier.name), coalesce(p.notes, ''))) like concat('%', :q, '%')
   and p.orderedAt>=:fromTime
   and p.orderedAt<:toTime
   """)
@@ -40,7 +40,7 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder,UUI
   select p from PurchaseOrder p where (:status is null or p.status=:status)
    and (:supplierId is null or p.supplier.id=:supplierId)
    and (:warehouseId is null or p.warehouse.id=:warehouseId)
-   and (:q is null or lower(concat(p.orderNumber, ' ', p.supplier.name)) like concat('%', :q, '%'))
+   and (:q is null or lower(concat(concat(concat(p.orderNumber, ' '), p.supplier.name), coalesce(p.notes, ''))) like concat('%', :q, '%'))
    and p.warehouse.id in :warehouseIds and p.orderedAt>=:fromTime and p.orderedAt<:toTime
   """)
  Page<PurchaseOrder> searchScoped(@Param("status") PurchaseOrderStatus status,@Param("supplierId") UUID supplierId,

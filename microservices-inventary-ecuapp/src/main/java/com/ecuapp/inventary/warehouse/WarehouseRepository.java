@@ -15,8 +15,21 @@ public interface WarehouseRepository extends com.ecuapp.inventary.common.Flushab
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select w from Warehouse w where w.id=:id")
  Optional<Warehouse> findForUpdate(@Param("id") UUID id);
- @Query("select w from Warehouse w where (:active is null or w.active=:active)")
- Page<Warehouse> search(@Param("active") Boolean active,Pageable pageable);
-    @Query("select w from Warehouse w where (:active is null or w.active=:active) and w.id in :warehouseIds")
-    Page<Warehouse> searchScoped(@Param("active") Boolean active,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
+ @Query("""
+     select w from Warehouse w
+     where (:active is null or w.active=:active)
+       and (:q is null or lower(w.code) like lower(concat('%', cast(:q as string), '%'))
+                    or lower(w.name) like lower(concat('%', cast(:q as string), '%'))
+                    or lower(coalesce(w.address,'')) like lower(concat('%', cast(:q as string), '%')))
+     """)
+ Page<Warehouse> search(@Param("q") String q,@Param("active") Boolean active,Pageable pageable);
+    @Query("""
+        select w from Warehouse w
+        where (:active is null or w.active=:active)
+          and w.id in :warehouseIds
+          and (:q is null or lower(w.code) like lower(concat('%', cast(:q as string), '%'))
+                         or lower(w.name) like lower(concat('%', cast(:q as string), '%'))
+                         or lower(coalesce(w.address,'')) like lower(concat('%', cast(:q as string), '%')))
+        """)
+    Page<Warehouse> searchScoped(@Param("q") String q,@Param("active") Boolean active,@Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }

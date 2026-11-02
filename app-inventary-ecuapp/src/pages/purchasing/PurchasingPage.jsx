@@ -9,7 +9,7 @@ import '../../features/operations/operation-workspaces.css';
 import '../../features/purchasing/purchasing.css';
 
 export default function PurchasingPage({
-  rows, loading, pagination, page, query, onSearch, onPageChange, onView, onEdit, onSubmit, onApprove, onCancel, onReceive, onChanged, can
+  rows, loading, pagination, page, query, statusFilter, onStatusChange, onSearch, onPageChange, onView, onEdit, onDelete, onSubmit, onApprove, onCancel, onReceive, onChanged, can
 }) {
   const [tab, setTab] = useState('orders');
   return <section className={'panel' + (loading ? ' is-refreshing' : '')}>
@@ -20,7 +20,7 @@ export default function PurchasingPage({
     </nav>
     <div role="tabpanel">
       {tab === 'orders' && <PurchaseTable rows={rows} loading={loading} pagination={pagination} page={page} query={query} onSearch={onSearch}
-        onPageChange={onPageChange} onView={onView} onEdit={onEdit} onSubmit={onSubmit} onApprove={onApprove}
+        onPageChange={onPageChange} onView={onView} onEdit={onEdit} onDelete={onDelete} statusFilter={statusFilter} onStatusChange={onStatusChange} onSubmit={onSubmit} onApprove={onApprove}
         onCancel={onCancel} onReceive={onReceive} can={can} />}
       {tab === 'receipts' && <GoodsReceipts />}
       {tab === 'returns' && <PurchaseReturns onChanged={onChanged} />}

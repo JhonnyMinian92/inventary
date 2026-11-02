@@ -1,12 +1,18 @@
 
 import { request } from '../http/request.js';
-const query = params => new URLSearchParams(params).size ? '?' + new URLSearchParams(params) : '';
+const query = params => {
+  const clean = Object.fromEntries(Object.entries(params || {}).filter(([, value]) =>
+    value !== undefined && value !== null && String(value).trim() !== ''));
+  const encoded = new URLSearchParams(clean);
+  return encoded.size ? '?' + encoded.toString() : '';
+};
 export const purchasingApi = {
   purchaseOrders: (params = {}) => request('/purchase-orders' + query(params)),
   purchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id)),
   cancelPurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id) + '/cancel', { method: 'POST' }),
   createPurchaseOrder: data => request('/purchase-orders', { method: 'POST', body: data, idempotent: true }),
   updatePurchaseOrder: (id, data) => request('/purchase-orders/' + encodeURIComponent(id), { method: 'PUT', body: data }),
+  deletePurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id), { method: 'DELETE' }),
   submitPurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id) + '/submit', { method: 'POST' }),
   approvePurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id) + '/approve', { method: 'POST' }),
   createReceipt: (purchaseOrderId, data) => request('/purchase-orders/' + encodeURIComponent(purchaseOrderId) + '/receipts', { method: 'POST', body: data, idempotent: true }),

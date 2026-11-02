@@ -32,10 +32,11 @@ public class WarehouseService {
   PurchaseOrderRepository purchaseOrders,StockTransferRepository transfers,InventoryCountRepository counts,WarehouseScopeService scopes){
   this.repo=repo;this.locations=locations;this.balances=balances;this.movements=movements;this.audit=audit;this.purchaseOrders=purchaseOrders;this.transfers=transfers;this.counts=counts;this.scopes=scopes;
  }
- @Transactional(readOnly=true) public Page<WarehouseDtos.View> list(Boolean active,Pageable p,String actor){
+ @Transactional(readOnly=true) public Page<WarehouseDtos.View> list(String q,Boolean active,Pageable p,String actor){
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,SORT,Sort.by("name"));
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
-  return (allowed==null?repo.search(active,pageable):repo.searchScoped(active,allowed,pageable)).map(WarehouseDtos.View::from);
+  String normalized=q==null||q.trim().isEmpty()?null:q.trim();
+  return (allowed==null?repo.search(normalized,active,pageable):repo.searchScoped(normalized,active,allowed,pageable)).map(WarehouseDtos.View::from);
  }
  @Transactional(readOnly=true) public WarehouseDtos.View get(UUID id,String actor){scopes.requireWarehouseAccess(actor,id);return WarehouseDtos.View.from(require(id));}
  @Transactional public WarehouseDtos.View create(WarehouseDtos.WriteRequest r,String actor){

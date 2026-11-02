@@ -30,6 +30,11 @@ export default function useWorkspaceController() {
   const [section, setSection] = useState(() => routeState().section);
   const [listPage, setListPage] = useState(() => initialPage(routeState().section));
   const [listQuery, setListQuery] = useState(() => readSearchValue(window.location.search, 'purchases.q', ''));
+  const [purchaseStatus, setPurchaseStatus] = useState(() => {
+    const allowed = new Set(['DRAFT', 'SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED']);
+    const value = String(readSearchValue(window.location.search, 'purchases.status', '')).toUpperCase();
+    return allowed.has(value) ? value : '';
+  });
   const [routeEntityId, setRouteEntityId] = useState(() => routeState().entityId);
   const [detailRoute, setDetailRoute] = useState(() => routeState().detail);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -50,7 +55,7 @@ export default function useWorkspaceController() {
   useMessageToast(error, setError, 'error');
   useMessageToast(notice, setNotice, 'success');
 
-  const workspace = useWorkspaceData({ token, section, modal, listPage, listQuery, expireSession, onError: setError });
+  const workspace = useWorkspaceData({ token, section, modal, listPage, listQuery, purchaseStatus, expireSession, onError: setError });
 
   useEffect(() => { if (authError) setError(authError); }, [authError]);
   useEffect(() => {
@@ -75,6 +80,12 @@ export default function useWorkspaceController() {
       productId: readSearchValue(window.location.search, 'inventory.productId', '')
     });
     if (window.location.pathname !== route.path) window.history.replaceState(window.history.state, '', route.path);
+  }, []);
+  const changePurchaseStatus = useCallback(value => {
+    const next = String(value || '').toUpperCase();
+    setPurchaseStatus(next);
+    setListPage(0);
+    updateBrowserQuery({ 'purchases.status': next || null, 'purchases.page': null }, { replace: false });
   }, []);
 
   useEffect(() => {
@@ -288,14 +299,14 @@ export default function useWorkspaceController() {
     auth: { token, user, apiStatus, can, expireSession, login, authError, handleLogout },
     nav: { groups: NAV_GROUPS, sectionTitles: SECTION_TITLES },
     state: {
-      section, listPage, listQuery, routeEntityId, detailRoute, selectedOrder, purchaseDetail, saleDetail,
+      section, listPage, listQuery, purchaseStatus, routeEntityId, detailRoute, selectedOrder, purchaseDetail, saleDetail,
       saleToCancel, saleCancelReason, actionLoading, error, notice, modal, editing,
       inventoryFilter, loading, refreshing, isWorkflow: WORKFLOW_MODALS.has(modal)
     },
     data: workspace,
     metrics: { stockTotal, inventoryValueLabel, dashboardData },
     actions: {
-      navigateSection, changeListPage, changeListQuery, startWorkflow, closeWorkflow, openDetail, closeDetail, editPurchase,
+      navigateSection, changeListPage, changeListQuery, changePurchaseStatus, startWorkflow, closeWorkflow, openDetail, closeDetail, editPurchase,
       openProduct, openCategory, handleLogout, closeSaleCancellation, loadInventoryFilter,
       setError, setSaleCancelReason, setInventoryFilter
     },

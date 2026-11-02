@@ -143,6 +143,15 @@ public class PurchaseOrderService {
    audit.record(actor,"PURCHASE_ORDER_UPDATED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber(),"lineCount",newLines.size()));
    return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow());
   }
+  @Transactional public void deleteDraft(UUID id,String actor){
+   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
+   if(order.getStatus()!=PurchaseOrderStatus.DRAFT&&order.getStatus()!=PurchaseOrderStatus.CANCELLED)
+    throw new ConflictException("Solo se puede eliminar físicamente un borrador o una orden cancelada sin recepciones.");
+   if(order.getLines().stream().anyMatch(line->line.getReceivedQuantity().signum()!=0))
+    throw new ConflictException("La orden tiene recepciones registradas y no puede eliminarse físicamente.");
+   audit.record(actor,"PURCHASE_ORDER_DELETED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber()));
+   orders.delete(order);
+  }
  @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){
   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
    if(order.submit(actor)){

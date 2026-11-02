@@ -99,10 +99,10 @@ export default function OperationsCatalogs({ onChanged, can = () => false }) {
   useMessageToast(error, setError);
   const [notice, setNotice] = useState('');
   useMessageToast(notice, setNotice, 'success');
+  const [roleModal, setRoleModal] = useState(false);
   const dialogRef = useAccessibleDialog(modal, () => setModal(false));
   const roleDialogRef = useAccessibleDialog(roleModal, () => setRoleModal(false));
   const [optionSources, setOptionSources] = useState({ dimensions: [] });
-  const [roleModal, setRoleModal] = useState(false);
   const [roleSelection, setRoleSelection] = useState([]);
   const canManagePartnerRoles = Boolean(can('partners:manage'));
 
@@ -128,7 +128,7 @@ export default function OperationsCatalogs({ onChanged, can = () => false }) {
       const config = configs[kind];
       const params = kind === 'units' ? undefined : {
         page, size: 20,
-        ...(kind === 'suppliers' || kind === 'customers') && debouncedSearch ? { q: debouncedSearch } : {}
+        ...(debouncedSearch ? { q: debouncedSearch } : {})
       };
       const payload = kind === 'units' ? await api.units() : await config.list(params);
       const rows = listFrom(payload);

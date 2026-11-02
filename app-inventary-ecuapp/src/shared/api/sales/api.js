@@ -13,6 +13,7 @@ export const salesApi = {
   salePricing: data => request('/sales/pricing', { method: 'POST', body: data })
   ,
   refunds: (params = {}) => request('/refunds' + query(params)),
+  createRefund: data => request('/refunds', { method: 'POST', body: data, idempotent: true }),
   refundAction: (id, action, providerReference = '') => request('/refunds/' + encodeURIComponent(id) + '/' + action +
     (providerReference && action === 'complete' ? '?providerReference=' + encodeURIComponent(providerReference) :
       providerReference && action === 'processing' ? '?providerReference=' + encodeURIComponent(providerReference) : ''),
