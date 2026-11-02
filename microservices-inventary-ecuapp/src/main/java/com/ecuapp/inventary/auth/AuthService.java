@@ -1,5 +1,5 @@
 package com.ecuapp.inventary.auth;
-import com.ecuapp.inventary.audit.AuditService;
+import com.ecuapp.inventary.audit.AuditService;\nimport io.micrometer.core.instrument.MeterRegistry;
 import com.ecuapp.inventary.common.BusinessRuleException;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolation;
@@ -24,11 +24,11 @@ import java.util.UUID;
 public class AuthService {
  private final AppUserRepository users; private final AppRoleRepository roles; private final PasswordEncoder passwordEncoder; private final JwtEncoder jwtEncoder;
  private final PasswordPolicy passwordPolicy; private final AuditService audit; private final long ttlMinutes; private final String dummyHash;
- private final LoginEncryptionService encryption; private final LoginAttemptGuard attempts; private final Validator validator;
+ private final LoginEncryptionService encryption; private final LoginAttemptGuard attempts; private final Validator validator; private final MeterRegistry metrics;
  public AuthService(AppUserRepository users,AppRoleRepository roles,PasswordEncoder passwordEncoder,JwtEncoder jwtEncoder,PasswordPolicy passwordPolicy,AuditService audit,
-  LoginEncryptionService encryption,LoginAttemptGuard attempts,Validator validator,@Value("${app.security.token-ttl-minutes:60}") long ttlMinutes){
+  LoginEncryptionService encryption,LoginAttemptGuard attempts,Validator validator,MeterRegistry metrics,@Value("${app.security.token-ttl-minutes:60}") long ttlMinutes){
   this.users=users;this.roles=roles;this.passwordEncoder=passwordEncoder;this.jwtEncoder=jwtEncoder;this.passwordPolicy=passwordPolicy;this.audit=audit;
-  this.encryption=encryption;this.attempts=attempts;this.validator=validator;
+  this.encryption=encryption;this.attempts=attempts;this.validator=validator;this.metrics=metrics;
   this.ttlMinutes=Math.max(5,Math.min(ttlMinutes,120));
   // Keeps the response time similar for unknown users to avoid account enumeration by timing.
   this.dummyHash=passwordEncoder.encode(UUID.randomUUID().toString());
@@ -41,14 +41,14 @@ public class AuthService {
   attempts.checkNotLocked(username);
   AppUser user=users.findByUsername(username).orElse(null);
   boolean passwordMatches=passwordEncoder.matches(credentials.password(),user==null?dummyHash:user.getPasswordHash());
-  if(user==null||!passwordMatches||!user.isActive()||roles.findByCodeAndActiveTrue(user.getRole()).isEmpty()){
+  if(user==null||!passwordMatches||!user.isActive()||roles.findByCodeAndActiveTrue(user.getRole()).isEmpty()){\n   metrics.counter("inventary.auth.authentication","outcome","failed").increment();
    boolean locked=attempts.recordFailure(username);
    // Audit events use their own transaction (this one is read-only). Unknown names are not stored: they are often mistyped passwords.
    audit.recordOutcome(user==null?"anonymous":user.getUsername(),locked?"USER_LOGIN_LOCKED":"USER_LOGIN_FAILED","APP_USER",user==null?null:user.getId(),"DENIED",
     MDC.get("requestId"),Map.of("knownUser",user!=null,"encrypted",request.encrypted()!=null));
    throw new BadCredentialsException("Credenciales inválidas");
   }
-  attempts.recordSuccess(username);
+  attempts.recordSuccess(username);\n  metrics.counter("inventary.auth.authentication","outcome","success").increment();
   Instant now=Instant.now(),expires=now.plus(ttlMinutes,ChronoUnit.MINUTES);
   JwtClaimsSet claims=JwtClaimsSet.builder().issuer("inventary").audience(List.of("inventary-api"))
    .issuedAt(now).expiresAt(expires).subject(user.getUsername()).id(UUID.randomUUID().toString())
