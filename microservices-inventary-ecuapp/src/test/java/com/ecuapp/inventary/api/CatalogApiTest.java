@@ -419,6 +419,8 @@ class CatalogApiTest extends ApiTestSupport {
         long primaries = 0;
         for (JsonNode image : list) if (image.get("primaryImage").asBoolean()) primaries++;
         assertEquals(1, primaries);
+        assertEquals(second.get("imageUrl").asText(), httpGet(admin, "/api/v1/catalog/products/" + product.get("id").asText(), 200).get("imageUrl").asText(),
+            "the primary gallery image must also be the product card image");
         assertEquals(second.get("id").asText(), list.get(0).get("id").asText(), "ordered by sortOrder");
         problem(call(post(base), admin, Map.of("imageUrl", "http://cdn.example.com/c.png", "sortOrder", 0, "primaryImage", false)), 400, "VALIDATION_FAILED");
         problem(call(post(base), admin, Map.of("imageUrl", "https://cdn.example.com/a.png", "sortOrder", 0, "primaryImage", false)), 409, "DATA_INTEGRITY_VIOLATION");
@@ -426,6 +428,8 @@ class CatalogApiTest extends ApiTestSupport {
         httpDelete(admin, base + "/" + second.get("id").asText(), 204);
         httpDelete(admin, base + "/" + second.get("id").asText(), 204);
         assertEquals(1, httpGet(admin, base, 200).size());
+        assertEquals(first.get("imageUrl").asText(), httpGet(admin, "/api/v1/catalog/products/" + product.get("id").asText(), 200).get("imageUrl").asText(),
+            "unpublishing the selected primary promotes the next published image");
         JsonNode publicDetail = httpGet(null, "/api/v1/public/catalog/products/" + product.get("sku").asText(), 200);
         assertEquals(1, publicDetail.get("images").size());
         problem(call(delete(base + "/" + UUID.randomUUID()), admin, null), 404, "RESOURCE_NOT_FOUND");
