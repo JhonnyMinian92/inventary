@@ -4,6 +4,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -44,6 +46,7 @@ public class LoginAttemptGuard {
     }
 
     /** Returns true if this failed attempt activated a lockout. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean recordFailure(String username) {
         metrics.counter("inventary.auth.login", "outcome", "failure").increment();
         if (maxFailures <= 0) return false;
@@ -77,6 +80,7 @@ public class LoginAttemptGuard {
         return false;
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordSuccess(String username) {
         jdbc.update("DELETE FROM auth_login_attempt WHERE subject_hash=?", digest(username));
         metrics.counter("inventary.auth.login", "outcome", "success").increment();
