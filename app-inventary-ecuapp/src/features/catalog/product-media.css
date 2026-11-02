@@ -147,3 +147,5 @@
   .variant-row { align-items:flex-start; }
   .variant-row-meta { flex:1 1 100%; }
 }
+
+.variant-form-actions { display:flex; flex-wrap:wrap; gap:8px; }
