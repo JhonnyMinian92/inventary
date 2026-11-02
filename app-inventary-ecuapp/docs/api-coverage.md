@@ -1,12 +1,12 @@
 # Cobertura de API consumida por el frontend
 
-**Código funcional de referencia:** rama implementacion_propuestas, commit 992b131c2de9cf5ed60c83ec4b826d2797029270. La documentación por pantalla está en [Estado funcional pendiente por pantalla](../../ESTADO_FUNCIONAL_POR_PANTALLA.md).
+**Código funcional de referencia:** rama `implementacion_propuestas` (consulta el HEAD de la rama para el commit vigente). La documentación por pantalla está en [Estado funcional pendiente por pantalla](../../ESTADO_FUNCIONAL_POR_PANTALLA.md). El flujo de acceso está auditado en [Login y sesión](login-session-audit.md).
 
 Esta matriz describe los endpoints que la SPA consume. No es el inventario completo del backend ni una certificación de que cada operación esté autorizada de forma segura. La referencia completa está en [25 — APIs del backend](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md).
 
 | Módulo UI | Rutas REST consumidas | Uso |
 |---|---|---|
-| Sesión | POST /auth/login, POST /auth/login-challenge, GET /auth/me, POST /auth/logout | Inicio, desafío de credenciales, sesión y cierre. |
+| Sesión | POST /auth/login, POST /auth/login-challenge, GET /auth/me, POST /auth/logout, PUT /auth/me/password | Login cifrado, desafío de credenciales, perfil/permisos, cierre e invalidación/cambio de contraseña. El cliente usa fallback volátil si Storage está bloqueado. |
 | Catálogo | /catalog/products, /catalog/categories, /catalog/units, /catalog/unit-dimensions, /catalog/unit-conversions, /catalog/attribute-presets, /catalog/product-kinds, rutas de variantes | Productos, categorías, atributos, tipo de producto, unidades y variantes. |
 | Imágenes | GET/POST/DELETE /catalog/products/{id}/images... | Galería, carga PNG/JPEG y retirada de imágenes. |
 | Contactos | /customers, /suppliers, /partners | Clientes, proveedores y tipo de contraparte. |
@@ -22,6 +22,9 @@ Esta matriz describe los endpoints que la SPA consume. No es el inventario compl
 | Reportes | /reports/inventory-balance, /reports/sales, /reports/purchases, /reports/kardex, /reports/valuation, /reports/low-stock | Balance por periodo, resultados comerciales, trazabilidad y valoración. |
 
 ## Funciones backend sin pantalla equivalente en esta SPA
+
+- Recuperación de contraseña por autoservicio: no existe endpoint ni pantalla de solicitud/verificación/restablecimiento. La pantalla de login informa que debe contactarse al administrador.
+- MFA/passkeys: no implementados.
 
 - Administración completa de usuarios, roles y permisos.
 - Consulta detallada de auditoría y operaciones Outbox.
