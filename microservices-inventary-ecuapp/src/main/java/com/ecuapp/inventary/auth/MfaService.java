@@ -168,7 +168,7 @@ public class MfaService {
     private boolean verify(String secret,String code) {
         if(code==null||!code.matches("[0-9]{6}")) return false;
         long counter=Instant.now().getEpochSecond()/30;
-        for(long offset=-1;offset<=1;offset++) if(totp(secret,counter+offset).equals(code)) return true;
+        for(long offset=-1;offset<=1;offset++) if(MessageDigest.isEqual(totp(secret,counter+offset).getBytes(StandardCharsets.US_ASCII),code.getBytes(StandardCharsets.US_ASCII))) return true;
         return false;
     }
     private String totp(String secret,long counter) {
