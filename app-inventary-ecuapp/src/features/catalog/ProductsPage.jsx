@@ -168,6 +168,7 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
 function ProductsTab({ products: initialProducts, categories, balances, ready, can, onCountChange, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
   const [query, setQuery] = useState(() => readSearchValue(window.location.search, 'products.q', ''));
   const [categoryId, setCategoryId] = useState(() => readSearchValue(window.location.search, 'products.categoryId', ''));
+  const [kindFilter, setKindFilter] = useState(() => ['STOCKED_GOOD', 'NON_STOCKED_GOOD', 'SERVICE'].includes(readSearchValue(window.location.search, 'products.kind', '')) ? readSearchValue(window.location.search, 'products.kind', '') : '');
   const [statusFilter, setStatusFilter] = useState(() => {
     const value = readSearchValue(window.location.search, 'products.status', 'active');
     return PRODUCT_STATUS_FILTERS.has(value) ? value : 'active';
@@ -198,6 +199,8 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       setQuery(nextQuery);
       setDebouncedQuery(nextQuery.trim());
       setCategoryId(readSearchValue(window.location.search, 'products.categoryId', ''));
+      const nextKind = readSearchValue(window.location.search, 'products.kind', '');
+      setKindFilter(['STOCKED_GOOD', 'NON_STOCKED_GOOD', 'SERVICE'].includes(nextKind) ? nextKind : '');
       setStatusFilter(PRODUCT_STATUS_FILTERS.has(nextStatus) ? nextStatus : 'active');
       setStockFilter(nextStock === 'with' || nextStock === 'without' ? nextStock : '');
       setSort(readProductSort());
@@ -212,13 +215,14 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     updateBrowserQuery({
       'products.q': query.trim() || null,
       'products.categoryId': categoryId || null,
+      'products.kind': kindFilter || null,
       'products.status': statusFilter || null,
       'products.stock': stockFilter || null,
       'products.sortKey': sort.key === 'name' ? null : sort.key,
       'products.sortDir': sort.dir === 'asc' ? null : sort.dir,
       'products.page': page || null
     }, { replace: true });
-  }, [query, categoryId, statusFilter, stockFilter, sort, page]);
+  }, [query, categoryId, kindFilter, statusFilter, stockFilter, sort, page]);
 
   useEffect(() => {
     let active = true;
@@ -228,6 +232,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     const params = { page, size: PAGE_SIZE, sort: serverSort + ',' + sort.dir };
     if (debouncedQuery) params.q = debouncedQuery;
     if (categoryId) params.categoryId = categoryId;
+    if (kindFilter) params.kind = kindFilter;
     if (statusFilter === 'active') params.active = true;
     if (statusFilter === 'inactive') params.active = false;
     api.products(params).then(payload => {
@@ -241,7 +246,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       setListError(error?.status === 403 ? 'No tienes permiso para consultar el catálogo.' : (error?.message || 'No se pudieron cargar los productos.'));
     }).finally(() => { if (active) setListLoading(false); });
     return () => { active = false; };
-  }, [page, debouncedQuery, categoryId, statusFilter, sort]);
+  }, [page, debouncedQuery, categoryId, kindFilter, statusFilter, sort]);
   const categoryNames = useMemo(() => new Map(categories.map(category => [String(idOf(category)), category.name])), [categories]);
   const stock = useMemo(() => {
     const totals = new Map();
@@ -296,7 +301,9 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     downloadCsv('inventary-productos-pagina-' + (page + 1) + '-' + isoDate() + '.csv', [
       { key: 'sku', label: 'SKU' }, { key: 'name', label: 'Producto' },
       { key: 'category', label: 'Categoría', csvValue: product => categoryNames.get(String(product.categoryId)) || '' },
+      { key: 'kind', label: 'Tipo', csvValue: product => KIND_LABELS[product.kind] || 'Inventariable' },
       { key: 'salePrice', label: 'Precio de venta' },
+      { key: 'taxCode', label: 'Código fiscal' },
       { key: 'onHand', label: 'Existencia', csvValue: product => stock.get(String(idOf(product)))?.onHand || 0 },
       { key: 'available', label: 'Disponible', csvValue: product => stock.get(String(idOf(product)))?.available || 0 },
       { key: 'active', label: 'Estado', csvValue: product => isInactive(product) ? 'Inactivo' : 'Activo' }
@@ -314,6 +321,12 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       <select value={categoryId} onChange={event => { setCategoryId(event.target.value); setPage(0); }} aria-label="Categoría">
         <option value="">Todas las categorías</option>
         {categories.map(category => <option key={idOf(category)} value={idOf(category)}>{category.name}</option>)}
+      </select>
+      <select value={kindFilter} onChange={event => { setKindFilter(event.target.value); setPage(0); }} aria-label="Tipo de producto">
+        <option value="">Todos los tipos</option>
+        <option value="STOCKED_GOOD">Inventariables</option>
+        <option value="NON_STOCKED_GOOD">No inventariables</option>
+        <option value="SERVICE">Servicios</option>
       </select>
       <select value={stockFilter} onChange={event => { setStockFilter(event.target.value); setPage(0); }} aria-label="Existencias">
         <option value="">Todas las existencias</option><option value="with">Con existencias en esta página</option><option value="without">Sin existencias en esta página</option>
