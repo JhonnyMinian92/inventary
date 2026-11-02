@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
 /** Distributed account lockout backed by PostgreSQL; all replicas share one atomic UPSERT state. */
 @Component
@@ -71,6 +72,9 @@ public class LoginAttemptGuard {
               updated_at = CURRENT_TIMESTAMP
             RETURNING locked_until IS NOT NULL AND locked_until > CURRENT_TIMESTAMP
             """;
+        if (ThreadLocalRandom.current().nextInt(512) == 0) {
+            jdbc.update("DELETE FROM auth_login_attempt WHERE updated_at < CURRENT_TIMESTAMP - INTERVAL '2 days'");
+        }
         Boolean locked = jdbc.queryForObject(sql, Boolean.class, digest(username),
                 window.toSeconds(), window.toSeconds(), window.toSeconds(), maxFailures, window.toSeconds());
         if (Boolean.TRUE.equals(locked)) {
