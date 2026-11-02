@@ -9,7 +9,7 @@ CREATE TABLE auth_login_attempt (
 CREATE INDEX ix_auth_login_attempt_updated ON auth_login_attempt(updated_at);
 ALTER TABLE app_user ADD COLUMN email VARCHAR(254);
 ALTER TABLE app_user ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE app_user ADD CONSTRAINT ck_app_user_email_format CHECK (email IS NULL OR email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$');
+ALTER TABLE app_user ADD CONSTRAINT ck_app_user_email_format CHECK (email IS NULL OR email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}$');
 CREATE UNIQUE INDEX uk_app_user_email_ci ON app_user(lower(email)) WHERE email IS NOT NULL;
 CREATE TABLE auth_password_reset (
     id UUID PRIMARY KEY,
@@ -20,13 +20,6 @@ CREATE TABLE auth_password_reset (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX ix_auth_password_reset_user ON auth_password_reset(user_id, expires_at DESC);
-CREATE TABLE auth_mfa (
-    user_id UUID PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
-    secret_ciphertext TEXT NOT NULL,
-    enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    enabled_at TIMESTAMPTZ
-);
 CREATE TABLE auth_security_event (
     id UUID PRIMARY KEY,
     event_type VARCHAR(40) NOT NULL,
