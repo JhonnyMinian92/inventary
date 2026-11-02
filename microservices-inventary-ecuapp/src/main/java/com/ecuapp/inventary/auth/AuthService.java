@@ -54,10 +54,6 @@ public class AuthService {
   attempts.recordSuccess(username);
   metrics.counter("inventary.auth.authentication","outcome","success").increment();
   return issueToken(user,request.encrypted()!=null);
-  JwtClaimsSet claims=JwtClaimsSet.builder().issuer("inventary").audience(List.of("inventary-api"))
-   .issuedAt(now).expiresAt(expires).subject(user.getUsername()).id(UUID.randomUUID().toString())
-   .claim("uid",user.getId().toString()).claim("ver",user.getTokenVersion()).build();
-
  }
  @Transactional
  public AuthDtos.TokenResponse completeMfaLogin(String ticket,String code){
