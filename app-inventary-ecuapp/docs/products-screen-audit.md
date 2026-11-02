@@ -12,7 +12,7 @@
 - El estado de filtros, orden y página queda reflejado en la URL y se restaura con Atrás/Adelante.
 - El orden por categoría ahora se ejecuta en el servidor con una ruta de ordenamiento permitida (`category.name`), en vez de ordenar solo la página visible.
 - El orden por existencia y el filtro por existencia permanecen explícitamente limitados a la página cargada, porque el endpoint no implementa todavía orden/filtro global por stock.
-- El CSV exporta todos los resultados que coinciden con texto, categoría, tipo y estado, recorriendo páginas del servidor; incorpora saldos agregados si el usuario tiene permiso de lectura de inventario. El filtro/orden por existencia siguen siendo de alcance página y no se aplican al conjunto exportado.
+- El CSV exporta todos los resultados que coinciden con texto, categoría, tipo y estado, recorriendo correctamente el metadato de paginación anidado del backend; incorpora saldos agregados si el usuario tiene permiso de lectura de inventario. El filtro/orden por existencia siguen siendo de alcance página y no se aplican al conjunto exportado.
 - El contador de Productos usa el total de resultados del servidor. El listado de categorías recibe `productCount` con el total de productos activos de cada categoría.
 
 ### Formulario y reglas del producto
@@ -34,7 +34,7 @@
 ### Detalle e imágenes
 - El listado muestra la miniatura de la imagen principal. El detalle muestra clasificación, datos fiscales, atributos, galería de imágenes, variantes, saldos por almacén y últimos movimientos cuando el permiso lo permite.
 - Se respeta la regla de no subir nuevas imágenes a productos inactivos.
-- La imagen principal de la galería se sincroniza con `product.imageUrl`; al retirarla, se promueve otra imagen publicada o se limpia la miniatura. Las actualizaciones ordinarias de la ficha conservan esa imagen.
+- La galería permite elegir imagen principal, editar texto alternativo, reordenar imágenes y retirarlas. La imagen principal se sincroniza con `product.imageUrl`; al retirarla, se promueve otra imagen publicada o se limpia la miniatura. Las actualizaciones ordinarias de la ficha conservan esa imagen.
 - La carga continúa limitada a PNG/JPEG y 5 MB; la validación de contenido real y tamaño también ocurre en backend.
 
 ### Backend
@@ -61,7 +61,7 @@
 
 ## Pruebas agregadas
 
-- Frontend: `productWritePayload` conserva los campos fiscales, la unidad predeterminada, atributos y configuración de suscripción; los productos inventariables no envían precio manual.
+- Frontend: `productWritePayload` conserva los campos fiscales, la unidad predeterminada, atributos y configuración de suscripción; los productos inventariables no envían precio manual. `listAllPages` recorre el `page.totalPages` anidado del contrato real y aplica el límite defensivo de exportación.
 - Backend `CatalogApiTest`: conteo activo por categoría, ordenamiento por `category.name`, persistencia de `taxCode`/`taxTreatment`, además de las pruebas existentes de SKU, costo, desactivación, variantes, imágenes y atributos.
 
 ## Limitaciones conocidas / trabajo pendiente
