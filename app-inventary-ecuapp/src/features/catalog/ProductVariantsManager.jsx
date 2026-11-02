@@ -27,7 +27,7 @@ function optionInput(definition, value, onChange) {
   </label>;
 }
 
-export default function ProductVariantsManager({ productId, definitions = [], disabled = false }) {
+export default function ProductVariantsManager({ productId, definitions = [], disabled = false, productActive = true }) {
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -143,6 +143,7 @@ export default function ProductVariantsManager({ productId, definitions = [], di
       <button type="button" className="icon-button" aria-label="Actualizar variantes" title="Actualizar" disabled={loading || busy} onClick={() => void load()}><RefreshCw size={15}/></button>
     </div>
     {error && <p className="alert error" role="alert">{error}</p>}
+    {!productActive && <p className="form-hint">El producto está inactivo. Puedes consultar o modificar variantes existentes, pero no crear nuevas hasta reactivarlo.</p>}
     {usableDefinitions.length === 0
       ? <p className="form-hint">Esta categoría no tiene propiedades simples para formar variantes. Agrega campos como talla, color o capacidad en la configuración de la categoría.</p>
       : <form className="variant-create-form" onSubmit={create}>
@@ -151,7 +152,7 @@ export default function ProductVariantsManager({ productId, definitions = [], di
           <label className="field"><span>Código de barras</span><input maxLength="128" value={barcode} onChange={event => setBarcode(event.target.value)} placeholder="EAN / código interno"/></label>
           {usableDefinitions.map(definition => optionInput(definition, options[definition.key] ?? '', changeOption))}
           <label className="field"><span>Precio propio (opcional)</span><input type="number" min="0" step="0.01" value={salePrice} onChange={event => setSalePrice(event.target.value)} placeholder="Usar precio del producto"/></label>
-          <div className="field variant-create-action"><span>&nbsp;</span><div className="variant-form-actions"><button type="submit" className="button secondary" disabled={disabled || busy || loading}>{editingVariantId ? <Pencil size={15}/> : <Plus size={15}/>} {editingVariantId ? "Guardar cambios" : "Crear variante"}</button>{editingVariantId && <button type="button" className="button ghost" onClick={cancelEdit} disabled={busy}><X size={15}/>Cancelar</button>}</div></div>
+          <div className="field variant-create-action"><span>&nbsp;</span><div className="variant-form-actions"><button type="submit" className="button secondary" disabled={disabled || busy || loading || (!productActive && !editingVariantId)}>{editingVariantId ? <Pencil size={15}/> : <Plus size={15}/>} {editingVariantId ? "Guardar cambios" : "Crear variante"}</button>{editingVariantId && <button type="button" className="button ghost" onClick={cancelEdit} disabled={busy}><X size={15}/>Cancelar</button>}</div></div>
         </div>
       </form>}
     {loading ? <p className="form-hint">Cargando variantes…</p> : variants.length ? <div className="variant-list">
