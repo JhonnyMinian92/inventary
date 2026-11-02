@@ -138,6 +138,16 @@ class CatalogApiTest extends ApiTestSupport {
         String id = product.get("id").asText();
         assertEquals(sku.toUpperCase(), product.get("sku").asText());
         assertAmount("3.10", product.get("costPrice"));
+        JsonNode categoryPage = httpGet(admin, "/api/v1/catalog/categories?active=true&size=100", 200);
+        boolean categoryCountFound = false;
+        for (JsonNode categoryView : categoryPage.get("content")) {
+            if (categoryId.equals(categoryView.get("id").asText())) {
+                assertEquals(1, categoryView.get("productCount").asInt());
+                categoryCountFound = true;
+                break;
+            }
+        }
+        assertTrue(categoryCountFound, "category list must include the product count for this category");
         problem(call(post("/api/v1/catalog/products"), admin, productBody(categoryId, sku.toUpperCase())), 409, "CONFLICT");
 
         JsonNode sellerView = httpGet(token("VENDEDOR"), "/api/v1/catalog/products/" + id, 200);
