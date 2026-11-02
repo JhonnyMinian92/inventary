@@ -21,4 +21,4 @@ La búsqueda, categoría, tipo y estado se resuelven en el endpoint paginado del
 
 ## Evidencia
 
-La corrección está en `implementacion_propuestas`, commit `b544f7cb359aadefc951aa33be032ffb6cb70e52`. El workflow Frontend Build de ese commit se lanzó y estaba en ejecución al redactar esta auditoría: https://github.com/JhonnyMinian92/inventary/actions/runs/41449330376. No se declara aprobado hasta que finalice.
+La corrección está en `implementacion_propuestas`, commit `b544f7cb359aadefc951aa33be032ffb6cb70e52`. El workflow **Frontend Build** del commit terminó en `success`: https://github.com/JhonnyMinian92/inventary/actions/runs/41449330376. La ejecución confirma build y pruebas configuradas en CI; no sustituye E2E autenticado ni validación manual de accesibilidad.
