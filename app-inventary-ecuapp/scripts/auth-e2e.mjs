@@ -47,7 +47,7 @@ async function evaluate(expression) {
 async function waitFor(expression, description, timeout = 8000) {
   const end = Date.now() + timeout;
   while (Date.now() < end) {
-    if (await evaluate(expression)) return;
+    if (await evaluate(`Boolean(${expression})`)) return;
     await delay(100);
   }
   throw new Error(`Timed out waiting for ${description}`);
