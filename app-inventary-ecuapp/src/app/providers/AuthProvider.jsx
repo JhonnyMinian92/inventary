@@ -27,6 +27,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async ({ username, password, remember }) => {
     const result = await api.login(username, password);
+    if (result?.mfaRequired) return result;
     const accessToken = result?.accessToken;
     if (!accessToken) throw new Error('La respuesta de inicio de sesión no contiene accessToken.');
     setToken(accessToken, { persist: remember, expiresAt: result.expiresAt });
@@ -34,6 +35,15 @@ export function AuthProvider({ children }) {
     setAuthError('');
     setTokenState(accessToken);
     setApiStatus('checking');
+    return result;
+  }, []);
+
+  const completeMfaLogin = useCallback(async (mfaToken, code, remember = false) => {
+    const result = await api.completeMfaLogin(mfaToken, code);
+    const accessToken = result?.accessToken;
+    if (!accessToken) throw new Error('La verificación MFA no devolvió una sesión válida.');
+    setToken(accessToken, { persist: remember, expiresAt: result.expiresAt });
+    setUser(null); setAuthError(''); setTokenState(accessToken); setApiStatus('checking');
     return result;
   }, []);
 
@@ -88,8 +98,8 @@ export function AuthProvider({ children }) {
   }, [token, expireSession]);
 
   const can = useCallback(permission => hasPermission(user, permission), [user]);
-  const value = useMemo(() => ({ token, user, apiStatus, authError, can, login, logout, expireSession }),
-    [token, user, apiStatus, authError, can, login, logout, expireSession]);
+  const value = useMemo(() => ({ token, user, apiStatus, authError, can, login, completeMfaLogin, logout, expireSession }),
+    [token, user, apiStatus, authError, can, login, completeMfaLogin, logout, expireSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
