@@ -88,8 +88,12 @@ public class SecurityConfig {
     .requestMatchers("/api/v1/dashboard/events").authenticated()
     .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
-    .requestMatchers("/api/v1/tax/**").permitAll()
-    .requestMatchers("/api/v1/refunds/**").permitAll()
+    // Fiscal configuration is restricted to security administrators until dedicated tax permissions are provisioned.
+    .requestMatchers("/api/v1/tax/**").hasAuthority("security:manage")
+    // Refunds expose financial data and state-changing operations; require authenticated sales permissions.
+    .requestMatchers(HttpMethod.GET,"/api/v1/refunds/**").hasAuthority("sales:read")
+    .requestMatchers(HttpMethod.POST,"/api/v1/refunds/*/approve").hasAuthority("sales:cancel")
+    .requestMatchers("/api/v1/refunds/**").hasAuthority("sales:manage")
     .requestMatchers("/api/v1/integrations/whatsapp/**").permitAll()
     .requestMatchers("/api/v1/admin/**").hasAuthority("security:manage")
     .requestMatchers("/api/v1/audit-events/**").hasAuthority("audit:read")
