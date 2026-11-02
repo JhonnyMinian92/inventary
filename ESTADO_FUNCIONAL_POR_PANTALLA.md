@@ -9,7 +9,7 @@ Este documento separa la existencia de una pantalla de la finalización real del
 
 | Pantalla / módulo | Disponible actualmente | Pendiente en frontend | Pendiente en backend / negocio | Estado |
 |---|---|---|---|---|
-| Login y sesión | Login, desafío, JWT, sesión y logout | E2E por rol, expiración/revocación en navegación, errores y recuperación de acceso si entra en alcance | Pruebas HTTP de bloqueo, concurrencia, revocación y política de credenciales | Parcial |
+| Login y sesión | Login cifrado, desafío de un solo uso, JWT, perfil/permisos, expiración y logout; fallback de sesión cuando Storage está bloqueado y feedback accesible | E2E browser por escenario/rol, sincronización entre pestañas, accesibilidad auditada y recuperación de contraseña/MFA si entran en alcance | Rate limit/bloqueo distribuidos, pruebas HTTP de concurrencia y revocación; recuperación segura aún no implementada | Parcial — ver [auditoría de login](app-inventary-ecuapp/docs/login-session-audit.md) |
 | Dashboard | Indicadores, alertas, tareas, existencias, movimientos y SSE de refresco | Validar filtros, permisos por widget, estados vacíos y coherencia con reportes | Definir y probar fórmulas de utilidad/ventas; SSE solo notifica refresco, no entrega eventos de negocio completos | Parcial |
 | Catálogo — productos | Listado, formularios, búsqueda, variantes, atributos, unidades y medios | E2E de alta/edición/archivo, variantes, validaciones, imágenes y errores | Cerrar reglas de variantes/unidades; confirmar storage persistente/escaneo de medios; aclarar stock y costo compartidos con producto padre | Parcial |
 | Catálogo — categorías y atributos | CRUD básico y presets | Probar duplicados, desactivación y asociaciones existentes | Integridad referencial, versionado y reglas de borrado lógico | Parcial |
@@ -46,6 +46,10 @@ Este documento separa la existencia de una pantalla de la finalización real del
 4. Pruebas de doble clic, timeout/reintento, última unidad y devoluciones concurrentes.
 5. Responsive y accesibilidad de tablas, formularios, diálogos y navegación.
 6. Trazabilidad de actor, fecha, motivo, request ID y movimiento para cada acción sensible.
+
+## Cambios recientes en seguridad, fiscalidad y acceso
+
+- Login: fallback de token en memoria ante Storage bloqueado, manejo accesible de errores y mensajes explícitos sobre recuperación aún no disponible. Se añadieron pruebas de regresión del cliente HTTP. Ver [auditoría detallada](app-inventary-ecuapp/docs/login-session-audit.md).
 
 ## Cambios recientes en seguridad y fiscalidad
 
