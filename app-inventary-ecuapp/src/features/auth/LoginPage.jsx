@@ -24,7 +24,7 @@ function loginErrorMessage(error) {
   return error?.message || 'No se pudo iniciar sesión. Inténtalo nuevamente.';
 }
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin, onCompleteMfa }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -36,6 +36,8 @@ export default function LoginPage({ onLogin }) {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const resetToken = new URLSearchParams(window.location.search).get('token') || '';
   const [busy, setBusy] = useState(false);
+  const [mfaToken, setMfaToken] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
@@ -55,7 +57,8 @@ export default function LoginPage({ onLogin }) {
     setBusy(true);
     setErrorMessage('');
     try {
-      await onLogin({ username: user, password, remember });
+      const result = await onLogin({ username: user, password, remember });
+      if (result?.mfaRequired) { setMfaToken(result.mfaToken); setPassword(''); setBusy(false); return; }
     } catch (loginError) {
       // La contraseña no se conserva en memoria tras un intento fallido.
       setPassword('');
@@ -64,6 +67,12 @@ export default function LoginPage({ onLogin }) {
       setBusy(false);
       passwordRef.current?.focus();
     }
+  }
+
+  async function submitMfa(event) {
+    event.preventDefault(); setBusy(true); setErrorMessage('');
+    try { await onCompleteMfa(mfaToken, mfaCode, remember); }
+    catch (error) { setMfaCode(''); setErrorMessage(error?.message || 'El código MFA no es válido.'); setBusy(false); }
   }
 
   async function requestRecovery(event) {
@@ -86,13 +95,13 @@ export default function LoginPage({ onLogin }) {
         <p className="auth-eyebrow">Bienvenido de nuevo</p>
         <h1 id={`${ids}-title`}>Toma el control absoluto de tu inventario.</h1>
 
-        <form className="auth-form" onSubmit={submit} noValidate aria-busy={busy}>
+        <form className="auth-form" onSubmit={mfaToken ? submitMfa : submit} noValidate aria-busy={busy}>
           <div className="auth-field">
             <label htmlFor={`${ids}-user`}>Usuario</label>
             <div className="auth-input">
               <User size={20} aria-hidden="true" />
               <input ref={usernameRef} id={`${ids}-user`} name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off"
-                spellCheck={false} maxLength={80} required value={username} disabled={busy} placeholder="Tu usuario"
+                spellCheck={false} maxLength={80} required value={username} disabled={busy || Boolean(mfaToken)} placeholder="Tu usuario"
                 aria-invalid={Boolean(errorMessage)} aria-describedby={errorMessage ? `${ids}-error` : undefined}
                 onChange={event => { setUsername(event.target.value); setErrorMessage(''); }} />
             </div>
@@ -106,7 +115,7 @@ export default function LoginPage({ onLogin }) {
             <div className="auth-input">
               <LockKeyhole size={20} aria-hidden="true" />
               <input ref={passwordRef} id={`${ids}-password`} name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password"
-                maxLength={128} required value={password} disabled={busy} placeholder="Tu contraseña"
+                maxLength={128} required value={password} disabled={busy || Boolean(mfaToken)} placeholder="Tu contraseña"
                 aria-invalid={Boolean(errorMessage)} aria-describedby={[capsLock ? `${ids}-caps` : '', errorMessage ? `${ids}-error` : ''].filter(Boolean).join(' ') || undefined}
                 onChange={event => { setPassword(event.target.value); setErrorMessage(''); }} onKeyDown={trackCapsLock} onKeyUp={trackCapsLock} onBlur={() => setCapsLock(false)} />
               <button type="button" className="auth-reveal" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={showPassword}
@@ -115,9 +124,10 @@ export default function LoginPage({ onLogin }) {
               </button>
             </div>
             {capsLock && <p id={`${ids}-caps`} className="auth-hint warning">Bloq Mayús activado</p>}
-            {showRecovery && <form id={`${ids}-recovery`} className="auth-recovery-form" onSubmit={requestRecovery}><label htmlFor={`${ids}-recovery-email`}>Correo electrónico verificado</label><input id={`${ids}-recovery-email`} type="email" autoComplete="email" maxLength={254} required value={recoveryEmail} onChange={event => setRecoveryEmail(event.target.value)} placeholder="correo@ejemplo.com" /><button type="submit" className="auth-link" disabled={recoveryBusy}>{recoveryBusy ? 'Enviando…' : 'Enviar enlace de recuperación'}</button>{recoveryNotice && <p className="auth-hint" role="status">{recoveryNotice}</p>}</form>}
+            {showRecovery && <div id={`${ids}-recovery`} className="auth-recovery-form"><label htmlFor={`${ids}-recovery-email`}>Correo electrónico verificado</label><input id={`${ids}-recovery-email`} type="email" autoComplete="email" maxLength={254} required value={recoveryEmail} onChange={event => setRecoveryEmail(event.target.value)} placeholder="correo@ejemplo.com" /><button type="button" className="auth-link" disabled={recoveryBusy} onClick={() => requestRecovery({ preventDefault() {} })}>{recoveryBusy ? 'Enviando…' : 'Enviar enlace de recuperación'}</button>{recoveryNotice && <p className="auth-hint" role="status">{recoveryNotice}</p>}</div>}
           </div>
 
+          {mfaToken && <div className="auth-field"><label htmlFor="auth-mfa-code">Código de tu aplicación autenticadora</label><input id="auth-mfa-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={mfaCode} onChange={event => setMfaCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="123456" /></div>}
           {errorMessage && <p id={`${ids}-error`} className="auth-error" role="alert" aria-live="assertive">{errorMessage}</p>}
 
           <label className="auth-check">
@@ -126,8 +136,9 @@ export default function LoginPage({ onLogin }) {
           </label>
 
           <button type="submit" className="auth-submit" disabled={busy}>
-            {busy ? <><span className="auth-spinner" aria-hidden="true" />Verificando…</> : <>Iniciar sesión<ChevronRight size={20} aria-hidden="true" /></>}
+            {busy ? <><span className="auth-spinner" aria-hidden="true" />Verificando…</> : <>{mfaToken ? "Verificar código" : "Iniciar sesión"}<ChevronRight size={20} aria-hidden="true" /></>}
           </button>
+          {mfaToken && <button type="button" className="auth-link" disabled={busy} onClick={() => { setMfaToken(""); setMfaCode(""); setErrorMessage(""); }}>Volver</button>}
         </form>
 
         <footer className="auth-legal">
