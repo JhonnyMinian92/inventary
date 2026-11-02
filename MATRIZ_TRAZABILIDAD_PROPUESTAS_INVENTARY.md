@@ -12,10 +12,10 @@
 - Las propuestas siguen siendo diseño/alcance, no evidencia de código.
 - Se retiran documentos duplicados, placeholders y diagnósticos de un fallo CI ya corregido; las auditorías históricas de la raíz se conservan como registro y no como estado vivo.
 
-**Fecha de análisis:** 30 de octubre de 2026  
+**Fecha de actualización:** 2 de noviembre de 2026  
 **Rama revisada:** implementacion_propuestas  
 **Plan de ejecución:** PLAN_EJECUCION_PROPUESTAS_INVENTARY.md  
-**Propósito:** demostrar dónde se implementa cada requisito y evitar que dos propuestas contradictorias generen trabajo duplicado o regresiones.
+**Propósito:** demostrar dónde se implementa cada requisito y evitar que dos propuestas contradictorias generen trabajo duplicado o regresiones. Esta matriz clasifica propuestas y documentos; el estado funcional del código se determina en los documentos vivos 24–28 y 29–31.
 
 ## 1. Inventario raíz verificado
 

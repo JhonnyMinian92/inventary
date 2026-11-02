@@ -1,35 +1,35 @@
-> **Adenda de ejecución — 2026-10-27:** los apartados siguientes describen la auditoría histórica del snapshot anterior, no el estado de CI más reciente. El backend ha pasado Maven verify en PostgreSQL 16, los perfiles de Compose (normal/Kafka) han validado su configuración, y el smoke test con base vacía ha pasado en [backend-ci 40504351485](https://github.com/JhonnyMinian92/inventary/actions/runs/40504351485), SHA `ac60c93a97c90c6384262880bf970dea813a6dce`. Se añadió un ajuste de CI para dar variables de entorno a la limpieza del smoke test; el workflow en ese SHA actualizado se valida en [backend-ci 40504639896](https://github.com/JhonnyMinian92/inventary/actions/runs/40504639896), SHA `b81ce241aff62d6eabff3408c1be4e6c10eb3be7`, donde Maven y configuración Compose están verdes y el smoke test aún estaba en curso en el momento de redactar esta nota. El frontend pasó los tests de CSV y el build de producción en [Frontend Build 40504502526](https://github.com/JhonnyMinian92/inventary/actions/runs/40504502526), SHA `26dc33cd209133be037beb13fb7990933cde394d`.
+# Auditoría técnica de Inventary — historial y seguimiento
 
-> Se implementaron además: V15 inbox persistente y consumidor Kafka opcional con deduplicación por hash canónico, reintentos acotados y DLQ; carga binaria segura PNG/JPEG con validación de firma/contenido, tamaño y resolución, almacenamiento por UUID, endpoint público que exige que la imagen siga publicada y limpieza tras despublicación; mitigación de fórmula CSV; y rutas guiadas de UI para subida y retirada de imagen. Kafka sigue apagado por defecto y no incluye proyecciones de analítica. Límites abiertos fuera de los 13 issues de entrega: lockfile npm, CSP/XSS y almacenamiento de token, rate limit distribuido, reconciliación de costeo inicial y alcances no implementados como SRI, pagos, multiempresa y picking multi-bin.
+**Estado de este documento:** conserva el cuerpo de una auditoría histórica que examinó snapshots anteriores de master. Los hallazgos y el recuento de archivos del cuerpo histórico no describen automáticamente la rama actual. Para el estado válido del código se deben usar los documentos 24–28 del backend, el README del frontend y la matriz de cobertura API.
 
-> **Nota de vigencia — 2026-10-26:** este documento conserva hallazgos de una revisión anterior. Algunos apartados describen un árbol donde el frontend no existía, rutas aún propuestas o estado previo a V14; esos textos son históricos y no constituyen inventario vivo. Consultar [estado actual](microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md), [referencia de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md), [arquitectura implementada](microservices-inventary-ecuapp/docs/26-arquitectura-y-patrones-actuales.md) y [plan de cierre](microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md). El cuerpo original se preserva como registro histórico y no demuestra validación del HEAD actual.
+**Corte de código de referencia actual:** rama implementacion_propuestas, SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
 
-# Auditoría técnica de Inventary — pendientes, defectos y plan de cierre
+## Estado vigente y evidencia
 
-## Corrección ejecutada el 2026-11-02
+- Backend CI [41385132612](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132612): Maven Verify sobre PostgreSQL 16; 119 pruebas sin fallos; validación del Compose de backend normal y Kafka; smoke de backend desde volumen PostgreSQL vacío.
+- Frontend Build [41385132616](https://github.com/JhonnyMinian92/inventary/actions/runs/41385132616): 26 pruebas; build Vite; smoke browser responsive de login a 360, 768 y 1280 px.
+- El smoke browser no es E2E autenticado de todos los dominios. El Compose raíz frontend+API+n8n tampoco es el entorno validado por el smoke de backend.
 
-- En el SHA auditado, SecurityConfig conserva `permitAll()` para `/api/v1/tax/**` y `/api/v1/refunds/**`. La regla está en la cadena general y no está limitada a un perfil local; los controladores no añaden `@PreAuthorize`. Aunque se introdujera para pruebas HTTP locales, constituye un bloqueo P0 y no es segura para exponer.
-- Los controladores fiscal y de reembolsos dejaron de depender de un `Authentication` obligatorio durante las pruebas locales.
-- El panel React de reembolsos reemplazó `window.prompt`, añade un diálogo accesible y bloquea acciones simultáneas.
-- GraphQL conserva autorización por `catalog:read`; la prueba focalizada REST/GraphQL quedó aprobada.
-- Docker Compose fue reconstruido y levantado; API, web, fiscal y reembolsos respondieron `200` sobre HTTP local.
-- Las pruebas frontend siguen en verde: 26 de 26.
-- La suite backend completa quedó en verde antes de los cambios finales; la matriz GraphQL/RBAC focalizada quedó en verde después de conservar la autorización.
+## Hallazgos vigentes trasladados al estado verificable
 
-Pendientes que requieren terceros, evidencia externa o infraestructura real: certificación contable/jurídica vigente, credenciales y sandbox del SRI, proveedores de pagos, revisión del plano de rama/CI, prueba E2E browser autenticada y certificación productiva.
+1. **P0 — Rutas fiscales públicas:** SecurityConfig mantiene permitAll para /api/v1/tax/** y TaxController no declara autorización equivalente por método.
+2. **P0 — Rutas de reembolso públicas:** SecurityConfig mantiene permitAll para /api/v1/refunds/** y RefundController no declara autorización equivalente por método.
+3. **P1 — Finanzas/fiscalidad incompletas:** reembolsos sin ledger de pagos realmente liquidados ni conciliación; snapshots fiscales históricos por venta/línea incompletos y sin emisión SRI.
+4. **P1 — Integración V28 parcial:** existen tablas/endpoints de operaciones y webhooks, pero no se encontró worker/dispatcher completo de entrega externa.
+5. **P1 — E2E autenticado pendiente:** los workflows cubren unit tests/build y smoke responsive de login, no recorridos completos por roles.
 
-## Verificación ejecutada el 2026-11-01
+El detalle vivo, las funcionalidades reales, los límites y los criterios de cierre se encuentran en:
+- [Estado actual verificable](microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md)
+- [Referencia de APIs](microservices-inventary-ecuapp/docs/25-referencia-apis.md)
+- [Arquitectura actual](microservices-inventary-ecuapp/docs/26-arquitectura-y-patrones-actuales.md)
+- [Plan de cierre](microservices-inventary-ecuapp/docs/28-plan-cierre-y-validacion.md)
 
-- Backend: suite Maven completa aprobada.
-- Frontend: 26 pruebas aprobadas y build de producción aprobado.
-- Docker: `docker compose build` aprobado.
-- Docker Compose: API, web y n8n levantados; API saludable y ambas aplicaciones accesibles.
-- Catálogo fiscal: contrato de producto ampliado para persistir y devolver `taxCode` y `taxTreatment`.
-- Prueba de catálogo público corregida para validar categorías paginadas sin depender de un único bloque.
-- Pendiente externo: emisión/firma/autorización SRI, pagos de terceros, credenciales reales, validaciones profesionales fiscal/jurídica, protección de rama y despliegue productivo.
+## Historial preservado
 
-> **Objetivo:** registro de hallazgos y backlog técnico. Para el estado vivo usar `microservices-inventary-ecuapp/docs/24-estado-actual-repositorio.md`, `25-referencia-apis.md` y `28-plan-cierre-y-validacion.md`; este cuerpo incluye auditorías anteriores y no debe leerse como inventario íntegro del HEAD.
->
+El bloque siguiente conserva la auditoría original del snapshot master indicado en sus metadatos. Sus afirmaciones sobre ausencia de frontend, impuesto cero, número de migraciones, pruebas no ejecutadas y pendientes de ese momento son históricas. No se deben usar como estado actual sin cotejarlas con los documentos vivos anteriores.
+
+---
+
 > **Repositorio:** `JhonnyMinian92/inventary`  
 > **Rama examinada:** `master`  
 > **Commit del árbol de código examinado:** `983017215e6362e18eb9cdb4aa57845261a73593`  
