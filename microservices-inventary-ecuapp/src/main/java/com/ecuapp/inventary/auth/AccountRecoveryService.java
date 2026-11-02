@@ -100,6 +100,7 @@ public class AccountRecoveryService {
         if(users.findByEmailIgnoreCase(email).filter(existing->!existing.getId().equals(user.getId())).isPresent())
             throw new BusinessRuleException("No se pudo utilizar ese correo electrónico.");
         user.setEmail(email);
+        users.consumePendingPasswordResets(user.getId());
         jdbc.update("UPDATE auth_email_verification SET consumed_at=CURRENT_TIMESTAMP WHERE user_id=? AND consumed_at IS NULL",user.getId());
         String token=newToken();
         jdbc.update("INSERT INTO auth_email_verification(id,user_id,token_hash,expires_at) VALUES(?,?,?,CURRENT_TIMESTAMP + INTERVAL '24 hours')",
