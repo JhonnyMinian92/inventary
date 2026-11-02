@@ -4,9 +4,13 @@ La búsqueda, categoría, tipo y estado se resuelven en el endpoint paginado del
 
 ## Corrección aplicada
 
-- Se eliminó el segundo filtrado local por nombre/SKU/descripción, categoría y estado después de recibir la página del servidor.
+- Se eliminó el segundo filtrado local por nombre/SKU/descripción, categoría y estado después de recibir la página del servidor. Así no se descartan resultados válidos encontrados por código de barras de una variante.
 - Se conserva el filtro local de existencias y se aclara en la interfaz que opera sobre la página actual.
 - La ordenación por nombre, categoría y precio permanece en el servidor; la ordenación por existencias se calcula sobre la página visible.
+
+## Prueba de regresión
+
+La suite frontend prueba que un producto devuelto por una búsqueda server-side (por ejemplo, un código de barras de variante) no se elimina al aplicar el filtro de existencias de la página. También comprueba la agregación de saldos por producto y que las filas originales no se mutan.
 
 ## Cobertura backend existente
 
@@ -21,4 +25,4 @@ La búsqueda, categoría, tipo y estado se resuelven en el endpoint paginado del
 
 ## Evidencia
 
-La corrección está en `implementacion_propuestas`, commit `b544f7cb359aadefc951aa33be032ffb6cb70e52`. El workflow **Frontend Build** del commit terminó en `success`: https://github.com/JhonnyMinian92/inventary/actions/runs/41449330376. La ejecución confirma build y pruebas configuradas en CI; no sustituye E2E autenticado ni validación manual de accesibilidad.
+La corrección y su prueba de regresión están en `implementacion_propuestas`, HEAD `6f7483cee3cc492553040ea82dda32bac85602c0`. El workflow **Frontend Build** terminó en `success`: https://github.com/JhonnyMinian92/inventary/actions/runs/41449770801. Pasaron **38/38 pruebas**, build de producción y smoke browser responsive configurado a 360, 768 y 1280 px. El smoke browser cubre login, no un flujo autenticado de catálogo; no sustituye E2E de productos ni validación manual de accesibilidad.
