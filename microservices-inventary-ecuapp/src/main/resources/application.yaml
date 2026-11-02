@@ -101,6 +101,12 @@ app:
     login-lockout:
       max-failures: ${LOGIN_LOCKOUT_MAX_FAILURES:5}
       minutes: ${LOGIN_LOCKOUT_MINUTES:15}
+    password-recovery:
+      ttl-minutes: ${PASSWORD_RECOVERY_TTL_MINUTES:30}
+      frontend-url: ${PASSWORD_RECOVERY_FRONTEND_URL:http://localhost:5173/reset-password}
+    mfa:
+      encryption-key: ${MFA_ENCRYPTION_KEY:}
+      issuer: ${MFA_ISSUER:Inventary}
   kafka:
     enabled: ${KAFKA_ENABLED:false}
     topic: ${KAFKA_TOPIC:inventary.domain-events}
