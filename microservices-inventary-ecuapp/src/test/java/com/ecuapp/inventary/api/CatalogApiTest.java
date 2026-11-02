@@ -281,6 +281,12 @@ class CatalogApiTest extends ApiTestSupport {
         JsonNode variant = httpPost(admin, "/api/v1/catalog/products/" + productId + "/variants",
             Map.of("sku", variantSku, "barcode", barcode, "optionValues", Map.of("talla", "S", "color", "rojo"), "salePrice", new BigDecimal("12.00")), 201);
         assertAmount("12.00", variant.get("effectivePrice"));
+        JsonNode barcodeSearch = httpGet(admin, "/api/v1/catalog/products?q=" + barcode, 200);
+        assertEquals(1, barcodeSearch.get("page").get("totalElements").asInt(),
+            "catalog search must find the parent product by a variant barcode");
+        JsonNode variantSkuSearch = httpGet(admin, "/api/v1/catalog/products?q=" + variantSku, 200);
+        assertEquals(1, variantSkuSearch.get("page").get("totalElements").asInt(),
+            "catalog search must find the parent product by a variant SKU");
         problem(call(post("/api/v1/catalog/products/" + productId + "/variants"), admin,
             Map.of("sku", variantSku, "optionValues", Map.of("talla", "M"))), 409, "CONFLICT");
         problem(call(post("/api/v1/catalog/products/" + productId + "/variants"), admin,
