@@ -76,6 +76,8 @@ export default function ProductVariantsManager({ productId, definitions = [], di
       } else optionValues[definition.key] = raw;
     }
     if (!sku.trim()) { setError('El SKU de la variante es obligatorio.'); return; }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(sku.trim())) { setError('El SKU admite letras, números, punto, guion y guion bajo (máximo 64 caracteres).'); return; }
+    if (barcode.trim() && !/^[A-Za-z0-9-]{4,128}$/.test(barcode.trim())) { setError('El código de barras debe tener entre 4 y 128 letras, números o guiones.'); return; }
     if (!Object.keys(optionValues).length) { setError('Indica al menos una opción para identificar la variante.'); return; }
     if (salePrice.trim() && (!Number.isFinite(Number(salePrice)) || Number(salePrice) < 0 || !/^\\d+(?:\\.\\d{1,2})?$/.test(salePrice.trim()))) {
       setError('El precio debe ser positivo o cero y tener hasta dos decimales.'); return;
