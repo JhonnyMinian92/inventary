@@ -28,7 +28,9 @@ public interface ProductRepository extends com.ecuapp.inventary.common.Flushable
  @EntityGraph(attributePaths={"category"})
  @Query("""
   select p from Product p
-  where (:pattern is null or lower(p.name) like :pattern escape '\\' or lower(p.sku) like :pattern escape '\\')
+  where (:pattern is null or lower(p.name) like :pattern escape '\\' or lower(p.sku) like :pattern escape '\\'
+   or exists (select v.id from ProductVariant v where v.product=p and
+    (lower(v.sku) like :pattern escape '\\' or lower(v.barcode) like :pattern escape '\\')))
   and (:categoryId is null or p.category.id=:categoryId)
   and (:active is null or p.active=:active)
   and (:kind is null or p.kind=:kind)
