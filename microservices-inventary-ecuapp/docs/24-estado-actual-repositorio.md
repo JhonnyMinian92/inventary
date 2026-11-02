@@ -10,7 +10,7 @@
 - CI del commit de código está en ejecución; no marcar este hallazgo como verificado hasta que finalice correctamente.
 - El cierre financiero de reembolsos sigue pendiente: ledger de pagos liquidados, conciliación, pasarela y confirmación autenticada del proveedor.
 
-La matriz funcional más útil para conocer qué falta por pantalla frontend/backend está en [ESTADO_FUNCIONAL_POR_PANTALLA.md](../../../ESTADO_FUNCIONAL_POR_PANTALLA.md).
+La matriz funcional más útil para conocer qué falta por pantalla frontend/backend está en [ESTADO_FUNCIONAL_POR_PANTALLA.md](../../ESTADO_FUNCIONAL_POR_PANTALLA.md).
 
 # 24 — Estado actual verificable del repositorio
 
