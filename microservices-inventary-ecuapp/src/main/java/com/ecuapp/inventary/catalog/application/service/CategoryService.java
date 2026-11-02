@@ -26,7 +26,14 @@ public class CategoryService {
  private final CategoryRepository repository; private final ProductRepository products; private final CategoryAttributeDefinitionRepository definitions; private final AuditService audit;
  private final CatalogStructureService structure;
  public CategoryService(CategoryRepository repository,ProductRepository products,CategoryAttributeDefinitionRepository definitions,AuditService audit,CatalogStructureService structure){this.repository=repository;this.products=products;this.definitions=definitions;this.audit=audit;this.structure=structure;}
- @Transactional(readOnly=true) public Page<CategoryDtos.View> list(Boolean active,Pageable pageable){return repository.search(active,Pages.of(pageable,SORT,Sort.by("name"))).map(c->CategoryDtos.View.from(c,products.countByCategory_IdAndActiveTrue(c.getId())));}
+ @Transactional(readOnly=true) public Page<CategoryDtos.View> list(Boolean active,Pageable pageable){
+  Page<Category> page=repository.search(active,Pages.of(pageable,SORT,Sort.by("name")));
+  if(page.isEmpty())return page.map(CategoryDtos.View::from);
+  java.util.List<UUID> ids=page.getContent().stream().map(Category::getId).toList();
+  java.util.Map<UUID,Long> counts=new java.util.HashMap<>();
+  products.countActiveByCategoryIds(ids).forEach(row->counts.put(row.getCategoryId(),row.getProductCount()));
+  return page.map(category->CategoryDtos.View.from(category,counts.getOrDefault(category.getId(),0L)));
+ }
  @Transactional(readOnly=true) public CategoryDtos.View get(UUID id){return CategoryDtos.View.from(require(id));}
  @Transactional public CategoryDtos.View create(CategoryDtos.WriteRequest request,String actor){
   String name=request.name().trim();
