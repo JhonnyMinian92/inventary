@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, getToken, getTokenExpiry, setToken } from '../../api.js';
+import { api, getToken, getTokenExpiry, setToken, endSessionAcrossTabs, subscribeToSessionEnd } from '../../api.js';
 import { toast } from '../../ui/feedback.js';
 import { hasPermission } from './permissions.js';
 
@@ -11,14 +11,19 @@ export function AuthProvider({ children }) {
   const [apiStatus, setApiStatus] = useState(() => getToken() ? 'checking' : 'disconnected');
   const [authError, setAuthError] = useState('');
 
-  const expireSession = useCallback((message = 'La sesión expiró o ya no es válida. Inicia sesión nuevamente.') => {
+  const clearLocalSession = useCallback(() => {
     setToken('');
     setTokenState('');
     setUser(null);
-    setApiStatus('error');
+    setApiStatus('disconnected');
     setAuthError('');
-    toast.info(message);
   }, []);
+
+  const expireSession = useCallback((message = 'La sesión expiró o ya no es válida. Inicia sesión nuevamente.') => {
+    endSessionAcrossTabs();
+    clearLocalSession();
+    toast.info(message);
+  }, [clearLocalSession]);
 
   const login = useCallback(async ({ username, password, remember }) => {
     const result = await api.login(username, password);
@@ -36,14 +41,16 @@ export function AuthProvider({ children }) {
     let error = null;
     try { await api.logout(); } catch (cause) { error = cause; }
     finally {
-      setToken('');
-      setTokenState('');
-      setUser(null);
-      setApiStatus('disconnected');
-      setAuthError('');
+      endSessionAcrossTabs();
+      clearLocalSession();
     }
     return error;
-  }, []);
+  }, [clearLocalSession]);
+
+  useEffect(() => subscribeToSessionEnd(() => {
+    clearLocalSession();
+    toast.info('La sesión se cerró en otra pestaña o dejó de ser válida.');
+  }), [clearLocalSession]);
 
   useEffect(() => {
     if (!token) {
@@ -80,7 +87,6 @@ export function AuthProvider({ children }) {
     return () => window.clearTimeout(timer);
   }, [token, expireSession]);
 
-  // Fail closed while the authenticated profile is unknown or lacks the requested permission.
   const can = useCallback(permission => hasPermission(user, permission), [user]);
   const value = useMemo(() => ({ token, user, apiStatus, authError, can, login, logout, expireSession }),
     [token, user, apiStatus, authError, can, login, logout, expireSession]);
