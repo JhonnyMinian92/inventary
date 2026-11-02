@@ -96,6 +96,16 @@ function AttributeInput({ definition, value, onChange }) {
   };
 
   const options = Array.isArray(definition.options) ? definition.options.map(String) : [];
+  if (definition.valueType === 'STRING_LIST' && options.length === 0) {
+    return <label className="field" htmlFor={common.id}>
+      <span>{label}{definition.required && <b> *</b>}</span>
+      <input {...common} value={Array.isArray(value) ? value.join(', ') : ''} type="text"
+        onChange={event => onChange(definition.key, event.target.value.split(',').map(item => item.trim()).filter(Boolean))}
+        placeholder="Separa los valores con comas" />
+      <small className="field-help">Escribe varios valores separados por comas.</small>
+    </label>;
+  }
+
   if (definition.valueType === 'STRING_LIST' || (definition.valueType === 'ENUM' && options.length && options.length <= 12)) {
     const multiple = definition.valueType === 'STRING_LIST';
     const current = multiple ? (Array.isArray(value) ? value.map(String) : []) : (value == null ? '' : String(value));
