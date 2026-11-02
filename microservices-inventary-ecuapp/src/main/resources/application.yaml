@@ -83,17 +83,26 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
     path: /swagger-ui.html
 management:
-  endpoints.web.exposure.include: health,info,metrics
-  # URI tags are route templates (bounded cardinality); the API exposes ~140 templates.
-  metrics.web.server.max-uri-tags: 300
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    web:
+      server:
+        max-uri-tags: 300
   endpoint:
     health:
       show-details: never
       probes:
         enabled: true
   health:
-    livenessstate.enabled: true
-    readinessstate.enabled: true
+    mail:
+      enabled: false
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
 app:
   security:
     jwt-secret: ${JWT_SECRET}
