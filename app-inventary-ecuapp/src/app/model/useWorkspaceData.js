@@ -154,6 +154,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, listQuer
 
     setData(current => {
       const next = { ...EMPTY, ...current, ...updates };
+      if (!canReadInventory && (section === 'products' || section === 'categories')) next.balances = EMPTY.balances;
       // Do not keep financial or operational rows from an earlier filter/session after failure.
       for (const key of failedKeys) {
         if (Object.hasOwn(EMPTY, key)) next[key] = EMPTY[key];
