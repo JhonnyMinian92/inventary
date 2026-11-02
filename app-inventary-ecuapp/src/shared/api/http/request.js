@@ -1,9 +1,13 @@
-
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '');
+export const API_BASE = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '');
 const TOKEN_KEY = 'inventary.accessToken';
 const TOKEN_EXPIRY_KEY = 'inventary.accessTokenExpiresAt';
 const IDEMPOTENCY_RETRY_WINDOW_MS = 120_000;
 const pendingIdempotencyKeys = new Map();
+
+// Storage can be disabled by browser privacy settings or fail with QuotaExceededError.
+// Keep a tab-scoped fallback so a successful login can still call /auth/me.
+let volatileToken = '';
+let volatileExpiry = 0;
 
 function createIdempotencyKey() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -54,7 +58,7 @@ function readStoredToken() {
       if (token) return { token, expiresAt: Number(storage.getItem(TOKEN_EXPIRY_KEY)) || 0 };
     } catch { /* almacenamiento bloqueado */ }
   }
-  return null;
+  return volatileToken ? { token: volatileToken, expiresAt: volatileExpiry } : null;
 }
 export function getToken() {
   const stored = readStoredToken();
@@ -69,17 +73,20 @@ export function getTokenExpiry() { return readStoredToken()?.expiresAt || 0; }
 export function setToken(token, { persist = false, expiresAt = null } = {}) {
   const nextToken = token || '';
   if (readStoredToken()?.token !== nextToken) pendingIdempotencyKeys.clear();
+  volatileToken = nextToken;
+  const expiry = Date.parse(expiresAt || '');
+  volatileExpiry = Number.isFinite(expiry) ? expiry : 0;
   for (const storage of storages()) {
     try { storage.removeItem(TOKEN_KEY); storage.removeItem(TOKEN_EXPIRY_KEY); } catch { /* almacenamiento bloqueado */ }
   }
   if (!nextToken) return;
-  const target = storages().find(storage => storage === (persist ? globalThis.localStorage : globalThis.sessionStorage)) || storages()[0];
+  const available = storages();
+  const target = available.find(storage => storage === (persist ? globalThis.localStorage : globalThis.sessionStorage)) || available[0];
   if (!target) return;
-  const expiry = Date.parse(expiresAt || '');
   try {
     target.setItem(TOKEN_KEY, nextToken);
-    if (Number.isFinite(expiry)) target.setItem(TOKEN_EXPIRY_KEY, String(expiry));
-  } catch { /* almacenamiento bloqueado: la sesión dura lo que la pestaña */ }
+    if (volatileExpiry) target.setItem(TOKEN_EXPIRY_KEY, String(volatileExpiry));
+  } catch { /* fallback en memoria: la sesión dura lo que la pestaña */ }
 }
 
 export async function request(path, options = {}) {
