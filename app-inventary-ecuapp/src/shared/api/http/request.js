@@ -84,7 +84,9 @@ export function setToken(token, { persist = false, expiresAt = null } = {}) {
   const preferredName = persist ? 'localStorage' : 'sessionStorage';
   const target = available.find(storage => {
     try { return storage === globalThis[preferredName]; } catch { return false; }
-  }) || available[0];
+  }) || (persist ? available.find(storage => {
+    try { return storage === globalThis.sessionStorage; } catch { return false; }
+  }) : undefined);
   if (!target) return;
   try {
     target.setItem(TOKEN_KEY, nextToken);
