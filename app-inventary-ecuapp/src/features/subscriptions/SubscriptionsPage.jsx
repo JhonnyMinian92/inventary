@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Ban, CalendarClock, ChevronLeft, ChevronRight, CircleDollarSign, Plus, Repeat } from 'lucide-react';
+import { AlertCircle, Ban, CalendarClock, ChevronLeft, ChevronRight, CircleDollarSign, Plus, Repeat, Search } from 'lucide-react';
 import { api, listFrom } from '../../api';
 import Drawer from '../../ui/Drawer.jsx';
 import { SkeletonTable } from '../../ui/Skeleton.jsx';
@@ -92,7 +92,7 @@ function NewSubscriptionModal({ options, products, customers, warehouses, onClos
 
   const prepayTotal = preview ? Number(preview.total) * (1 - Number(form.discountPercent || 0) / 100) : 0;
   return <Modal titleId="subscription-new-title" title="Nueva suscripción" wide busy={busy} onClose={onClose} onSubmit={submit}
-    description="El sistema genera solo cada factura en su fecha de cobro. Si el cliente cancela, solo paga el periodo vigente."
+    description="El sistema programa facturas para cada cobro. La emisión de una factura no confirma que el cliente haya pagado."
     footer={<>
       <button type="button" className="button secondary" disabled={busy} onClick={onClose}>Cancelar</button>
       <button type="submit" className="button primary" disabled={busy || !services.length}><Plus size={16} />{busy ? 'Creando…' : 'Crear suscripción'}</button>
@@ -144,14 +144,14 @@ function NewSubscriptionModal({ options, products, customers, warehouses, onClos
     {service && <div className="prepay-box">
       <label className="checkbox-field property-required">
         <input type="checkbox" checked={form.prepay} onChange={event => change('prepay', event.target.checked)} />
-        <span>Cobrar todo por adelantado<small>Se genera una sola factura ahora por todo el plan.</small></span>
+        <span>Facturar las cuotas pendientes de una vez<small>Consolida la factura. No confirma cobro ni pago recibido.</small></span>
       </label>
       {form.prepay && (options?.canDiscount
-        ? <label className="field"><span>Descuento por pago adelantado (%)</span>
+        ? <label className="field"><span>Descuento por facturación anticipada (%)</span>
           <input type="number" min="0" max="100" step="0.01" value={form.discountPercent} onChange={event => change('discountPercent', event.target.value)} />
           {preview && <small className="field-help">Se facturará {money(prepayTotal)} en lugar de {money(preview.total)}.</small>}
         </label>
-        : <p className="form-hint">Sin descuento. Solo el propietario puede aplicar descuentos por pago adelantado.</p>)}
+        : <p className="form-hint">Sin descuento. Solo el propietario puede aplicar descuentos por facturación anticipada.</p>)}
     </div>}
   </Modal>;
 }
@@ -204,14 +204,14 @@ function PrepayModal({ subscription, options, onClose, onDone }) {
     setBusy(true);
     try {
       const updated = await api.prepaySubscription(subscription.id, value > 0 ? value : undefined);
-      toast.success('Se generó la factura por los cobros pendientes.');
+      toast.success('Se generó la factura consolidada por los cobros pendientes.');
       onDone(updated);
     } catch (error) {
       toast.error(error?.message || 'No se pudo registrar el pago adelantado.');
       setBusy(false);
     }
   }
-  return <Modal titleId="subscription-prepay-title" title="Pagar por adelantado" busy={busy} onClose={onClose} onSubmit={submit}
+  return <Modal titleId="subscription-prepay-title" title="Facturar cobros pendientes" busy={busy} onClose={onClose} onSubmit={submit}
     description={`Se facturan ahora los ${pending.length} cobros pendientes en una sola factura.`}
     footer={<>
       <button type="button" className="button secondary" disabled={busy} onClick={onClose}>Volver</button>
@@ -224,13 +224,14 @@ function PrepayModal({ subscription, options, onClose, onDone }) {
     </dl>
     {options?.canDiscount
       ? <label className="field"><span>Descuento (%)</span><input type="number" min="0" max="100" step="0.01" value={discount} onChange={event => setDiscount(event.target.value)} /></label>
-      : <p className="form-hint">Sin descuento. Solo el propietario puede aplicar descuentos por pago adelantado.</p>}
+      : <p className="form-hint">Sin descuento. Solo el propietario puede aplicar descuentos por facturación anticipada.</p>}
   </Modal>;
 }
 
 function SubscriptionDrawer({ id, can, options, onClose, onChanged }) {
   const [subscription, setSubscription] = useState(null);
   const [action, setAction] = useState('');
+  const [tab, setTab] = useState('summary');
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
@@ -246,7 +247,7 @@ function SubscriptionDrawer({ id, can, options, onClose, onChanged }) {
   return <>
     <Drawer open title={subscription ? subscription.subscriptionNumber : 'Suscripción'} subtitle={subscription ? `${subscription.productName} · ${subscription.customerName}` : 'Cargando…'} onClose={onClose}
       footer={subscription && active && can('sales:manage') && <>
-        {hasPending && <button type="button" className="button secondary" onClick={() => setAction('prepay')}><CircleDollarSign size={16} />Pagar por adelantado</button>}
+        {hasPending && <button type="button" className="button secondary" onClick={() => setAction('prepay')}><CircleDollarSign size={16} />Facturar pendientes</button>}
         <button type="button" className="button secondary danger-text" onClick={() => setAction('cancel')}><Ban size={16} />Cancelar suscripción</button>
       </>}>
       {!subscription ? <SkeletonTable rows={4} columns={3} label="Cargando suscripción" /> : <>
@@ -254,9 +255,14 @@ function SubscriptionDrawer({ id, can, options, onClose, onChanged }) {
           <span className={'pill ' + statusTone(subscription.status)}>{statusLabel('subscription', subscription.status)}</span>
           <span className="pill neutral">{subscription.billingFrequencyLabel}</span>
           <span className="pill neutral">{termLabel(options, subscription.termMonths)}</span>
-          {subscription.prepaid && <span className="pill info">Pagada por adelantado</span>}
+          {subscription.prepaid && <span className="pill info">Factura anticipada</span>}
         </div>
         {subscription.lastBillingError && <p className="inline-warning">{subscription.lastBillingError}</p>}
+        <div className="catalog-tabs subscription-detail-tabs" role="tablist" aria-label="Secciones de la suscripción">
+          {[['summary', 'Resumen'], ['calendar', 'Calendario y facturas'], ['activity', 'Actividad']].map(([value, label]) =>
+            <button type="button" role="tab" aria-selected={tab === value} className={tab === value ? 'catalog-tab active' : 'catalog-tab'} onClick={() => setTab(value)}>{label}</button>)}
+        </div>
+        {tab === 'summary' && <>
         <dl className="metric-grid">
           <div><dt>Precio por mes</dt><dd>{money(subscription.monthlyPrice)}</dd></div>
           <div><dt>Total del plan</dt><dd>{money(subscription.totalAmount)}</dd></div>
@@ -265,14 +271,23 @@ function SubscriptionDrawer({ id, can, options, onClose, onChanged }) {
           <div><dt>Próximo cobro</dt><dd>{subscription.nextBillingDate ? `${calendarDate(subscription.nextBillingDate)} · ${money(subscription.nextAmount)}` : '—'}</dd></div>
           <div><dt>Local</dt><dd>{subscription.warehouseCode}</dd></div>
         </dl>
-        {subscription.prepaid && <p className="drawer-text">Pago adelantado de {money(subscription.prepaidAmount)}{Number(subscription.prepaidDiscountPercent) > 0 ? ` con ${number(subscription.prepaidDiscountPercent)} % de descuento` : ''}.</p>}
+        {subscription.prepaid && <p className="drawer-text">Facturación anticipada por {money(subscription.prepaidAmount)}{Number(subscription.prepaidDiscountPercent) > 0 ? ` con ${number(subscription.prepaidDiscountPercent)} % de descuento` : ''}. No implica cobro confirmado.</p>}
         {subscription.status === 'CANCELLED' && <p className="drawer-text">Cancelada por {subscription.cancelledBy}: {subscription.cancellationReason}</p>}
+        </>}
+        {tab === 'calendar' && <>
         <h3 className="drawer-subtitle">Calendario de cobros</h3>
         <ul className="line-items">{listFrom(subscription.installments).map(item => <li key={item.id}>
           <span><strong>Cobro {item.sequence} · {calendarDate(item.billingDate)}</strong>
             <small>Periodo {calendarDate(item.periodStart)} – {calendarDate(item.periodEnd)}{item.saleNumber ? ` · Factura ${item.saleNumber}` : ''}</small></span>
           <span className="installment-amount"><strong>{money(item.amount)}</strong><span className={'pill ' + statusTone(item.status)}>{statusLabel('installment', item.status)}</span></span>
         </li>)}</ul>
+        </>}
+        {tab === 'activity' && <div className="subscription-activity">
+          <p><strong>Creado por:</strong> {subscription.createdBy || '—'} · {calendarDate(subscription.createdAt)}</p>
+          <p><strong>Condiciones:</strong> {subscription.billingFrequencyLabel} durante {termLabel(options, subscription.termMonths)}.</p>
+          {subscription.cancelledAt && <p><strong>Cancelación:</strong> {calendarDate(subscription.cancelledAt)} por {subscription.cancelledBy || '—'}.</p>}
+          {subscription.lastBillingError && <p className="inline-warning">{subscription.lastBillingError}</p>}
+        </div>}
       </>}
     </Drawer>
     {action === 'cancel' && subscription && <CancelModal subscription={subscription} onClose={() => setAction('')} onDone={updated} />}
@@ -283,17 +298,32 @@ function SubscriptionDrawer({ id, can, options, onClose, onChanged }) {
 export default function SubscriptionsPage({ can, products, customers, warehouses, detailId, onOpenDetail, onCloseDetail, onChanged }) {
   const options = useSubscriptionOptions();
   const [status, setStatus] = useState('ACTIVE');
+  const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [billingErrorOnly, setBillingErrorOnly] = useState(false);
+  const [warehouseId, setWarehouseId] = useState('');
+  const [nextBillingFrom, setNextBillingFrom] = useState('');
+  const [nextBillingTo, setNextBillingTo] = useState('');
   const [page, setPage] = useState(0);
   const [creating, setCreating] = useState(false);
   const [result, setResult] = useState({ loading: true, rows: [], total: 0, pages: 1 });
   const [reloadKey, setReloadKey] = useState(0);
-  useEffect(() => { setPage(0); }, [status]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  useEffect(() => { setPage(0); }, [status, debouncedQuery, billingErrorOnly, warehouseId, nextBillingFrom, nextBillingTo]);
 
   useEffect(() => {
     let active = true;
     setResult(current => ({ ...current, loading: true }));
     const params = { page, size: PAGE_SIZE, sort: 'createdAt,desc' };
     if (status) params.status = status;
+    if (debouncedQuery) params.q = debouncedQuery;
+    if (billingErrorOnly) params.billingError = true;
+    if (warehouseId) params.warehouseId = warehouseId;
+    if (nextBillingFrom) params.nextBillingFrom = nextBillingFrom;
+    if (nextBillingTo) params.nextBillingTo = nextBillingTo;
     api.subscriptions(params)
       .then(payload => {
         if (!active) return;
@@ -306,16 +336,30 @@ export default function SubscriptionsPage({ can, products, customers, warehouses
         toast.error(error?.message || 'No se pudieron cargar las suscripciones.');
       });
     return () => { active = false; };
-  }, [status, page, reloadKey]);
+  }, [status, debouncedQuery, billingErrorOnly, warehouseId, nextBillingFrom, nextBillingTo, page, reloadKey]);
 
   const refresh = useCallback(() => { setReloadKey(key => key + 1); onChanged?.(); }, [onChanged]);
 
   return <div className="page">
+    <header className="page-heading">
+      <div><h1>Suscripciones y contratos</h1><p>Contratos, calendario de facturación e incidencias de cobro.</p></div>
+      {can('sales:manage') && <button type="button" className="button primary" onClick={() => setCreating(true)}><Plus size={16} />Nueva suscripción</button>}
+    </header>
+    <div className="subscription-summary">
+      <article><span>Activas</span><strong>{status === 'ACTIVE' ? number(result.total) : '—'}</strong><small>Contratos vigentes</small></article>
+      <article><span>Facturado en la vista</span><strong>{money(result.rows.reduce((sum, item) => sum + Number(item.invoicedAmount || 0), 0))}</strong><small>No representa cobro confirmado</small></article>
+      <article className={result.rows.some(item => item.lastBillingError) ? 'warning' : ''}><span>Incidencias</span><strong>{result.rows.filter(item => item.lastBillingError).length}</strong><small>Errores visibles en esta página</small></article>
+      <article><span>Próximo periodo</span><strong>{result.rows.filter(item => item.nextBillingDate).length}</strong><small>Cargos programados en la vista</small></article>
+    </div>
     <div className="filter-bar">
       <div className="segmented" role="group" aria-label="Estado de la suscripción">
         {STATUSES.map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={status === value} onClick={() => setStatus(value)}>{label}</button>)}
       </div>
-      {can('sales:manage') && <div className="filter-actions"><button type="button" className="button primary" onClick={() => setCreating(true)}><Plus size={16} />Nueva suscripción</button></div>}
+      <label className="search-box subscriptions-search"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} aria-label="Buscar suscripciones" placeholder="Número, cliente o servicio" /></label>
+      <select aria-label="Filtrar por local" value={warehouseId} onChange={event => setWarehouseId(event.target.value)}><option value="">Todos los locales</option>{listFrom(warehouses).filter(isActive).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+      <label className="subscription-date-filter"><span>Desde</span><input type="date" value={nextBillingFrom} onChange={event => setNextBillingFrom(event.target.value)} /></label>
+      <label className="subscription-date-filter"><span>Hasta</span><input type="date" value={nextBillingTo} onChange={event => setNextBillingTo(event.target.value)} /></label>
+      <button type="button" className={'button secondary' + (billingErrorOnly ? ' selected' : '')} aria-pressed={billingErrorOnly} onClick={() => setBillingErrorOnly(value => !value)}><AlertCircle size={16} />Con errores</button>
     </div>
     {result.loading && !result.rows.length ? <SkeletonTable rows={6} columns={6} label="Cargando suscripciones" /> : <div className={'table-wrap data-table' + (result.loading ? ' is-refreshing' : '')}>
       <table aria-label="Suscripciones">

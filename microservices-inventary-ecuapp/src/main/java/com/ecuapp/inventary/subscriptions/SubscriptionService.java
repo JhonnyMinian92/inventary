@@ -98,12 +98,15 @@ public class SubscriptionService {
     }
 
     @Transactional(readOnly = true)
-    public Page<SubscriptionDtos.View> list(Subscription.Status status, UUID customerId, Pageable pageable,String actor) {
+    public Page<SubscriptionDtos.View> list(Subscription.Status status, UUID customerId, UUID warehouseId, String q,
+                                            LocalDate nextBillingFrom, LocalDate nextBillingTo, Boolean billingError,
+                                            Pageable pageable,String actor) {
         var allowed=scopes.accessibleWarehouseIds(actor);
         Pageable limited=Pages.of(pageable,SORT,Sort.by(Sort.Direction.DESC,"createdAt"));
         if(allowed!=null&&allowed.isEmpty())return Page.empty(limited);
-        Page<Subscription> page = allowed==null?subscriptions.search(status,customerId,limited):
-            subscriptions.searchScoped(status,customerId,allowed,limited);
+        String normalized=q==null||q.trim().isEmpty()?null:q.trim();
+        Page<Subscription> page = allowed==null?subscriptions.search(status,customerId,warehouseId,normalized,billingError,nextBillingFrom,nextBillingTo,limited):
+            subscriptions.searchScoped(status,customerId,warehouseId,normalized,billingError,nextBillingFrom,nextBillingTo,allowed,limited);
         Map<UUID, Sale> invoices = invoicesOf(page.getContent());
         return page.map(s -> view(s, invoices, false));
     }

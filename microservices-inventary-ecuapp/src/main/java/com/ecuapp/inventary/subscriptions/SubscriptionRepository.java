@@ -18,9 +18,30 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @Query("select s from Subscription s where s.id = :id")
     Optional<Subscription> findForUpdate(@Param("id") UUID id);
 
-    @Query(value = "select s from Subscription s join fetch s.customer join fetch s.product join fetch s.warehouse where (:status is null or s.status = :status) and (:customerId is null or s.customer.id = :customerId)",
-        countQuery = "select count(s) from Subscription s where (:status is null or s.status = :status) and (:customerId is null or s.customer.id = :customerId)")
-    Page<Subscription> search(@Param("status") Subscription.Status status, @Param("customerId") UUID customerId, Pageable pageable);
+    @Query(value = """
+        select s from Subscription s join fetch s.customer join fetch s.product join fetch s.warehouse
+        where (:status is null or s.status=:status) and (:customerId is null or s.customer.id=:customerId)
+          and (:warehouseId is null or s.warehouse.id=:warehouseId)
+          and (:q is null or lower(s.subscriptionNumber) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.customer.name) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.product.name) like lower(concat('%', cast(:q as string), '%')))
+          and (:billingError is null or (:billingError=true and s.lastBillingError is not null) or (:billingError=false and s.lastBillingError is null))
+          and (:nextBillingFrom is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate>=:nextBillingFrom))
+          and (:nextBillingTo is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate<=:nextBillingTo))
+        """, countQuery = """
+        select count(s) from Subscription s
+        where (:status is null or s.status=:status) and (:customerId is null or s.customer.id=:customerId)
+          and (:warehouseId is null or s.warehouse.id=:warehouseId)
+          and (:q is null or lower(s.subscriptionNumber) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.customer.name) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.product.name) like lower(concat('%', cast(:q as string), '%')))
+          and (:billingError is null or (:billingError=true and s.lastBillingError is not null) or (:billingError=false and s.lastBillingError is null))
+          and (:nextBillingFrom is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate>=:nextBillingFrom))
+          and (:nextBillingTo is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate<=:nextBillingTo))
+        """)
+    Page<Subscription> search(@Param("status") Subscription.Status status, @Param("customerId") UUID customerId,
+                              @Param("warehouseId") UUID warehouseId, @Param("q") String q, @Param("billingError") Boolean billingError,
+                              @Param("nextBillingFrom") LocalDate nextBillingFrom, @Param("nextBillingTo") LocalDate nextBillingTo, Pageable pageable);
 
     /** Active subscriptions with at least one charge due on or before the given day. */
     @Query("select distinct i.subscription.id from SubscriptionInstallment i where i.status = com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED " +
@@ -36,12 +57,28 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
         select s from Subscription s join fetch s.customer join fetch s.product join fetch s.warehouse
         where (:status is null or s.status=:status) and (:customerId is null or s.customer.id=:customerId)
           and s.warehouse.id in :warehouseIds
+          and (:warehouseId is null or s.warehouse.id=:warehouseId)
+          and (:q is null or lower(s.subscriptionNumber) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.customer.name) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.product.name) like lower(concat('%', cast(:q as string), '%')))
+          and (:billingError is null or (:billingError=true and s.lastBillingError is not null) or (:billingError=false and s.lastBillingError is null))
+          and (:nextBillingFrom is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate>=:nextBillingFrom))
+          and (:nextBillingTo is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate<=:nextBillingTo))
         """,
         countQuery = """
         select count(s) from Subscription s
         where (:status is null or s.status=:status) and (:customerId is null or s.customer.id=:customerId)
           and s.warehouse.id in :warehouseIds
+          and (:warehouseId is null or s.warehouse.id=:warehouseId)
+          and (:q is null or lower(s.subscriptionNumber) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.customer.name) like lower(concat('%', cast(:q as string), '%'))
+               or lower(s.product.name) like lower(concat('%', cast(:q as string), '%')))
+          and (:billingError is null or (:billingError=true and s.lastBillingError is not null) or (:billingError=false and s.lastBillingError is null))
+          and (:nextBillingFrom is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate>=:nextBillingFrom))
+          and (:nextBillingTo is null or exists(select i.id from SubscriptionInstallment i where i.subscription=s and i.status=com.ecuapp.inventary.subscriptions.SubscriptionInstallment.Status.SCHEDULED and i.billingDate<=:nextBillingTo))
         """)
     Page<Subscription> searchScoped(@Param("status") Subscription.Status status,@Param("customerId") UUID customerId,
-                                    @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
+                                    @Param("warehouseId") UUID warehouseId, @Param("q") String q,
+                                    @Param("billingError") Boolean billingError, @Param("nextBillingFrom") LocalDate nextBillingFrom,
+                                    @Param("nextBillingTo") LocalDate nextBillingTo, @Param("warehouseIds") java.util.Collection<UUID> warehouseIds,Pageable pageable);
 }

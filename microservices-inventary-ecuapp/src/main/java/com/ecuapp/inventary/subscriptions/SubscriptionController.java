@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.time.LocalDate;
 
 /** Reads need sales:read, writes sales:manage; discounts on prepayment additionally need sales:discount. */
 @RestController
@@ -28,8 +29,11 @@ public class SubscriptionController {
 
     @GetMapping @PreAuthorize("hasAuthority('sales:read')")
     public Page<SubscriptionDtos.View> list(@RequestParam(required = false) Subscription.Status status, @RequestParam(required = false) UUID customerId,
+                                            @RequestParam(required = false) UUID warehouseId, @RequestParam(required = false) String q,
+                                            @RequestParam(required = false) LocalDate nextBillingFrom, @RequestParam(required = false) LocalDate nextBillingTo,
+                                            @RequestParam(required = false) Boolean billingError,
                                             @PageableDefault(size = 20) Pageable pageable,Authentication auth) {
-        return service.list(status, customerId, pageable,auth.getName());
+        return service.list(status, customerId, warehouseId, q, nextBillingFrom, nextBillingTo, billingError, pageable,auth.getName());
     }
 
     @GetMapping("/{id}") @PreAuthorize("hasAuthority('sales:read')")
