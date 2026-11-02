@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface ProductRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<Product,UUID> {
  boolean existsBySku(String sku);
  boolean existsBySkuIgnoreCase(String sku);
+ long countByCategory_IdAndActiveTrue(UUID categoryId);
  Optional<Product> findBySkuIgnoreCase(String sku);
  boolean existsByUnitOfMeasureIdAndActiveTrue(UUID unitOfMeasureId);
  boolean existsByUnitOfMeasureId(UUID unitOfMeasureId);
