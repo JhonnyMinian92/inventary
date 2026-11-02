@@ -88,3 +88,27 @@ test('adjunta el token volátil a las peticiones autenticadas', async () => {
     else delete globalThis.localStorage;
   }
 });
+
+test('no persiste en localStorage cuando el usuario no marcó mantener sesión', () => {
+  const originalSession = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  const originalLocal = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const values = new Map();
+  const local = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  };
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, get() { throw new Error('sessionStorage blocked'); } });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: local });
+  try {
+    setToken('tab-only-token', { persist: false, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    assert.equal(getToken(), 'tab-only-token');
+    assert.equal(values.has('inventary.accessToken'), false);
+  } finally {
+    setToken('');
+    if (originalSession) Object.defineProperty(globalThis, 'sessionStorage', originalSession);
+    else delete globalThis.sessionStorage;
+    if (originalLocal) Object.defineProperty(globalThis, 'localStorage', originalLocal);
+    else delete globalThis.localStorage;
+  }
+});
