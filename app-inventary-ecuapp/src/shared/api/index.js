@@ -1,4 +1,3 @@
-
 import { authApi } from './auth/api.js';
 import { catalogApi } from './catalog/api.js';
 import { partnersApi } from './partners/api.js';
@@ -13,5 +12,5 @@ export const api = Object.freeze({
   ...authApi, ...catalogApi, ...partnersApi, ...inventoryApi, ...reportsApi,
   ...purchasingApi, ...salesApi, ...subscriptionsApi, ...whatsappApi
 });
-export { API_BASE, ApiError, request, getToken, getTokenExpiry, setToken } from './http/request.js';
+export { API_BASE, ApiError, request, getToken, getTokenExpiry, setToken, endSessionAcrossTabs, subscribeToSessionEnd } from './http/request.js';
 export { listFrom, identifier, listAllPages, resolveApiUrl } from './utils.js';
