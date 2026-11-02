@@ -2,7 +2,7 @@
 
 SPA React 19 + Vite 8 que consume la API REST de Inventary. El navegador no escribe saldos ni calcula como autoridad los efectos contables/inventario: los comandos transaccionales se envían al backend, que valida permisos, reglas, idempotencia y consistencia.
 
-**Código auditado:** implementacion_propuestas · dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
+**Código auditado:** implementacion_propuestas · revisión de login en progreso de validación CI. Consulta [auditoría de login y sesión](docs/login-session-audit.md).
 
 ## Requisitos
 
@@ -31,7 +31,7 @@ El Nginx de Docker sirve la SPA bajo /inventary/ y reenvía /inventary/api/ al b
 
 | Área | Capacidades visibles |
 |---|---|
-| Acceso | Login con desafío/cifrado del cliente, estado de sesión y permisos. |
+| Acceso | Login con desafío/cifrado del cliente, sesión JWT, permisos, expiración, logout y fallback en memoria cuando Storage está bloqueado. La recuperación automática de contraseña y MFA aún no existen. |
 | Dashboard | KPIs, ventas, utilidad, alertas, pendientes, existencias por almacén y movimientos; señal SSE que solicita refresco. |
 | Catálogo | Productos, categorías, atributos, unidades, conversiones, galería de imágenes y variantes. |
 | Contactos | Clientes/proveedores, almacenes, registro de contribuyentes y establecimientos; gestión fiscal visible según permisos de UI. |
