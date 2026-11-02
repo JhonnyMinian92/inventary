@@ -1,6 +1,6 @@
 # Cobertura de API consumida por el frontend
 
-**Código auditado:** rama implementacion_propuestas, SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481.
+**Código funcional de referencia:** rama implementacion_propuestas, commit 992b131c2de9cf5ed60c83ec4b826d2797029270. La documentación por pantalla está en [Estado funcional pendiente por pantalla](../../ESTADO_FUNCIONAL_POR_PANTALLA.md).
 
 Esta matriz describe los endpoints que la SPA consume. No es el inventario completo del backend ni una certificación de que cada operación esté autorizada de forma segura. La referencia completa está en [25 — APIs del backend](../../microservices-inventary-ecuapp/docs/25-referencia-apis.md).
 
@@ -16,7 +16,7 @@ Esta matriz describe los endpoints que la SPA consume. No es el inventario compl
 | Operaciones de inventario | /inventory/counts, /inventory/transfers, /inventory/reorder-rules, /inventory/replenishment-suggestions | Conteos, traslados, reposición y reglas. |
 | Compras | /purchase-orders, /goods-receipts, /goods-receipts/{id}/returnable-lines, /purchase-returns | Órdenes, recepciones y devoluciones a proveedores. |
 | Ventas | /sales, /sales/{id}, /sales/{id}/request-cancellation, /sales/{id}/approve-cancellation | Ventas y cancelaciones aprobadas. |
-| Devoluciones/reembolsos | /sales-returns, /refunds, /refunds/{id}/... | Devoluciones físicas y estados iniciales de reembolso. La API de reembolsos tiene bloqueo crítico de autorización en backend. |
+| Devoluciones/reembolsos | /sales-returns, /refunds, /refunds/{id}/... | Devoluciones físicas y estados iniciales de reembolso. Desde el commit 5567df1 las rutas fiscales y de reembolso requieren permisos; la suite de seguridad está en validación CI. |
 | Suscripciones | /subscriptions, /subscriptions/options, /subscriptions/preview, acciones de facturación/prepago/cancelación | Calendarios y facturación interna. |
 | WhatsApp backoffice | /whatsapp-orders, /whatsapp-orders/work-summary, /whatsapp-orders/{id}, /whatsapp-orders/{id}/confirm-payment | Bandeja de trabajo, detalle y confirmación manual de pago. |
 | Reportes | /reports/inventory-balance, /reports/sales, /reports/purchases, /reports/kardex, /reports/valuation, /reports/low-stock | Balance por periodo, resultados comerciales, trazabilidad y valoración. |
@@ -38,6 +38,12 @@ Esta matriz describe los endpoints que la SPA consume. No es el inventario compl
 - Un 401 significa sesión ausente/no válida; un 403 significa que el usuario no tiene el permiso requerido. Ninguno debe convertirse en lista vacía o cifra cero.
 - El estado visual de una acción no sustituye la autorización ni la validación transaccional del servidor.
 
-## Riesgo de seguridad que afecta a esta matriz
+## Estado de seguridad tras los cambios recientes
 
-Aunque la UI muestre gestión fiscal y reembolsos solo a ciertos permisos, el código backend auditado mantiene permitAll para /api/v1/tax/** y /api/v1/refunds/**. La ocultación de pestañas no protege esos endpoints. No exponerlos a redes no confiables hasta corregir SecurityConfig/controladores y probar respuestas 401/403 por HTTP.
+- /api/v1/tax/** exige security:manage.
+- GET /api/v1/refunds/** exige sales:read.
+- POST /api/v1/refunds/*/approve exige sales:cancel.
+- Otras operaciones de reembolso exigen sales:manage.
+- Se añadió una prueba HTTP de contrato para rechazar llamadas sin autenticación y verificar permisos de lectura.
+
+La protección por ruta no cierra por sí sola el proceso financiero: siguen pendientes el ledger de pagos liquidados, conciliación, pasarela externa y confirmación autenticada del proveedor. La suite CI debe terminar correctamente antes de considerar verificado el cambio.
