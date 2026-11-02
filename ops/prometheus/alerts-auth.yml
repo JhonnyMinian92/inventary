@@ -26,6 +26,14 @@ groups:
         annotations:
           summary: "Picos de solicitudes limitadas"
           description: "La API está rechazando un volumen anómalo de solicitudes por límite."
+      - alert: InventaryMfaVerificationFailuresHigh
+        expr: sum(increase(inventary_auth_mfa_total{outcome=~"invalid_code|enrollment_failed"}[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Aumento de verificaciones MFA fallidas"
+          description: "Se detectaron múltiples códigos TOTP inválidos; revisar posible ataque o problemas de sincronización horaria."
       - alert: InventaryAuthenticationEmailDeliveryFailures
         expr: sum(increase(inventary_auth_email_total{outcome="failed"}[10m])) > 0
         for: 1m
