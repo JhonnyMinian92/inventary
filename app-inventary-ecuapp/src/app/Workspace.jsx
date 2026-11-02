@@ -13,9 +13,10 @@ export default function Workspace() {
 
   if (!auth.token) return <>
     <LoginPage onLogin={async credentials => {
-      await auth.login(credentials);
-      model.feedback.clearToasts();
-    }} />
+      const result = await auth.login(credentials);
+      if (!result?.mfaRequired) model.feedback.clearToasts();
+      return result;
+    }} onCompleteMfa={auth.completeMfaLogin} />
     <FeedbackHost />
   </>;
 
