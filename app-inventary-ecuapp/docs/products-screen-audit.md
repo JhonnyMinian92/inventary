@@ -62,7 +62,7 @@
 
 ## Evidencia CI
 
-**PASS — Frontend Build:** [ejecución 41448177000](https://github.com/JhonnyMinian92/inventary/actions/runs/41448177000), commit `890e9f78545012f5aba584692192d04cb5838352`.
+**PASS — Frontend Build:** [ejecución 41448540693](https://github.com/JhonnyMinian92/inventary/actions/runs/41448177000), commit `1d1f447fc6754dc7b81ef513622f0cd3fc12f259`.
 - 37/37 pruebas Node aprobadas.
 - Build de producción correcto.
 - Smoke browser responsive aprobado a 360, 768 y 1280 px.
