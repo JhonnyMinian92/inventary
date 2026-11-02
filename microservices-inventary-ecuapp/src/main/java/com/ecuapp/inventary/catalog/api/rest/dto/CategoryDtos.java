@@ -17,7 +17,8 @@ public final class CategoryDtos {
   @Size(max=50) List<CatalogStructureDtos.@Valid AttributeDefinitionRequest> definitions){
   public WriteRequest(String name,String description){this(name,description,null,null);}
  }
- public record View(UUID id,String name,String slug,String description,boolean active,Instant createdAt,Instant updatedAt){
-  public static View from(Category c){return new View(c.getId(),c.getName(),c.getSlug(),c.getDescription(),c.isActive(),c.getCreatedAt(),c.getUpdatedAt());}
+ public record View(UUID id,String name,String slug,String description,boolean active,Instant createdAt,Instant updatedAt,long productCount){
+  public static View from(Category c){return from(c,0);}
+  public static View from(Category c,long productCount){return new View(c.getId(),c.getName(),c.getSlug(),c.getDescription(),c.isActive(),c.getCreatedAt(),c.getUpdatedAt(),productCount);}
  }
 }
