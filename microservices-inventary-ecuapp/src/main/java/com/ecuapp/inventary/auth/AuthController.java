@@ -7,7 +7,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
     private final AuthService service;
-    public AuthController(AuthService service){this.service=service;}
+    private final AccountRecoveryService recovery;
+    public AuthController(AuthService service, AccountRecoveryService recovery){this.service=service;this.recovery=recovery;}
     /** Single-use ECDH P-256 key used to encrypt the credentials of exactly one login request. */
     @PostMapping("/login-challenge") public AuthDtos.LoginChallenge loginChallenge(){return service.loginChallenge();}
     @PostMapping("/login") public AuthDtos.TokenResponse login(@Valid @RequestBody AuthDtos.LoginRequest request){return service.login(request);}
