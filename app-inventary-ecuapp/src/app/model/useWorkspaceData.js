@@ -25,7 +25,7 @@ function totalOf(payload) { return pageMeta(payload).totalElements; }
  * Operational lists are server-paginated; large histories are never downloaded into the browser.
  * A monotonically increasing version prevents slower responses from overwriting a newer view.
  */
-export function useWorkspaceData({ token, section, modal, listPage = 0, listQuery = '', purchaseStatus = '', expireSession, onError }) {
+export function useWorkspaceData({ token, section, modal, listPage = 0, listQuery = '', purchaseStatus = '', canReadInventory = true, expireSession, onError }) {
   const [data, setData] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
@@ -75,7 +75,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, listQuer
 
     if (section === 'products' || section === 'categories') {
       add('categories', () => api.categories({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
-      add('balances', () => api.balances({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
+      if (canReadInventory) add('balances', () => api.balances({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
     }
 
     if (section === 'purchases') {
@@ -181,7 +181,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, listQuer
     if (importantErrors.length) onError?.(importantErrors[0].message);
     setHasLoadedData(true);
     setLoading(false);
-  }, [token, section, modal, listPage, listQuery, purchaseStatus, expireSession, onError]);
+  }, [token, section, modal, listPage, listQuery, purchaseStatus, canReadInventory, expireSession, onError]);
 
   useEffect(() => {
     setHasLoadedData(false);
