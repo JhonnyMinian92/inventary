@@ -33,7 +33,7 @@ El Nginx de Docker sirve la SPA bajo /inventary/ y reenvía /inventary/api/ al b
 |---|---|
 | Acceso | Login con desafío/cifrado del cliente, sesión JWT, permisos, expiración, logout y fallback en memoria cuando Storage está bloqueado. La recuperación automática de contraseña y MFA aún no existen. |
 | Dashboard | KPIs, ventas, utilidad, alertas, pendientes, existencias por almacén y movimientos; señal SSE que solicita refresco. |
-| Catálogo | Productos, categorías, atributos, unidades, conversiones, galería de imágenes y variantes. | Detalle de implementación, pruebas y brechas: [auditoría de la pantalla Productos](docs/products-screen-audit.md).
+| Catálogo | Productos, categorías, atributos, unidades, conversiones, galería de imágenes y variantes. Consulta la [auditoría de la pantalla Productos](docs/catalog-products-audit.md). |
 | Contactos | Clientes/proveedores, almacenes, registro de contribuyentes y establecimientos; gestión fiscal visible según permisos de UI. |
 | Inventario | Centro de mando, existencias, movimientos, operaciones, conteos, ajustes, transferencias y reposición. |
 | Compras | Pestañas de órdenes, recepciones y devoluciones; filtros/paginación server-side para órdenes, recepciones y devoluciones. |
