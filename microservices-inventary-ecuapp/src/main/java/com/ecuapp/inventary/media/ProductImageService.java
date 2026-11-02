@@ -27,8 +27,9 @@ public class ProductImageService {
   if(!product.isActive())throw new BusinessRuleException("No se pueden publicar imágenes de un producto inactivo.");
   String url=r.imageUrl().trim();
   if(url.length()>2048||url.chars().anyMatch(Character::isISOControl))throw new BusinessRuleException("La URL de imagen no es válida.");
-  if(r.primaryImage())images.clearPrimary(productId);
+  if(r.primaryImage()){images.clearPrimary(productId);product=products.findById(productId).orElseThrow(()->new ResourceNotFoundException("Producto",productId));}
   ProductImage image=images.saveAndFlush(new ProductImage(product,url,clean(r.altText()),r.sortOrder(),r.primaryImage()));
+  synchronizePrimary(product);
   audit.record(actor,"PRODUCT_IMAGE_PUBLISHED","PRODUCT_IMAGE",image.getId(),Map.of("productId",productId.toString(),"primary",r.primaryImage()));
   return ProductImageDtos.View.from(image);
  }
@@ -44,9 +45,10 @@ public class ProductImageService {
     }
    });
   }
-  if(primaryImage)images.clearPrimary(productId);
+  if(primaryImage){images.clearPrimary(productId);product=products.findById(productId).orElseThrow(()->new ResourceNotFoundException("Producto",productId));}
   try{
    ProductImage image=images.saveAndFlush(new ProductImage(product,stored.publicUrl(),clean(altText),sortOrder,primaryImage));
+   synchronizePrimary(product);
    audit.record(actor,"PRODUCT_IMAGE_UPLOADED","PRODUCT_IMAGE",image.getId(),Map.of(
     "productId",productId.toString(),"primary",primaryImage,"contentType",stored.contentType(),"sizeBytes",stored.size()));
    return ProductImageDtos.View.from(image);
@@ -61,6 +63,7 @@ public class ProductImageService {
   if(r.primaryImage())images.clearPrimaryExcept(productId,imageId);
   image.update(clean(r.altText()),r.sortOrder(),r.primaryImage());
   images.save(image);
+  synchronizePrimary(image.getProduct());
   audit.record(actor,"PRODUCT_IMAGE_UPDATED","PRODUCT_IMAGE",imageId,Map.of("productId",productId.toString(),"primary",r.primaryImage()));
   return ProductImageDtos.View.from(image);
  }
@@ -68,7 +71,9 @@ public class ProductImageService {
   ProductImage image=images.findByIdAndProductId(imageId,productId).orElseThrow(()->new ResourceNotFoundException("Imagen de producto",imageId));
   if(!image.isPublished())return;
   String fileName=uploadedFileName(image.getImageUrl());
+  Product product=image.getProduct();
   image.unpublish();
+  synchronizePrimary(product);
   audit.record(actor,"PRODUCT_IMAGE_UNPUBLISHED","PRODUCT_IMAGE",imageId,Map.of("productId",productId.toString()));
   if(fileName!=null&&TransactionSynchronizationManager.isSynchronizationActive()){
    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){
@@ -77,6 +82,16 @@ public class ProductImageService {
     }
    });
   }
+ }
+ private void synchronizePrimary(Product product){
+  List<ProductImage> published=images.findByProductIdAndPublishedTrueOrderBySortOrderAsc(product.getId());
+  ProductImage primary=published.stream().filter(ProductImage::isPrimaryImage).findFirst().orElse(null);
+  if(primary==null&&!published.isEmpty()){
+   primary=published.get(0);
+   primary.setPrimary(true);
+   images.save(primary);
+  }
+  product.setImageUrl(primary==null?null:primary.getImageUrl());
  }
  private String uploadedFileName(String imageUrl){
   String prefix="/api/v1/public/media/products/";
