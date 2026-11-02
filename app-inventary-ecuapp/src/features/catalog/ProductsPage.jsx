@@ -267,32 +267,23 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     return totals;
   }, [balances]);
 
-  const rows = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    const filtered = serverProducts.filter(product => {
-      const id = String(idOf(product));
-      const onHand = stock.get(id)?.onHand || 0;
-      if (text && ![product.name, product.sku, product.description].some(value => String(value || '').toLowerCase().includes(text))) return false;
-      if (categoryId && String(product.categoryId ?? product.category?.id) !== categoryId) return false;
-      if (statusFilter === 'active' && isInactive(product)) return false;
-      if (statusFilter === 'inactive' && !isInactive(product)) return false;
-      if (stockFilter === 'with' && !(onHand > 0)) return false;
-      if (stockFilter === 'without' && onHand > 0) return false;
-      return true;
-    });
-    const value = product => sort.key === 'stock' ? stock.get(String(idOf(product)))?.onHand || 0
-      : sort.key === 'price' ? Number(product.salePrice || 0)
-      : sort.key === 'category' ? categoryNames.get(String(product.categoryId)) || ''
-      : String(product.name || '').toLowerCase();
-    return filtered.sort((a, b) => {
-      const left = value(a), right = value(b);
-      const order = typeof left === 'number' ? left - right : String(left).localeCompare(String(right), 'es');
-      return sort.dir === 'asc' ? order : -order;
-    });
-  }, [serverProducts, query, categoryId, statusFilter, stockFilter, sort, stock, categoryNames]);
+  // Search, category, kind, status and all supported sort keys are authoritative on the
+  // server. Do not filter them again here: the API also searches variant barcodes, which
+  // are intentionally not repeated in the parent product projection.
+  const rows = useMemo(() => serverProducts.filter(product => {
+    const onHand = stock.get(String(idOf(product)))?.onHand || 0;
+    if (stockFilter === 'with' && !(onHand > 0)) return false;
+    if (stockFilter === 'without' && onHand > 0) return false;
+    return true;
+  }), [serverProducts, stockFilter, stock]);
 
-  // The API already returns one server page; applying a second local offset empties page 2+.
-  const visible = rows;
+  // Stock is aggregated from warehouse balances and therefore sorted only within the
+  // currently loaded page. Every other sort is performed by the paginated API.
+  const visible = useMemo(() => sort.key !== 'stock' ? rows : [...rows].sort((a, b) => {
+    const left = stock.get(String(idOf(a)))?.onHand || 0;
+    const right = stock.get(String(idOf(b)))?.onHand || 0;
+    return (sort.dir === 'asc' ? 1 : -1) * (left - right);
+  }), [rows, sort, stock]);
   const active = serverProducts.filter(product => !isInactive(product));
   const withoutStock = active.filter(product => !(stock.get(String(idOf(product)))?.onHand > 0)).length;
   const toggleSort = key => {
