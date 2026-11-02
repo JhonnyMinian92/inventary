@@ -8,7 +8,7 @@ Esta matriz describe los endpoints que la SPA consume. No es el inventario compl
 |---|---|---|
 | Sesión | POST /auth/login, POST /auth/login-challenge, GET /auth/me, POST /auth/logout, PUT /auth/me/password | Login cifrado, desafío de credenciales, perfil/permisos, cierre e invalidación/cambio de contraseña. El cliente usa fallback volátil si Storage está bloqueado. |
 | Catálogo | /catalog/products, /catalog/categories, /catalog/units, /catalog/unit-dimensions, /catalog/unit-conversions, /catalog/attribute-presets, /catalog/product-kinds, /catalog/products/{id}/variants, /catalog/variants/{id} | Productos con filtros y paginación, orden por categoría, conteo activo por categoría, atributos versionados, fiscalidad, unidades y CRUD de variantes. La pantalla de productos documenta el alcance de stock y CSV por página en [auditoría de Productos](products-screen-audit.md). |
-| Imágenes | GET/POST/DELETE /catalog/products/{id}/images..., POST /catalog/products/{id}/images/upload | Galería, carga PNG/JPEG, retirada, texto alternativo e imagen principal. |
+| Imágenes | GET/POST/PATCH/DELETE /catalog/products/{id}/images..., POST /catalog/products/{id}/images/upload | Galería, carga PNG/JPEG, retirada, texto alternativo e imagen principal. |
 | Contactos | /customers, /suppliers, /partners | Clientes, proveedores y tipo de contraparte. |
 | Almacenes | /warehouses, /warehouses/{id}, /warehouses/{id}/establishment-assignments | Almacenes y asociaciones fiscales de establecimientos. |
 | Datos tributarios | /taxpayers, /taxpayers/{id}/establishments, /taxpayers/{id}/snapshots, /tax/rates, /tax/products/{id} | Registro manual de contribuyentes, tarifas y tratamiento fiscal de productos. No es consulta oficial ni emisión SRI. |
