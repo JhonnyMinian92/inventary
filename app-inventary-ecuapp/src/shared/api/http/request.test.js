@@ -112,3 +112,25 @@ test('no persiste en localStorage cuando el usuario no marcó mantener sesión',
     else delete globalThis.localStorage;
   }
 });
+
+test('notifica a los suscriptores cuando una sesión termina para sincronizar pestañas', async () => {
+  const { endSessionAcrossTabs, subscribeToSessionEnd } = await import('./request.js');
+  let notifications = 0;
+  const unsubscribe = subscribeToSessionEnd(() => { notifications += 1; });
+  try {
+    setToken('cross-tab-session-token', { expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    endSessionAcrossTabs();
+    assert.equal(notifications, 1);
+    assert.equal(getToken(), '');
+  } finally {
+    unsubscribe();
+    setToken('');
+  }
+});
+
+test('el logout remoto fallido no impide limpiar el token local', async () => {
+  const { endSessionAcrossTabs } = await import('./request.js');
+  setToken('logout-failure-token', { expiresAt: new Date(Date.now() + 60_000).toISOString() });
+  endSessionAcrossTabs();
+  assert.equal(getToken(), '');
+});
