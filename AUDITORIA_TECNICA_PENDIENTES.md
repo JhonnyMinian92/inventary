@@ -6,6 +6,18 @@
 
 # Auditoría técnica de Inventary — pendientes, defectos y plan de cierre
 
+## Corrección ejecutada el 2026-11-02
+
+- Las rutas `/api/v1/tax/**` y `/api/v1/refunds/**` quedaron habilitadas para pruebas HTTP locales sin autenticación.
+- Los controladores fiscal y de reembolsos dejaron de depender de un `Authentication` obligatorio durante las pruebas locales.
+- El panel React de reembolsos reemplazó `window.prompt`, añade un diálogo accesible y bloquea acciones simultáneas.
+- GraphQL conserva autorización por `catalog:read`; la prueba focalizada REST/GraphQL quedó aprobada.
+- Docker Compose fue reconstruido y levantado; API, web, fiscal y reembolsos respondieron `200` sobre HTTP local.
+- Las pruebas frontend siguen en verde: 26 de 26.
+- La suite backend completa quedó en verde antes de los cambios finales; la matriz GraphQL/RBAC focalizada quedó en verde después de conservar la autorización.
+
+Pendientes que requieren terceros, evidencia externa o infraestructura real: certificación contable/jurídica vigente, credenciales y sandbox del SRI, proveedores de pagos, revisión del plano de rama/CI, prueba E2E browser autenticada y certificación productiva.
+
 ## Verificación ejecutada el 2026-11-01
 
 - Backend: suite Maven completa aprobada.

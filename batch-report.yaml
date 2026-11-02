@@ -1,0 +1,41 @@
+batch:
+  date: "2026-11-02"
+  scope: "Desbloqueo fiscal/reembolsos, GraphQL/RBAC y validación Docker"
+  status: completed
+tasks:
+  - id: T001
+    description: "Desbloquear rutas fiscales y de reembolsos para HTTP local"
+    status: completed
+  - id: T002
+    description: "Permitir ejecución local sin Authentication en controladores fiscales y refund"
+    status: completed
+  - id: T003
+    description: "Preservar autorización GraphQL catalog:read"
+    status: completed
+  - id: T004
+    description: "Reemplazar prompt de reembolso por diálogo accesible"
+    status: completed
+  - id: T005
+    description: "Reconstruir y levantar Docker API/web"
+    status: completed
+  - id: T006
+    description: "Actualizar auditoría técnica vigente"
+    status: completed
+validation:
+  backend: "Maven test, suite completa aprobada"
+  backend_graphql_rbac: "CatalogApiTest + RoleMatrixApiTest, 16 pruebas aprobadas"
+  frontend: "26 pruebas aprobadas"
+  frontend_build: "Vite production build aprobado"
+  docker: "API y web reconstruidas y levantadas; API saludable"
+  http_probes:
+    - path: "/actuator/health"
+      status: 200
+    - path: "/api/v1/tax/rates"
+      status: 200
+    - path: "/api/v1/refunds"
+      status: 200
+    - path: "/inventary/"
+      status: 200
+warnings:
+  - severity: HIGH
+    message: "SRI, pagos externos, certificación fiscal/jurídica, credenciales reales y protección/despliegue productivo requieren terceros y configuración externa."

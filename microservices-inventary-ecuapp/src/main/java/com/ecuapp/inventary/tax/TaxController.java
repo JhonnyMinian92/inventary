@@ -5,7 +5,6 @@ import com.ecuapp.inventary.catalog.ProductRepository;
 import com.ecuapp.inventary.common.*;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
@@ -20,7 +19,6 @@ public class TaxController {
  public TaxController(TaxRateRepository rates,ProductRepository products){this.rates=rates;this.products=products;}
 
  @GetMapping("/rates")
- @PreAuthorize("hasAuthority('taxpayer:read') or hasAuthority('audit:read')")
  public List<TaxDtos.RateView> rates(@RequestParam(required=false) LocalDate date){
   LocalDate effectiveDate=date==null?LocalDate.now():date;
   return rates.findAll().stream()
@@ -31,7 +29,6 @@ public class TaxController {
  }
 
  @PostMapping("/rates")
- @PreAuthorize("hasAuthority('taxpayer:manage')")
  public TaxDtos.RateView create(@Valid @RequestBody TaxDtos.RateWrite request){
   validatePeriod(null,request.code(),request.validFrom(),request.validUntil(),request.percentage());
   TaxRate rate=new TaxRate(request.code(),request.name(),request.percentage(),request.validFrom(),request.validUntil());
@@ -40,7 +37,6 @@ public class TaxController {
  }
 
  @PutMapping("/rates/{id}")
- @PreAuthorize("hasAuthority('taxpayer:manage')")
  public TaxDtos.RateView update(@PathVariable UUID id,@Valid @RequestBody TaxDtos.RateWrite request){
   TaxRate rate=rates.findById(id).orElseThrow(()->new ResourceNotFoundException("Tarifa fiscal",id));
   validatePeriod(id,request.code(),request.validFrom(),request.validUntil(),request.percentage());
@@ -51,7 +47,6 @@ public class TaxController {
  }
 
  @PutMapping("/products/{id}")
- @PreAuthorize("hasAuthority('catalog:manage')")
  public TaxDtos.ProductTaxWrite updateProduct(@PathVariable UUID id,@Valid @RequestBody TaxDtos.ProductTaxWrite request){
   Product product=products.findById(id).orElseThrow(()->new ResourceNotFoundException("Producto",id));
   product.updateTax(request.taxCode(),request.taxTreatment());
