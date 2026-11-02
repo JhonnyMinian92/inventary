@@ -39,6 +39,12 @@ public class PurchaseOrder {
  }
  @PrePersist void onCreate(){if(createdAt==null)createdAt=Instant.now();if(orderedAt==null)orderedAt=Instant.now();}
  public void addLine(PurchaseOrderLine line){lines.add(line);line.setPurchaseOrder(this);}
+ public void replaceDraft(BusinessPartner supplier,Warehouse warehouse,String currency,BigDecimal subtotal,String notes,List<PurchaseOrderLine> replacementLines){
+  if(status!=PurchaseOrderStatus.DRAFT)throw new ConflictException("Solo se puede editar una orden en borrador.");
+  this.supplier=supplier;this.warehouse=warehouse;this.currency=currency;this.subtotal=subtotal;this.total=subtotal;this.notes=notes;
+  lines.clear();
+  replacementLines.forEach(this::addLine);
+ }
  /** @return false when the order was already submitted (idempotent retry). */
  public boolean submit(String actor){
   if(status==PurchaseOrderStatus.SUBMITTED)return false;

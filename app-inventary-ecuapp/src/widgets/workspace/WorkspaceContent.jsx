@@ -34,7 +34,7 @@ function WorkspaceContentView({ model }) {
           initialValue={state.editing} loading={state.loading} onCancel={actions.closeWorkflow}
           onSubmit={commands.submitCategory} onError={actions.setError} />}
         {state.modal === 'purchase' && <PurchaseForm products={data.products} warehouses={data.warehouses} suppliers={data.suppliers}
-          loading={state.loading} onCancel={actions.closeWorkflow} onSubmit={commands.submitPurchase} onError={actions.setError} />}
+          loading={state.loading} initialValue={state.editing} onCancel={actions.closeWorkflow} onSubmit={commands.submitPurchase} onError={actions.setError} />}
         {state.modal === 'sale' && <SaleForm products={data.products} warehouses={data.warehouses} customers={data.customers}
           balances={data.balances} loading={state.loading} onCancel={actions.closeWorkflow}
           onSubmit={commands.submitSale} onError={actions.setError} />}
@@ -84,7 +84,7 @@ function WorkspaceContentView({ model }) {
       return <PurchasingPage rows={data.purchases} loading={state.loading} pagination={data.pageInfo.purchases}
         query={state.listQuery} onSearch={actions.changeListQuery} page={state.listPage} onPageChange={actions.changeListPage} onView={order => actions.openDetail('purchase', order)}
         onSubmit={commands.submitPurchaseOrder} onApprove={commands.approvePurchaseOrder}
-        onCancel={commands.cancelPurchase} onReceive={commands.openReceive} onChanged={data.loadData} />;
+        onCancel={commands.cancelPurchase} onReceive={commands.openReceive} onEdit={actions.editPurchase} onChanged={data.loadData} can={auth.can} />;
     case 'sales':
       return <SalesPage rows={data.sales} loading={state.loading} pagination={data.pageInfo.sales}
         page={state.listPage} onPageChange={actions.changeListPage} onView={sale => actions.openDetail('sale', sale)}

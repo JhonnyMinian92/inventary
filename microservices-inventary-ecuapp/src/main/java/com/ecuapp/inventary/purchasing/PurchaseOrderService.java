@@ -116,6 +116,33 @@ public class PurchaseOrderService {
    "warehouseId",warehouse.getId().toString(),"lineCount",newLines.size(),"currency",order.getCurrency())));
   return PurchaseDtos.OrderView.from(orders.findDetailedById(order.getId()).orElseThrow());
  }
+  @Transactional public PurchaseDtos.OrderView update(UUID id,PurchaseDtos.CreateOrderRequest r,String actor){
+   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
+   if(order.getStatus()!=PurchaseOrderStatus.DRAFT)throw new ConflictException("Solo se puede editar una orden en borrador.");
+   scopes.requireWarehouseAccess(actor,r.warehouseId());
+   BusinessPartner supplier=partners.findForUpdateByIdAndTypeIn(r.supplierId(),List.of(PartnerType.SUPPLIER,PartnerType.BOTH)).orElseThrow(()->new ResourceNotFoundException("Proveedor",r.supplierId()));
+   if(!supplier.isActive())throw new BusinessRuleException("El proveedor está inactivo.");
+   Warehouse warehouse=warehouses.findForUpdate(r.warehouseId()).orElseThrow(()->new ResourceNotFoundException("Almacén",r.warehouseId()));
+   if(!warehouse.isActive())throw new BusinessRuleException("El almacén está inactivo.");
+   BigDecimal subtotal=BigDecimal.ZERO.setScale(2);String currency=null;Set<UUID> unique=new HashSet<>();
+   List<PurchaseDtos.OrderLineRequest> sorted=new ArrayList<>(r.items());sorted.sort(Comparator.comparing(x->x.productId().toString()));
+   List<PurchaseOrderLine> newLines=new ArrayList<>();
+   for(PurchaseDtos.OrderLineRequest line:sorted){
+    if(!unique.add(line.productId()))throw new BusinessRuleException("No repita el mismo producto en varias líneas de una orden de compra.");
+    Product product=products.findForUpdate(line.productId()).orElseThrow(()->new ResourceNotFoundException("Producto",line.productId()));
+    if(!product.isActive())throw new BusinessRuleException("No se puede comprar un producto inactivo.");
+    if(product.getKind()!=ProductKind.STOCKED_GOOD)throw new BusinessRuleException("Solo se pueden recibir físicamente productos con control de stock.");
+    if(currency==null)currency=product.getCurrency();else if(!currency.equals(product.getCurrency()))throw new BusinessRuleException("Todos los productos de una orden deben usar la misma moneda.");
+    BigDecimal quantity=line.quantity().setScale(3,RoundingMode.UNNECESSARY),unitCost=line.unitCost().setScale(2,RoundingMode.UNNECESSARY);
+    BigDecimal lineTotal=unitCost.multiply(quantity).setScale(2,RoundingMode.HALF_UP);
+    subtotal=subtotal.add(lineTotal).setScale(2,RoundingMode.HALF_UP);
+    newLines.add(new PurchaseOrderLine(product,quantity,unitCost,lineTotal));
+   }
+   order.replaceDraft(supplier,warehouse,currency==null?"USD":currency,subtotal,clean(r.notes()),newLines);
+   orders.save(order);
+   audit.record(actor,"PURCHASE_ORDER_UPDATED","PURCHASE_ORDER",id,Map.of("orderNumber",order.getOrderNumber(),"lineCount",newLines.size()));
+   return PurchaseDtos.OrderView.from(orders.findDetailedById(id).orElseThrow());
+  }
  @Transactional public PurchaseDtos.OrderView submit(UUID id,String actor){
   PurchaseOrder order=requireForUpdate(id);scopes.requireWarehouseAccess(actor,order.getWarehouse().getId());
    if(order.submit(actor)){

@@ -230,6 +230,15 @@ export default function useWorkspaceController() {
     setEditing(category);
     startWorkflow('category', category ? (category.id ?? category.categoryId ?? '') : '');
   }
+  async function editPurchase(order) {
+    try {
+      const detail = await api.purchaseOrder(productId(order) || order?.purchaseOrderId || order?.id);
+      setEditing(detail);
+      startWorkflow('purchase', productId(detail) || detail?.id || '');
+    } catch (loadError) {
+      setError(loadError?.message || 'No se pudo cargar el borrador.');
+    }
+  }
 
   async function handleLogout() {
     const logoutError = await logoutSession();
@@ -286,7 +295,7 @@ export default function useWorkspaceController() {
     data: workspace,
     metrics: { stockTotal, inventoryValueLabel, dashboardData },
     actions: {
-      navigateSection, changeListPage, changeListQuery, startWorkflow, closeWorkflow, openDetail, closeDetail,
+      navigateSection, changeListPage, changeListQuery, startWorkflow, closeWorkflow, openDetail, closeDetail, editPurchase,
       openProduct, openCategory, handleLogout, closeSaleCancellation, loadInventoryFilter,
       setError, setSaleCancelReason, setInventoryFilter
     },

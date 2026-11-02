@@ -115,7 +115,9 @@ export default function useWorkspaceCommands(context) {
   }
 
   async function submitPurchase(data) {
-    await runAction(() => api.createPurchaseOrder(data), 'Orden creada como borrador.');
+    const purchaseId = pickId(editing);
+    await runAction(() => purchaseId ? api.updatePurchaseOrder(purchaseId, data) : api.createPurchaseOrder(data),
+      purchaseId ? 'Borrador de compra actualizado.' : 'Orden creada como borrador.');
   }
 
   async function cancelPurchase(order) {

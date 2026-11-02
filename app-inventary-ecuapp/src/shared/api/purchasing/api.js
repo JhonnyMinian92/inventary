@@ -6,6 +6,7 @@ export const purchasingApi = {
   purchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id)),
   cancelPurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id) + '/cancel', { method: 'POST' }),
   createPurchaseOrder: data => request('/purchase-orders', { method: 'POST', body: data, idempotent: true }),
+  updatePurchaseOrder: (id, data) => request('/purchase-orders/' + encodeURIComponent(id), { method: 'PUT', body: data }),
   submitPurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id) + '/submit', { method: 'POST' }),
   approvePurchaseOrder: id => request('/purchase-orders/' + encodeURIComponent(id) + '/approve', { method: 'POST' }),
   createReceipt: (purchaseOrderId, data) => request('/purchase-orders/' + encodeURIComponent(purchaseOrderId) + '/receipts', { method: 'POST', body: data, idempotent: true }),
