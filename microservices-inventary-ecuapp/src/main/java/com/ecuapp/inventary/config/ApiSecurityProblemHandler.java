@@ -2,6 +2,7 @@ package com.ecuapp.inventary.config;
 
 import com.ecuapp.inventary.common.ApiProblemFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -19,15 +20,18 @@ import java.io.IOException;
 public class ApiSecurityProblemHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
     private final ApiProblemFactory problems;
     private final ObjectMapper mapper;
+    private final MeterRegistry metrics;
 
-    public ApiSecurityProblemHandler(ApiProblemFactory problems, ObjectMapper mapper) {
+    public ApiSecurityProblemHandler(ApiProblemFactory problems, ObjectMapper mapper, MeterRegistry metrics) {
         this.problems = problems;
         this.mapper = mapper;
+        this.metrics = metrics;
     }
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException exception) throws IOException {
+        metrics.counter("inventary.auth.authentication_errors", "reason", "unauthenticated").increment();
         write(request, response, HttpStatus.UNAUTHORIZED, "No autenticado",
                 "Se requiere una sesión válida para acceder a este recurso.", "AUTHENTICATION_REQUIRED");
     }
@@ -35,6 +39,7 @@ public class ApiSecurityProblemHandler implements AuthenticationEntryPoint, Acce
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException exception) throws IOException {
+        metrics.counter("inventary.auth.authorization_errors", "reason", "forbidden").increment();
         write(request, response, HttpStatus.FORBIDDEN, "Acceso denegado",
                 "La sesión no tiene permiso para realizar esta operación.", "ACCESS_DENIED");
     }
