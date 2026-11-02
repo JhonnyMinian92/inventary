@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.concurrent.ThreadLocalRandom;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.FilterChain;
@@ -30,11 +31,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Best-effort per-instance rate limit. X-Forwarded-For is deliberately not trusted here:
- * configure the gateway/WAF for distributed limits and only use forwarded client IPs when
- * they are overwritten by a known, trusted proxy.
- */
+/** Shared PostgreSQL rate limits for authentication paths; bounded in-memory limits for public integrations. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class ApiRateLimitFilter extends OncePerRequestFilter {
@@ -104,6 +101,9 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
                 digest(key),seconds,seconds);
             active.set(shared);
             limited.set(shared.requests() > policy.maxRequests());
+            if (ThreadLocalRandom.current().nextInt(1024) == 0) {
+                jdbc.update("DELETE FROM auth_rate_limit_window WHERE updated_at < CURRENT_TIMESTAMP - INTERVAL '2 days'");
+            }
         } else {
             windows.asMap().compute(key, (ignored, current) -> {
                 if (current == null || now - current.startedAtMillis() >= policy.windowMillis()) {
