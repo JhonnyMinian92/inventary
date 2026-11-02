@@ -72,3 +72,13 @@ test('stocked product payload does not send a manually editable sale price', () 
   assert.equal(payload.salePrice, undefined);
   assert.equal(payload.unitOfMeasureId, DEFAULT_PRODUCT_UNIT_ID);
 });
+
+test('page stock filtering keeps API search matches and aggregates warehouse balances', () => {
+  const product = { id: 'p1', name: 'Camiseta', sku: 'CAM-1' };
+  const other = { id: 'p2', name: 'Pantalón', sku: 'PAN-1' };
+  const rows = [product, other];
+  const balances = [{ productId: 'p1', onHand: 2 }, { productId: 'p1', onHand: 3 }];
+  assert.deepEqual(filterProductsByPageStock(rows, balances, ''), rows);
+  assert.deepEqual(filterProductsByPageStock(rows, balances, 'with'), [product]);
+  assert.deepEqual(filterProductsByPageStock(rows, balances, 'without'), [other]);
+});
