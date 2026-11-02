@@ -162,6 +162,16 @@ class CatalogApiTest extends ApiTestSupport {
 
         JsonNode filtered = httpGet(admin, "/api/v1/catalog/products?q=" + sku.substring(4, 10) + "&categoryId=" + categoryId + "&active=true&kind=STOCKED_GOOD", 200);
         assertEquals(1, filtered.get("page").get("totalElements").asInt());
+        JsonNode categorySorted = httpGet(admin, "/api/v1/catalog/products?categoryId=" + categoryId + "&sort=category.name,asc", 200);
+        assertEquals(1, categorySorted.get("page").get("totalElements").asInt(),
+            "category sort must be supported by the server-paginated product list");
+
+        Map<String, Object> fiscalUpdate = productBody(categoryId, sku);
+        fiscalUpdate.put("taxCode", "IVA_0");
+        fiscalUpdate.put("taxTreatment", "ZERO_RATED");
+        JsonNode fiscallyUpdated = httpPut(admin, "/api/v1/catalog/products/" + id, fiscalUpdate, 200);
+        assertEquals("IVA_0", fiscallyUpdated.get("taxCode").asText());
+        assertEquals("ZERO_RATED", fiscallyUpdated.get("taxTreatment").asText());
         assertEquals(0, httpGet(admin, "/api/v1/catalog/products?q=%25_%25&categoryId=" + categoryId, 200).get("page").get("totalElements").asInt(),
             "LIKE wildcards supplied by clients are escaped");
         problem(call(get("/api/v1/catalog/products?sort=costPrice"), admin, null), 400, "INVALID_QUERY");
