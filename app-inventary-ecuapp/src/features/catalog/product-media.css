@@ -149,3 +149,7 @@
 }
 
 .variant-form-actions { display:flex; flex-wrap:wrap; gap:8px; }
+
+.product-image-card-actions { display:flex; flex-wrap:wrap; align-items:center; gap:5px; width:100%; }
+.product-image-card-actions .icon-button { min-width:28px; width:28px; height:28px; }
+.product-image-card-actions .text-button { display:inline-flex; align-items:center; gap:4px; }
