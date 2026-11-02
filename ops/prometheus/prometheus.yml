@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 1m
+
+rule_files:
+  - /etc/prometheus/alerts/alerts-auth.yml
+
+scrape_configs:
+  - job_name: inventary-api
+    metrics_path: /actuator/prometheus
+    scheme: https
+    static_configs:
+      - targets: ["inventary-api.internal:8080"]
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/inventary-technical-token
+    tls_config:
+      # Use the internal CA in production; never set insecure_skip_verify.
+      ca_file: /etc/prometheus/certs/internal-ca.pem
