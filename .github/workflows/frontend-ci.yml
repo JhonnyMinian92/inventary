@@ -2,7 +2,7 @@ name: Frontend Build
 
 on:
   push:
-    branches: [master, implementacion_propuestas]
+    branches: [master, implementacion_propuestas, feat/login-hardening-e2e]
     paths:
       - "app-inventary-ecuapp/**"
       - ".github/workflows/frontend-ci.yml"
@@ -59,6 +59,10 @@ jobs:
         env:
           CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/responsive-smoke.mjs
+      - name: Authentication lifecycle browser E2E
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm run test:e2e:auth
       - name: Upload responsive browser screenshots
         if: always()
         uses: actions/upload-artifact@v4
