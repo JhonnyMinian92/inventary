@@ -22,8 +22,10 @@ public class TaxController {
  public List<TaxDtos.RateView> rates(@RequestParam(required=false) LocalDate date){
   LocalDate effectiveDate=date==null?LocalDate.now():date;
   return rates.findAll().stream()
-   .filter(rate->rate.isActive()||date!=null)
-   .map(rate->view(rate))
+   .filter(TaxRate::isActive)
+   .filter(rate->!rate.getValidFrom().isAfter(effectiveDate))
+   .filter(rate->rate.getValidUntil()==null||!rate.getValidUntil().isBefore(effectiveDate))
+   .map(this::view)
    .sorted(java.util.Comparator.comparing(TaxDtos.RateView::code).thenComparing(TaxDtos.RateView::validFrom))
    .toList();
  }
