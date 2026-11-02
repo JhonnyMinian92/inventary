@@ -124,7 +124,8 @@ public class ProductService implements ProductUseCases {
   Map<String,Object> attributes=validator.validateValues(command.attributes()==null?product.getAttributes():command.attributes(),schema,true);
   product.update(command.name().trim(),clean(command.description()),category,
    command.costPrice()==null?product.getCostPrice():money(command.costPrice()),
-   command.salePrice()==null?product.getSalePrice():money(command.salePrice()),currency(command.currency()),clean(command.imageUrl()));
+   command.salePrice()==null?product.getSalePrice():money(command.salePrice()),currency(command.currency()),
+   command.imageUrl()==null?product.getImageUrl():clean(command.imageUrl()));
   // A new markup without an explicit price reprices from the last purchase cost.
   product.changeMarginPercent(command.marginPercent(),command.salePrice()==null);
   configureService(product,command,false);
