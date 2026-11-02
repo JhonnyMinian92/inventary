@@ -2,6 +2,7 @@ import { api, listFrom } from '../../api.js';
 import { isInactive, titleCase } from '../../utils/format.js';
 import { confirmDialog } from '../../ui/feedback.js';
 import { detailPath, navigate, sectionPath } from '../../router.js';
+import { productWritePayload } from '../../entities/product/model/product.js';
 
 const WORKFLOW_MODALS = new Set(['product', 'category', 'purchase', 'sale', 'receive']);
 const WORKFLOW_SECTIONS = { product: 'products', category: 'categories', purchase: 'purchases', sale: 'sales', receive: 'purchases' };
@@ -50,20 +51,7 @@ export default function useWorkspaceCommands(context) {
   async function submitProduct(form) {
     if (!String(form.name || '').trim()) { setError('Escribe el nombre del producto.'); return; }
     if (!form.categoryId) { setError('Selecciona una categoría.'); return; }
-    const data = {
-      name: form.name.trim(), kind: form.kind || 'STOCKED_GOOD', categoryId: form.categoryId,
-      marginPercent: Number(form.marginPercent), description: form.description.trim()
-    };
-    if (form.attributes && typeof form.attributes === 'object' && !Array.isArray(form.attributes)) data.attributes = form.attributes;
-    if (form.unitOfMeasureId) data.unitOfMeasureId = form.unitOfMeasureId;
-    if (data.kind !== 'STOCKED_GOOD') data.salePrice = Number(form.manualPrice);
-    if (data.kind === 'SERVICE') {
-      data.serviceBilling = form.serviceBilling || 'ONE_TIME';
-      if (data.serviceBilling === 'SUBSCRIPTION') {
-        data.billingFrequency = form.billingFrequency;
-        data.termMonths = Number(form.termMonths);
-      }
-    }
+    const data = productWritePayload(form);
     if (!Number.isFinite(data.marginPercent) || data.marginPercent < 0 || data.marginPercent > 1000) {
       setError('La ganancia sugerida debe ser un porcentaje entre 0 y 1000.');
       return;
