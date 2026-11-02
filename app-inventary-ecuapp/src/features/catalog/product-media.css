@@ -153,3 +153,7 @@
 .product-image-card-actions { display:flex; flex-wrap:wrap; align-items:center; gap:5px; width:100%; }
 .product-image-card-actions .icon-button { min-width:28px; width:28px; height:28px; }
 .product-image-card-actions .text-button { display:inline-flex; align-items:center; gap:4px; }
+
+.product-image-alt-field { width:100%; gap:4px; }
+.product-image-alt-field > span { font-size:10px; }
+.product-image-alt-field input { width:100%; min-height:34px; padding:6px 8px; border:1px solid var(--line); border-radius:7px; font-size:11px; }
