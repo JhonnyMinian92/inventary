@@ -15,4 +15,5 @@ FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY nginx-security-headers.conf /etc/nginx/security-headers.conf
 COPY --from=build /workspace/dist /usr/share/nginx/html/inventary
+RUN apk add --no-cache wget
 EXPOSE 80

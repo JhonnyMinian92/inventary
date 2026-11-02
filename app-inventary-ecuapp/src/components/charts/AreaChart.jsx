@@ -17,6 +17,9 @@ export default function AreaChart({ data = [], height = 220, formatValue = Strin
   const y = value => PAD.top + innerHeight - (Number(value) || 0) / max * innerHeight;
   const line = data.map((point, index) => `${index ? 'L' : 'M'}${x(index).toFixed(1)},${y(point.value).toFixed(1)}`).join(' ');
   const area = data.length ? `${line} L${x(data.length - 1).toFixed(1)},${y(0)} L${x(0).toFixed(1)},${y(0)} Z` : '';
+  const depth = 7;
+  const depthLine = data.map((point, index) => `${index ? 'L' : 'M'}${(x(index) + depth).toFixed(1)},${(y(point.value) + depth).toFixed(1)}`).join(' ');
+  const depthArea = data.length ? `${depthLine} L${(x(data.length - 1) + depth).toFixed(1)},${y(0) + depth} L${(x(0) + depth).toFixed(1)},${y(0) + depth} Z` : '';
   const ticks = [0, max / 2, max];
   const xLabels = data.length > 2 ? [0, Math.floor((data.length - 1) / 2), data.length - 1] : data.map((_, index) => index);
   const last = data.length - 1;
@@ -38,12 +41,23 @@ export default function AreaChart({ data = [], height = 220, formatValue = Strin
   return <div ref={ref} className="chart-frame" style={{ height }}>
     {width > 0 && <svg width={width} height={height} role="img" aria-label={label} tabIndex={0}
       onPointerMove={event => pick(event.clientX)} onPointerLeave={() => setActive(null)} onFocus={() => setActive(last)} onBlur={() => setActive(null)} onKeyDown={onKeyDown}>
+      <defs>
+        <linearGradient id="chart-area-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity=".38" />
+          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity=".03" />
+        </linearGradient>
+        <linearGradient id="chart-line-depth" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#174f35" />
+          <stop offset="100%" stopColor="#0f3524" />
+        </linearGradient>
+      </defs>
       {ticks.map(tick => <g key={tick}>
         <line x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} className="chart-grid" />
         <text x={PAD.left - 10} y={y(tick)} className="chart-axis" textAnchor="end" dominantBaseline="middle">{formatAxis(tick)}</text>
       </g>)}
       {xLabels.map(index => <text key={index} x={x(index)} y={height - 8} className="chart-axis" textAnchor={index === 0 ? 'start' : index === last ? 'end' : 'middle'}>{data[index]?.label}</text>)}
-      <path d={area} fill={SERIES_COLOR} fillOpacity=".1" />
+      <path d={depthArea} fill="url(#chart-line-depth)" opacity=".16" />
+      <path d={area} fill="url(#chart-area-fill)" />
       <path d={line} fill="none" stroke={SERIES_COLOR} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
       {last >= 0 && active === null && <>
         <circle cx={x(last)} cy={y(data[last].value)} r="4" fill={SERIES_COLOR} stroke="#fff" strokeWidth="2" />
