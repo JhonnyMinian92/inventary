@@ -146,7 +146,7 @@ export default function ProductVariantsManager({ productId, definitions = [], di
     {!productActive && <p className="form-hint">El producto está inactivo. Puedes consultar o modificar variantes existentes, pero no crear nuevas hasta reactivarlo.</p>}
     {usableDefinitions.length === 0
       ? <p className="form-hint">Esta categoría no tiene propiedades simples para formar variantes. Agrega campos como talla, color o capacidad en la configuración de la categoría.</p>
-      : <div className="variant-create-form">
+      : <div className="variant-create-form" onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }}>
         <div className="form-grid workflow-fields">
           <label className="field"><span>SKU de variante<b> *</b></span><input required maxLength="64" value={sku} disabled={Boolean(editingVariantId)} onChange={event => setSku(event.target.value)} placeholder="Ej. CAM-NEG-M"/></label>
           <label className="field"><span>Código de barras</span><input maxLength="128" value={barcode} onChange={event => setBarcode(event.target.value)} placeholder="EAN / código interno"/></label>
