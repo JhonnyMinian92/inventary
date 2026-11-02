@@ -2,7 +2,7 @@
 
 Inventary es una aplicación web de EcuApp para administrar catálogo, almacenes, inventario, compras, ventas, devoluciones, suscripciones, pedidos de WhatsApp y reportes.
 
-**Código auditado:** rama implementacion_propuestas, SHA dc028a346ccf7b94cfbb60b4fb6cd5493518b481.  
+**Código auditado:** rama `implementacion_propuestas` (consulta el HEAD vigente). La auditoría de login y sesión, con Frontend CI y Backend CI aprobados, está en [login-session-audit.md](app-inventary-ecuapp/docs/login-session-audit.md). El estado funcional por pantalla se mantiene en [ESTADO_FUNCIONAL_POR_PANTALLA.md](ESTADO_FUNCIONAL_POR_PANTALLA.md).  
 **Arquitectura efectiva:** SPA React/Vite y API Spring Boot como monolito modular; PostgreSQL es la fuente transaccional. El nombre histórico de la carpeta backend no significa que existan microservicios desplegables por separado.
 
 > La documentación describe el código del SHA indicado. Las auditorías antiguas y las propuestas de producto se conservan como historial/diseño; no demuestran por sí mismas que una capacidad esté implementada.
