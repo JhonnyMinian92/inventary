@@ -123,7 +123,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     private Policy policy(String path) {
-        if ("/api/v1/auth/login".equals(path)) return new Policy("login", loginPerMinute, 60_000);
+        if ("/api/v1/auth/login".equals(path) || "/api/v1/auth/login-mfa".equals(path)) return new Policy("login", loginPerMinute, 60_000);
         if ("/api/v1/auth/login-challenge".equals(path)) return new Policy("login-challenge", loginChallengePerMinute, 60_000);
         if (path.startsWith("/api/v1/integrations/whatsapp/")) return new Policy("whatsapp", whatsappPerMinute, 60_000);
         if (path.startsWith("/api/v1/public/")) return new Policy("public", publicPerMinute, 60_000);
