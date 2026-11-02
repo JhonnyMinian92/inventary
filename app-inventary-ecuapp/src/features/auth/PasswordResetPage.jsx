@@ -11,8 +11,8 @@ export default function PasswordResetPage({ token }) {
 
   async function submit(event) {
     event.preventDefault();
-    if (password.length < 12) {
-      setNotice('La contraseña debe tener al menos 12 caracteres.');
+    if (password.length < 8 || password.length > 15 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      setNotice('Usa entre 8 y 15 caracteres e incluye mayúscula, minúscula, número y símbolo.');
       return;
     }
     setBusy(true);
@@ -39,8 +39,8 @@ export default function PasswordResetPage({ token }) {
         <form className="auth-form" onSubmit={submit}>
           <div className="auth-field">
             <label htmlFor="new-password">Nueva contraseña</label>
-            <input id="new-password" type="password" autoComplete="new-password" minLength={12}
-              maxLength={128} required value={password} onChange={event => setPassword(event.target.value)} />
+            <input id="new-password" type="password" autoComplete="new-password" minLength={8}
+              maxLength={15} required value={password} onChange={event => setPassword(event.target.value)} />
           </div>
           {notice && <p className="auth-hint" role="status" aria-live="polite">{notice}</p>}
           {!success && <button type="submit" className="auth-submit" disabled={busy}>
