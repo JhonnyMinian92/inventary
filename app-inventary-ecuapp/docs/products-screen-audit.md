@@ -12,6 +12,7 @@
 - El estado de filtros, orden y página queda reflejado en la URL y se restaura con Atrás/Adelante.
 - El orden por categoría ahora se ejecuta en el servidor con una ruta de ordenamiento permitida (`category.name`), en vez de ordenar solo la página visible.
 - El orden por existencia y el filtro por existencia permanecen explícitamente limitados a la página cargada, porque el endpoint no implementa todavía orden/filtro global por stock.
+- Si el rol no tiene `inventory:read` ni `inventory:manage`, la pantalla no solicita saldos, no muestra cantidades y no expone filtros de stock.
 - El CSV exporta todos los resultados que coinciden con texto, categoría, tipo y estado, recorriendo correctamente el metadato de paginación anidado del backend; incorpora saldos agregados si el usuario tiene permiso de lectura de inventario. El filtro/orden por existencia siguen siendo de alcance página y no se aplican al conjunto exportado.
 - El contador de Productos usa el total de resultados del servidor. El listado de categorías recibe `productCount` con el total de productos activos de cada categoría.
 
@@ -82,13 +83,15 @@
 1. El filtro y el orden por existencia son de alcance **página actual**, no globales. Para hacerlos globales hace falta un endpoint de inventario que filtre/ordene el catálogo con saldos agregados en base de datos.
 2. La exportación CSV completa recorre páginas y puede exportar hasta el límite defensivo de 100.000 registros; el filtro/orden por existencia de página no se aplica a esa exportación.
 3. No se ha añadido importación masiva de productos por CSV/XLSX ni actualización masiva con vista previa, conflictos y resultados por fila.
-4. No se han implementado edición de SKU, códigos internos alternativos ni etiquetas imprimibles; los SKU son inmutables por diseño.
-5. Las imágenes adicionales se gestionan al editar un producto ya creado; no se adjuntan antes del primer guardado.
-6. La galería acepta PNG/JPEG; formatos WebP/AVIF, antivirus/escaneo y CDN/almacenamiento externo deben evaluarse para producción.
-7. Las reglas de variantes dependen de propiedades simples definidas en la categoría. Atributos tipo lista no forman combinaciones de variante.
-8. El costo se mantiene como costo de referencia actualizado por recepción de compra; no equivale por sí solo al costo contable FIFO/promedio del inventario.
-9. Falta ejecutar E2E autenticado completo de alta, edición, filtros, paginación, variantes, imágenes, roles y errores contra backend efímero; el CI automatizado no sustituye la aceptación manual de negocio.
-10. El contador de categorías corresponde a productos activos, no a todas las referencias históricas inactivas.
+4. No existe todavía una puntuación de completitud/calidad de ficha configurable por categoría, ni filtros por atributos, ausencia de imagen o fecha de actualización.
+5. No hay asistente de IA para redactar/normalizar descripciones, mapear categorías o proponer atributos; cualquier futura sugerencia debe permanecer en borrador y requerir aprobación humana.
+6. No se han implementado edición de SKU, códigos internos alternativos ni etiquetas imprimibles; los SKU son inmutables por diseño.
+7. Las imágenes adicionales se gestionan al editar un producto ya creado; no se adjuntan antes del primer guardado.
+8. La galería acepta PNG/JPEG; formatos WebP/AVIF, antivirus/escaneo y CDN/almacenamiento externo deben evaluarse para producción.
+9. Las reglas de variantes dependen de propiedades simples definidas en la categoría. Atributos tipo lista no forman combinaciones de variante.
+10. El costo se mantiene como costo de referencia actualizado por recepción de compra; no equivale por sí solo al costo contable FIFO/promedio del inventario.
+11. Falta ejecutar E2E autenticado completo de alta, edición, filtros, paginación, variantes, imágenes, roles y errores contra backend efímero; el CI automatizado no sustituye la aceptación manual de negocio.
+12. El contador de categorías corresponde a productos activos, no a todas las referencias históricas inactivas.
 
 ## Criterio de cierre
 
