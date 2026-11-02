@@ -2,7 +2,7 @@
 
 SPA React 19 + Vite 8 que consume la API REST de Inventary. El navegador no escribe saldos ni calcula como autoridad los efectos contables/inventario: los comandos transaccionales se envían al backend, que valida permisos, reglas, idempotencia y consistencia.
 
-**Código auditado:** implementacion_propuestas · revisión de login en progreso de validación CI. Consulta [auditoría de login y sesión](docs/login-session-audit.md).
+**Código auditado:** rama `implementacion_propuestas`. Login y sesión revisados; Frontend CI y Backend CI aprobados. Evidencia y brechas: [auditoría de login y sesión](docs/login-session-audit.md).
 
 ## Requisitos
 
