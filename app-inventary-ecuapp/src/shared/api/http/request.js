@@ -1,13 +1,50 @@
 export const API_BASE = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080/api/v1').replace(/\/$/, '');
 const TOKEN_KEY = 'inventary.accessToken';
 const TOKEN_EXPIRY_KEY = 'inventary.accessTokenExpiresAt';
+const SESSION_END_KEY = 'inventary.sessionEndedAt';
 const IDEMPOTENCY_RETRY_WINDOW_MS = 120_000;
 const pendingIdempotencyKeys = new Map();
 
-// Storage can be disabled by browser privacy settings or fail with QuotaExceededError.
-// Keep a tab-scoped fallback so a successful login can still call /auth/me.
 let volatileToken = '';
 let volatileExpiry = 0;
+const sessionEndListeners = new Set();
+const logoutChannel = typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel('inventary-auth-session')
+  : null;
+
+function publishSessionEnd() {
+  for (const listener of sessionEndListeners) listener();
+  try { logoutChannel?.postMessage({ type: 'SESSION_ENDED' }); } catch { /* canal no disponible */ }
+  try {
+    globalThis.localStorage?.setItem(SESSION_END_KEY, String(Date.now()));
+  } catch { /* Storage puede estar bloqueado; BroadcastChannel sigue disponible */ }
+}
+
+logoutChannel?.addEventListener('message', event => {
+  if (event.data?.type !== 'SESSION_ENDED') return;
+  for (const listener of sessionEndListeners) listener();
+});
+
+if (typeof globalThis.addEventListener === 'function') {
+  globalThis.addEventListener('storage', event => {
+    if (event.key === SESSION_END_KEY) {
+      for (const listener of sessionEndListeners) listener();
+    }
+    if (event.key === TOKEN_KEY && event.newValue == null) {
+      for (const listener of sessionEndListeners) listener();
+    }
+  });
+}
+
+export function subscribeToSessionEnd(listener) {
+  sessionEndListeners.add(listener);
+  return () => sessionEndListeners.delete(listener);
+}
+
+export function endSessionAcrossTabs() {
+  setToken('');
+  publishSessionEnd();
+}
 
 function createIdempotencyKey() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -64,7 +101,7 @@ export function getToken() {
   const stored = readStoredToken();
   if (!stored) return '';
   if (stored.expiresAt && stored.expiresAt <= Date.now()) {
-    setToken('');
+    endSessionAcrossTabs();
     return '';
   }
   return stored.token;
@@ -130,7 +167,7 @@ export async function request(path, options = {}) {
     if (cached?.key === idempotencyKey) pendingIdempotencyKeys.delete(signature);
   }
   if (!response.ok) {
-    if (response.status === 401) setToken('');
+    if (response.status === 401) endSessionAcrossTabs();
     const message = payload?.detail || payload?.message || payload?.title ||
       (typeof payload === 'string' ? payload : '') || 'Error HTTP ' + response.status;
     throw new ApiError(message, response.status, payload, Number(response.headers.get('Retry-After')) || 0);
