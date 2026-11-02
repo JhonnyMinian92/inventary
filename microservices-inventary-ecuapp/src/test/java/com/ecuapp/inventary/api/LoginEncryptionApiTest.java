@@ -9,7 +9,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.Map;\nimport java.util.concurrent.CountDownLatch;\nimport java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;\nimport java.util.concurrent.Future;\nimport java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -75,6 +75,33 @@ class LoginEncryptionApiTest extends ApiTestSupport {
         String ghost = "ghost-" + suffix().toLowerCase();
         for (int i = 0; i < 5; i++) problem(loginAttempt(ghost, "Wrong-Pass-123!"), 401, "INVALID_CREDENTIALS");
         problem(loginAttempt(ghost, "Wrong-Pass-123!"), 429, "LOGIN_TEMPORARILY_LOCKED");
+    }
+
+
+    @Test
+    void concurrentFailuresCannotBypassTheAccountLockout() throws Exception {
+        String username = createUser("VENDEDOR");
+        int parallelAttempts = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(parallelAttempts);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> attempts = new java.util.ArrayList<>();
+            for (int i = 0; i < parallelAttempts; i++) {
+                attempts.add(pool.submit(() -> {
+                    start.await();
+                    return loginAttempt(username, "Wrong-Pass-123!", randomIp()).getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            for (Future<Integer> attempt : attempts) {
+                int status = attempt.get(45, TimeUnit.SECONDS);
+                assertTrue(status == 401 || status == 429, "unexpected concurrent login status: " + status);
+            }
+            problem(loginAttempt(username, PASSWORD), 429, "LOGIN_TEMPORARILY_LOCKED");
+        } finally {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
     }
 
     private MvcResult postLogin(String body, RequestPostProcessor client) throws Exception {
