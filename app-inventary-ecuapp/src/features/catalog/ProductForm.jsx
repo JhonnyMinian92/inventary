@@ -616,7 +616,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
             <small className="field-help">{imageFile ? `${imageFile.name} · ${(imageFile.size / 1024 / 1024).toFixed(2)} MB` : 'El archivo se valida también en el servidor.'}</small>
           </label>
           <label className="field"><span>Texto alternativo <small>(opcional)</small></span>
-            <input maxLength="300" value={imageAltText} disabled={imageBusy || loading} onChange={event => setImageAltText(event.target.value)} placeholder="Describe brevemente la imagen" />
+            <input maxLength="300" value={imageAltText} disabled={imageBusy || loading} onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} onChange={event => setImageAltText(event.target.value)} placeholder="Describe brevemente la imagen" />
           </label>
           <label className="checkbox-field product-image-primary">
             <span>Marcar como imagen principal</span>
@@ -634,7 +634,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
             <div className="product-image-card-details">
               <label className="field product-image-alt-field"><span>Texto alternativo</span>
                 <input type="text" maxLength="300" value={imageAltDrafts[image.id] ?? image.altText ?? ''} disabled={imageBusy || loading}
-                  onChange={event => setImageAltDrafts(current => ({ ...current, [image.id]: event.target.value }))} placeholder="Describe la imagen" />
+                  onKeyDown={event => { if (event.key === "Enter") event.preventDefault(); }} onChange={event => setImageAltDrafts(current => ({ ...current, [image.id]: event.target.value }))} placeholder="Describe la imagen" />
               </label>
               {image.primaryImage && <span className="product-image-primary-label"><Star size={12} fill="currentColor"/> Principal</span>}
               {String(imageAltDrafts[image.id] ?? image.altText ?? '').trim() !== String(image.altText || '') && <button type="button" className="text-button" disabled={imageBusy || loading} onClick={() => saveImageAltText(image)}>Guardar texto</button>}
