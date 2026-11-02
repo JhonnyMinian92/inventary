@@ -22,8 +22,9 @@
 ## Limitación distribuida
 
 - El bloqueo por cuenta se persiste en PostgreSQL en `auth_login_attempt`; las instancias comparten contadores y bloqueos mediante un UPSERT atómico.
-- El identificador de cuenta se almacena como SHA-256 del nombre normalizado, no como nombre de usuario.
-- El limitador por IP existente sigue siendo local a cada proceso. Para límites globales por IP, configurar además un WAF/API Gateway compartido y confiar en cabeceras de proxy solo cuando el proxy las sobrescriba.
+- Los límites por IP para login, desafío criptográfico, recuperación, verificación de correo y MFA se comparten mediante `auth_rate_limit_window`, también con UPSERT atómico.
+- Los identificadores de cuenta e IP se almacenan como SHA-256, no como nombres de usuario ni direcciones IP en claro.
+- Los límites de otras rutas públicas/WhatsApp permanecen locales; para defensa perimetral adicional se recomienda un WAF/API Gateway compartido. Confiar en IP reenviada solo cuando el proxy confiable sobrescriba las cabeceras y `FORWARD_HEADERS_STRATEGY` esté configurado correctamente.
 - La migración Flyway V29 crea las tablas de seguridad y añade correo verificado a `app_user`.
 
 ## Métricas y alertas
