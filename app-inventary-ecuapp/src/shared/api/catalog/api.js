@@ -17,6 +17,7 @@ export const catalogApi = {
     body.append('primaryImage', String(Boolean(options.primaryImage)));
     return request('/catalog/products/' + encodeURIComponent(id) + '/images/upload', { method: 'POST', body });
   },
+  updateProductImage: (productId, imageId, data) => request('/catalog/products/' + encodeURIComponent(productId) + '/images/' + encodeURIComponent(imageId), { method: 'PATCH', body: data }),
   unpublishProductImage: (productId, imageId) => request('/catalog/products/' + encodeURIComponent(productId) + '/images/' + encodeURIComponent(imageId), { method: 'DELETE' }),
   createProduct: data => request('/catalog/products', { method: 'POST', body: data }),
   updateProduct: (id, data) => request('/catalog/products/' + encodeURIComponent(id), { method: 'PUT', body: data }),
