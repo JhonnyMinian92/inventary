@@ -41,7 +41,7 @@ public class MfaService {
             @Value("${app.security.mfa.issuer:Inventary}") String issuer) {
         this.jdbc=jdbc; this.users=users; this.audit=audit; this.metrics=metrics; this.issuer=issuer;
         try {
-            this.encryptionKey=encryptionSecret==null||encryptionSecret.isBlank()?null:
+            this.encryptionKey=encryptionSecret==null||encryptionSecret.length()<32?null:
                 MessageDigest.getInstance("SHA-256").digest(encryptionSecret.getBytes(StandardCharsets.UTF_8));
         } catch(Exception ex) { throw new IllegalStateException("No se pudo inicializar el cifrado MFA.",ex); }
     }
@@ -105,7 +105,7 @@ public class MfaService {
         return token;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BadCredentialsException.class)
     public AppUser completeLogin(String ticket,String code) {
         UUID userId;
         try {
