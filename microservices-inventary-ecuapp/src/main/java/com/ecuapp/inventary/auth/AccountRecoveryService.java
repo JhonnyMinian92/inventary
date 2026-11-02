@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
@@ -35,16 +34,14 @@ public class AccountRecoveryService {
     private final SecureRandom random = new SecureRandom();
     private final long ttlMinutes;
     private final String frontendUrl;
-    private final String from;
 
     public AccountRecoveryService(AppUserRepository users, JdbcTemplate jdbc, AuthEmailSender mail,
             PasswordEncoder encoder, PasswordPolicy policy, AuditService audit, MeterRegistry metrics,
             @Value("${app.security.password-recovery.ttl-minutes:30}") long ttlMinutes,
-            @Value("${app.security.password-recovery.frontend-url}") String frontendUrl,
-            @Value("${app.security.mail-from:no-reply@inventary.local}") String from) {
+            @Value("${app.security.password-recovery.frontend-url}") String frontendUrl) {
         this.users=users; this.jdbc=jdbc; this.mail=mail; this.encoder=encoder; this.policy=policy;
         this.audit=audit; this.metrics=metrics; this.ttlMinutes=Math.max(5,Math.min(ttlMinutes,60));
-        this.frontendUrl=frontendUrl; this.from=from;
+        this.frontendUrl=frontendUrl;
     }
 
     @Transactional
