@@ -18,6 +18,10 @@ async function encryptedLogin(username, password) {
 export const authApi = {
   login: encryptedLogin,
   logout: () => request('/auth/logout', { method: 'POST' }),
+  completeMfaLogin: (mfaToken, code) => request('/auth/login-mfa', { method: 'POST', body: { mfaToken, code } }),
+  beginMfaEnrollment: () => request('/auth/mfa/enroll', { method: 'POST' }),
+  confirmMfaEnrollment: code => request('/auth/mfa/confirm', { method: 'POST', body: { code } }),
+  disableMfa: code => request('/auth/mfa', { method: 'DELETE', body: { code } }),
   me: () => request('/auth/me'),
   requestPasswordReset: email => request('/auth/password-recovery/request', { method: 'POST', body: { email } }),
   completePasswordReset: (token, newPassword) => request('/auth/password-recovery/complete', { method: 'POST', body: { token, newPassword } }),
