@@ -188,7 +188,8 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     let active = true;
     setListLoading(true);
     setListError('');
-    const params = { page, size: PAGE_SIZE, sort: (sort.key === 'price' ? 'salePrice' : sort.key === 'name' ? 'name' : 'name') + ',' + sort.dir };
+    const serverSort = sort.key === 'price' ? 'salePrice' : sort.key === 'category' ? 'category.name' : 'name';
+    const params = { page, size: PAGE_SIZE, sort: serverSort + ',' + sort.dir };
     if (debouncedQuery) params.q = debouncedQuery;
     if (categoryId) params.categoryId = categoryId;
     if (statusFilter === 'active') params.active = true;
@@ -285,7 +286,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
         {[['active', 'Activos'], ['inactive', 'Inactivos'], ['', 'Todos']].map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={statusFilter === value} onClick={() => { setStatusFilter(value); setPage(0); }}>{label}</button>)}
       </div>
       <div className="filter-actions">
-        <button type="button" className="button secondary" onClick={exportCsv} disabled={!rows.length}><Download size={15} />CSV</button>
+        <button type="button" className="button secondary" onClick={exportCsv} disabled={!rows.length} aria-label="Exportar productos de esta página a CSV"><Download size={15} />CSV página</button>
         {can('catalog:manage') && <button type="button" className="button primary" onClick={onNew}><Plus size={16} />Nuevo producto</button>}
       </div>
     </div>
@@ -295,7 +296,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
           <SortHeader id="name" label="Producto" sort={sort} onSort={toggleSort} />
           <SortHeader id="category" label="Categoría" sort={sort} onSort={toggleSort} />
           <SortHeader id="price" label="Precio" sort={sort} onSort={toggleSort} align="num" />
-          <SortHeader id="stock" label="Existencia" sort={sort} onSort={toggleSort} align="num" />
+          <SortHeader id="stock" label="Existencia (página)" sort={sort} onSort={toggleSort} align="num" />
           <th scope="col">Calidad</th>
           <th scope="col">Estado</th>
           {can('catalog:manage') && <th scope="col" className="actions-col"><span className="visually-hidden">Acciones</span></th>}
