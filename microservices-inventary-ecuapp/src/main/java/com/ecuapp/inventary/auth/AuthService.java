@@ -55,7 +55,7 @@ public class AuthService {
   metrics.counter("inventary.auth.authentication","outcome","success").increment();
   return issueToken(user,request.encrypted()!=null);
  }
- @Transactional
+ @Transactional(noRollbackFor = BadCredentialsException.class)
  public AuthDtos.TokenResponse completeMfaLogin(String ticket,String code){
   AppUser user=mfa.completeLogin(ticket,code);
   attempts.recordSuccess(user.getUsername());
