@@ -97,6 +97,7 @@ public class Product {
  public UUID getId(){return id;} public String getSku(){return sku;} public String getName(){return name;}
  public String getDescription(){return description;} public Category getCategory(){return category;}
  public BigDecimal getCostPrice(){return costPrice;} public BigDecimal getSalePrice(){return salePrice;}
+ public void setImageUrl(String imageUrl){this.imageUrl=imageUrl;}
  public String getCurrency(){return currency;} public String getImageUrl(){return imageUrl;} public boolean isActive(){return active;}
  public String getTaxCode(){return taxCode;} public String getTaxTreatment(){return taxTreatment;}
  public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
