@@ -193,6 +193,11 @@ class SecurityContractApiTest extends ApiTestSupport {
         assertEquals(401, mvc.perform(get("/actuator/info")).andReturn().getResponse().getStatus());
         assertEquals(403, call(get("/actuator/metrics"), token("VENDEDOR"), null).getResponse().getStatus());
         assertEquals(200, call(get("/actuator/metrics/inventary.outbox.events"), token("SOPORTE_TI"), null).getResponse().getStatus());
+        assertEquals(200, call(get("/actuator/prometheus"), token("SOPORTE_TI"), null).getResponse().getStatus());
+        assertEquals(401, mvc.perform(post("/api/v1/auth/mfa/enroll")).andReturn().getResponse().getStatus());
+        MvcResult recoveryRequest = mvc.perform(post("/api/v1/auth/password-recovery/request")
+            .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"unknown@example.test\"}")).andReturn();
+        assertEquals(202, recoveryRequest.getResponse().getStatus(), "unknown emails must receive the same accepted response");
 
         MvcResult me = call(get("/api/v1/auth/me"), admin(), null);
         assertEquals("nosniff", me.getResponse().getHeader("X-Content-Type-Options"));
