@@ -81,7 +81,10 @@ export function setToken(token, { persist = false, expiresAt = null } = {}) {
   }
   if (!nextToken) return;
   const available = storages();
-  const target = available.find(storage => storage === (persist ? globalThis.localStorage : globalThis.sessionStorage)) || available[0];
+  const preferredName = persist ? 'localStorage' : 'sessionStorage';
+  const target = available.find(storage => {
+    try { return storage === globalThis[preferredName]; } catch { return false; }
+  }) || available[0];
   if (!target) return;
   try {
     target.setItem(TOKEN_KEY, nextToken);
