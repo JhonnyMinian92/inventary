@@ -162,6 +162,7 @@ function AttributeInput({ definition, value, onChange }) {
 
 export default function ProductForm({ initialValue, categories, units = [], loading, onCancel, onSubmit, onError, onCategoryCreated, onUnitCreated }) {
   const productId = initialValue?.id || initialValue?.productId || '';
+  const productInactive = initialValue?.active === false;
   const imageInputRef = useRef(null);
   const [form, setForm] = useState(() => normalizeProduct(initialValue));
   const [step, setStep] = useState(0);
@@ -550,11 +551,11 @@ export default function ProductForm({ initialValue, categories, units = [], load
       {initialValue && productId ? <section className="product-image-manager wide" aria-labelledby="product-images-title">
         <div className="product-image-manager-heading">
           <span className="workflow-stage-icon"><ImagePlus size={19}/></span>
-          <div><h3 id="product-images-title">Imágenes del producto</h3><p>Se aceptan imágenes PNG o JPEG de hasta 5 MB.</p></div>
+          <div><h3 id="product-images-title">Imágenes del producto</h3><p>Se aceptan imágenes PNG o JPEG de hasta 5 MB.{productInactive ? " Reactiva el producto para subir nuevas imágenes." : ""}</p></div>
         </div>
         <div className="product-image-upload-fields">
           <label className="field"><span>Archivo de imagen<b> *</b></span>
-            <input ref={imageInputRef} type="file" accept="image/png,image/jpeg" disabled={imageBusy || loading} onChange={event => { setImageFile(event.target.files?.[0] || null); setImageError(''); setImageNotice(''); }} />
+            <input ref={imageInputRef} type="file" accept="image/png,image/jpeg" disabled={imageBusy || loading || productInactive} onChange={event => { setImageFile(event.target.files?.[0] || null); setImageError(''); setImageNotice(''); }} />
             <small className="field-help">{imageFile ? `${imageFile.name} · ${(imageFile.size / 1024 / 1024).toFixed(2)} MB` : 'El archivo se valida también en el servidor.'}</small>
           </label>
           <label className="field"><span>Texto alternativo <small>(opcional)</small></span>
@@ -564,7 +565,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
             <span>Marcar como imagen principal</span>
             <input type="checkbox" checked={imagePrimary || images.length === 0} disabled={imageBusy || loading || images.length === 0} onChange={event => setImagePrimary(event.target.checked)} />
           </label>
-          <button type="button" className="button secondary" disabled={imageBusy || loading || imagesLoading || !imageFile} onClick={uploadImage}>
+          <button type="button" className="button secondary" disabled={imageBusy || loading || imagesLoading || productInactive || !imageFile} onClick={uploadImage}>
             <UploadCloud size={16}/>{imageBusy ? 'Guardando imagen…' : 'Subir imagen'}
           </button>
         </div>
@@ -581,7 +582,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
           </article>)}
         </div>
       </section> : <p className="form-hint wide product-image-first-save">Guarda el producto y vuelve a editarlo para añadir imágenes.</p>}
-      {initialValue && productId && !schemaLoading && !schemaError && <ProductVariantsManager productId={productId} definitions={definitions} disabled={loading} />}
+      {initialValue && productId && !schemaLoading && !schemaError && <ProductVariantsManager productId={productId} definitions={definitions} disabled={loading} productActive={initialValue.active !== false} />}
     </section>}
     {step === 2 && <section className="workflow-stage" aria-labelledby="product-review-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-review-title">Confirma los datos</h2><p>Comprueba la información antes de guardar.</p></div></div>
