@@ -26,7 +26,7 @@ function initialPage(section) {
 }
 
 export default function useWorkspaceController() {
-  const { token, user, apiStatus, can, expireSession, login, logout: logoutSession, authError } = useAuth();
+  const { token, user, apiStatus, can, expireSession, login, completeMfaLogin, logout: logoutSession, authError } = useAuth();
   const [section, setSection] = useState(() => routeState().section);
   const [listPage, setListPage] = useState(() => initialPage(routeState().section));
   const [listQuery, setListQuery] = useState(() => readSearchValue(window.location.search, 'purchases.q', ''));
@@ -296,7 +296,7 @@ export default function useWorkspaceController() {
     workspace.purchases, workspace.sales, workspace.warehouses, workspace.customers, workspace.valuation]);
 
   return {
-    auth: { token, user, apiStatus, can, expireSession, login, authError, handleLogout },
+    auth: { token, user, apiStatus, can, expireSession, login, completeMfaLogin, authError, handleLogout },
     nav: { groups: NAV_GROUPS, sectionTitles: SECTION_TITLES },
     state: {
       section, listPage, listQuery, purchaseStatus, routeEntityId, detailRoute, selectedOrder, purchaseDetail, saleDetail,
