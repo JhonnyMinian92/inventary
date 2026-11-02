@@ -22,7 +22,7 @@ public final class AuthDtos {
   @Override public String toString(){return "Credentials[username="+username+", password=***]";}
  }
  public record LoginChallenge(String challengeId,String algorithm,String publicKey,Instant expiresAt){}
- public record TokenResponse(String accessToken,String tokenType,Instant expiresAt){}
+ public record TokenResponse(String accessToken,String tokenType,Instant expiresAt,boolean mfaRequired,String mfaToken){}
  public record UserView(UUID id,String username,String role,List<String> permissions){}
  public record ChangePasswordRequest(@NotBlank @Size(max=128) String currentPassword,@NotBlank @Size(min=PasswordPolicy.MIN_LENGTH,max=PasswordPolicy.MAX_LENGTH) String newPassword){
   @Override public String toString(){return "ChangePasswordRequest[***]";}
