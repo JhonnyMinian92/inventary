@@ -14,7 +14,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test"
+    "test": "node --test",
+    "test:e2e:auth": "node scripts/auth-e2e.mjs"
   },
   "dependencies": {
     "lucide-react": "1.61.0",
