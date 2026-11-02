@@ -60,9 +60,15 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 
 - `LoginEncryptionApiTest`: desafío público/no cacheable, claves frescas, login cifrado de un solo uso, rechazo de replay, payload en texto plano, payload mixto, manipulación, desafío desconocido, bloqueo secuencial y bloqueo bajo fallos concurrentes.
 - `AuthAdminApiTest`: perfil y permisos efectivos, política de cambio de contraseña, invalidación del token al cambiar contraseña y revocación inmediata/auditada al cerrar sesión.
-- `AuthAdminApiTest` y pruebas de contrato de seguridad: complementar la verificación del ciclo de usuario/roles y protección de rutas.
+- Las pruebas de contrato de seguridad complementan la verificación de rutas y permisos del backend.
 
-**Importante:** las pruebas se consideran aprobadas únicamente cuando el workflow del commit final de esta auditoría termine en estado `success`. No interpretar el código de prueba como evidencia de ejecución.
+## Evidencia CI
+
+<badge>success</badge> **Frontend Build:** [ejecución 41394184467](https://github.com/JhonnyMinian92/inventary/actions/runs/41394184467), commit `531670a89e70fea82a579dcc6b85886b7e014177`. Pasaron `npm test`, build de producción y smoke browser responsive (360, 768 y 1280 px).
+
+<badge>success</badge> **Backend CI:** [ejecución 41394216160](https://github.com/JhonnyMinian92/inventary/actions/runs/41394216160), commit `7006457333af66043f665bec039f7b194e864ea5`. Pasaron Maven Verify con PostgreSQL 16 (incluidas pruebas nuevas de logout y bloqueo concurrente), validación de Docker Compose y smoke de arranque desde volumen PostgreSQL vacío.
+
+La evidencia CI valida los comandos automatizados anteriores. No sustituye la ejecución manual de todos los casos de aceptación ni una prueba E2E de navegador contra un backend efímero.
 
 ## Matriz de aceptación manual
 
@@ -86,7 +92,7 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 
 ## Brechas que siguen abiertas (no se deben presentar como implementadas)
 
-1. **Recuperación/restablecimiento de contraseña:** no existe flujo backend de solicitud, verificación, token de recuperación y cambio seguro. La pantalla ahora lo declara explícitamente.
+1. **Recuperación/restablecimiento de contraseña:** no existe flujo de autoservicio con solicitud, verificación y token de recuperación. Un administrador con `security:manage` sí puede restablecer la contraseña mediante `PUT /api/v1/admin/users/{id}/password`; la pantalla ahora indica que se debe contactar al administrador.
 2. **MFA/passkeys:** no están implementados. El cifrado de credenciales no es un segundo factor.
 3. **Rate limit y bloqueo distribuidos:** los contadores de `ApiRateLimitFilter` y `LoginAttemptGuard` son por instancia y memoria local. En despliegue con varias réplicas se necesita WAF/gateway con límite distribuido y estado de bloqueo compartido; no confiar en `X-Forwarded-For` salvo proxy de confianza.
 4. **Almacenamiento del bearer token:** la opción «Mantener sesión» usa localStorage; un XSS con ejecución de JavaScript podría leerlo. La defensa requiere CSP estricta, control de dependencias y prevención de XSS. Una migración a cookie HttpOnly/SameSite requiere rediseñar CORS/CSRF y el contrato de autenticación; no debe hacerse parcialmente.
@@ -96,4 +102,4 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 
 ## Criterio de cierre
 
-La corrección del fallback de Storage y del feedback de la pantalla está implementada en esta rama. La pantalla solo debe declararse **cerrada para el alcance actual** después de que Frontend CI, Backend CI y smoke responsive del commit final estén verdes, y después de ejecutar la matriz manual. Las brechas anteriores son trabajo explícitamente pendiente, no defectos ocultos por esta auditoría.
+La corrección del fallback de Storage y del feedback de la pantalla está implementada en esta rama. Frontend CI, Backend CI, build, pruebas, responsive smoke y arranque de Compose desde volumen vacío están **verdes** en las ejecuciones enlazadas. La matriz manual y un E2E autenticado completo aún no se han ejecutado. Las brechas anteriores son trabajo explícitamente pendiente, no defectos ocultos por esta auditoría.
