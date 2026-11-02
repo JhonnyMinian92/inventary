@@ -10,6 +10,14 @@ groups:
         annotations:
           summary: "Aumento de autenticaciones fallidas"
           description: "Se registraron más de 20 fallos de autenticación en cinco minutos."
+      - alert: InventaryUnauthorizedRequestsHigh
+        expr: sum(increase(inventary_auth_authentication_errors_total[5m])) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Aumento de errores de autenticación HTTP"
+          description: "Se registraron más de 30 solicitudes no autenticadas en cinco minutos."
       - alert: InventaryAccountLockoutsHigh
         expr: sum(increase(inventary_auth_lockouts_total[10m])) > 10
         for: 1m
