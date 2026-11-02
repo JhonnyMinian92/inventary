@@ -8,6 +8,7 @@
 - El token es aleatorio de 256 bits, se almacena como SHA-256, vence en 30 minutos por defecto y se consume una sola vez.
 - Al restablecer la contraseña se incrementa `token_version`, revocando todas las sesiones activas.
 - Configurar `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_AUTH`, `SMTP_STARTTLS`, `AUTH_MAIL_FROM` y `PASSWORD_RECOVERY_FRONTEND_URL`.
+- Los correos se despachan fuera del hilo HTTP para reducir filtraciones temporales sobre la existencia de cuentas. Los fallos de SMTP incrementan `inventary.auth.email{outcome=failed}` y disparan alerta; usar un relay SMTP con cola/reintentos confiables para producción.
 - El frontend usa `/inventary/iniciar-sesion?token=...` (la vista de login procesa el token de query string).
 
 ## MFA TOTP
