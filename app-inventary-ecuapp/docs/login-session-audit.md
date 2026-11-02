@@ -13,7 +13,7 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 | Área | Corrección | Resultado esperado |
 |---|---|---|
 | Persistencia de sesión | Se agregó un respaldo en memoria para el token y su vencimiento cuando Storage está bloqueado o falla por cuota/permisos. | El usuario puede completar la sesión durante la pestaña actual sin depender de Storage. |
-| Preferencia «Mantener sesión» | La selección de `localStorage` ya no accede a una propiedad bloqueada fuera de un `try/catch`; usa `sessionStorage` si es el único disponible. | No se rompe el login cuando localStorage está bloqueado. El respaldo alternativo no sobrevive al cierre de la pestaña. |
+| Preferencia «Mantener sesión» | La selección de `localStorage` ya no accede a una propiedad bloqueada fuera de un `try/catch`; usa `sessionStorage` si el usuario pidió mantener la sesión. Si no marcó esa opción, nunca degrada silenciosamente a almacenamiento persistente. | No se rompe el login cuando localStorage está bloqueado. El respaldo alternativo no sobrevive al cierre de la pestaña. |
 | Expiración | El token del respaldo en memoria se valida contra `expiresAt` igual que los tokens persistidos y se elimina al vencer. | No se conserva una sesión vencida. |
 | Errores de login | Los errores ahora se presentan dentro del formulario mediante una región accesible `role=alert`; se conserva el foco en contraseña después de un fallo y se limpia la contraseña. | El usuario recibe feedback visible y accesible sin depender exclusivamente de notificaciones temporales. |
 | Errores de seguridad | Se agregaron mensajes específicos para desafío expirado, cifrado obligatorio, bloqueo temporal, rate limit y navegador sin WebCrypto. | Se explica el siguiente paso sin exponer detalles criptográficos sensibles. |
@@ -77,6 +77,7 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 | Storage bloqueado | Login y llamadas autenticadas funcionan en memoria durante la pestaña. |
 | «Mantener sesión» con localStorage disponible | El token queda en localStorage hasta vencimiento/logout. |
 | «Mantener sesión» con localStorage bloqueado | Se usa sessionStorage si está disponible; no se promete persistencia tras cerrar pestaña. |
+| Sesión sin «Mantener sesión» y sessionStorage bloqueado | Token solo en memoria; no se escribe en localStorage. |
 | Token expirado o revocado | Se elimina localmente y se vuelve al login. |
 | Usuario desactivado o rol desactivado | El backend rechaza login y sesiones existentes. |
 | Logout remoto fallido | El cliente elimina igualmente el token local. |
