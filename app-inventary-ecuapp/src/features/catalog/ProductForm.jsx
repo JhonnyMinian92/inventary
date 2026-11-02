@@ -5,6 +5,7 @@ import StepProgress from '../../components/StepProgress.jsx';
 import { api, resolveApiUrl } from '../../api';
 import QuickCreateDialog, { SelectWithCreate } from '../../ui/QuickCreateDialog.jsx';
 import CategoryQuickCreate from './CategoryQuickCreate.jsx';
+import ProductVariantsManager from './ProductVariantsManager.jsx';
 import './catalog-forms.css';
 import './product-media.css';
 
@@ -570,6 +571,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
           </article>)}
         </div>
       </section> : <p className="form-hint wide product-image-first-save">Guarda el producto y vuelve a editarlo para añadir imágenes.</p>}
+      {initialValue && productId && !schemaLoading && !schemaError && <ProductVariantsManager productId={productId} definitions={definitions} disabled={loading} />}
     </section>}
     {step === 2 && <section className="workflow-stage" aria-labelledby="product-review-title">
       <div className="workflow-stage-heading"><span className="workflow-stage-icon"><Boxes size={20}/></span><div><h2 id="product-review-title">Confirma los datos</h2><p>Comprueba la información antes de guardar.</p></div></div>
