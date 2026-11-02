@@ -25,11 +25,11 @@ import java.util.UUID;
 public class AuthService {
  private final AppUserRepository users; private final AppRoleRepository roles; private final PasswordEncoder passwordEncoder; private final JwtEncoder jwtEncoder;
  private final PasswordPolicy passwordPolicy; private final AuditService audit; private final long ttlMinutes; private final String dummyHash;
- private final LoginEncryptionService encryption; private final LoginAttemptGuard attempts; private final Validator validator; private final MeterRegistry metrics;
+ private final LoginEncryptionService encryption; private final LoginAttemptGuard attempts; private final Validator validator; private final MeterRegistry metrics; private final MfaService mfa;
  public AuthService(AppUserRepository users,AppRoleRepository roles,PasswordEncoder passwordEncoder,JwtEncoder jwtEncoder,PasswordPolicy passwordPolicy,AuditService audit,
-  LoginEncryptionService encryption,LoginAttemptGuard attempts,Validator validator,MeterRegistry metrics,@Value("${app.security.token-ttl-minutes:60}") long ttlMinutes){
+  LoginEncryptionService encryption,LoginAttemptGuard attempts,Validator validator,MeterRegistry metrics,MfaService mfa,@Value("${app.security.token-ttl-minutes:60}") long ttlMinutes){
   this.users=users;this.roles=roles;this.passwordEncoder=passwordEncoder;this.jwtEncoder=jwtEncoder;this.passwordPolicy=passwordPolicy;this.audit=audit;
-  this.encryption=encryption;this.attempts=attempts;this.validator=validator;this.metrics=metrics;
+  this.encryption=encryption;this.attempts=attempts;this.validator=validator;this.metrics=metrics;this.mfa=mfa;
   this.ttlMinutes=Math.max(5,Math.min(ttlMinutes,120));
   // Keeps the response time similar for unknown users to avoid account enumeration by timing.
   this.dummyHash=passwordEncoder.encode(UUID.randomUUID().toString());
@@ -50,16 +50,31 @@ public class AuthService {
     MDC.get("requestId"),Map.of("knownUser",user!=null,"encrypted",request.encrypted()!=null));
    throw new BadCredentialsException("Credenciales inválidas");
   }
+  if(mfa.isEnabled(user.getId())) return new AuthDtos.TokenResponse(null,null,null,true,mfa.createLoginTicket(user.getId()));
   attempts.recordSuccess(username);
   metrics.counter("inventary.auth.authentication","outcome","success").increment();
+  return issueToken(user,request.encrypted()!=null);
+  JwtClaimsSet claims=JwtClaimsSet.builder().issuer("inventary").audience(List.of("inventary-api"))
+   .issuedAt(now).expiresAt(expires).subject(user.getUsername()).id(UUID.randomUUID().toString())
+   .claim("uid",user.getId().toString()).claim("ver",user.getTokenVersion()).build();
+
+ }
+ @Transactional
+ public AuthDtos.TokenResponse completeMfaLogin(String ticket,String code){
+  AppUser user=mfa.completeLogin(ticket,code);
+  attempts.recordSuccess(user.getUsername());
+  metrics.counter("inventary.auth.authentication","outcome","success").increment();
+  return issueToken(user,true);
+ }
+ private AuthDtos.TokenResponse issueToken(AppUser user,boolean encrypted){
   Instant now=Instant.now(),expires=now.plus(ttlMinutes,ChronoUnit.MINUTES);
   JwtClaimsSet claims=JwtClaimsSet.builder().issuer("inventary").audience(List.of("inventary-api"))
    .issuedAt(now).expiresAt(expires).subject(user.getUsername()).id(UUID.randomUUID().toString())
    .claim("uid",user.getId().toString()).claim("ver",user.getTokenVersion()).build();
   JwsHeader header=JwsHeader.with(MacAlgorithm.HS256).build();
   String token=jwtEncoder.encode(JwtEncoderParameters.from(header,claims)).getTokenValue();
-  audit.recordOutcome(user.getUsername(),"USER_LOGIN","APP_USER",user.getId(),"SUCCESS",MDC.get("requestId"),Map.of("encrypted",request.encrypted()!=null));
-  return new AuthDtos.TokenResponse(token,"Bearer",expires);
+  audit.recordOutcome(user.getUsername(),"USER_LOGIN","APP_USER",user.getId(),"SUCCESS",MDC.get("requestId"),Map.of("encrypted",encrypted,"mfa",mfa.isEnabled(user.getId())));
+  return new AuthDtos.TokenResponse(token,"Bearer",expires,false,null);
  }
  private AuthDtos.Credentials resolveCredentials(AuthDtos.LoginRequest request){
   AuthDtos.Credentials credentials;
