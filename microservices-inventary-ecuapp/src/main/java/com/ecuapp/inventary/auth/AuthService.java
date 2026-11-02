@@ -1,5 +1,6 @@
 package com.ecuapp.inventary.auth;
-import com.ecuapp.inventary.audit.AuditService;\nimport io.micrometer.core.instrument.MeterRegistry;
+import com.ecuapp.inventary.audit.AuditService;
+import io.micrometer.core.instrument.MeterRegistry;
 import com.ecuapp.inventary.common.BusinessRuleException;
 import com.ecuapp.inventary.common.ResourceNotFoundException;
 import jakarta.validation.ConstraintViolation;
@@ -41,14 +42,16 @@ public class AuthService {
   attempts.checkNotLocked(username);
   AppUser user=users.findByUsername(username).orElse(null);
   boolean passwordMatches=passwordEncoder.matches(credentials.password(),user==null?dummyHash:user.getPasswordHash());
-  if(user==null||!passwordMatches||!user.isActive()||roles.findByCodeAndActiveTrue(user.getRole()).isEmpty()){\n   metrics.counter("inventary.auth.authentication","outcome","failed").increment();
+  if(user==null||!passwordMatches||!user.isActive()||roles.findByCodeAndActiveTrue(user.getRole()).isEmpty()){
+   metrics.counter("inventary.auth.authentication","outcome","failed").increment();
    boolean locked=attempts.recordFailure(username);
    // Audit events use their own transaction (this one is read-only). Unknown names are not stored: they are often mistyped passwords.
    audit.recordOutcome(user==null?"anonymous":user.getUsername(),locked?"USER_LOGIN_LOCKED":"USER_LOGIN_FAILED","APP_USER",user==null?null:user.getId(),"DENIED",
     MDC.get("requestId"),Map.of("knownUser",user!=null,"encrypted",request.encrypted()!=null));
    throw new BadCredentialsException("Credenciales inválidas");
   }
-  attempts.recordSuccess(username);\n  metrics.counter("inventary.auth.authentication","outcome","success").increment();
+  attempts.recordSuccess(username);
+  metrics.counter("inventary.auth.authentication","outcome","success").increment();
   Instant now=Instant.now(),expires=now.plus(ttlMinutes,ChronoUnit.MINUTES);
   JwtClaimsSet claims=JwtClaimsSet.builder().issuer("inventary").audience(List.of("inventary-api"))
    .issuedAt(now).expiresAt(expires).subject(user.getUsername()).id(UUID.randomUUID().toString())
