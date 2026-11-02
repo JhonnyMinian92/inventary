@@ -64,9 +64,9 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 
 ## Evidencia CI
 
-<badge>success</badge> **Frontend Build:** [ejecución 41394184467](https://github.com/JhonnyMinian92/inventary/actions/runs/41394184467), commit `531670a89e70fea82a579dcc6b85886b7e014177`. Pasaron `npm test`, build de producción y smoke browser responsive (360, 768 y 1280 px).
+**Resultado: PASS — Frontend Build:** [ejecución 41394184467](https://github.com/JhonnyMinian92/inventary/actions/runs/41394184467), commit `531670a89e70fea82a579dcc6b85886b7e014177`. Pasaron `npm test`, build de producción y smoke browser responsive (360, 768 y 1280 px).
 
-<badge>success</badge> **Backend CI:** [ejecución 41394216160](https://github.com/JhonnyMinian92/inventary/actions/runs/41394216160), commit `7006457333af66043f665bec039f7b194e864ea5`. Pasaron Maven Verify con PostgreSQL 16 (incluidas pruebas nuevas de logout y bloqueo concurrente), validación de Docker Compose y smoke de arranque desde volumen PostgreSQL vacío.
+**Resultado: PASS — Backend CI:** [ejecución 41394216160](https://github.com/JhonnyMinian92/inventary/actions/runs/41394216160), commit `7006457333af66043f665bec039f7b194e864ea5`. Pasaron Maven Verify con PostgreSQL 16 (incluidas pruebas nuevas de logout y bloqueo concurrente), validación de Docker Compose y smoke de arranque desde volumen PostgreSQL vacío.
 
 La evidencia CI valida los comandos automatizados anteriores. No sustituye la ejecución manual de todos los casos de aceptación ni una prueba E2E de navegador contra un backend efímero.
 
