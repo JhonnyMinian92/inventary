@@ -30,7 +30,7 @@ public class ProductImageService {
   if(r.primaryImage()){images.clearPrimary(productId);product=products.findById(productId).orElseThrow(()->new ResourceNotFoundException("Producto",productId));}
   ProductImage image=images.saveAndFlush(new ProductImage(product,url,clean(r.altText()),r.sortOrder(),r.primaryImage()));
   synchronizePrimary(product);
-  audit.record(actor,"PRODUCT_IMAGE_PUBLISHED","PRODUCT_IMAGE",image.getId(),Map.of("productId",productId.toString(),"primary",r.primaryImage()));
+  audit.record(actor,"PRODUCT_IMAGE_PUBLISHED","PRODUCT_IMAGE",image.getId(),Map.of("productId",productId.toString(),"primary",image.isPrimaryImage()));
   return ProductImageDtos.View.from(image);
  }
  @Transactional public ProductImageDtos.View upload(UUID productId,MultipartFile upload,String altText,int sortOrder,boolean primaryImage,String actor){
@@ -50,7 +50,7 @@ public class ProductImageService {
    ProductImage image=images.saveAndFlush(new ProductImage(product,stored.publicUrl(),clean(altText),sortOrder,primaryImage));
    synchronizePrimary(product);
    audit.record(actor,"PRODUCT_IMAGE_UPLOADED","PRODUCT_IMAGE",image.getId(),Map.of(
-    "productId",productId.toString(),"primary",primaryImage,"contentType",stored.contentType(),"sizeBytes",stored.size()));
+    "productId",productId.toString(),"primary",image.isPrimaryImage(),"contentType",stored.contentType(),"sizeBytes",stored.size()));
    return ProductImageDtos.View.from(image);
   }catch(RuntimeException failure){
    if(!TransactionSynchronizationManager.isSynchronizationActive())storage.deleteQuietly(stored.fileName());
