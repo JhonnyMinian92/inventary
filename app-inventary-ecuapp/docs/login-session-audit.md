@@ -58,7 +58,8 @@ El flujo existente ya implementaba cifrado ECDH P-256 + HKDF-SHA256 + AES-256-GC
 
 ### Backend
 
-- `LoginEncryptionApiTest`: desafío público/no cacheable, claves frescas, login cifrado de un solo uso, rechazo de replay, payload en texto plano, payload mixto, manipulación, desafío desconocido y bloqueo de intentos.
+- `LoginEncryptionApiTest`: desafío público/no cacheable, claves frescas, login cifrado de un solo uso, rechazo de replay, payload en texto plano, payload mixto, manipulación, desafío desconocido, bloqueo secuencial y bloqueo bajo fallos concurrentes.
+- `AuthAdminApiTest`: perfil y permisos efectivos, política de cambio de contraseña, invalidación del token al cambiar contraseña y revocación inmediata/auditada al cerrar sesión.
 - `AuthAdminApiTest` y pruebas de contrato de seguridad: complementar la verificación del ciclo de usuario/roles y protección de rutas.
 
 **Importante:** las pruebas se consideran aprobadas únicamente cuando el workflow del commit final de esta auditoría termine en estado `success`. No interpretar el código de prueba como evidencia de ejecución.
