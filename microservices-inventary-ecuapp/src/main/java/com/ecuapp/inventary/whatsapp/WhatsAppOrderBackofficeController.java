@@ -37,6 +37,11 @@ public class WhatsAppOrderBackofficeController {
     public WhatsAppDtos.OrderView get(@PathVariable UUID id,Authentication authentication) {
         return service.get(id,authentication.getName());
     }
+    @GetMapping("/work-summary")
+    @PreAuthorize("hasAuthority('sales:read')")
+    public WhatsAppDtos.WorkSummary workSummary(Authentication authentication) {
+        return service.workSummary(authentication.getName());
+    }
 
     @PostMapping("/{id}/confirm-payment")
     @PreAuthorize("hasAuthority('sales:manage')")

@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 public interface StockTransferRepository extends JpaRepository<StockTransfer,UUID>{
+ long countByStatus(com.ecuapp.inventary.transfers.TransferStatus status);
  Optional<StockTransfer> findByIdempotencyKey(String key);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select t from StockTransfer t where t.id=:id")

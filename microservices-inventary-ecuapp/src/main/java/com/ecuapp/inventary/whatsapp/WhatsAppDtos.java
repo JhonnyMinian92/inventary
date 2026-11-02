@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public final class WhatsAppDtos {
  private WhatsAppDtos(){}
+ public record WorkSummary(long awaitingReview,long toPrepare,long expiringPayments,long incidents){}
  public record CreateCartRequest(@NotBlank @Size(max=120) @Pattern(regexp="[A-Za-z0-9+._:@-]{6,120}",message="customerRef debe ser un identificador WhatsApp verificado") String customerRef){}
  public record CartItemRequest(@NotNull @DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal quantity){}
  public record QuoteRequest(@NotNull UUID warehouseId){}

@@ -1,8 +1,15 @@
 
 import { request } from '../http/request.js';
-const query = params => new URLSearchParams(params).size ? '?' + new URLSearchParams(params) : '';
+const query = params => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value));
+  });
+  return search.size ? '?' + search.toString() : '';
+};
 export const inventoryApi = {
   balances: (params = {}) => request('/inventory/balances' + query(params)),
+  commandCenter: (params = {}) => request('/inventory/command-center' + query(params)),
   createInventoryAdjustment: data => request('/inventory/adjustments', { method: 'POST', body: data, idempotent: true }),
   balance: (productId, warehouseId) => request('/inventory/balances/' + encodeURIComponent(productId) + '/' + encodeURIComponent(warehouseId)),
   movements: (params = {}) => request('/inventory/movements' + query(params)),

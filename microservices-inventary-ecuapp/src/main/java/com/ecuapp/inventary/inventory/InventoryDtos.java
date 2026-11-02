@@ -31,4 +31,6 @@ public final class InventoryDtos {
   static ValuationEntryView from(InventoryValuationEntry e){return new ValuationEntryView(e.getId(),e.getCostLayer()==null?null:e.getCostLayer().getId(),e.getMethod(),e.getQuantity(),e.getUnitCost(),e.getTotalCost(),e.getCurrency());}
  }
  public record MovementDetailView(MovementView movement,BigDecimal valuedTotalCost,List<ValuationEntryView> valuation){}
+ public record CommandCenterView(BigDecimal onHand,BigDecimal reserved,BigDecimal available,long openCounts,long inTransitTransfers,long recentMovements,List<CommandAlert> alerts){}
+ public record CommandAlert(String title,String detail,String tone,String actionTab){}
 }

@@ -76,6 +76,18 @@ public class WhatsAppOrderBackofficeService {
         return WhatsAppDtos.OrderView.from(order);
     }
 
+    @Transactional(readOnly=true)
+    public WhatsAppDtos.WorkSummary workSummary(String actor) {
+        var allowed=scopes.accessibleWarehouseIds(actor);
+        List<WhatsAppOrder> visible=orders.findAll().stream()
+            .filter(order->allowed==null||allowed.contains(order.getWarehouse().getId())).toList();
+        Instant soon=Instant.now().plusSeconds(24*60*60);
+        long awaiting=visible.stream().filter(order->order.getStatus()==WhatsAppOrderStatus.AWAITING_PAYMENT).count();
+        long expiring=visible.stream().filter(order->order.getStatus()==WhatsAppOrderStatus.AWAITING_PAYMENT
+            &&order.getExpiresAt()!=null&&order.getExpiresAt().isBefore(soon)).count();
+        return new WhatsAppDtos.WorkSummary(awaiting,0L,expiring,0L);
+    }
+
     @Transactional
     public WhatsAppDtos.OrderView confirmPayment(UUID orderId, String rawKey, WhatsAppDtos.ConfirmPaymentRequest request, String actor) {
         WhatsAppOrder visible=orders.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Orden WhatsApp",orderId));

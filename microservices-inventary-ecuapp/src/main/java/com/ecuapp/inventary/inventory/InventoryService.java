@@ -5,6 +5,8 @@ import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.warehouse.*;
 import com.ecuapp.inventary.common.*;
 import com.ecuapp.inventary.auth.WarehouseScopeService;
+import com.ecuapp.inventary.transfers.StockTransferRepository;
+import com.ecuapp.inventary.transfers.TransferStatus;
 import com.ecuapp.inventary.sales.OutboxEvent;
 import com.ecuapp.inventary.sales.OutboxEventRepository;
 import org.springframework.data.domain.*;
@@ -26,13 +28,42 @@ public class InventoryService {
  private static final Map<String,String> MOVEMENT_SORT=Map.of("occurredAt","occurredAt","quantity","quantity","movementType","movementType");
  private final ProductRepository products;private final IdempotencyRecordRepository idempotencyRecords;private final WarehouseRepository warehouses;private final StockBalanceRepository balances;private final StockMovementRepository movements;private final WarehouseLocationRepository locations;private final UnitOfMeasureRepository units;private final AuditService audit;
  private final InventoryCostingService costing;private final InventoryValuationEntryRepository valuationEntries;private final WarehouseScopeService scopes;private final OutboxEventRepository outbox;
+ private final InventoryCountRepository countRepository;private final StockTransferRepository transferRepository;
  public InventoryService(ProductRepository products,IdempotencyRecordRepository idempotencyRecords,WarehouseRepository warehouses,StockBalanceRepository balances,StockMovementRepository movements,WarehouseLocationRepository locations,UnitOfMeasureRepository units,AuditService audit,
-  InventoryCostingService costing,InventoryValuationEntryRepository valuationEntries,WarehouseScopeService scopes,OutboxEventRepository outbox){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;this.valuationEntries=valuationEntries;this.scopes=scopes;this.outbox=outbox;}
+  InventoryCostingService costing,InventoryValuationEntryRepository valuationEntries,WarehouseScopeService scopes,OutboxEventRepository outbox,
+  InventoryCountRepository countRepository,StockTransferRepository transferRepository){this.products=products;this.idempotencyRecords=idempotencyRecords;this.warehouses=warehouses;this.balances=balances;this.movements=movements;this.locations=locations;this.units=units;this.audit=audit;this.costing=costing;this.valuationEntries=valuationEntries;this.scopes=scopes;this.outbox=outbox;this.countRepository=countRepository;this.transferRepository=transferRepository;}
  @Transactional(readOnly=true) public Page<InventoryDtos.BalanceView> balances(UUID productId,UUID warehouseId,boolean onlyAvailable,Pageable p,String actor){
   if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
   var allowed=scopes.accessibleWarehouseIds(actor);var pageable=Pages.of(p,BALANCE_SORT,Sort.by("product.sku"));
   if(allowed!=null&&allowed.isEmpty())return Page.empty(pageable);
   return (allowed==null?balances.search(productId,warehouseId,onlyAvailable,pageable):balances.searchScoped(productId,warehouseId,onlyAvailable,allowed,pageable)).map(InventoryDtos.BalanceView::from);
+ }
+ @Transactional(readOnly=true)
+ public InventoryDtos.CommandCenterView commandCenter(UUID warehouseId,String actor){
+  if(warehouseId!=null)scopes.requireWarehouseAccess(actor,warehouseId);
+  var allowed=scopes.accessibleWarehouseIds(actor);
+  List<StockBalance> balanceRows=balances.findAll().stream()
+   .filter(balance->warehouseId==null||warehouseId.equals(balance.getWarehouse().getId()))
+   .filter(balance->allowed==null||allowed.contains(balance.getWarehouse().getId())).toList();
+  BigDecimal onHand=balanceRows.stream().map(StockBalance::getOnHand).reduce(BigDecimal.ZERO,BigDecimal::add);
+  BigDecimal reserved=balanceRows.stream().map(StockBalance::getReserved).reduce(BigDecimal.ZERO,BigDecimal::add);
+  BigDecimal available=balanceRows.stream().map(StockBalance::available).reduce(BigDecimal.ZERO,BigDecimal::add);
+  long openCounts=countRepository.findAll().stream().filter(count->count.getStatus()==InventoryCountStatus.OPEN)
+   .filter(count->warehouseId==null||warehouseId.equals(count.getWarehouse().getId()))
+   .filter(count->allowed==null||allowed.contains(count.getWarehouse().getId())).count();
+  long inTransit=transferRepository.findAll().stream().filter(transfer->transfer.getStatus()==TransferStatus.IN_TRANSIT)
+   .filter(transfer->warehouseId==null||warehouseId.equals(transfer.getSourceWarehouse().getId())||warehouseId.equals(transfer.getDestinationWarehouse().getId()))
+   .filter(transfer->allowed==null||allowed.contains(transfer.getSourceWarehouse().getId())||allowed.contains(transfer.getDestinationWarehouse().getId())).count();
+  long recent=movements.count();
+  List<InventoryDtos.CommandAlert> alerts=new java.util.ArrayList<>();
+  if(openCounts>0)alerts.add(new InventoryDtos.CommandAlert(openCounts+" conteo"+(openCounts==1?"":"s")+" físico"+(openCounts==1?" pendiente":"s pendientes"),
+   "La cantidad registrada debe reconciliarse antes de considerar el inventario cerrado.","warning","operations"));
+  if(inTransit>0)alerts.add(new InventoryDtos.CommandAlert(inTransit+" traslado"+(inTransit==1?"":"s")+" en tránsito",
+   "El movimiento físico todavía no confirma recepción en el almacén destino.","info","operations"));
+  long inconsistent=balanceRows.stream().filter(balance->balance.available().compareTo(BigDecimal.ZERO)<0).count();
+  if(inconsistent>0)alerts.add(new InventoryDtos.CommandAlert(inconsistent+" saldo"+(inconsistent==1?"":"s")+" con disponibilidad negativa",
+   "Las reservas superan las unidades en mano; revise las operaciones relacionadas.","danger","balances"));
+  return new InventoryDtos.CommandCenterView(onHand,reserved,available,openCounts,inTransit,recent,alerts.stream().limit(7).toList());
  }
  @Transactional(readOnly=true) public Page<InventoryDtos.MovementView> movements(UUID productId,UUID warehouseId,MovementType type,String referenceType,UUID referenceId,Instant from,Instant to,Pageable p,String actor){
   if(from!=null&&to!=null&&!from.isBefore(to))throw new InvalidQueryException("'from' debe ser anterior a 'to'.");

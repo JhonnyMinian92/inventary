@@ -29,6 +29,10 @@ public class InventoryController {
   @PageableDefault(size=20) Pageable p,Authentication auth){return service.movements(productId,warehouseId,type,referenceType,referenceId,from,to,p,auth.getName());}
  @GetMapping("/movements/{id}") @PreAuthorize("hasAnyAuthority('inventory:manage','audit:read')")
  public InventoryDtos.MovementDetailView movement(@PathVariable UUID id,Authentication auth){return service.movement(id,auth.getName());}
+ @GetMapping("/movements/{id}/trace") @PreAuthorize("hasAnyAuthority('inventory:manage','audit:read')")
+ public InventoryDtos.MovementDetailView movementTrace(@PathVariable UUID id,Authentication auth){return service.movement(id,auth.getName());}
+ @GetMapping("/command-center")
+ public InventoryDtos.CommandCenterView commandCenter(@RequestParam(required=false) UUID warehouseId,Authentication auth){return service.commandCenter(warehouseId,auth.getName());}
  @PostMapping("/adjustments") @ResponseStatus(org.springframework.http.HttpStatus.CREATED) @PreAuthorize("hasAuthority('inventory:manage')")
  public InventoryDtos.MovementView adjust(@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody InventoryDtos.AdjustmentRequest r,Authentication auth){return service.adjust(key,r,auth.getName());}
 }

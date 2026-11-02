@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface InventoryCountRepository extends JpaRepository<InventoryCount, UUID> {
+    long countByStatus(InventoryCountStatus status);
     Optional<InventoryCount> findByIdempotencyKey(String idempotencyKey);
 
     @EntityGraph(attributePaths = {"warehouse"})
