@@ -103,6 +103,7 @@ public class MfaService {
 
     @Transactional
     public String createLoginTicket(UUID userId) {
+        jdbc.update("DELETE FROM auth_mfa_login_challenge WHERE expires_at < CURRENT_TIMESTAMP - INTERVAL '1 day' OR consumed_at < CURRENT_TIMESTAMP - INTERVAL '1 day'");
         byte[] bytes=new byte[32]; RANDOM.nextBytes(bytes);
         String token=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         jdbc.update("INSERT INTO auth_mfa_login_challenge(id,user_id,token_hash,expires_at) VALUES(?,?,?,CURRENT_TIMESTAMP + INTERVAL '5 minutes')",
