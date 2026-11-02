@@ -62,10 +62,10 @@ public class AccountRecoveryService {
             jdbc.update("UPDATE auth_password_reset SET consumed_at=CURRENT_TIMESTAMP WHERE user_id=? AND consumed_at IS NULL",user.getId());
             jdbc.update("INSERT INTO auth_password_reset(id,user_id,token_hash,expires_at) VALUES(?,?,?,CURRENT_TIMESTAMP + (? * INTERVAL '1 minute'))",
                     UUID.randomUUID(),user.getId(),hash(token),ttlMinutes);
-            send(user.getEmail(),"Restablecer contraseña de Inventary",
+            boolean delivered=send(user.getEmail(),"Restablecer contraseña de Inventary",
                     "Para restablecer tu contraseña abre este enlace (válido durante "+ttlMinutes+" minutos):\n\n"+
                     frontendUrl+"?token="+token+"\n\nSi no solicitaste este cambio, ignora este mensaje.");
-            audit.recordOutcome(user.getUsername(),"PASSWORD_RESET_REQUESTED","APP_USER",user.getId(),"SUCCESS",null,Map.of());
+            audit.recordOutcome(user.getUsername(),"PASSWORD_RESET_REQUESTED","APP_USER",user.getId(),delivered?"SUCCESS":"FAILURE",null,Map.of());
         });
         metrics.counter("inventary.auth.password_recovery","event","requested").increment();
     }
@@ -105,10 +105,10 @@ public class AccountRecoveryService {
         String token=newToken();
         jdbc.update("INSERT INTO auth_email_verification(id,user_id,token_hash,expires_at) VALUES(?,?,?,CURRENT_TIMESTAMP + INTERVAL '24 hours')",
                 UUID.randomUUID(),user.getId(),hash(token));
-        send(email,"Verifica tu correo de Inventary",
+        boolean delivered=send(email,"Verifica tu correo de Inventary",
                 "Confirma tu correo de recuperación con este código de un solo uso:\n\n"+token+
                 "\n\nEl código vence en 24 horas. Si no solicitaste esta operación, ignora este mensaje.");
-        audit.record(username,"RECOVERY_EMAIL_VERIFICATION_REQUESTED","APP_USER",user.getId(),Map.of());
+        audit.recordOutcome(username,"RECOVERY_EMAIL_VERIFICATION_REQUESTED","APP_USER",user.getId(),delivered?"SUCCESS":"FAILURE",null,Map.of());
     }
 
     @Transactional
@@ -124,16 +124,18 @@ public class AccountRecoveryService {
         audit.record(username,"RECOVERY_EMAIL_VERIFIED","APP_USER",user.getId(),Map.of());
     }
 
-    private void send(String recipient,String subject,String body) {
+    private boolean send(String recipient,String subject,String body) {
         try {
             SimpleMailMessage message=new SimpleMailMessage();
             message.setFrom(from); message.setTo(recipient); message.setSubject(subject); message.setText(body);
             mail.send(message);
             metrics.counter("inventary.auth.email","outcome","sent").increment();
+            return true;
         } catch (RuntimeException failure) {
             metrics.counter("inventary.auth.email","outcome","failed").increment();
             log.error("Authentication email delivery failed; recipient omitted from log",failure);
             // Keep the public response generic to avoid account enumeration; the metric/alert carries the operational signal.
+            return false;
         }
     }
 
