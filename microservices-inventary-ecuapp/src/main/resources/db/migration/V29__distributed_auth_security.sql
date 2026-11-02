@@ -38,3 +38,13 @@ CREATE TABLE auth_email_verification (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX ix_auth_email_verification_user ON auth_email_verification(user_id, expires_at DESC);
+
+CREATE TABLE auth_mfa_login_challenge (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX ix_auth_mfa_login_user ON auth_mfa_login_challenge(user_id, expires_at DESC);
