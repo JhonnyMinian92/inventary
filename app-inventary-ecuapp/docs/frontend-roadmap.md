@@ -9,7 +9,7 @@ Este documento sustituye el calendario histórico de implementación por una des
 | Área | Estado del código |
 |---|---|
 | Fundación, login y sesión | Flujo cifrado, perfil/permisos, expiración y logout; fallback de Storage y feedback accesible corregidos. Frontend CI y Backend CI aprobados, incluido responsive smoke y arranque Compose. Pendientes: E2E autenticado completo, recuperación autoservicio y MFA. |
-| Catálogo | Productos, categorías, atributos, unidades, conversiones, imágenes y variantes tienen pantallas/workflows. |
+| Catálogo | Productos: filtros por tipo/estado/categoría, paginación, orden por categoría, detalle enriquecido, atributos dinámicos, datos fiscales, unidades, galería y CRUD de variantes. Categorías muestran conteo activo de productos. Stock filter/sort y CSV siguen acotados a página; faltan importación masiva y E2E autenticado. Detalle: [auditoría de Productos](products-screen-audit.md). |
 | Contactos y datos fiscales | Clientes/proveedores/almacenes y registro tributario manual están en UI. La importación sigue en revisión manual; la gestión de tarifas tiene una API con excepción de autorización pública. |
 | Inventario | Centro de mando con KPIs/alertas/acciones; pestañas de existencias, movimientos, operaciones y auditoría; consumos de endpoint command-center. |
 | Compras | Pestañas Órdenes, Recepciones y Devoluciones a proveedores. Órdenes, recepciones y devoluciones usan búsqueda/paginación desde servidor. |
