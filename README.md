@@ -114,3 +114,7 @@ Las propuestas de la raíz describen alcance deseado. Los documentos P01–P23 y
 ## Licencia
 
 Software propietario de EcuApp. Ver LICENSE.
+
+## Seguimiento funcional
+
+- [Estado funcional pendiente por pantalla (frontend + backend)](ESTADO_FUNCIONAL_POR_PANTALLA.md)
