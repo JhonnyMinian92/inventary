@@ -35,6 +35,25 @@ class AuthAdminApiTest extends ApiTestSupport {
         assertNotNull(login(username, "Nueva-Clave-26!"));
     }
 
+
+    @Test
+    void logoutRevokesTheCurrentTokenImmediately() {
+        String username = createUser("VENDEDOR");
+        String token = login(username, PASSWORD);
+        httpGet(token, "/api/v1/auth/me", 200);
+
+        MvcResult logout = call(post("/api/v1/auth/logout"), token, null);
+        assertEquals(204, logout.getResponse().getStatus());
+        problem(call(get("/api/v1/auth/me"), token, null), 401, null);
+
+        // Logout revokes the presented token, not the user's ability to authenticate again.
+        assertNotNull(login(username, PASSWORD));
+        Integer audited = jdbc.queryForObject(
+            "select count(*) from audit_event where actor=? and action='USER_LOGOUT'",
+            Integer.class, username);
+        assertEquals(1, audited);
+    }
+
     @Test
     void userAdministrationValidatesPolicyUniquenessAndRoles() {
         String admin = admin();
