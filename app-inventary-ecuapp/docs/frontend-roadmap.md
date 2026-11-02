@@ -1,6 +1,6 @@
 # Estado y roadmap del frontend Inventary
 
-**Código auditado:** revisión de login y sesión en `implementacion_propuestas` (validación CI pendiente). Detalle: [auditoría de login y sesión](login-session-audit.md).
+**Código auditado:** revisión de login y sesión en `implementacion_propuestas`; Frontend CI aprobado y Backend CI aprobado. Evidencia: [auditoría de login y sesión](login-session-audit.md).
 
 Este documento sustituye el calendario histórico de implementación por una descripción del código actual y de las brechas que siguen abiertas.
 
@@ -8,7 +8,7 @@ Este documento sustituye el calendario histórico de implementación por una des
 
 | Área | Estado del código |
 |---|---|
-| Fundación, login y sesión | Flujo de login cifrado, perfil/permisos, expiración y logout implementados; se corrigió el fallback de Storage y el feedback accesible. Tests añadidos; pendiente validar el CI del commit final y E2E browser completo. Recuperación automática y MFA no implementados. |
+| Fundación, login y sesión | Flujo cifrado, perfil/permisos, expiración y logout; fallback de Storage y feedback accesible corregidos. Frontend CI y Backend CI aprobados, incluido responsive smoke y arranque Compose. Pendientes: E2E autenticado completo, recuperación autoservicio y MFA. |
 | Catálogo | Productos, categorías, atributos, unidades, conversiones, imágenes y variantes tienen pantallas/workflows. |
 | Contactos y datos fiscales | Clientes/proveedores/almacenes y registro tributario manual están en UI. La importación sigue en revisión manual; la gestión de tarifas tiene una API con excepción de autorización pública. |
 | Inventario | Centro de mando con KPIs/alertas/acciones; pestañas de existencias, movimientos, operaciones y auditoría; consumos de endpoint command-center. |
