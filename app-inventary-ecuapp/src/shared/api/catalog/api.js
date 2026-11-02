@@ -5,6 +5,10 @@ export const catalogApi = {
   products: (params = {}) => request('/catalog/products' + query(params)),
   product: id => request('/catalog/products/' + encodeURIComponent(id)),
   productImages: id => request('/catalog/products/' + encodeURIComponent(id) + '/images'),
+  productVariants: id => request('/catalog/products/' + encodeURIComponent(id) + '/variants'),
+  createProductVariant: (id, data) => request('/catalog/products/' + encodeURIComponent(id) + '/variants', { method: 'POST', body: data }),
+  updateProductVariant: (id, data) => request('/catalog/variants/' + encodeURIComponent(id), { method: 'PATCH', body: data }),
+  deactivateProductVariant: id => request('/catalog/variants/' + encodeURIComponent(id) + '/deactivate', { method: 'POST' }),
   uploadProductImage: (id, file, options = {}) => {
     const body = new FormData();
     body.append('file', file);
