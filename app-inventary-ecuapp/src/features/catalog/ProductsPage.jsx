@@ -126,7 +126,7 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
     {product.description && <p className="drawer-text">{product.description}</p>}
     <h3 className="drawer-subtitle">Clasificación y datos fiscales</h3>
     <dl className="product-detail-attributes">
-      <div><dt>Unidad de medida</dt><dd>{product.unitOfMeasure?.name || product.unitOfMeasureName || 'Unidad'}</dd></div>
+      <div><dt>Unidad de medida</dt><dd>{product.unitOfMeasure?.name || product.unitOfMeasureName || product.unitOfMeasureId || 'Unidad'}</dd></div>
       <div><dt>Código fiscal</dt><dd>{product.taxCode || '—'}</dd></div>
       <div><dt>Tratamiento tributario</dt><dd>{({ TAXABLE: 'Gravado', ZERO_RATED: 'Tarifa 0%', EXEMPT: 'Exento', NOT_SUBJECT: 'No sujeto' })[product.taxTreatment] || product.taxTreatment || '—'}</dd></div>
       <div><dt>Unidad / SKU</dt><dd>{product.sku}</dd></div>
