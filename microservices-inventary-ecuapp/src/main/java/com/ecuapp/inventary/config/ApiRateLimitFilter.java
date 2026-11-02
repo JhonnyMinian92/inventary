@@ -4,6 +4,10 @@ import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.ApiProblemFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.FilterChain;
@@ -44,13 +48,14 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     private final ObjectMapper mapper;
     private final AuditService audit;
     private final MeterRegistry metrics;
+    private final JdbcTemplate jdbc;
 
     private final int loginPerMinute;
     private final int loginChallengePerMinute;
     private final int whatsappPerMinute;
     private final int publicPerMinute;
 
-    public ApiRateLimitFilter(ApiProblemFactory problems, ObjectMapper mapper, AuditService audit, MeterRegistry metrics,
+    public ApiRateLimitFilter(ApiProblemFactory problems, ObjectMapper mapper, AuditService audit, MeterRegistry metrics, JdbcTemplate jdbc,
                               @Value("${app.rate-limit.login-per-minute:10}") int loginPerMinute,
                               @Value("${app.rate-limit.login-challenge-per-minute:30}") int loginChallengePerMinute,
                               @Value("${app.rate-limit.whatsapp-per-minute:240}") int whatsappPerMinute,
@@ -59,6 +64,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
         this.mapper = mapper;
         this.audit = audit;
         this.metrics = metrics;
+        this.jdbc = jdbc;
         this.loginPerMinute = loginPerMinute;
         this.loginChallengePerMinute = loginChallengePerMinute;
         this.whatsappPerMinute = whatsappPerMinute;
@@ -80,21 +86,41 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
         long now = System.currentTimeMillis();
         AtomicBoolean limited = new AtomicBoolean(false);
         AtomicReference<Window> active = new AtomicReference<>();
-        windows.asMap().compute(key, (ignored, current) -> {
-            if (current == null || now - current.startedAtMillis() >= policy.windowMillis()) {
-                Window fresh = new Window(now, 1);
-                active.set(fresh);
-                return fresh;
-            }
-            active.set(current);
-            if (current.requests() >= policy.maxRequests()) {
-                limited.set(true);
-                return current;
-            }
-            Window next = new Window(current.startedAtMillis(), current.requests() + 1);
-            active.set(next);
-            return next;
-        });
+        if (isAuthenticationPolicy(policy.key())) {
+            long seconds = Math.max(1, policy.windowMillis() / 1000);
+            Window shared = jdbc.queryForObject("""
+                INSERT INTO auth_rate_limit_window(key_hash,window_started_at,requests,updated_at)
+                VALUES(?,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)
+                ON CONFLICT(key_hash) DO UPDATE SET
+                  requests = CASE
+                    WHEN auth_rate_limit_window.window_started_at <= CURRENT_TIMESTAMP - (? * INTERVAL '1 second') THEN 1
+                    ELSE auth_rate_limit_window.requests + 1 END,
+                  window_started_at = CASE
+                    WHEN auth_rate_limit_window.window_started_at <= CURRENT_TIMESTAMP - (? * INTERVAL '1 second') THEN CURRENT_TIMESTAMP
+                    ELSE auth_rate_limit_window.window_started_at END,
+                  updated_at = CURRENT_TIMESTAMP
+                RETURNING window_started_at,requests
+                """, (rs,rowNum) -> new Window(rs.getTimestamp(1).getTime(),rs.getInt(2)),
+                digest(key),seconds,seconds);
+            active.set(shared);
+            limited.set(shared.requests() > policy.maxRequests());
+        } else {
+            windows.asMap().compute(key, (ignored, current) -> {
+                if (current == null || now - current.startedAtMillis() >= policy.windowMillis()) {
+                    Window fresh = new Window(now, 1);
+                    active.set(fresh);
+                    return fresh;
+                }
+                active.set(current);
+                if (current.requests() >= policy.maxRequests()) {
+                    limited.set(true);
+                    return current;
+                }
+                Window next = new Window(current.startedAtMillis(), current.requests() + 1);
+                active.set(next);
+                return next;
+            });
+        }
         if (limited.get()) {
             metrics.counter("inventary.auth.rate_limited", "policy", policy.key()).increment();
             long remaining = Math.max(1L, (active.get().startedAtMillis() + policy.windowMillis() - now + 999) / 1000);
@@ -120,6 +146,21 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
             return;
         }
         chain.doFilter(request, response);
+    }
+
+    private boolean isAuthenticationPolicy(String key) {
+        return switch (key) {
+            case "login","login-challenge","password-recovery","recovery-email","mfa-management" -> true;
+            default -> false;
+        };
+    }
+
+    private String digest(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is required by the Java runtime.",impossible);
+        }
     }
 
     private Policy policy(String path) {
