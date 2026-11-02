@@ -55,7 +55,7 @@ export default function useWorkspaceController() {
   useMessageToast(error, setError, 'error');
   useMessageToast(notice, setNotice, 'success');
 
-  const workspace = useWorkspaceData({ token, section, modal, listPage, listQuery, purchaseStatus, expireSession, onError: setError });
+  const workspace = useWorkspaceData({ token, section, modal, listPage, listQuery, purchaseStatus, canReadInventory: can('inventory:read') || can('inventory:manage'), expireSession, onError: setError });
 
   useEffect(() => { if (authError) setError(authError); }, [authError]);
   useEffect(() => {
