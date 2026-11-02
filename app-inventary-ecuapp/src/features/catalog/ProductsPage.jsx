@@ -130,7 +130,7 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
   </Drawer>;
 }
 
-function ProductsTab({ products: initialProducts, categories, balances, ready, can, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
+function ProductsTab({ products: initialProducts, categories, balances, ready, can, onCountChange, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
   const [query, setQuery] = useState(() => readSearchValue(window.location.search, 'products.q', ''));
   const [categoryId, setCategoryId] = useState(() => readSearchValue(window.location.search, 'products.categoryId', ''));
   const [statusFilter, setStatusFilter] = useState(() => {
@@ -148,6 +148,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => { onCountChange?.(serverTotal); }, [serverTotal, onCountChange]);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -376,6 +377,7 @@ function CategoriesTab({ categories, products, ready, can, onNew, onEdit, onTogg
 
 export default function ProductsPage({ tab, products = [], categories, balances, ready, refreshing, can, detailId, onNavigateTab, onOpenDetail, onCloseDetail, product: actions, category: categoryActions }) {
   const [detail, setDetail] = useState(null);
+  const [productCount, setProductCount] = useState(products.length);
   useEffect(() => {
     if (!detailId) { setDetail(null); return undefined; }
     let active = true;
@@ -386,10 +388,10 @@ export default function ProductsPage({ tab, products = [], categories, balances,
   }, [detailId]);
   const categoryName = id => categories.find(category => String(idOf(category)) === String(id))?.name || '';
   return <div className={'page' + (refreshing ? ' is-refreshing' : '')}>
-    <CatalogTabs active={tab} productCount={products.length} categoryCount={categories.length} onNavigate={onNavigateTab} />
+    <CatalogTabs active={tab} productCount={productCount} categoryCount={categories.length} onNavigate={onNavigateTab} />
     {tab === 'categories'
       ? <CategoriesTab categories={categories} products={products} ready={ready} can={can} {...categoryActions} />
-      : <ProductsTab products={products} categories={categories} balances={balances} ready={ready} can={can} onOpenDetail={onOpenDetail} {...actions} />}
+       : <ProductsTab products={products} categories={categories} balances={balances} ready={ready} can={can} onCountChange={setProductCount} onOpenDetail={onOpenDetail} {...actions} />}
     {detail && <ProductDrawer product={detail} category={categoryName(detail.categoryId)} balances={balances} can={can} onClose={onCloseDetail}
       onEdit={actions.onEdit} onToggle={actions.onToggle} onDelete={actions.onDelete} />}
   </div>;
