@@ -2,7 +2,8 @@ package com.ecuapp.inventary.config;
 
 import com.ecuapp.inventary.audit.AuditService;
 import com.ecuapp.inventary.common.ApiProblemFactory;
-import com.fasterxml.jackson.databind.ObjectMapper;\nimport io.micrometer.core.instrument.MeterRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.FilterChain;
@@ -41,7 +42,8 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
             .expireAfterAccess(Duration.ofMinutes(10)).maximumSize(20_000).build();
     private final ApiProblemFactory problems;
     private final ObjectMapper mapper;
-    private final AuditService audit;\n    private final MeterRegistry metrics;
+    private final AuditService audit;
+    private final MeterRegistry metrics;
 
     private final int loginPerMinute;
     private final int loginChallengePerMinute;
@@ -55,7 +57,8 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
                               @Value("${app.rate-limit.public-per-minute:300}") int publicPerMinute) {
         this.problems = problems;
         this.mapper = mapper;
-        this.audit = audit;\n        this.metrics = metrics;
+        this.audit = audit;
+        this.metrics = metrics;
         this.loginPerMinute = loginPerMinute;
         this.loginChallengePerMinute = loginChallengePerMinute;
         this.whatsappPerMinute = whatsappPerMinute;
@@ -92,7 +95,8 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
             active.set(next);
             return next;
         });
-        if (limited.get()) {\n            metrics.counter("inventary.auth.rate_limited", "policy", policy.key()).increment();
+        if (limited.get()) {
+            metrics.counter("inventary.auth.rate_limited", "policy", policy.key()).increment();
             long remaining = Math.max(1L, (active.get().startedAtMillis() + policy.windowMillis() - now + 999) / 1000);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
