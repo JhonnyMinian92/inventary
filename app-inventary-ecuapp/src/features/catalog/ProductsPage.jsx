@@ -68,6 +68,7 @@ function CatalogTabs({ active, productCount, categoryCount, onNavigate }) {
 
 function ProductDrawer({ product, category, balances, can, onClose, onEdit, onToggle, onDelete }) {
   const canMovements = can('inventory:manage') || can('audit:read');
+  const canBalances = can('inventory:read') || can('inventory:manage');
   const [movements, setMovements] = useState(null);
   const [productBalances, setProductBalances] = useState(null);
   const [images, setImages] = useState([]);
@@ -83,13 +84,14 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
     return () => { active = false; };
   }, [productId, canMovements]);
   useEffect(() => {
+    if (!canBalances) { setProductBalances([]); return undefined; }
     let active = true;
     setProductBalances(null);
     api.balances({ productId, page: 0, size: 100 })
       .then(payload => { if (active) setProductBalances(listFrom(payload)); })
       .catch(error => { if (active) { setProductBalances([]); toast.error(error?.message || 'No se pudieron cargar las existencias del producto.'); } });
     return () => { active = false; };
-  }, [productId]);
+  }, [productId, canBalances]);
   useEffect(() => {
     let active = true;
     setImages([]);
@@ -101,7 +103,7 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
     });
     return () => { active = false; };
   }, [productId]);
-  const rows = (productBalances ?? balances.filter(row => String(row.productId) === String(productId)));
+  const rows = canBalances ? (productBalances ?? balances.filter(row => String(row.productId) === String(productId))) : [];
   const onHand = rows.reduce((sum, row) => sum + Number(row.onHand || 0), 0);
   const available = rows.reduce((sum, row) => sum + Number(row.available ?? row.onHand ?? 0), 0);
   const reserved = rows.reduce((sum, row) => sum + Number(row.reserved || 0), 0);
@@ -116,9 +118,9 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
     </>}>
     <div className="detail-pills"><span className={'pill ' + (inactive ? 'inactive' : 'active')}>{inactive ? 'Inactivo' : 'Activo'}</span><span className="pill neutral">{KIND_LABELS[product.kind] || titleCase(product.kind || 'STOCKED_GOOD')}</span></div>
     <dl className="metric-grid">
-      <div><dt>Existencia</dt><dd>{number(onHand)}</dd></div>
+      {canBalances && <><div><dt>Existencia</dt><dd>{number(onHand)}</dd></div>
       <div><dt>Disponible</dt><dd>{number(available)}</dd></div>
-      <div><dt>Reservado</dt><dd>{number(reserved)}</dd></div>
+      <div><dt>Reservado</dt><dd>{number(reserved)}</dd></div></>}
       <div><dt>Precio de venta</dt><dd>{money(product.salePrice)}</dd></div>
       {product.costPrice !== undefined && product.costPrice !== null && <div><dt>Costo (última compra)</dt><dd>{money(product.costPrice)}</dd></div>}
       {product.marginPercent !== undefined && product.marginPercent !== null && <div><dt>Ganancia sugerida</dt><dd>{Number(product.marginPercent)} %</dd></div>}
@@ -146,12 +148,12 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
         <strong>{money(variant.effectivePrice)}</strong><span className={'pill ' + (variant.active ? 'active' : 'inactive')}>{variant.active ? 'Activa' : 'Inactiva'}</span>
       </li>)}</ul>
     </>}
-    <h3 className="drawer-subtitle">Existencias por almacén</h3>
+    {canBalances && <><h3 className="drawer-subtitle">Existencias por almacén</h3>
     {rows.length ? <ul className="stock-rows">{rows.map(row => <li key={row.warehouseId}>
       <span>{row.warehouseCode}</span>
       <span className="stock-track" aria-hidden="true"><span style={{ width: Math.max(0, Number(row.onHand || 0)) / max * 100 + '%' }} /></span>
       <strong>{number(row.onHand)}</strong>
-    </li>)}</ul> : <p className="drawer-empty">Sin existencias registradas.</p>}
+    </li>)}</ul> : <p className="drawer-empty">Sin existencias registradas.</p>}</>}
     {canMovements && <h3 className="drawer-subtitle">Últimos movimientos</h3>}
     {!canMovements ? null : movements === null ? <div className="drawer-skeleton">{[0, 1, 2].map(index => <Skeleton key={index} height={34} radius={8} />)}</div>
       : movements.length ? <ul className="movement-list compact">{movements.map(movement => {
@@ -166,6 +168,7 @@ function ProductDrawer({ product, category, balances, can, onClose, onEdit, onTo
 }
 
 function ProductsTab({ products: initialProducts, categories, balances, ready, can, onCountChange, onOpenDetail, onNew, onEdit, onToggle, onDelete }) {
+  const canStock = can('inventory:read') || can('inventory:manage');
   const [query, setQuery] = useState(() => readSearchValue(window.location.search, 'products.q', ''));
   const [categoryId, setCategoryId] = useState(() => readSearchValue(window.location.search, 'products.categoryId', ''));
   const [kindFilter, setKindFilter] = useState(() => ['STOCKED_GOOD', 'NON_STOCKED_GOOD', 'SERVICE'].includes(readSearchValue(window.location.search, 'products.kind', '')) ? readSearchValue(window.location.search, 'products.kind', '') : '');
@@ -175,9 +178,12 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
   });
   const [stockFilter, setStockFilter] = useState(() => {
     const value = readSearchValue(window.location.search, 'products.stock', '');
-    return value === 'with' || value === 'without' ? value : '';
+    return canStock && (value === 'with' || value === 'without') ? value : '';
   });
-  const [sort, setSort] = useState(readProductSort);
+  const [sort, setSort] = useState(() => {
+    const initial = readProductSort();
+    return !canStock && initial.key === 'stock' ? { key: 'name', dir: 'asc' } : initial;
+  });
   const [page, setPage] = useState(readProductPage);
   const [serverProducts, setServerProducts] = useState(initialProducts || []);
   const [serverTotal, setServerTotal] = useState(Number(initialProducts?.length || 0));
@@ -203,8 +209,9 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       const nextKind = readSearchValue(window.location.search, 'products.kind', '');
       setKindFilter(['STOCKED_GOOD', 'NON_STOCKED_GOOD', 'SERVICE'].includes(nextKind) ? nextKind : '');
       setStatusFilter(PRODUCT_STATUS_FILTERS.has(nextStatus) ? nextStatus : 'active');
-      setStockFilter(nextStock === 'with' || nextStock === 'without' ? nextStock : '');
-      setSort(readProductSort());
+      setStockFilter(canStock && (nextStock === 'with' || nextStock === 'without') ? nextStock : '');
+      const nextSort = readProductSort();
+      setSort(!canStock && nextSort.key === 'stock' ? { key: 'name', dir: 'asc' } : nextSort);
       setPage(readProductPage());
     };
     window.addEventListener('popstate', syncFromLocation);
@@ -218,7 +225,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       'products.categoryId': categoryId || null,
       'products.kind': kindFilter || null,
       'products.status': statusFilter || null,
-      'products.stock': stockFilter || null,
+      'products.stock': canStock ? (stockFilter || null) : null,
       'products.sortKey': sort.key === 'name' ? null : sort.key,
       'products.sortDir': sort.dir === 'asc' ? null : sort.dir,
       'products.page': page || null
@@ -310,7 +317,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
       if (statusFilter === 'active') params.active = true;
       if (statusFilter === 'inactive') params.active = false;
       const productsPromise = listAllPages(api.products, params, 100);
-      const canReadStock = can('inventory:read') || can('inventory:manage');
+      const canReadStock = canStock;
       const balancesPromise = canReadStock ? listAllPages(api.balances, {}, 100) : Promise.resolve([]);
       const [allProducts, allBalances] = await Promise.all([productsPromise, balancesPromise]);
       const totals = new Map();
@@ -347,7 +354,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
     <div className="stat-chips">
       <span><strong>{number(serverTotal)}</strong> resultados</span>
       <span><strong>{number(active.length)}</strong> activos en esta página</span>
-      <span className={withoutStock ? 'warn' : ''}><strong>{number(withoutStock)}</strong> activos sin stock en esta página</span>
+      {canStock && <span className={withoutStock ? 'warn' : ''}><strong>{number(withoutStock)}</strong> activos sin stock en esta página</span>}
     </div>
     <div className="filter-bar">
       <label className="search-field"><Search size={16} aria-hidden="true" /><input type="search" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} placeholder="Buscar nombre, SKU o código de barras" aria-label="Buscar productos" /></label>
@@ -361,9 +368,9 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
         <option value="NON_STOCKED_GOOD">No inventariables</option>
         <option value="SERVICE">Servicios</option>
       </select>
-      <select value={stockFilter} onChange={event => { setStockFilter(event.target.value); setPage(0); }} aria-label="Existencias">
+      {canStock && <select value={stockFilter} onChange={event => { setStockFilter(event.target.value); setPage(0); }} aria-label="Existencias">
         <option value="">Todas las existencias</option><option value="with">Con existencias en esta página</option><option value="without">Sin existencias en esta página</option>
-      </select>
+      </select>}
       <div className="segmented" role="group" aria-label="Estado">
         {[['active', 'Activos'], ['inactive', 'Inactivos'], ['', 'Todos']].map(([value, label]) => <button key={value || 'all'} type="button" aria-pressed={statusFilter === value} onClick={() => { setStatusFilter(value); setPage(0); }}>{label}</button>)}
       </div>
@@ -378,7 +385,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
           <SortHeader id="name" label="Producto" sort={sort} onSort={toggleSort} />
           <SortHeader id="category" label="Categoría" sort={sort} onSort={toggleSort} />
           <SortHeader id="price" label="Precio" sort={sort} onSort={toggleSort} align="num" />
-          <SortHeader id="stock" label="Existencia (página)" sort={sort} onSort={toggleSort} align="num" />
+          {canStock && <SortHeader id="stock" label="Existencia (página)" sort={sort} onSort={toggleSort} align="num" />}
           <th scope="col">Calidad</th>
           <th scope="col">Estado</th>
           {can('catalog:manage') && <th scope="col" className="actions-col"><span className="visually-hidden">Acciones</span></th>}
@@ -394,7 +401,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
             </div></td>
             <td>{categoryNames.get(String(product.categoryId)) || product.category?.name || '—'}</td>
             <td className="num">{money(product.salePrice)}</td>
-            <td className="num"><span className={'stock-value' + (!(totals?.onHand > 0) && !inactive ? ' empty' : '')}>{number(totals?.onHand || 0)}</span>{totals && totals.available !== totals.onHand && <small className="cell-note">{number(totals.available)} disp.</small>}</td>
+            {canStock && <td className="num"><span className={'stock-value' + (!(totals?.onHand > 0) && !inactive ? ' empty' : '')}>{number(totals?.onHand || 0)}</span>{totals && totals.available !== totals.onHand && <small className="cell-note">{number(totals.available)} disp.</small>}</td>}
             <td><div className="catalog-quality" title="Completitud de la ficha"><span><i style={{ width: productCompleteness(product) + '%' }}/></span><strong>{productCompleteness(product)}%</strong></div></td>
             <td><span className={'pill ' + (inactive ? 'inactive' : 'active')}>{inactive ? 'Inactivo' : 'Activo'}</span></td>
             {can('catalog:manage') && <td className="actions-col" onClick={event => event.stopPropagation()}>
