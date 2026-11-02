@@ -1,4 +1,5 @@
-import { Ban, CheckCircle2, Eye } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Ban, CheckCircle2, Eye, Search, X } from 'lucide-react';
 import { statusLabel, statusTone } from '../../utils/format.js';
 import ServerPagination from '../../ui/ServerPagination.jsx';
 
@@ -15,11 +16,38 @@ function money(value, currency = 'USD') {
 }
 
 export default function SalesTable({ rows = [], loading = false, onView, onRequestCancel, onApproveCancellation, pagination, page = 0, onPageChange }) {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('');
+  const visibleRows = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return rows.filter(sale => {
+      const saleStatus = String(sale.status || 'COMPLETED').toUpperCase();
+      const matchesStatus = !status || saleStatus === status;
+      const matchesText = !text || [
+        sale.saleNumber, sale.number, sale.code, sale.customerName,
+        sale.customer?.name, sale.warehouseCode, sale.warehouseName, sale.warehouse?.name
+      ].some(value => String(value || '').toLowerCase().includes(text));
+      return matchesStatus && matchesText;
+    });
+  }, [rows, query, status]);
+
   return <div className="table-wrap">
+    <div className="sales-filter-bar">
+      <label className="search-field"><Search size={16}/><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar documento, cliente o almacén" aria-label="Buscar ventas"/></label>
+      <select value={status} onChange={event => setStatus(event.target.value)} aria-label="Filtrar ventas por estado">
+        <option value="">Todos los estados</option>
+        <option value="COMPLETED">Completadas</option>
+        <option value="CANCELLATION_REQUESTED">Anulación solicitada</option>
+        <option value="CANCELLED">Anuladas</option>
+        <option value="DRAFT">Borradores</option>
+      </select>
+      {(query || status) && <button type="button" className="button secondary sales-clear-filter" onClick={() => { setQuery(''); setStatus(''); }}><X size={15}/>Limpiar</button>}
+      <span className="sales-filter-result">{visibleRows.length} de {rows.length} ventas visibles</span>
+    </div>
     <table aria-label="Ventas registradas">
       <caption className="visually-hidden">Ventas y solicitudes de anulación</caption>
       <thead><tr><th scope="col">Documento</th><th scope="col">Estado</th><th scope="col">Cliente</th><th scope="col">Almacén</th><th scope="col">Fecha</th><th scope="col">Total</th><th scope="col">Acciones</th></tr></thead>
-      <tbody>{rows.map((sale, index) => {
+      <tbody>{visibleRows.map((sale, index) => {
         const status = String(sale.status || 'COMPLETED').toUpperCase();
         const number = sale.saleNumber || sale.number || sale.code || String(idOf(sale)).slice(0, 12) || 'Venta';
         const canRequest = status === 'COMPLETED';
@@ -39,7 +67,7 @@ export default function SalesTable({ rows = [], loading = false, onView, onReque
         </tr>;
       })}</tbody>
     </table>
-    {!rows.length && <div className="empty-state" role="status">No hay ventas en esta página.</div>}
+    {!visibleRows.length && <div className="empty-state" role="status">{rows.length ? 'No hay ventas que coincidan con los filtros.' : 'No hay ventas en esta página.'}</div>}
     <ServerPagination info={pagination} page={page} loading={loading} onChange={onPageChange} />
   </div>;
 }

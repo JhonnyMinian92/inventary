@@ -271,9 +271,9 @@ export default function useWorkspaceController() {
   const dashboardData = useMemo(() => ({
     products: workspace.products, categories: workspace.categories, balances: workspace.balances,
     movements: workspace.movements, purchases: workspace.purchases, sales: workspace.sales,
-    warehouses: workspace.warehouses, valuation: workspace.valuation
+    warehouses: workspace.warehouses, customers: workspace.customers, valuation: workspace.valuation
   }), [workspace.products, workspace.categories, workspace.balances, workspace.movements,
-    workspace.purchases, workspace.sales, workspace.warehouses, workspace.valuation]);
+    workspace.purchases, workspace.sales, workspace.warehouses, workspace.customers, workspace.valuation]);
 
   return {
     auth: { token, user, apiStatus, can, expireSession, login, authError, handleLogout },

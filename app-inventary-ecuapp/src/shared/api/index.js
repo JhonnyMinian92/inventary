@@ -13,5 +13,5 @@ export const api = Object.freeze({
   ...authApi, ...catalogApi, ...partnersApi, ...inventoryApi, ...reportsApi,
   ...purchasingApi, ...salesApi, ...subscriptionsApi, ...whatsappApi
 });
-export { ApiError, request, getToken, getTokenExpiry, setToken } from './http/request.js';
+export { API_BASE, ApiError, request, getToken, getTokenExpiry, setToken } from './http/request.js';
 export { listFrom, identifier, listAllPages, resolveApiUrl } from './utils.js';

@@ -4,6 +4,7 @@ import { api, listFrom } from '../../api';
 import AreaChart from '../../components/charts/AreaChart.jsx';
 import BarList from '../../components/charts/BarList.jsx';
 import Sparkline from '../../components/charts/Sparkline.jsx';
+import IsometricOperationsScene from './IsometricOperationsScene.jsx';
 import { Skeleton, SkeletonBlock, SkeletonTiles } from '../../ui/Skeleton.jsx';
 import { compactMoney, compactNumber, idOf, isoDate, money, movementDirection, movementLabel, number, relativeTime, shortDate } from '../../utils/format.js';
 import './dashboard.css';
@@ -53,7 +54,7 @@ function Card({ title, action, children, className = '' }) {
 }
 
 export default function Dashboard({ data, ready, refreshing, refreshKey, whatsappPending, pendingCounts = {}, can, onNavigate, onStartWorkflow, onOpenProduct }) {
-  const { products, balances, movements, purchases, sales, warehouses, valuation } = data;
+  const { products, balances, movements, purchases, sales, warehouses, customers = [], valuation, whatsappPending: realtimeWhatsappPending = 0 } = data;
   const [days, setDays] = useState(30);
   const [view, setView] = useState('chart');
   const [report, setReport] = useState({ loading: true, sales: null, lowStock: null, lowStockTotal: null });
@@ -138,6 +139,9 @@ export default function Dashboard({ data, ready, refreshing, refreshKey, whatsap
       <Tile label="Bajo mínimo" value={report.lowStock ? number(report.lowStockTotal ?? lowStock.length) : '—'} status={report.lowStock ? (lowStock.length ? 'warning' : 'good') : ''}
         detail={report.lowStock ? (lowStock.length ? 'Productos por reponer' : 'Existencias en orden') : 'Sin acceso a reportes'} />
     </div>}
+
+    <IsometricOperationsScene products={products} warehouses={warehouses} balances={balances}
+      customers={customers} whatsappPending={whatsappPending ?? realtimeWhatsappPending} movements={movements} onOpenProduct={onOpenProduct} />
 
     <div className="dash-grid two-one">
       <Card title="Ventas por día" action={<div className="segmented small" role="group" aria-label="Vista">

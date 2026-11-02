@@ -61,6 +61,7 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, listQuer
     if (section === 'overview') {
       add('products', () => api.products({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('warehouses', () => api.warehouses({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
+      add('customers', () => api.customers({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('balances', () => api.balances({ page: 0, size: REFERENCE_PAGE_SIZE }), listFrom);
       add('movements', () => api.movements({ page: 0, size: 8, sort: 'occurredAt,desc' }), listFrom);
       add('valuation', () => api.inventoryValuationReport({ page: 0, size: 1 }));
@@ -186,6 +187,12 @@ export function useWorkspaceData({ token, section, modal, listPage = 0, listQuer
     setHasLoadedData(false);
     void loadData();
     return () => { requestVersion.current += 1; };
+  }, [loadData]);
+
+  useEffect(() => {
+    const refresh = () => void loadData();
+    window.addEventListener('inventary:dashboard-realtime', refresh);
+    return () => window.removeEventListener('inventary:dashboard-realtime', refresh);
   }, [loadData]);
 
   return {

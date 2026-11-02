@@ -25,6 +25,18 @@ function readProductSort() {
 }
 const KIND_LABELS = { STOCKED_GOOD: 'Inventariable', NON_STOCKED_GOOD: 'No inventariable', SERVICE: 'Servicio' };
 
+function productCompleteness(product) {
+  const checks = [
+    Boolean(String(product?.name || '').trim()),
+    Boolean(String(product?.sku || product?.code || '').trim()),
+    Boolean(product?.categoryId || product?.category?.id),
+    Number(product?.salePrice) >= 0,
+    Boolean(String(product?.description || '').trim()),
+    Boolean(String(product?.unitOfMeasureId || product?.unitOfMeasure?.id || '').trim())
+  ];
+  return Math.round(checks.filter(Boolean).length / checks.length * 100);
+}
+
 function SortHeader({ id, label, sort, onSort, align }) {
   const active = sort.key === id;
   const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
@@ -284,6 +296,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
           <SortHeader id="category" label="Categoría" sort={sort} onSort={toggleSort} />
           <SortHeader id="price" label="Precio" sort={sort} onSort={toggleSort} align="num" />
           <SortHeader id="stock" label="Existencia" sort={sort} onSort={toggleSort} align="num" />
+          <th scope="col">Calidad</th>
           <th scope="col">Estado</th>
           {can('catalog:manage') && <th scope="col" className="actions-col"><span className="visually-hidden">Acciones</span></th>}
         </tr></thead>
@@ -296,6 +309,7 @@ function ProductsTab({ products: initialProducts, categories, balances, ready, c
             <td>{categoryNames.get(String(product.categoryId)) || product.category?.name || '—'}</td>
             <td className="num">{money(product.salePrice)}</td>
             <td className="num"><span className={'stock-value' + (!(totals?.onHand > 0) && !inactive ? ' empty' : '')}>{number(totals?.onHand || 0)}</span>{totals && totals.available !== totals.onHand && <small className="cell-note">{number(totals.available)} disp.</small>}</td>
+            <td><div className="catalog-quality" title="Completitud de la ficha"><span><i style={{ width: productCompleteness(product) + '%' }}/></span><strong>{productCompleteness(product)}%</strong></div></td>
             <td><span className={'pill ' + (inactive ? 'inactive' : 'active')}>{inactive ? 'Inactivo' : 'Activo'}</span></td>
             {can('catalog:manage') && <td className="actions-col" onClick={event => event.stopPropagation()}>
               <div className="icon-actions">

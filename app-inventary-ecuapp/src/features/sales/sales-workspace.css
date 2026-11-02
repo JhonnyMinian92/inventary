@@ -1,0 +1,147 @@
+.sales-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sales-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sales-tabs button:hover {
+  background: #f4f8f6;
+  color: var(--ink);
+}
+
+.sales-tabs button.active {
+  border-color: #d6eadf;
+  background: #eaf5ef;
+  color: #1f6b46;
+}
+
+.sales-list-workspace {
+  min-width: 0;
+}
+
+.sales-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.sales-list-heading h3 {
+  margin: 0 0 4px;
+  font: 750 15px Manrope, sans-serif;
+  color: var(--ink);
+}
+
+.sales-list-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sales-record-count {
+  flex: none;
+  padding: 6px 9px;
+  border-radius: 99px;
+  background: #f3f6f4;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sales-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.sales-filter-bar .search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d8e0da;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted);
+}
+
+.sales-filter-bar .search-field input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.sales-filter-bar .search-field {
+  flex: 1 1 320px;
+  max-width: 420px;
+}
+
+.sales-filter-bar select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d8e0da;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.sales-filter-result {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .sales-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sales-tabs button {
+    justify-content: center;
+    padding-inline: 7px;
+  }
+
+  .sales-list-heading {
+    align-items: flex-start;
+  }
+
+  .sales-filter-bar {
+    flex-wrap: wrap;
+  }
+
+  .sales-filter-bar .search-field,
+  .sales-filter-bar select,
+  .sales-clear-filter {
+    width: 100%;
+    max-width: none;
+  }
+
+  .sales-filter-result {
+    width: 100%;
+    margin-left: 0;
+  }
+}

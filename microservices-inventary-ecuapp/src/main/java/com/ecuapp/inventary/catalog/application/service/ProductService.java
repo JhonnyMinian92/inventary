@@ -141,8 +141,14 @@ public class ProductService implements ProductUseCases {
   if(!p.isActive())return;
   if(balances.hasPhysicalStock(id))
    throw new ConflictException("No se puede desactivar un producto con existencias o reservas. Traslade, devuelva o ajuste el inventario primero.");
-  if(purchaseOrders.existsForProductInStatuses(id,EnumSet.of(PurchaseOrderStatus.DRAFT,PurchaseOrderStatus.SUBMITTED,PurchaseOrderStatus.APPROVED,PurchaseOrderStatus.PARTIALLY_RECEIVED)))
-   throw new ConflictException("No se puede desactivar un producto que aparece en órdenes de compra pendientes. Cierre o cancele esas órdenes primero.");
+  java.util.List<com.ecuapp.inventary.purchasing.PurchaseOrder> pendingPurchases=purchaseOrders.findPendingForProduct(id,
+   EnumSet.of(PurchaseOrderStatus.DRAFT,PurchaseOrderStatus.SUBMITTED,PurchaseOrderStatus.APPROVED,PurchaseOrderStatus.PARTIALLY_RECEIVED));
+  if(!pendingPurchases.isEmpty()){
+   String orders=pendingPurchases.stream().limit(3).map(order->order.getOrderNumber()+" ("+order.getStatus()+")").distinct()
+    .collect(java.util.stream.Collectors.joining(", "));
+   throw new ConflictException("No se puede desactivar el producto porque está incluido en órdenes de compra pendientes: "
+    +orders+". Cierre o cancele esas órdenes antes de desactivarlo.");
+  }
   if(transfers.existsForProductInStatuses(id,EnumSet.of(TransferStatus.DRAFT,TransferStatus.IN_TRANSIT)))
    throw new ConflictException("No se puede desactivar un producto que aparece en transferencias pendientes. Complete o cancele esas transferencias primero.");
   if(counts.existsForProductWithStatus(id,InventoryCountStatus.OPEN))

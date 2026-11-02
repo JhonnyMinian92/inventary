@@ -85,6 +85,7 @@ public class SecurityConfig {
     .requestMatchers("/actuator/metrics","/actuator/metrics/**").hasAnyAuthority("technical:read","operations:manage")
     .requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/login-challenge").permitAll()
     .requestMatchers("/api/v1/auth/**").authenticated()
+    .requestMatchers("/api/v1/dashboard/events").authenticated()
     .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
     .requestMatchers(HttpMethod.GET,"/api/v1/public/**").permitAll()
     .requestMatchers("/api/v1/tax/**").permitAll()

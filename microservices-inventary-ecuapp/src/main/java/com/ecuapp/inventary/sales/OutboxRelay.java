@@ -82,7 +82,23 @@ public class OutboxRelay {
             boolean ok = Boolean.TRUE.equals(tx.execute(status -> {
                 OutboxEvent current = repository.findById(id).orElse(null);
                 if (current == null || !"PROCESSING".equals(current.getStatus())) return false;
-                if (failure == null) current.markPublished(); else current.markFailed(failure);
+                if (failure == null) {
+                    current.markPublished();
+                    return true;
+                }
+                int attempts = jdbc.getJdbcTemplate().queryForObject(
+                    "select attempts from outbox_event where id=?", Integer.class, id);
+                int nextAttempts = attempts + 1;
+                boolean terminal = nextAttempts >= OutboxEvent.MAX_ATTEMPTS;
+                long delaySeconds = Math.min(3600L, 1L << Math.min(nextAttempts, 11));
+                jdbc.getJdbcTemplate().update("""
+                    update outbox_event
+                    set attempts=?, status=?, locked_until=null, last_error=?,
+                        next_attempt_at=now()+(? * interval '1 second')
+                    where id=?""",
+                    nextAttempts, terminal ? "FAILED" : "PENDING",
+                    failure.substring(0, Math.min(failure.length(), 500)),
+                    terminal ? 0L : delaySeconds, id);
                 return failure == null;
             }));
             if (ok) published++;
