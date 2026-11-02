@@ -83,7 +83,7 @@ public class SecurityConfig {
     .requestMatchers(HttpMethod.GET,"/actuator/health","/actuator/health/**").permitAll()
     .requestMatchers("/actuator/info").hasAuthority("technical:read")
     .requestMatchers("/actuator/metrics","/actuator/metrics/**").hasAnyAuthority("technical:read","operations:manage")
-    .requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/login-challenge","/api/v1/auth/password-recovery/request","/api/v1/auth/password-recovery/complete").permitAll()
+    .requestMatchers(HttpMethod.POST,"/api/v1/auth/login","/api/v1/auth/login-challenge","/api/v1/auth/login-mfa","/api/v1/auth/password-recovery/request","/api/v1/auth/password-recovery/complete").permitAll()
     .requestMatchers("/api/v1/auth/**").authenticated()
     .requestMatchers("/api/v1/dashboard/events").authenticated()
     .requestMatchers("/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").permitAll()
