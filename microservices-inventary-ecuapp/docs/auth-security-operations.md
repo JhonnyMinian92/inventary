@@ -32,6 +32,7 @@
 
 Micrometer expone, entre otras, estas familias:
 - `inventary.auth.authentication`: autenticaciones correctas y fallidas.
+- `inventary.auth.authentication_errors` y `inventary.auth.authorization_errors`: rechazos del filtro de seguridad HTTP.
 - `inventary.auth.login`: intentos correctos/fallidos.
 - `inventary.auth.lockouts`: bloqueos por cuenta.
 - `inventary.auth.rate_limited`: solicitudes rechazadas por política.
