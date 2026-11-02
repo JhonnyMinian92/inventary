@@ -20,6 +20,13 @@ CREATE TABLE auth_password_reset (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX ix_auth_password_reset_user ON auth_password_reset(user_id, expires_at DESC);
+CREATE TABLE auth_mfa (
+    user_id UUID PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
+    secret_ciphertext TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    enabled_at TIMESTAMPTZ
+);
 CREATE TABLE auth_security_event (
     id UUID PRIMARY KEY,
     event_type VARCHAR(40) NOT NULL,
