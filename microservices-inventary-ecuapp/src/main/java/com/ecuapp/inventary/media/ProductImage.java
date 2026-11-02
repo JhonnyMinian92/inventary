@@ -20,6 +20,7 @@ public class ProductImage {
  public ProductImage(Product product,String url,String alt,int sortOrder,boolean primaryImage){this.product=product;this.imageUrl=url;this.altText=alt;this.sortOrder=sortOrder;this.primaryImage=primaryImage;this.published=true;}
  @PrePersist void onCreate(){if(createdAt==null)createdAt=Instant.now();}
  public void update(String altText,int sortOrder,boolean primaryImage){this.altText=altText;this.sortOrder=sortOrder;this.primaryImage=primaryImage;}
+ public void setPrimary(boolean primaryImage){this.primaryImage=primaryImage;}
  public void unpublish(){this.published=false;this.primaryImage=false;}
  public UUID getId(){return id;} public Product getProduct(){return product;} public String getImageUrl(){return imageUrl;}
  public String getAltText(){return altText;} public int getSortOrder(){return sortOrder;} public boolean isPrimaryImage(){return primaryImage;}
