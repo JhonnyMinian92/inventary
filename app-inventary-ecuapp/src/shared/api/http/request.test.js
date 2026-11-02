@@ -38,3 +38,27 @@ test('descarta tokens vencidos también en el fallback de memoria', () => {
     else delete globalThis.localStorage;
   }
 });
+
+test('usa sessionStorage como respaldo si localStorage está bloqueado y se solicita recordar sesión', () => {
+  const originalSession = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  const originalLocal = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const values = new Map();
+  const session = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key)
+  };
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: session });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('localStorage blocked'); } });
+  try {
+    setToken('remember-fallback-token', { persist: true, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    assert.equal(getToken(), 'remember-fallback-token');
+    assert.equal(values.get('inventary.accessToken'), 'remember-fallback-token');
+  } finally {
+    setToken('');
+    if (originalSession) Object.defineProperty(globalThis, 'sessionStorage', originalSession);
+    else delete globalThis.sessionStorage;
+    if (originalLocal) Object.defineProperty(globalThis, 'localStorage', originalLocal);
+    else delete globalThis.localStorage;
+  }
+});
