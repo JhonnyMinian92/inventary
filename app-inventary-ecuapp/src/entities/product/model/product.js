@@ -43,3 +43,23 @@ export function productWritePayload(form) {
   }
   return payload;
 }
+
+/**
+ * Applies the stock filter to an already server-filtered page only.
+ * Search/category/kind/status are server-authoritative; in particular, server
+ * search can match variant barcodes not present in the parent product DTO.
+ */
+export function filterProductsByPageStock(products, balances, stockFilter) {
+  if (!stockFilter) return products;
+  const totals = new Map();
+  for (const balance of balances || []) {
+    const id = String(balance?.productId ?? '');
+    if (!id) continue;
+    totals.set(id, (totals.get(id) || 0) + Number(balance?.onHand || 0));
+  }
+  return (products || []).filter(product => {
+    const id = String(product?.id ?? product?.productId ?? '');
+    const onHand = totals.get(id) || 0;
+    return stockFilter === 'with' ? onHand > 0 : stockFilter === 'without' ? onHand <= 0 : true;
+  });
+}
