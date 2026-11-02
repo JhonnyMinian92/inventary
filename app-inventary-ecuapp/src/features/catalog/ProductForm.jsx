@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { confirmDialog, toast, useMessageToast } from '../../ui/feedback.js';
-import { ArrowLeft, ArrowRight, Boxes, ImagePlus, Star, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Boxes, ChevronDown, ChevronUp, ImagePlus, Star, Trash2, UploadCloud } from 'lucide-react';
 import StepProgress from '../../components/StepProgress.jsx';
 import { api, resolveApiUrl } from '../../api';
 import QuickCreateDialog, { SelectWithCreate } from '../../ui/QuickCreateDialog.jsx';
@@ -315,6 +315,43 @@ export default function ProductForm({ initialValue, categories, units = [], load
     }
   }
 
+  async function setPrimaryImage(image) {
+    if (!productId || !image?.id || image.primaryImage || imageBusy) return;
+    setImageError(''); setImageNotice(''); setImageBusy(true);
+    try {
+      await api.updateProductImage(productId, image.id, {
+        altText: image.altText || '', sortOrder: Number(image.sortOrder || 0), primaryImage: true
+      });
+      setImages(current => current.map(item => ({ ...item, primaryImage: String(item.id) === String(image.id) })));
+      setImageNotice('Imagen principal actualizada.');
+    } catch (error) {
+      setImageError(error?.message || 'No se pudo cambiar la imagen principal.');
+    } finally { setImageBusy(false); }
+  }
+
+  async function moveImage(image, direction) {
+    if (!productId || !image?.id || imageBusy) return;
+    const ordered = [...images].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    const index = ordered.findIndex(item => String(item.id) === String(image.id));
+    const neighbor = ordered[index + direction];
+    if (index < 0 || !neighbor) return;
+    setImageError(''); setImageNotice(''); setImageBusy(true);
+    try {
+      await api.updateProductImage(productId, image.id, {
+        altText: image.altText || '', sortOrder: Number(neighbor.sortOrder || 0), primaryImage: Boolean(image.primaryImage)
+      });
+      await api.updateProductImage(productId, neighbor.id, {
+        altText: neighbor.altText || '', sortOrder: Number(image.sortOrder || 0), primaryImage: Boolean(neighbor.primaryImage)
+      });
+      const refreshed = await api.productImages(productId);
+      setImages(Array.isArray(refreshed) ? refreshed : []);
+      setImageNotice('Orden de imágenes actualizado.');
+    } catch (error) {
+      setImageError(error?.message || 'No se pudo cambiar el orden de las imágenes.');
+      try { setImages(await api.productImages(productId)); } catch { /* keep last known gallery */ }
+    } finally { setImageBusy(false); }
+  }
+
   async function removeImage(image) {
     const imageId = image?.id;
     if (!productId || !imageId || imageBusy) return;
@@ -572,12 +609,17 @@ export default function ProductForm({ initialValue, categories, units = [], load
         <div className="product-image-gallery" aria-live="polite">
           {imagesLoading && <p className="form-hint">Cargando imágenes…</p>}
           {!imagesLoading && !images.length && <p className="form-hint">Todavía no hay imágenes adicionales para este producto.</p>}
-          {images.map(image => <article className="product-image-card" key={image.id}>
+          {images.map((image, index) => <article className="product-image-card" key={image.id}>
             <img src={resolveApiUrl(image.imageUrl)} alt={image.altText || form.name || 'Imagen del producto'} loading="lazy" />
             <div className="product-image-card-details">
               <strong>{image.altText || 'Imagen del producto'}</strong>
               {image.primaryImage && <span className="product-image-primary-label"><Star size={12} fill="currentColor"/> Principal</span>}
-              <button type="button" className="text-button danger-text" disabled={imageBusy || loading} onClick={() => removeImage(image)}><Trash2 size={14}/> Quitar imagen</button>
+              <div className="product-image-card-actions">
+                {!image.primaryImage && <button type="button" className="text-button" disabled={imageBusy || loading || productInactive} onClick={() => setPrimaryImage(image)}><Star size={13}/> Hacer principal</button>}
+                <button type="button" className="icon-button ghost" title="Subir imagen" aria-label="Subir imagen" disabled={imageBusy || loading || index === 0} onClick={() => moveImage(image, -1)}><ChevronUp size={15}/></button>
+                <button type="button" className="icon-button ghost" title="Bajar imagen" aria-label="Bajar imagen" disabled={imageBusy || loading || index === images.length - 1} onClick={() => moveImage(image, 1)}><ChevronDown size={15}/></button>
+                <button type="button" className="text-button danger-text" disabled={imageBusy || loading} onClick={() => removeImage(image)}><Trash2 size={14}/> Quitar</button>
+              </div>
             </div>
           </article>)}
         </div>
