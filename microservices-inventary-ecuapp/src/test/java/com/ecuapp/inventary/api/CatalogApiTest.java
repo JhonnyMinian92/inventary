@@ -345,7 +345,7 @@ class CatalogApiTest extends ApiTestSupport {
         assertEquals("image/png", served.getResponse().getContentType());
         assertArrayEquals(imageData, served.getResponse().getContentAsByteArray());
         httpDelete(admin, base + "/" + view.get("id").asText(), 204);
-        assertTrue(httpGet(admin, "/api/v1/catalog/products/" + product.get("id").asText(), 200).get("imageUrl").isNull());
+        assertFalse(httpGet(admin, "/api/v1/catalog/products/" + product.get("id").asText(), 200).hasNonNull("imageUrl"));
         problem(call(get(publicUrl), null, null), 404, "RESOURCE_NOT_FOUND");
 
         MockMultipartFile spoofed = new MockMultipartFile("file", "looks-like.png", "image/png", "this is not a png".getBytes(java.nio.charset.StandardCharsets.UTF_8));
