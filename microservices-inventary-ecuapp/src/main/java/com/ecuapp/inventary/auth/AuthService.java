@@ -34,7 +34,7 @@ public class AuthService {
   this.dummyHash=passwordEncoder.encode(UUID.randomUUID().toString());
  }
  public AuthDtos.LoginChallenge loginChallenge(){return encryption.issueChallenge();}
- @Transactional(readOnly=true)
+ @Transactional
  public AuthDtos.TokenResponse login(AuthDtos.LoginRequest request){
   AuthDtos.Credentials credentials=resolveCredentials(request);
   String username=credentials.username().trim().toLowerCase(Locale.ROOT);
