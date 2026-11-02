@@ -173,6 +173,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
   const [schemaError, setSchemaError] = useState('');
   useEffect(() => { if (schemaError) toast.error(schemaError); }, [schemaError]);
   const [images, setImages] = useState([]);
+  const [imageAltDrafts, setImageAltDrafts] = useState({});
   const [imagesLoading, setImagesLoading] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageFile, setImageFile] = useState(null);
@@ -270,7 +271,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
     setImagesLoading(true);
     setImageError('');
     api.productImages(productId)
-      .then(result => { if (active) setImages(Array.isArray(result) ? result : []); })
+      .then(result => { if (active) { const gallery = Array.isArray(result) ? result : []; setImages(gallery); setImageAltDrafts(Object.fromEntries(gallery.map(image => [image.id, image.altText || '']))); } })
       .catch(error => { if (active) setImageError(error?.message || 'No se pudieron cargar las imágenes del producto.'); })
       .finally(() => { if (active) setImagesLoading(false); });
     return () => { active = false; };
@@ -303,6 +304,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
         primaryImage: imagePrimary || images.length === 0
       });
       setImages(current => [...current, created].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)));
+      setImageAltDrafts(current => ({ ...current, [created.id]: created.altText || '' }));
       setImageFile(null);
       setImageAltText('');
       setImagePrimary(false);
@@ -313,6 +315,22 @@ export default function ProductForm({ initialValue, categories, units = [], load
     } finally {
       setImageBusy(false);
     }
+  }
+
+  async function saveImageAltText(image) {
+    const altText = String(imageAltDrafts[image.id] ?? image.altText ?? '').trim();
+    if (altText === String(image.altText || '') || imageBusy) return;
+    setImageError(''); setImageNotice(''); setImageBusy(true);
+    try {
+      const updated = await api.updateProductImage(productId, image.id, {
+        altText, sortOrder: Number(image.sortOrder || 0), primaryImage: Boolean(image.primaryImage)
+      });
+      setImages(current => current.map(item => String(item.id) === String(image.id) ? updated : item));
+      setImageAltDrafts(current => ({ ...current, [image.id]: updated.altText || '' }));
+      setImageNotice('Texto alternativo guardado.');
+    } catch (error) {
+      setImageError(error?.message || 'No se pudo guardar el texto alternativo.');
+    } finally { setImageBusy(false); }
   }
 
   async function setPrimaryImage(image) {
@@ -345,6 +363,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
       });
       const refreshed = await api.productImages(productId);
       setImages(Array.isArray(refreshed) ? refreshed : []);
+      setImageAltDrafts(Object.fromEntries((Array.isArray(refreshed) ? refreshed : []).map(item => [item.id, item.altText || ''])));
       setImageNotice('Orden de imágenes actualizado.');
     } catch (error) {
       setImageError(error?.message || 'No se pudo cambiar el orden de las imágenes.');
@@ -362,6 +381,7 @@ export default function ProductForm({ initialValue, categories, units = [], load
     try {
       await api.unpublishProductImage(productId, imageId);
       setImages(current => current.filter(item => String(item.id) !== String(imageId)));
+      setImageAltDrafts(current => { const next = { ...current }; delete next[imageId]; return next; });
       setImageNotice('Imagen retirada del catálogo público.');
     } catch (error) {
       setImageError(error?.message || 'No se pudo retirar la imagen.');
@@ -612,8 +632,12 @@ export default function ProductForm({ initialValue, categories, units = [], load
           {images.map((image, index) => <article className="product-image-card" key={image.id}>
             <img src={resolveApiUrl(image.imageUrl)} alt={image.altText || form.name || 'Imagen del producto'} loading="lazy" />
             <div className="product-image-card-details">
-              <strong>{image.altText || 'Imagen del producto'}</strong>
+              <label className="field product-image-alt-field"><span>Texto alternativo</span>
+                <input type="text" maxLength="300" value={imageAltDrafts[image.id] ?? image.altText ?? ''} disabled={imageBusy || loading}
+                  onChange={event => setImageAltDrafts(current => ({ ...current, [image.id]: event.target.value }))} placeholder="Describe la imagen" />
+              </label>
               {image.primaryImage && <span className="product-image-primary-label"><Star size={12} fill="currentColor"/> Principal</span>}
+              {String(imageAltDrafts[image.id] ?? image.altText ?? '').trim() !== String(image.altText || '') && <button type="button" className="text-button" disabled={imageBusy || loading} onClick={() => saveImageAltText(image)}>Guardar texto</button>}
               <div className="product-image-card-actions">
                 {!image.primaryImage && <button type="button" className="text-button" disabled={imageBusy || loading || productInactive} onClick={() => setPrimaryImage(image)}><Star size={13}/> Hacer principal</button>}
                 <button type="button" className="icon-button ghost" title="Subir imagen" aria-label="Subir imagen" disabled={imageBusy || loading || index === 0} onClick={() => moveImage(image, -1)}><ChevronUp size={15}/></button>
