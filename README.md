@@ -16,6 +16,8 @@ Inventary es una aplicación web de EcuApp para administrar catálogo, almacenes
 | Base de datos | PostgreSQL, Flyway V1–V28 | microservices-inventary-ecuapp/src/main/resources/db/migration |
 | Orquestación local | Docker Compose, Nginx, n8n opcional | docker-compose.yml y Compose del backend |
 
+La pantalla de productos y sus límites funcionales están auditados en [Auditoría de Productos](app-inventary-ecuapp/docs/catalog-products-audit.md).
+
 ## Funcionalidades visibles en la aplicación
 
 - Inicio de sesión, sesión JWT, permisos efectivos y navegación protegida por capacidades.
