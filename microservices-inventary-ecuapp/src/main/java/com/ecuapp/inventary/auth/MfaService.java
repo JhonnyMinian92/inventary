@@ -72,6 +72,7 @@ public class MfaService {
         String encrypted=jdbc.query("SELECT secret_ciphertext FROM auth_mfa WHERE user_id=?",
             rs->rs.next()?rs.getString(1):null,user.getId());
         if(encrypted==null||!verify(decrypt(encrypted),code)) {
+            attempts.recordFailure(username);
             metrics.counter("inventary.auth.mfa","outcome","enrollment_failed").increment();
             throw new BusinessRuleException("El código de verificación MFA no es válido.");
         }
@@ -85,8 +86,10 @@ public class MfaService {
         AppUser user=activeUser(username);
         String encrypted=jdbc.query("SELECT secret_ciphertext FROM auth_mfa WHERE user_id=? AND enabled=TRUE",
             rs->rs.next()?rs.getString(1):null,user.getId());
-        if(encrypted==null||!verify(decrypt(encrypted),code))
+        if(encrypted==null||!verify(decrypt(encrypted),code)) {
+            attempts.recordFailure(username);
             throw new BusinessRuleException("El código MFA no es válido.");
+        }
         jdbc.update("DELETE FROM auth_mfa WHERE user_id=?",user.getId());
         user.invalidateTokens();
         audit.record(username,"MFA_DISABLED","APP_USER",user.getId(),Map.of());
