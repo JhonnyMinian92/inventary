@@ -18,5 +18,9 @@ async function encryptedLogin(username, password) {
 export const authApi = {
   login: encryptedLogin,
   logout: () => request('/auth/logout', { method: 'POST' }),
-  me: () => request('/auth/me')
+  me: () => request('/auth/me'),
+  requestPasswordReset: email => request('/auth/password-recovery/request', { method: 'POST', body: { email } }),
+  completePasswordReset: (token, newPassword) => request('/auth/password-recovery/complete', { method: 'POST', body: { token, newPassword } }),
+  setRecoveryEmail: email => request('/auth/me/email', { method: 'PUT', body: { email } }),
+  verifyRecoveryEmail: token => request('/auth/me/email/verify', { method: 'POST', body: { token } })
 };
