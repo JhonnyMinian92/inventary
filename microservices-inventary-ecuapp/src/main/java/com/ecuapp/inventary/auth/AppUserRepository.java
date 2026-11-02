@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.Optional;
 import java.util.UUID;
 public interface AppUserRepository extends JpaRepository<AppUser,UUID> {
- Optional<AppUser> findByUsername(String username);
+ Optional<AppUser> findByUsername(String username);\n Optional<AppUser> findByEmailIgnoreCaseAndEmailVerifiedTrue(String email);\n Optional<AppUser> findByEmailIgnoreCase(String email);
  @Lock(LockModeType.PESSIMISTIC_WRITE)
  @Query("select u from AppUser u where u.id=:id")
  Optional<AppUser> findForUpdate(@org.springframework.data.repository.query.Param("id") UUID id);
