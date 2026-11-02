@@ -41,6 +41,27 @@ class SecurityContractApiTest extends ApiTestSupport {
     }
 
     @Test
+    void taxRatesAreFilteredByTheRequestedEffectiveDate() throws Exception {
+        String code = "TEST_" + suffix();
+        jdbc.update("""
+            insert into tax_rate(id,code,name,percentage,valid_from,valid_until,active)
+            values(?,?,?,?,?,?,true)
+            """, UUID.randomUUID(), code, "Tarifa de prueba", new java.math.BigDecimal("7.5000"),
+            java.sql.Date.valueOf("2020-01-01"), java.sql.Date.valueOf("2020-12-31"));
+
+        String admin = admin();
+        JsonNode inRange = json.readTree(call(get("/api/v1/tax/rates?date=2020-06-15"), admin, null)
+            .getResponse().getContentAsString());
+        JsonNode afterRange = json.readTree(call(get("/api/v1/tax/rates?date=2021-01-01"), admin, null)
+            .getResponse().getContentAsString());
+
+        assertTrue(java.util.stream.StreamSupport.stream(inRange.spliterator(), false)
+            .anyMatch(rate -> code.equals(rate.path("code").asText())), "rate must be returned inside its validity period");
+        assertFalse(java.util.stream.StreamSupport.stream(afterRange.spliterator(), false)
+            .anyMatch(rate -> code.equals(rate.path("code").asText())), "rate must not be returned after its validity period");
+    }
+
+    @Test
     void deactivationPasswordResetAndLogoutRevokeIssuedTokens() {
         String username = createUser("VENDEDOR");
         String first = login(username, PASSWORD);
