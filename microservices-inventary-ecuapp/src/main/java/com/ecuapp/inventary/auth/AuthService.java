@@ -102,6 +102,7 @@ public class AuthService {
   if(request.currentPassword().equals(request.newPassword()))throw new BusinessRuleException("La nueva contraseña debe ser distinta de la actual.");
   passwordPolicy.validateForUser(request.newPassword(),user.getUsername());
   user.updatePasswordHash(passwordEncoder.encode(request.newPassword()));
+  users.consumePendingPasswordResets(user.getId());
   audit.record(username,"USER_PASSWORD_CHANGED","APP_USER",user.getId(),Map.of("username",username));
  }
  private AppUser requireActive(String username){
