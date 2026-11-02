@@ -155,3 +155,7 @@
   .auth-panel { padding: 24px 18px 18px; }
   .auth-label-row { flex-wrap: wrap; }
 }
+
+.auth-error { margin: 0; padding: 10px 12px; border: 1px solid #e6b8b8; border-radius: 10px; background: #fff1f0; color: #9b2424; font-size: 13px; line-height: 1.45; }
+.auth-input input[aria-invalid="true"] { color: #8d2424; }
+@media (prefers-reduced-motion: reduce) { .auth-submit, .auth-input, .auth-check input { transition: none; } }
