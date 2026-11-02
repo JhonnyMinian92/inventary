@@ -132,7 +132,7 @@ public class AccountRecoveryService {
         } catch (RuntimeException failure) {
             metrics.counter("inventary.auth.email","outcome","failed").increment();
             log.error("Authentication email delivery failed; recipient omitted from log",failure);
-            throw failure;
+            // Keep the public response generic to avoid account enumeration; the metric/alert carries the operational signal.
         }
     }
 
