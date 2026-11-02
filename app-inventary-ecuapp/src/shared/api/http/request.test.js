@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getToken, getTokenExpiry, setToken } from './request.js';
+import { getToken, getTokenExpiry, request, setToken } from './request.js';
 
 test('mantiene la sesión durante la pestaña si el navegador bloquea todo almacenamiento', () => {
   const originalSession = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
@@ -56,6 +56,32 @@ test('usa sessionStorage como respaldo si localStorage está bloqueado y se soli
     assert.equal(values.get('inventary.accessToken'), 'remember-fallback-token');
   } finally {
     setToken('');
+    if (originalSession) Object.defineProperty(globalThis, 'sessionStorage', originalSession);
+    else delete globalThis.sessionStorage;
+    if (originalLocal) Object.defineProperty(globalThis, 'localStorage', originalLocal);
+    else delete globalThis.localStorage;
+  }
+});
+
+test('adjunta el token volátil a las peticiones autenticadas', async () => {
+  const originalSession = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  const originalLocal = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const originalFetch = globalThis.fetch;
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, get() { throw new Error('storage blocked'); } });
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('storage blocked'); } });
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.headers.get('Authorization'), 'Bearer volatile-request-token');
+    return new Response(JSON.stringify({ username: 'operator' }), {
+      status: 200, headers: { 'Content-Type': 'application/json' }
+    });
+  };
+  try {
+    setToken('volatile-request-token', { expiresAt: new Date(Date.now() + 60_000).toISOString() });
+    const profile = await request('/auth/me');
+    assert.equal(profile.username, 'operator');
+  } finally {
+    setToken('');
+    globalThis.fetch = originalFetch;
     if (originalSession) Object.defineProperty(globalThis, 'sessionStorage', originalSession);
     else delete globalThis.sessionStorage;
     if (originalLocal) Object.defineProperty(globalThis, 'localStorage', originalLocal);
