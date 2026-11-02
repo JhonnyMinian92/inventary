@@ -12,7 +12,9 @@ import java.util.UUID;
 public interface ProductRepository extends com.ecuapp.inventary.common.FlushableJpaRepository<Product,UUID> {
  boolean existsBySku(String sku);
  boolean existsBySkuIgnoreCase(String sku);
- long countByCategory_IdAndActiveTrue(UUID categoryId);
+ @Query("select p.category.id as categoryId, count(p) as productCount from Product p where p.active=true and p.category.id in :categoryIds group by p.category.id")
+ java.util.List<CategoryProductCount> countActiveByCategoryIds(@Param("categoryIds") java.util.Collection<UUID> categoryIds);
+ interface CategoryProductCount { UUID getCategoryId(); Long getProductCount(); }
  Optional<Product> findBySkuIgnoreCase(String sku);
  boolean existsByUnitOfMeasureIdAndActiveTrue(UUID unitOfMeasureId);
  boolean existsByUnitOfMeasureId(UUID unitOfMeasureId);
